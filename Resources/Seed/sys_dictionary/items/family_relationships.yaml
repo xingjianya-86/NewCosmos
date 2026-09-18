@@ -1,0 +1,17 @@
+# 家庭关系字典（固定 ID）
+# 分类 ID=10，字典项 ID 范围: 10001-10999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 10001, category: "FamilyRelationships", item_key: "Head", item_value: "本人/户主", sort_order: 1, is_active: true }
+      - { id: 10002, category: "FamilyRelationships", item_key: "Spouse", item_value: "配偶", sort_order: 2, is_active: true }
+      - { id: 10003, category: "FamilyRelationships", item_key: "Son", item_value: "子/婿", sort_order: 3, is_active: true }
+      - { id: 10004, category: "FamilyRelationships", item_key: "Daughter", item_value: "女/媳", sort_order: 4, is_active: true }
+      - { id: 10005, category: "FamilyRelationships", item_key: "Grandchild", item_value: "孙子女/外孙子女", sort_order: 5, is_active: true }
+      - { id: 10006, category: "FamilyRelationships", item_key: "Parent", item_value: "父母/岳父母/公婆", sort_order: 6, is_active: true }
+      - { id: 10007, category: "FamilyRelationships", item_key: "Grandparent", item_value: "祖父母/外祖父母", sort_order: 7, is_active: true }
+      - { id: 10008, category: "FamilyRelationships", item_key: "Sibling", item_value: "兄弟姐妹", sort_order: 8, is_active: true }
+      - { id: 10009, category: "FamilyRelationships", item_key: "Other", item_value: "其他", sort_order: 9, is_active: true }

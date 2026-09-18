@@ -1,0 +1,154 @@
+# 一事一议审批Schema定义
+database: 一事一议
+version: 2.0
+description: 一事一议特殊审批记录 - 记录特殊情况下的救助审批（会议/纪要/豁免）
+
+tables:
+  # ── 一事一议审批记录表 ──
+  - name: nc_biz_special_approvals
+    comment: "[流程] 一事一议审批记录表 - 记录特殊情况下的救助审批（会议信息/豁免理由/审批结果）"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: meeting_date
+        type: date
+        nullable: true
+        comment: 会议日期
+      - name: meeting_location
+        type: character varying(200)
+        nullable: true
+        comment: 会议地点
+      - name: meeting_topic
+        type: character varying(500)
+        nullable: true
+        comment: 会议议题
+      - name: meeting_summary
+        type: text
+        nullable: true
+        comment: 会议摘要/纪要内容
+      - name: meeting_members
+        type: text
+        nullable: true
+        comment: 参会人员名单
+      - name: special_reason
+        type: text
+        nullable: true
+        comment: 豁免理由说明
+      - name: special_circumstances
+        type: text
+        nullable: true
+        comment: 特殊情况详细说明
+      - name: override_classification
+        type: character varying(100)
+        nullable: false
+        comment: 指定分类代码，如RuralSubsistence、UrbanLowIncome
+      - name: approver_name
+        type: character varying(100)
+        nullable: true
+        comment: 审批人姓名
+      - name: approver_title
+        type: character varying(100)
+        nullable: true
+        comment: 审批人职务
+      - name: approver_organization
+        type: character varying(200)
+        nullable: true
+        comment: 审批人所属单位
+      - name: attachment_file
+        type: character varying(500)
+        nullable: true
+        comment: 会议纪要附件路径
+      - name: created_by
+        type: character varying(100)
+        nullable: true
+        comment: 创建人用户名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+
+  # ── 一事一议申报表 ──
+  - name: nc_biz_special_approval_forms
+    comment: "[流程] 一事一议申报表 - 申请救助家庭的申报信息（基本情况/特殊事项/审核结果）"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: form_no
+        type: character varying(64)
+        nullable: true
+        comment: 申报表编号
+      - name: basic_situation
+        type: text
+        nullable: true
+        comment: 申请救助家庭基本情况
+      - name: special_matters
+        type: text
+        nullable: true
+        comment: '一事一议事项事由/特殊情况说明'
+      - name: template_key
+        type: character varying(100)
+        nullable: true
+        comment: 所选预案模板key（追溯使用频率）
+      - name: report_unit
+        type: character varying(200)
+        nullable: true
+        comment: 填报单位
+      - name: handler_name
+        type: character varying(100)
+        nullable: true
+        comment: 经办人员姓名
+      - name: form_date
+        type: date
+        nullable: true
+        comment: 填报时间
+      - name: audit_result
+        type: character varying(100)
+        nullable: true
+        comment: 乡镇民政办审核结果（拟（{审核结果}）纳入一事一议决策范围）
+      - name: audit_date
+        type: date
+        nullable: true
+        comment: 审核日期
+      - name: status
+        type: character varying(30)
+        nullable: true
+        defaultValue: Draft
+        comment: 申报表状态：Draft草稿/Submitted已提交/Approved审议通过/Rejected审议驳回
+      - name: created_by
+        type: character varying(100)
+        nullable: true
+        comment: 创建人用户名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）

@@ -1,0 +1,436 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.SocialAssistance.FormSteps.ApplicationFormStep5View"
+             x:Name="StepRoot"
+             x:DataType="ApplicationFormViewModel">
+
+    <!-- Step5: 分类认定 — 从 ApplicationFormPage.xaml 提取；可见性由宿主页面按 CurrentStep 懒加载控制 -->
+    <VerticalStackLayout Spacing="16">
+
+        <!-- 分类判定按钮 -->
+        <Border Style="{StaticResource CardBorder}" Margin="0,4">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <Label Text="🔍 分类判定" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="重新判定" Style="{StaticResource ButtonOutline}"
+                            HeightRequest="40" Padding="16,0"
+                            Command="{Binding ResetClassificationCommand}"
+                            IsVisible="{Binding IsClassificationDone}"
+                            IsEnabled="{Binding IsClassificationLocked, Converter={StaticResource BoolToInverseConverter}}"/>
+                    <Button Grid.Column="2" Text="执行判定" Style="{StaticResource ButtonPrimary}"
+                            HeightRequest="40" Padding="20,0"
+                            Command="{Binding DetermineClassificationCommand}"
+                            IsVisible="{Binding IsClassificationLocked, Converter={StaticResource BoolToInverseConverter}}"
+                            IsEnabled="{Binding IsDetermining, Converter={StaticResource BoolToInverseConverter}}"/>
+                </Grid>
+                <ActivityIndicator IsRunning="{Binding IsDetermining}" IsVisible="{Binding IsDetermining}"
+                                   Color="{StaticResource Primary}" HeightRequest="24"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 特困供养信息（仅当分类结果为特困时显示） -->
+        <Border Style="{StaticResource CardBorder}" Margin="0,4"
+                IsVisible="{Binding IsDestituteClassification}">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="12">
+                <Label Text="🏠 特困供养信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                <!-- 供养方式选择 -->
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Text="供养方式" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding SupportModeOptions}"
+                            SelectedItem="{Binding SelectedSupportModeObj}"
+                            ItemDisplayBinding="{Binding Display}"
+                            HeightRequest="38" FontSize="16"/>
+                    <Button Grid.Column="2" Text="更新" Style="{StaticResource ButtonOutline}"
+                            HeightRequest="34" Padding="12,0"
+                            Command="{Binding UpdateSupportModeCommand}"/>
+                </Grid>
+
+                <!-- 供养机构选择（仅集中供养时显示） -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12"
+                      IsVisible="{Binding IsCentralizedSupport}">
+                    <Label Text="供养机构" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding InstitutionOptions}"
+                            SelectedItem="{Binding SelectedInstitution}"
+                            ItemDisplayBinding="{Binding Name}"
+                            HeightRequest="38" FontSize="16"/>
+                </Grid>
+
+                <!-- 机构详情（选中机构后显示） -->
+                <Border Padding="12" StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0"
+                        IsVisible="{Binding HasSelectedInstitution}">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding SelectedInstitution.Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Success}"/>
+                            <Label Text="{Binding SelectedInstitution.Address}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SelectedInstitution.Phone}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="{Binding SelectedInstitutionFeeDisplay}" FontSize="14" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding SelectedInstitutionBedDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- 照料人信息 -->
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label Text="🤝 照料人信息" FontSize="15" FontAttributes="Bold" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="+ 照料人" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="10,0" FontSize="16"
+                            Command="{Binding AddCaregiverCommand}"/>
+                </Grid>
+                <CollectionView ItemsSource="{Binding Caregivers}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无照料人，点击右上角“+ 照料人”添加" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:Caregiver">
+                            <Border Padding="12" Margin="0,4" StrokeShape="RoundRectangle 8"
+                                    BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                <VerticalStackLayout Spacing="0">
+                                    <!-- 分区1：个人信息 -->
+                                    <VerticalStackLayout Spacing="8" Padding="0,8">
+                                        <HorizontalStackLayout Spacing="8">
+                                            <Label Text="👤 个人信息" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                        </HorizontalStackLayout>
+                                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                                        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4">
+                                            <Label Text="家庭关系" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="1" ItemsSource="{Binding BindingContext.MemberRelationOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding Relationship}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="2" Text="姓名" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="3" Text="{Binding Name}" HeightRequest="38" FontSize="16" Placeholder=""/>
+                                            <Label Grid.Column="4" Text="身份证号" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="5" Text="{Binding IdCard}" HeightRequest="38" FontSize="16" Placeholder=""
+                                                   TextChanged="OnCaregiverIdCardChanged"/>
+                                            <Label Grid.Column="6" Text="性别+年龄" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="7" Text="{Binding GenderAgeDisplay}" IsReadOnly="True"
+                                                   HeightRequest="38" FontSize="16" BackgroundColor="{StaticResource Gray100}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4">
+                                            <Label Text="联系方式" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="1" Text="{Binding Phone}" HeightRequest="38" FontSize="16" Placeholder="" Keyboard="Telephone"/>
+                                            <Label Grid.Column="2" Text="民族" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="3" ItemsSource="{Binding BindingContext.EthnicityOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedEthnicity}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="4" Text="婚姻状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="5" ItemsSource="{Binding BindingContext.MaritalStatusOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedMaritalStatus}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="6" Text="文化程度" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="7" ItemsSource="{Binding BindingContext.EducationLevelOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedEducationLevel}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="8" Text="政治面貌" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="9" ItemsSource="{Binding BindingContext.PoliticalStatusOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedPoliticalStatus}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                    <!-- 分区2：健康状况 -->
+                                    <VerticalStackLayout Spacing="8" Padding="0,8">
+                                        <HorizontalStackLayout Spacing="8">
+                                            <Label Text="🏥 健康状况" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                        </HorizontalStackLayout>
+                                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                                        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4">
+                                            <Label Text="健康状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="1" ItemsSource="{Binding BindingContext.HealthStatusOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedHealthStatus}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="2" Text="就业状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="3" ItemsSource="{Binding BindingContext.EmploymentStatusOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedEmploymentStatus}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="4" Text="收入来源" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Picker Grid.Column="5" ItemsSource="{Binding BindingContext.IncomeSourceOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedIncomeSource}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="16"/>
+                                            <Label Grid.Column="6" Text="工作单位" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="7" Text="{Binding WorkUnit}" HeightRequest="38" FontSize="16" Placeholder="" Grid.ColumnSpan="5"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                    <!-- 删除按钮 -->
+                                    <HorizontalStackLayout Spacing="8" HorizontalOptions="End" Padding="0,8">
+                                        <Button Text="删除" Style="{StaticResource ButtonDanger}"
+                                                HeightRequest="34" Padding="16,0" FontSize="16"
+                                                Command="{Binding BindingContext.RemoveCaregiverCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"/>
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 判定结果 -->
+        <Border Style="{StaticResource CardBorder}" Margin="0,4"
+                IsVisible="{Binding IsClassificationDone}">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="10">
+                <Label Text="📊 判定结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                
+                <!-- 分类结果 -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowSpacing="8">
+                    <Label Text="分类结果" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding ClassificationDescription}" 
+                           FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowSpacing="8">
+                    <Label Text="是否符合" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" VerticalOptions="Center"
+                           TextColor="{Binding IsEligible, Converter={StaticResource BoolToColorConverter}}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="{Binding IsEligible, Converter={StaticResource BoolToTextConverter}, ConverterParameter='符合|不符合'}" 
+                                      FontAttributes="Bold" FontSize="16"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </Grid>
+
+                <!-- 不符合原因 -->
+                <Border Padding="12" BackgroundColor="{StaticResource DangerSoft}" StrokeShape="RoundRectangle 8" StrokeThickness="0"
+                        IsVisible="{Binding IsEligible, Converter={StaticResource BoolToInverseConverter}}">
+                    <Label Text="{Binding IneligibleReason}" FontSize="15" TextColor="{StaticResource Error}"/>
+                </Border>
+
+                <!-- 一事一议入口（判定不符合时显示；补全模式不显示，见 OpenSpecialApprovalAsync 拦截） -->
+                <VerticalStackLayout IsVisible="{Binding IsNotCompletionMode}">
+                    <Border Padding="12" BackgroundColor="{StaticResource WarningSoft}" Stroke="{StaticResource Accent}"
+                            StrokeThickness="1" StrokeShape="RoundRectangle 8"
+                            IsVisible="{Binding IsEligible, Converter={StaticResource BoolToInverseConverter}}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="4">
+                            <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
+                                <Label Text="⚠️ 不符合常规认定条件？" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                <Label Text="可通过「一事一议」程序申报，由乡镇集体研究决定是否纳入救助。" FontSize="13" TextColor="{StaticResource WarningDark}"/>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="发起一事一议" Style="{StaticResource WarningButton}"
+                                    HeightRequest="38" Padding="16,0" FontSize="15"
+                                    Command="{Binding OpenSpecialApprovalCommand}"/>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- 保障金额卡片 -->
+                <Border Style="{StaticResource CardBorder}" Margin="0,4">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="💰 保障金额" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                <Label Text="月保障金额" Style="{StaticResource FormFieldLabelStyle}" HorizontalOptions="Center"/>
+                                <Label Text="{Binding GuaranteeAmount, StringFormat='{0:N0} 元'}" 
+                                       FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}" 
+                                       HorizontalOptions="Center" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4" HorizontalOptions="Center">
+                                <Label Text="照料护理费" Style="{StaticResource FormFieldLabelStyle}" HorizontalOptions="Center"/>
+                                <Label Text="{Binding CaregiverSubsidyAmount, StringFormat='{0:N0} 元'}" 
+                                       FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Accent}" 
+                                       HorizontalOptions="Center" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="4" HorizontalOptions="Center">
+                                <Label Text="分类施保" Style="{StaticResource FormFieldLabelStyle}" HorizontalOptions="Center"/>
+                                <Label Text="{Binding ClassifiedSubsidyAmount, StringFormat='{0:N0} 元'}" 
+                                       FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Success}" 
+                                       HorizontalOptions="Center" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4" HorizontalOptions="Center">
+                                <Label Text="合计保障" Style="{StaticResource FormFieldLabelStyle}" HorizontalOptions="Center"/>
+                                <Label Text="{Binding TotalGuaranteeAmount, StringFormat='{0:N0} 元'}" 
+                                       FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Warning}" 
+                                       HorizontalOptions="Center" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 分类施保详情 -->
+                <Border Padding="12" BackgroundColor="{StaticResource SuccessSoft}" StrokeShape="RoundRectangle 8" StrokeThickness="0"
+                        IsVisible="{Binding ClassifiedSubsidyCount, Converter={StaticResource IntToBoolConverter}}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="分类施保详情" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource Success}"/>
+                        <Label FontSize="15" TextColor="{StaticResource TextPrimary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="符合条件类型: "/>
+                                    <Span Text="{Binding ClassifiedSubsidyTypes}" FontAttributes="Bold"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                        <Label FontSize="15" TextColor="{StaticResource TextPrimary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="符合条件人数: "/>
+                                    <Span Text="{Binding ClassifiedSubsidyCount}" FontAttributes="Bold"/>
+                                    <Span Text=" 人"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                        <Label FontSize="15" TextColor="{StaticResource TextPrimary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="每人标准: "/>
+                                    <Span Text="{Binding ClassifiedSubsidyPerPerson, StringFormat='{0:N0}'}" FontAttributes="Bold"/>
+                                    <Span Text=" 元"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Border>
+
+<!-- 渐退期状态 -->
+                <Border Style="{StaticResource CardBorder}" Margin="0,4"
+                        IsVisible="{Binding IsInGracePeriod}">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="🔄 渐退期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="渐退期月数" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="原保障金额" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding OriginalGuaranteeAmount, StringFormat='{0:N0} 元'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="渐退开始" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding GracePeriodStartDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="状态" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding GracePeriodStatusText}" FontSize="15" TextColor="{StaticResource Warning}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 判定依据 -->
+                <Border Style="{StaticResource CardBorder}" Margin="0,4"
+                        IsVisible="{Binding IsClassificationDone}">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="10">
+                <Label Text="📋 判定依据" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                <Label Text="{Binding DeterminationBasis}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                
+                <!-- 判定详情 -->
+                <CollectionView ItemsSource="{Binding DeterminationDetails}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无判定明细" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Border Padding="8" Margin="0,2" StrokeShape="RoundRectangle 6"
+                                    BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                <Label Text="{Binding .}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 单人保提示 -->
+                <Border Padding="12" Margin="0,8,0,0" StrokeShape="RoundRectangle 8"
+                        BackgroundColor="{StaticResource WarningSoft}" Stroke="{StaticResource Accent}" StrokeThickness="1"
+                        IsVisible="{Binding NeedsSingleRescueDraft}">
+                    <Grid ColumnDefinitions="*,Auto" RowSpacing="8">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4">
+                            <Label Text="⚠️ 单人保提示" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                            <Label Text="{Binding SingleRescueHint}" FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="创建单人保" Style="{StaticResource ButtonPrimary}"
+                                HeightRequest="36" Padding="12,0" FontSize="14"
+                                BackgroundColor="{StaticResource Accent}"
+                                Command="{Binding CreateSingleRescueDraftCommand}"/>
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 能力鉴定（仅特困分类显示） -->
+        <Border Style="{StaticResource CardBorder}" Margin="0,4"
+                IsVisible="{Binding IsDestituteClassification}">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource ShadowLight}" Offset="0,2" Radius="6" Opacity="0.15"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="📋 能力鉴定（六项考核指标）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                    <Button Grid.Column="1" Text="编辑" Style="{StaticResource ButtonOutline}"
+                            HeightRequest="32" Padding="12,0"
+                            Command="{Binding EditCapabilityAssessmentCommand}"/>
+                </Grid>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                <!-- 快速预览：六项指标 -->
+                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="进食" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityEatingStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                    <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="穿衣" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityDressingStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                    <Grid Grid.Column="2" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="上下床" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityBedStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="如厕" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityToiletStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                    <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="室内行走" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityWalkingStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                    <Grid Grid.Row="1" Grid.Column="2" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                        <Label Text="洗澡" FontSize="13" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                        <Label Grid.Column="1" Text="{Binding CapabilityBathingStatus}" FontSize="13" FontAttributes="Bold"
+                               VerticalOptions="Center" HorizontalOptions="End" LineBreakMode="NoWrap"/>
+                    </Grid>
+                </Grid>
+
+                <!-- 评估结果摘要 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="能完成项目数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CapabilityCompletedItems, StringFormat='{0}/6 项'}" FontSize="16" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="自理能力等级" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CapabilitySelfCareLevel}" FontSize="16" FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+    </VerticalStackLayout>
+
+</ContentView>

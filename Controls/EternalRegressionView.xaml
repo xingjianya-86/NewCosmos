@@ -1,0 +1,193 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Controls.EternalRegressionView">
+
+    <!-- 全屏半透明背景层。关联布局：行=Auto(顶部)/*(中间)/Auto(底部) 由 Grid 联动；
+         中间标题/聚焦层全宽几何居中，右侧面板靠右，窗口缩放按比例伸缩不重叠。 -->
+    <Grid BackgroundColor="#CC070D18" RowDefinitions="Auto,*,Auto">
+
+        <!-- 底层：CRT 扫描线 + 噪点（铺满整个根区域） -->
+        <GraphicsView x:Name="MatrixView" InputTransparent="True" Grid.RowSpan="3"/>
+
+        <!-- 顶部：整体进度条（当前轮回） -->
+        <Border Grid.Row="0" VerticalOptions="Start" Margin="28,18,28,0" BackgroundColor="#A6000000"
+                StrokeThickness="1" Stroke="#3C33C0C0" StrokeShape="RoundRectangle 10" Padding="16,8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                <ProgressBar x:Name="TotalProgress" Progress="0" ProgressColor="#40E0E0" HeightRequest="8"
+                             VerticalOptions="Center"/>
+                <Label Grid.Column="1" x:Name="TotalProgressLabel" Text="00%" FontSize="15" FontFamily="Consolas"
+                       TextColor="#D0F8F8" VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- 中间偏上：标题 + 剩余轮回计数器（全宽几何居中） -->
+        <Border Grid.Row="1" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,24,0,0"
+                MaximumWidthRequest="820" BackgroundColor="#A6000000"
+                StrokeThickness="1" Stroke="#3C33C0C0" StrokeShape="RoundRectangle 16" Padding="32,18">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="翁法罗斯 · 永劫回归 · 数据删除" FontSize="28" FontAttributes="Bold"
+                       TextColor="#F5F5F5" HorizontalOptions="Center"/>
+                <Label Text="正 在 删 除 核 心 数 据" FontSize="15" FontFamily="Consolas"
+                       TextColor="#C0F0F0" HorizontalOptions="Center" Margin="0,12,0,0"/>
+                <Label x:Name="CounterLabel" Text="33,550,336" FontSize="54" FontAttributes="Bold"
+                       FontFamily="Consolas" TextColor="#E8FFF8" LineBreakMode="NoWrap" HorizontalOptions="Center"/>
+                <Label x:Name="CounterSubLabel" Text="每轮 13 人删除完毕 -1" FontSize="14"
+                       FontFamily="Consolas" TextColor="#A0E8F0" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 右侧区域：泰坦火种（上）+ 系统日志（下），靠右对齐，整体高度受内容约束 -->
+        <Grid Grid.Row="1" HorizontalOptions="End" VerticalOptions="Start" Margin="0,24,28,24"
+              WidthRequest="480" RowDefinitions="Auto,Auto" RowSpacing="14">
+
+            <!-- 泰坦火种（逐项闪烁） -->
+            <Border Grid.Row="0" BackgroundColor="#73000000" StrokeThickness="1" Stroke="#3C33C0C0"
+                    StrokeShape="RoundRectangle 12" Padding="16,12">
+                <VerticalStackLayout Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="泰坦火种  ▼RECALL" FontSize="14" FontFamily="Consolas" TextColor="#B8E8E8"/>
+                        <Label Grid.Column="1" x:Name="TitanPanelSub" Text="0/12" FontSize="12" FontFamily="Consolas"
+                               TextColor="#D0F0F0"/>
+                    </Grid>
+                    <CollectionView x:Name="TitanList" SelectionMode="None" ItemSizingStrategy="MeasureAllItems"
+                                    VerticalScrollBarVisibility="Never" MaximumHeightRequest="290">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="EternalTitanRow">
+                                <Grid ColumnDefinitions="Auto,*,Auto" Padding="0,2.5">
+                                    <Label Text="{Binding Code}" FontSize="12" FontFamily="Consolas"
+                                           TextColor="{Binding StatusColor}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="{Binding Name}" FontSize="14" FontFamily="Consolas"
+                                           TextColor="{Binding StatusColor}" VerticalOptions="Center" Margin="6,0,0,0"/>
+                                    <Label Grid.Column="2" Text="{Binding StatusText}" FontSize="11" FontFamily="Consolas"
+                                           TextColor="#D0D0D0" VerticalOptions="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 系统日志（泰坦下方，高度受限，超出滚动） -->
+            <Border Grid.Row="1" BackgroundColor="#80000000" StrokeThickness="1" Stroke="#3C33C0C0"
+                    StrokeShape="RoundRectangle 12" Padding="14,12">
+                <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                    <Label Text="SYSTEM LOG" FontSize="13" FontFamily="Consolas" TextColor="#A8E8F0"/>
+                    <CollectionView x:Name="LogList" Grid.Row="1" SelectionMode="None"
+                                    ItemSizingStrategy="MeasureAllItems" VerticalScrollBarVisibility="Default"
+                                    MaximumHeightRequest="420">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="EternalLogLine">
+                                <Label Text="{Binding Text}" FontSize="14" FontFamily="Consolas"
+                                       TextColor="{Binding Color}" LineBreakMode="NoWrap" Padding="0,1.5"/>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 聚焦层：当前删除角色特写（全宽几何居中，底部；快速清除与目标进度上下罗列） -->
+        <Grid x:Name="FocusLayer" Grid.Row="1" IsVisible="False"
+              BackgroundColor="#B0050A14" InputTransparent="True" VerticalOptions="End">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,20"
+                                 Spacing="24" MaximumWidthRequest="560">
+
+                <!-- 上栏：快速清除进度（随机文件名，快速刷屏） -->
+                <Border BackgroundColor="#B3000000" StrokeThickness="1" Stroke="#3C33C0C0"
+                        StrokeShape="RoundRectangle 14" Padding="22,14">
+                    <VerticalStackLayout Spacing="8" WidthRequest="380">
+                        <Label Text="◈ 快速清除 // FAST PURGE" FontSize="13" FontFamily="Consolas"
+                               TextColor="#A8E8F0"/>
+                        <ProgressBar x:Name="QuickProgress" ProgressColor="#40E0E0" HeightRequest="8"/>
+                        <Label x:Name="QuickFileName" FontSize="13" FontFamily="Consolas" TextColor="#C0F0F0"
+                               LineBreakMode="NoWrap"/>
+                        <Label x:Name="QuickSub" FontSize="11" FontFamily="Consolas" TextColor="#90B8C0"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 中栏：焦点卡片（人名） -->
+                <Border BackgroundColor="#B3000000" StrokeThickness="1" Stroke="#5C40E0E0"
+                        StrokeShape="RoundRectangle 18" Padding="36,22">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="▼ 数据删除进行中 ▼" FontSize="14" FontFamily="Consolas" TextColor="#FF9090"
+                               HorizontalOptions="Center"/>
+                        <Label x:Name="FocusSignal" FontSize="60" FontAttributes="Bold" FontFamily="Consolas"
+                               TextColor="#E8FFF8" HorizontalOptions="Center"/>
+                        <Label x:Name="FocusName" FontSize="40" FontAttributes="Bold" FontFamily="Consolas"
+                               TextColor="#FFFFFF" HorizontalOptions="Center"/>
+                        <Label x:Name="FocusFullName" FontSize="17" FontFamily="Consolas" TextColor="#D0F4F4"
+                               HorizontalOptions="Center"/>
+                        <Label x:Name="FocusLine" FontSize="18" FontFamily="Consolas" TextColor="#FFD970"
+                               HorizontalOptions="Center" HorizontalTextAlignment="Center" LineBreakMode="WordWrap"
+                               MaximumWidthRequest="700"/>
+                        <Label x:Name="FocusSub" FontSize="15" FontFamily="Consolas" TextColor="#A0E8F0"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 下栏：目标进度（当前人单独进度 + 长路径） -->
+                <Border BackgroundColor="#B3000000" StrokeThickness="1" Stroke="#3C33C0C0"
+                        StrokeShape="RoundRectangle 14" Padding="22,14">
+                    <VerticalStackLayout Spacing="8" WidthRequest="380">
+                        <Label Text="◈ 目标进度 // TARGET" FontSize="13" FontFamily="Consolas"
+                               TextColor="#A8E8F0"/>
+                        <Label x:Name="TargetPath" FontSize="12" FontFamily="Consolas" TextColor="#D0F4F4"
+                               LineBreakMode="NoWrap"/>
+                        <ProgressBar x:Name="TargetProgress" ProgressColor="#40E0E0" HeightRequest="8"/>
+                        <Label x:Name="TargetSub" FontSize="11" FontFamily="Consolas" TextColor="#A0E8F0"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- 底部：13 人角色进度条（单行横排） -->
+        <Border Grid.Row="2" VerticalOptions="End" HorizontalOptions="Fill" Margin="28,10,28,16" BackgroundColor="#A6000000"
+                StrokeThickness="1" Stroke="#3C33C0C0" StrokeShape="RoundRectangle 12" Padding="16,10">
+            <VerticalStackLayout Spacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="黄金裔档案  ▼DELETING" FontSize="14" FontFamily="Consolas" TextColor="#B8E8E8"/>
+                    <Label Grid.Column="1" x:Name="HeirPanelSub" Text="0/13" FontSize="13" FontFamily="Consolas"
+                           TextColor="#D0F0F0"/>
+                </Grid>
+                <CollectionView x:Name="HeirList" ItemsLayout="HorizontalList" SelectionMode="None"
+                                ItemSizingStrategy="MeasureAllItems" VerticalScrollBarVisibility="Never"
+                                HeightRequest="62">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="EternalHeirRow">
+                            <VerticalStackLayout WidthRequest="142" Spacing="2">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                    <Label Text="{Binding Signal}" FontSize="12" FontFamily="Consolas"
+                                           TextColor="{Binding SignalColor}" LineBreakMode="NoWrap"/>
+                                    <Label Grid.Column="1" Text="{Binding StatusText}" FontSize="10" FontFamily="Consolas"
+                                           TextColor="#FF9090"/>
+                                </Grid>
+                                <Label Text="{Binding Name}" FontSize="15" FontFamily="Consolas"
+                                       TextColor="{Binding NameColor}" LineBreakMode="NoWrap"/>
+                                <ProgressBar Progress="{Binding Progress}" ProgressColor="{Binding ProgressColor}"
+                                             HeightRequest="6"/>
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 终结层：永劫归零 -->
+        <Grid x:Name="EndingLayer" IsVisible="False" BackgroundColor="#D0050A14" InputTransparent="True">
+            <Border HorizontalOptions="Center" VerticalOptions="Center" BackgroundColor="#B3000000"
+                    StrokeThickness="1" Stroke="#5C40E0E0" StrokeShape="RoundRectangle 18" Padding="36,24">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="永劫归零" FontSize="52" FontAttributes="Bold" FontFamily="Consolas"
+                           TextColor="#FFE0E0" HorizontalOptions="Center"/>
+                    <Label x:Name="EndingTextLabel" FontSize="16" FontFamily="Consolas" TextColor="#E0D0D0"
+                           HorizontalOptions="Center" HorizontalTextAlignment="Center" LineBreakMode="WordWrap"/>
+                    <Label Text="等待自动再创世…" FontSize="14" FontFamily="Consolas" TextColor="#90D0D0"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+    </Grid>
+</ContentView>

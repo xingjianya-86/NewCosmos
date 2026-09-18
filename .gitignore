@@ -1,0 +1,128 @@
+# Build output
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.ncb
+*.aps
+*.cachefile
+*.pidb
+*.pdb
+
+# Rider
+.idea/
+*.sln.iml
+
+# NuGet
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nupkg
+**/packages/repositories.config
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# .NET
+*.log
+TestResult.xml
+*.trx
+*.coverage
+*.coveragexml
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Publish output
+publish/
+
+# Runtime generated reports
+reportfiles/
+
+# Business data
+2025年民政数据/
+津贴对象.xlsx
+
+# Database config (contains sensitive credentials)
+config/database.ini
+!config/database.ini.example
+
+# 网络接入/在线更新配置（含内网标识与更新服务器地址，不入公开库）
+config/network.ini
+config/update.ini
+
+# 本地代理连接信息（含内网主机/凭据，不入公开库）
+AGENTS.local.md
+
+# 一次性运维脚本（含内网地址与历史凭据；如需公开请先脱敏）
+Scripts/
+
+# 内部运维/排障文档（含服务器地址、SSH 与网络拓扑）
+docs/20260918_在线更新系统.md
+docs/20260918_网络接入排障.md
+
+# 公文商用字体（授权限制，使用方自备系统字体或自行获取）
+公文字体/
+
+# Python 运行时（体积大，非应用运行必需）
+python-embed/
+
+# 第三方二进制（自行获取：PostgreSQL 客户端 / ZeroTier 安装包）
+Resources/PostgreSQL/
+Resources/ZeroTier/
+
+# 手工备份目录（git 启用后由版本历史取代）
+backup/
+backups/
+*.back
+*.backup
+*.bak
+*.bak_*
+
+# 生成的公示文件与含公民数据的散落文件（PII 不入库）
+输出/
+06社会救助对象长期公示单（竖版）.xlsx
+*.rar
+
+# 模板素材副本目录（权威目录为 Templates_NEW，由用户裁决）
+Templates_NEW - 副本/
+
+# 个人 AI 工具残留（与项目无关）
+dream_query.py
+query_db.py
+.mimocode/
+.opencode/
+.claude/

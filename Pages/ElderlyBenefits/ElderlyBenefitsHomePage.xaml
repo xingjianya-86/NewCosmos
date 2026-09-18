@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyBenefitsHomePage"
+             x:DataType="ElderlyBenefitsHomeViewModel"
+             Title="高龄津贴发放"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 返回行 -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 标题与职责 -->
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="高龄津贴发放" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="80 周岁以上老年人津贴申请登记 · 停发管理 · 类别复核 · 月度报表" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 模块统计栏 -->
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享领取（人）"/>
+                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyNewText}" Caption="本月新增登记（人）"/>
+
+                            <Border Grid.Column="2" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                    BackgroundColor="Transparent" Padding="0">
+                                <components:StatCapsule Value="{Binding PendingNewText}" Caption="待新增（人）"/>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+
+                            <Border Grid.Column="3" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                    BackgroundColor="Transparent" Padding="0">
+                                <components:StatCapsule Value="{Binding PendingTransferText}" Caption="需停旧增新（人）"/>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 子功能卡片区 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="业务办理" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+
+                        <!-- 申请登记 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE710;"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="津贴申请登记" Description="受理登记、审核确认高龄津贴申请"
+                                                Command="{Binding OpenApplicationListCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
+                        <!-- 停发办理 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE738;"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="停发办理" Description="死亡、户籍迁出等情形停发处理"
+                                                Command="{Binding OpenStopListCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
+                        <!-- 月报表 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE81E;"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="高龄津贴月报表" Description="按月生成、导出发放统计报表"
+                                                Command="{Binding OpenMonthlyReportCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
+                        <!-- 后补追缴 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="&#xE8D1;"
+                                                IconBackgroundColor="#FFF3E0" IconColor="{StaticResource WarningDark}"
+                                                Title="后补追缴" Description="高龄津贴的后补追缴"
+                                                Command="{Binding OpenRecoveryCommand}"/>
+
+                        <!-- 高龄津贴复核 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE9D5;"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="高龄津贴复核" Description="身份/年龄重评，停旧增新并打印三表"
+                                                Command="{Binding OpenReviewListCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
+                    </Grid>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

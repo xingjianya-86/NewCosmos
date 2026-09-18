@@ -1,0 +1,333 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ChangeManagement.ChangePage"
+             x:DataType="ChangeViewModel"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 变更历史列表 交替行色（白 / #F8F9FA） -->
+        <DataTemplate x:Key="ChangeHistoryEvenRow" x:DataType="chg:ChangeRecord">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="White">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding ChangeType}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ChangeReason}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="ChangeHistoryOddRow" x:DataType="chg:ChangeRecord">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding ChangeType}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ChangeReason}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="ChangeHistorySelector"
+            EvenTemplate="{StaticResource ChangeHistoryEvenRow}"
+            OddTemplate="{StaticResource ChangeHistoryOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（绿色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="保障对象动态管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="户主变更、成员增减、死亡减员" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- 统计栏 -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding MonthlyChangesText}" Caption="本月变更（笔）"/>
+                    <components:StatCapsule Grid.Column="2" Value="{Binding GraceExpiringText}" Caption="渐退期临期（户）"/>
+                </Grid>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 选择档案 -->
+                <Border Style="{StaticResource CardBorder}" Padding="20">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="选择档案" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Entry Placeholder="输入姓名或身份证号搜索档案"
+                                   Text="{Binding SearchKeyword}"
+                                   ReturnCommand="{Binding SearchApplicationsCommand}"
+                                   ClearButtonVisibility="WhileEditing"/>
+                            <Button Grid.Column="1" Text="搜索" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding SearchApplicationsCommand}" MinimumWidthRequest="88"/>
+                        </Grid>
+                        <CollectionView ItemsSource="{Binding SearchResults}"
+                                        IsVisible="{Binding HasSearchResults}"
+                                        SelectionMode="None"
+                                        MaximumHeightRequest="260">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ArchiveSearchResultItem">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Padding="8" Style="{StaticResource TableRowInteractive}">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                <!-- 当前库徽标 -->
+                                                <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center"
+                                                        IsVisible="{Binding IsFromCurrentLibrary}">
+                                                    <Label Text="{Binding SourceDisplay}" Style="{StaticResource ChipInfoText}"/>
+                                                </Border>
+                                                <!-- 导入库徽标 -->
+                                                <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center"
+                                                        IsVisible="{Binding IsFromImportedLibrary}">
+                                                    <Label Text="{Binding SourceDisplay}" Style="{StaticResource ChipWarningText}"/>
+                                                </Border>
+                                                <Label Grid.Column="1" Text="{Binding ApplicantName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                            </Grid>
+                                            <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Text="{Binding Address}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                                   IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="选择" Style="{StaticResource ButtonOutline}"
+                                                HeightRequest="36" Padding="16,0" VerticalOptions="Center"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ChangeViewModel}}, Path=SelectApplicationCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 当前档案信息卡片 -->
+                <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding HasSelectedApplication}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="2" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding CurrentClassificationName}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                            </Border>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="保障金额" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAmount, StringFormat='{0:F2} 元/月'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="家庭人数" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding FamilySize, StringFormat='{0} 人'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                <Label Text="人均年收入" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding PerCapitaIncomeAnnual, StringFormat='{0:F2} 元'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="3" Spacing="4">
+                                <Label Text="户口类型" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding HukouType}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- 家庭成员名单（实读家庭成员生成） -->
+                        <Border Padding="10,8" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 6">
+                            <Label Text="{Binding MemberNamesDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                                   LineBreakMode="WordWrap" IsVisible="{Binding MemberNamesDisplay, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 未选档案引导提示 -->
+                <Border Style="{StaticResource CardBorder}" Padding="20" IsVisible="{Binding IsNoArchiveHintVisible}">
+                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                        <Label Text="&#xE946;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        <VerticalStackLayout Spacing="4" VerticalOptions="Center">
+                            <Label Text="请先搜索并选择档案" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="选择档案后，可进行以下变更操作" FontSize="13" TextColor="{StaticResource Gray400}"/>
+                        </VerticalStackLayout>
+                    </HorizontalStackLayout>
+                </Border>
+
+                <!-- 已选档案：档案摘要条 + 变更类型区域 -->
+                <VerticalStackLayout Spacing="12" IsVisible="{Binding HasSelectedApplication}">
+
+                    <!-- 档案摘要条 -->
+                    <Border Style="{StaticResource CardBorder}" Padding="16">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding ApplicantName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding ApplicantIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="2" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                            </Border>
+                            <Button Grid.Column="3" Text="更换" Style="{StaticResource ButtonOutline}"
+                                    HeightRequest="32" Padding="12,0" FontSize="13" VerticalOptions="Center"
+                                    Command="{Binding DeselectApplicationCommand}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 变更类型选择 -->
+                    <Label Text="选择变更类型" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                    <!-- 经济状况复核 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToEconomicReviewCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource InfoSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE8A0;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Info}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="经济状况复核" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="家庭经济发生变化时，重新评估分类" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 家庭信息修正 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToFamilyCorrectionCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource WarningSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE777;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource WarningDark}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="家庭信息修正" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="修正家庭成员信息并重新认定（仅限本月周期档案）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 编辑家庭信息 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToEditFamilyInfoCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE70F;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Primary}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="编辑家庭信息" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="编辑家庭成员详细信息（户主姓名/身份证锁定）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 家庭成员变更 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToMemberChangeCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource SuccessSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Success}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="家庭成员变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="增加或减少家庭成员，重新认定保障资格" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 户主死亡变更 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToHouseholdDeathCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource DangerSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Error}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="户主死亡变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="户主死亡，整户停止，选择新户主建立新档案" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- 户主变更 -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToHeadChangeCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource WarningSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource WarningDark}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="户主变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="仅变更户主，其他信息不变" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                </VerticalStackLayout>
+
+                <!-- 变更历史 -->
+                <Label Text="变更历史" Style="{StaticResource SectionTitleLabel}" Margin="0" IsVisible="{Binding HasChangeHistory}"/>
+
+                <CollectionView ItemsSource="{Binding ChangeHistory}" SelectionMode="None" IsVisible="{Binding HasChangeHistory}"
+                    ItemTemplate="{StaticResource ChangeHistorySelector}">
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="返回" Style="{StaticResource ButtonOutline}" MinimumWidthRequest="100" Command="{Binding GoBackCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载..."/>
+    </Grid>
+
+</ContentPage>

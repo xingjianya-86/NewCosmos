@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.SocialAssistanceHomePage"
+             x:DataType="SocialAssistanceHomeViewModel"
+             Title="低收入人口救助帮扶"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 返回行 -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 标题与职责 -->
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE765;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="低收入人口救助帮扶" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="低收入人口认定审核确认 · 保障对象动态管理 · 临时救助" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 模块统计栏 -->
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
+                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyNewAdditionsText}" Caption="本月新增（户）"/>
+                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyExitsText}" Caption="本月退出（户）"/>
+                            <components:StatCapsule  Grid.Column="3"  Value="{Binding GracePeriodExpiringText}" Caption="渐退期临期（户）"/>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 子功能卡片区 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="业务办理" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+
+                        <!-- 业务申请 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE7C1;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="业务申请" Description="五步工作流录入救助申请"
+                                                Command="{Binding OpenApplicationWorkflowCommand}"
+                                                Opacity="{Binding SocialAssistanceOpacity}"/>
+
+                        <!-- 保障对象动态管理 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE895;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="保障对象动态管理" Description="户主变更、成员增减、死亡减员"
+                                                Command="{Binding OpenChangeManagementCommand}"
+                                                Opacity="{Binding ChangeOpacity}"/>
+
+                        <!-- 临时救助 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE945;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="临时救助" Description="急难型与支出型临时救助办理"
+                                                Command="{Binding OpenTempReliefCommand}"
+                                                Opacity="{Binding TempReliefOpacity}"/>
+
+                        <!-- 救助月报表 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="&#xE81E;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="救助月报表" Description="按月生成、导出救助统计报表"
+                                                Command="{Binding OpenMonthlyReportCommand}"
+                                                Opacity="{Binding ReportOpacity}"/>
+
+                        <!-- 渐退期到期处理 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE783;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="渐退期到期处理" Description="临期对象核查与到期处置"
+                                                Command="{Binding OpenGracePeriodExpiringCommand}"/>
+
+                        <!-- 后补追缴 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="&#xE8D1;"
+                                                IconBackgroundColor="#FFF3E0" IconColor="{StaticResource WarningDark}"
+                                                Title="后补追缴" Description="低保、刚性支出、临时救助、高龄的后补追缴"
+                                                Command="{Binding OpenRecoveryCommand}"/>
+
+                        <!-- 大学生管理 -->
+                        <components:FeatureCard Grid.Row="3" Grid.Column="0" Glyph="&#xE774;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                 Title="大学生管理" Description="18-23周岁家庭成员大学生档案关联与毕业管理"
+                                                Command="{Binding OpenCollegeStudentCommand}"
+                                                Opacity="{Binding SocialAssistanceOpacity}"/>
+
+                    </Grid>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

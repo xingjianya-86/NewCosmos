@@ -1,0 +1,206 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.SocialAssistance.AddMemberPopup"
+             x:DataType="{x:Null}"
+             Title="添加家庭成员"
+             BackgroundColor="{StaticResource Background}">
+    <!-- 根 x:DataType="{x:Null}"：本页代码隐藏未设置 BindingContext（数据来源为外部动态注入/原型页），
+         页面级绑定保持运行时解析；列表项模板仍按 ent:FamilyMember 编译绑定 -->
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Label Text="" FontSize="13"/>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
+                        <Label Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="添加家庭成员" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="从已有数据或手动录入新成员" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 数据来源选择 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="数据来源" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <Border BackgroundColor="{StaticResource PrimaryLight}" Padding="12" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnManualModeTapped"/>
+                                </Border.GestureRecognizers>
+                                <Label Text="手动填写新成员信息" FontSize="14" TextColor="{StaticResource White}" HorizontalOptions="Center"/>
+                            </Border>
+                            <Border Grid.Column="1" BackgroundColor="{StaticResource Gray200}" Padding="12" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnImportModeTapped"/>
+                                </Border.GestureRecognizers>
+                                <Label Text="从已有档案导入" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center"/>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 手动填写模式 -->
+                <VerticalStackLayout IsVisible="{Binding IsManualMode}" Spacing="16">
+
+                    <!-- 基本信息 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="&#xE77B; 基本信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
+                                <Entry Grid.Row="0" Text="{Binding Name}" Placeholder="姓名"/>
+                                <Entry Grid.Row="0" Grid.Column="1" Text="{Binding IdCard}" Placeholder="身份证号"/>
+                                <Picker Grid.Row="1" ItemsSource="{Binding GenderOptions}" SelectedItem="{Binding Gender}" Title="性别"/>
+                                <Picker Grid.Row="1" Grid.Column="1" ItemsSource="{Binding EthnicityOptions}" SelectedItem="{Binding Ethnicity}" Title="民族"/>
+                                <Picker Grid.Row="2" ItemsSource="{Binding RelationshipOptions}" SelectedItem="{Binding Relationship}" Title="与户主关系"/>
+                                <Picker Grid.Row="2" Grid.Column="1" ItemsSource="{Binding MaritalStatusOptions}" SelectedItem="{Binding MaritalStatus}" Title="婚姻状况"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 健康状况 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="&#xE95D; 健康状况" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="12">
+                                <Picker Grid.Row="0" ItemsSource="{Binding HealthStatusOptions}" SelectedItem="{Binding HealthStatus}" Title="健康状况"/>
+                                <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding DisabilityTypeOptions}" SelectedItem="{Binding DisabilityType}" Title="残疾类型"/>
+                                <Picker Grid.Row="1" ItemsSource="{Binding DisabilityLevelOptions}" SelectedItem="{Binding DisabilityLevel}" Title="残疾等级"/>
+                                <Picker Grid.Row="1" Grid.Column="1" ItemsSource="{Binding WorkCapacityOptions}" SelectedItem="{Binding WorkCapacity}" Title="劳动能力"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 就业信息 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="&#xE8A0; 就业信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="12">
+                                <Picker Grid.Row="0" ItemsSource="{Binding EmploymentStatusOptions}" SelectedItem="{Binding EmploymentStatus}" Title="从业状况"/>
+                                <Entry Grid.Row="0" Grid.Column="1" Text="{Binding WorkUnit}" Placeholder="工作单位"/>
+                                <Picker Grid.Row="1" ItemsSource="{Binding IncomeSourceOptions}" SelectedItem="{Binding IncomeSource}" Title="收入来源"/>
+                                <Picker Grid.Row="1" Grid.Column="1" ItemsSource="{Binding SelfCareAbilityOptions}" SelectedItem="{Binding SelfCareAbility}" Title="自理能力"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+
+                <!-- 从已有档案导入模式 -->
+                <VerticalStackLayout IsVisible="{Binding IsImportMode}" Spacing="16">
+
+                    <!-- 搜索框 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="搜索成员（范围：所有低收入人口档案）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <Entry Text="{Binding SearchText}" Placeholder="输入姓名或身份证号"/>
+                                <Button Grid.Column="1" Text="&#xE721; 搜索" Style="{StaticResource ButtonSmall}" Command="{Binding SearchMemberCommand}"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 搜索结果 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="搜索结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <CollectionView ItemsSource="{Binding SearchResults}" SelectionMode="Single" SelectedItem="{Binding SelectedSearchResult}">
+                                <CollectionView.EmptyView>
+                                    <Label Text="暂无搜索结果" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                                </CollectionView.EmptyView>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="ent:FamilyMember">
+                                        <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,4">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                    <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                    <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                                        <Label.FormattedText>
+                                                            <FormattedString>
+                                                                <Span Text="身份证: "/>
+                                                                <Span Text="{Binding IdCard}"/>
+                                                            </FormattedString>
+                                                        </Label.FormattedText>
+                                                    </Label>
+                                                    <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                                        <Label.FormattedText>
+                                                            <FormattedString>
+                                                                <Span Text="{Binding Gender}"/>
+                                                                <Span Text=" "/>
+                                                                <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                                                <Span Text=" · "/>
+                                                                <Span Text="{Binding HealthStatus}"/>
+                                                            </FormattedString>
+                                                        </Label.FormattedText>
+                                                    </Label>
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 已选成员信息预览 -->
+                    <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasSelectedResult}" BackgroundColor="{StaticResource SuccessSoft}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="已选成员信息预览" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
+                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="姓名" FontSize="10" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding SelectedResult.Name}" FontSize="12" FontAttributes="Bold"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                    <Label Text="性别" FontSize="10" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding SelectedResult.Gender}" FontSize="12"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                    <Label Text="年龄" FontSize="10" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding SelectedResult.Age}" FontSize="12"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="3" Spacing="2">
+                                    <Label Text="健康状况" FontSize="10" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding SelectedResult.HealthStatus}" FontSize="12"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="{StaticResource White}" StrokeThickness="0" Padding="20,12">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="确认添加" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmAddCommand}" MinimumWidthRequest="100"/>
+                <Button Grid.Column="2" Text="取消" Style="{StaticResource ButtonOutline}" MinimumWidthRequest="100"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</ContentPage>

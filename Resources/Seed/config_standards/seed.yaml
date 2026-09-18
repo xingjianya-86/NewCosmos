@@ -1,0 +1,59 @@
+# 标准配置初始数据
+# 包含：收入标准、分类补贴标准、特困供养标准、系统配置等
+database: config_standards
+version: 2.0
+
+tables:
+  - name: config_standards
+    data:
+      # ==================== 收入标准 ====================
+      - { standard_type: "RuralSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Rural", support_mode: null, standard_value: 585.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2025-12-31", description: "2025年最低生活保障标准（农村）" }
+      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 780.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2025-12-31", description: "2025年最低生活保障标准（城市）" }
+      - { standard_type: "RuralSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Rural", support_mode: null, standard_value: 632.00, unit: "元/月", effective_start_date: "2026-04-01", effective_end_date: "2026-12-31", description: "2026年4月后最低生活保障标准（农村）" }
+      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 832.00, unit: "元/月", effective_start_date: "2026-04-01", effective_end_date: "2026-12-31", description: "2026年4月后最低生活保障标准（城市）" }
+      
+      # ==================== 分类补贴标准 ====================
+      - { standard_type: "ClassifiedSubsidyStandard", standard_name: "分类补贴标准", hukou_type: "Rural", support_mode: null, standard_value: 104.00, unit: "元/人/月", effective_start_date: "2025-01-01", effective_end_date: "2026-12-31", description: "最低生活保障分类施保每人补贴金额（农村）" }
+      - { standard_type: "ClassifiedSubsidyStandard", standard_name: "分类补贴标准", hukou_type: "Urban", support_mode: null, standard_value: 142.00, unit: "元/人/月", effective_start_date: "2025-01-01", effective_end_date: "2026-12-31", description: "最低生活保障分类施保每人补贴金额（城市）" }
+      
+      # ==================== 特困供养标准 ====================
+      - { standard_type: "RuralDestituteStandard", standard_name: "农村特困集中供养标准", hukou_type: "Rural", support_mode: "Centralized", standard_value: 1100.00, unit: "元/月", effective_start_date: "2025-01-01", description: "农村特困人员集中供养标准" }
+      - { standard_type: "RuralDestituteStandard", standard_name: "农村特困分散供养标准", hukou_type: "Rural", support_mode: "Scattered", standard_value: 900.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2026-08-11", description: "农村特困人员分散供养标准（2026-08-11前）" }
+      - { standard_type: "UrbanDestituteStandard", standard_name: "城市特困集中供养标准", hukou_type: "Urban", support_mode: "Centralized", standard_value: 1300.00, unit: "元/月", effective_start_date: "2025-01-01", description: "城市特困人员集中供养标准" }
+      - { standard_type: "UrbanDestituteStandard", standard_name: "城市特困分散供养标准", hukou_type: "Urban", support_mode: "Scattered", standard_value: 1100.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2026-08-11", description: "城市特困人员分散供养标准（2026-08-11前）" }
+      - { standard_type: "RuralDestituteStandard", standard_name: "农村特困分散供养标准", hukou_type: "Rural", support_mode: "Scattered", standard_value: 822.00, unit: "元/月", effective_start_date: "2026-08-12", description: "农村特困人员分散供养标准（2026-08-12起）" }
+      - { standard_type: "UrbanDestituteStandard", standard_name: "城市特困分散供养标准", hukou_type: "Urban", support_mode: "Scattered", standard_value: 1076.00, unit: "元/月", effective_start_date: "2026-08-12", description: "城市特困人员分散供养标准（2026-08-12起）" }
+      
+      # ==================== 照料护理费标准（特困，按自理能力等级三档） ====================
+      - { standard_type: "CaregiverAllowanceFull", standard_name: "全自理照料护理费", hukou_type: null, support_mode: null, standard_value: 191.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-全自理" }
+      - { standard_type: "CaregiverAllowancePartial", standard_name: "半自理照料护理费", hukou_type: null, support_mode: null, standard_value: 319.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-半自理" }
+      - { standard_type: "CaregiverAllowanceNone", standard_name: "无法自理照料护理费", hukou_type: null, support_mode: null, standard_value: 478.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-无法自理" }
+      
+      # ==================== 渐退期配置 ====================
+      - { standard_type: "GracePeriodMonths", standard_name: "渐退期月数", hukou_type: null, support_mode: null, standard_value: 6.00, unit: "月", effective_start_date: "2025-01-01", description: "低保转低收入渐退期默认月数（可选1-12）" }
+      
+      # ==================== 系统配置 ====================
+      - { standard_type: "MinWage", standard_name: "最低工资标准", hukou_type: null, support_mode: null, standard_value: 1850.00, unit: "元", effective_start_date: "2025-01-01", description: "最低工资标准" }
+      - { standard_type: "RuralSingleRescue", standard_name: "农村单人救助金额", hukou_type: "Rural", support_mode: null, standard_value: 282.00, unit: "元", effective_start_date: "2025-01-01", effective_end_date: "2026-03-31", description: "2026年4月前农村单人保救助金额" }
+      - { standard_type: "UrbanSingleRescue", standard_name: "城市单人救助金额", hukou_type: "Urban", support_mode: null, standard_value: 282.00, unit: "元", effective_start_date: "2025-01-01", effective_end_date: "2026-03-31", description: "2026年4月前城市单人保救助金额" }
+      - { standard_type: "RuralSingleRescue", standard_name: "农村单人救助金额", hukou_type: "Rural", support_mode: null, standard_value: 313.00, unit: "元", effective_start_date: "2026-04-01", description: "2026年4月后农村单人保救助金额" }
+      - { standard_type: "UrbanSingleRescue", standard_name: "城市单人救助金额", hukou_type: "Urban", support_mode: null, standard_value: 313.00, unit: "元", effective_start_date: "2026-04-01", description: "2026年4月后城市单人保救助金额" }
+      
+      # ==================== 土地价格 ====================
+      - { standard_type: "LandSelfFarmPrice", standard_name: "自营土地价格", hukou_type: null, support_mode: null, standard_value: 700.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "自营土地流转价格" }
+      - { standard_type: "LandSubleasePrice", standard_name: "转包土地价格", hukou_type: null, support_mode: null, standard_value: 400.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "转包土地流转价格" }
+      - { standard_type: "LandContractPrice", standard_name: "承包土地价格", hukou_type: null, support_mode: null, standard_value: 600.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "承包土地流转价格" }
+      
+      # ==================== 普惠高龄补贴标准 ====================
+      - { standard_type: "ELDERLY_SUBSIDY", standard_name: "80-89周岁低保/边缘/特困补贴", hukou_type: "CAT1", support_mode: null, standard_value: 100.00, unit: "元/月", effective_start_date: "2024-10-01", description: "80-89周岁（含）低保对象、低保边缘家庭成员、特困人员补贴标准" }
+      - { standard_type: "ELDERLY_SUBSIDY", standard_name: "80-89周岁其他老年人补贴", hukou_type: "CAT2", support_mode: null, standard_value: 25.00, unit: "元/月", effective_start_date: "2024-10-01", description: "80-89周岁（含）其他老年人补贴标准" }
+      - { standard_type: "ELDERLY_SUBSIDY", standard_name: "90-99周岁补贴", hukou_type: "CAT3", support_mode: null, standard_value: 100.00, unit: "元/月", effective_start_date: "2024-10-01", description: "90-99周岁（含）老年人补贴标准" }
+      - { standard_type: "ELDERLY_SUBSIDY", standard_name: "100周岁以上补贴", hukou_type: "CAT4", support_mode: null, standard_value: 300.00, unit: "元/月", effective_start_date: "2024-10-01", description: "100周岁（含）以上老年人补贴标准" }
+      
+      # ==================== 农业补贴价格 ====================
+      - { standard_type: "LandFertilityPrice", standard_name: "地力补贴价格", hukou_type: null, support_mode: null, standard_value: 75.60, unit: "元/亩", effective_start_date: "2025-01-01", description: "耕地地力保护补贴每亩价格" }
+      - { standard_type: "SoybeanPrice", standard_name: "大豆补贴价格", hukou_type: null, support_mode: null, standard_value: 350.73, unit: "元/亩", effective_start_date: "2025-01-01", description: "大豆生产者补贴每亩价格" }
+      - { standard_type: "CornPrice", standard_name: "玉米补贴价格", hukou_type: null, support_mode: null, standard_value: 16.73, unit: "元/亩", effective_start_date: "2025-01-01", description: "玉米生产者补贴每亩价格" }
+      - { standard_type: "RotationPrice", standard_name: "轮作补贴价格", hukou_type: null, support_mode: null, standard_value: 150.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "耕地轮作补贴每亩价格" }
+      - { standard_type: "SurfaceWaterRicePrice", standard_name: "地表水水稻价格", hukou_type: null, support_mode: null, standard_value: 156.53, unit: "元/亩", effective_start_date: "2025-01-01", description: "地表水灌溉水稻补贴每亩价格" }
+      - { standard_type: "GroundWaterRicePrice", standard_name: "地下水水稻价格", hukou_type: null, support_mode: null, standard_value: 106.53, unit: "元/亩", effective_start_date: "2025-01-01", description: "地下水灌溉水稻补贴每亩价格" }

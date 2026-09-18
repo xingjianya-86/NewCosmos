@@ -1,0 +1,43 @@
+# 低收入档案Schema定义
+database: 低收入档案
+version: 1.0
+description: 低收入家庭档案管理
+
+tables:
+  # ── 低收入档案表 ──
+  - name: nc_biz_low_income_archives
+    comment: 低收入档案表，记录低收入家庭的归档信息
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: family_id
+        type: bigint
+        nullable: false
+        comment: 关联家庭ID，关联nc_biz_low_income_families.id
+      - name: classification_result
+        type: character varying(50)
+        nullable: true
+        comment: 分类结果代码，如RuralSubsistence、UrbanLowIncome
+      - name: guarantee_amount
+        type: numeric
+        nullable: true
+        defaultValue: 0
+        comment: 保障金额（元/月）
+      - name: status
+        type: character varying(20)
+        nullable: true
+        defaultValue: 'Active'
+        comment: 状态：Active=有效, Stopped=已停止
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+    indexes:
+      - name: idx_low_income_archives_family_id
+        columns: [family_id]
+      - name: idx_low_income_archives_status
+        columns: [status]

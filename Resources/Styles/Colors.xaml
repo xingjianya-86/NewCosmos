@@ -1,0 +1,166 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 主题色 - 深邃蓝 -->
+    <Color x:Key="Primary">#1a73e8</Color>
+    <Color x:Key="PrimaryLight">#4285f4</Color>
+    <Color x:Key="PrimaryDark">#0d47a1</Color>
+    <Color x:Key="PrimaryGradientStart">#667eea</Color>
+    <Color x:Key="PrimaryGradientEnd">#764ba2</Color>
+    
+    <!-- 辅助色 - 翡翠绿 -->
+    <Color x:Key="Secondary">#00c853</Color>
+    <Color x:Key="SecondaryLight">#69f0ae</Color>
+    <Color x:Key="SecondaryDark">#00a844</Color>
+    
+    <!-- 强调色 - 活力橙 -->
+    <Color x:Key="Accent">#ff6d00</Color>
+    <Color x:Key="AccentLight">#ff9e40</Color>
+    
+    <!-- 背景色 -->
+    <Color x:Key="Background">#f8f9fa</Color>
+    <Color x:Key="CardBackground">#ffffff</Color>
+    <Color x:Key="HeaderBackground">#ffffff</Color>
+    <Color x:Key="SurfaceVariant">#f5f5f5</Color>
+    <Color x:Key="Surface">#ffffff</Color>
+    
+    <!-- 文字色 -->
+    <Color x:Key="TextPrimary">#212121</Color>
+    <Color x:Key="TextSecondary">#757575</Color>
+    <Color x:Key="TextTertiary">#9e9e9e</Color>
+    <Color x:Key="TextWhite">#ffffff</Color>
+    <Color x:Key="TextDark">#1e1e2e</Color>
+    
+    <!-- 状态色 -->
+    <Color x:Key="Success">#00c853</Color>
+    <Color x:Key="SuccessLight">#69f0ae</Color>
+    <Color x:Key="Warning">#ffc107</Color>
+    <Color x:Key="WarningDark">#e65100</Color>
+    <Color x:Key="WarningLight">#fff3cd</Color>
+    <Color x:Key="Error">#ff1744</Color>
+    <Color x:Key="ErrorLight">#ffcdd2</Color>
+    <Color x:Key="Info">#2196f3</Color>
+    <Color x:Key="InfoLight">#bbdefb</Color>
+    
+    <!-- 灰度色 -->
+    <Color x:Key="White">#ffffff</Color>
+    <Color x:Key="Black">#000000</Color>
+    <Color x:Key="Gray50">#fafafa</Color>
+    <Color x:Key="Gray100">#f5f5f5</Color>
+    <Color x:Key="Gray200">#eeeeee</Color>
+    <Color x:Key="Gray300">#e0e0e0</Color>
+    <Color x:Key="Gray400">#bdbdbd</Color>
+    <Color x:Key="Gray500">#9e9e9e</Color>
+    <Color x:Key="Gray600">#757575</Color>
+    <Color x:Key="Gray700">#616161</Color>
+    <Color x:Key="Gray800">#424242</Color>
+    <Color x:Key="Gray900">#212121</Color>
+    
+    <!-- 阴影色 -->
+    <Color x:Key="ShadowLight">#10000000</Color>
+    <Color x:Key="ShadowMedium">#20000000</Color>
+    <Color x:Key="ShadowDark">#30000000</Color>
+    
+    <!-- 侧边栏颜色 -->
+    <Color x:Key="SidebarBackground">#1E293B</Color>
+    <Color x:Key="SidebarItemSelected">#3B82F6</Color>
+    <Color x:Key="SidebarItemUnselected">#94A3B8</Color>
+    <Color x:Key="SidebarItemHover">#334155</Color>
+    
+    <!-- 统计卡片渐变颜色 -->
+    <Color x:Key="StatCardBlueStart">#3B82F6</Color>
+    <Color x:Key="StatCardBlueEnd">#1D4ED8</Color>
+    <Color x:Key="StatCardGreenStart">#10B981</Color>
+    <Color x:Key="StatCardGreenEnd">#059669</Color>
+    <Color x:Key="StatCardOrangeStart">#F59E0B</Color>
+    <Color x:Key="StatCardOrangeEnd">#D97706</Color>
+    <Color x:Key="StatCardPurpleStart">#8B5CF6</Color>
+    <Color x:Key="StatCardPurpleEnd">#7C3AED</Color>
+    
+    <!-- 功能模块颜色 -->
+    <Color x:Key="ModuleSocialAssistance">#3B82F6</Color>
+    <Color x:Key="ModuleElderly">#8B5CF6</Color>
+    <Color x:Key="ModuleAssetVerification">#F59E0B</Color>
+    <Color x:Key="ModuleArchive">#10B981</Color>
+    <Color x:Key="ModuleDatabase">#64748B</Color>
+    <Color x:Key="ModuleUser">#EC4899</Color>
+    
+    <!-- 状态栏颜色 -->
+    <Color x:Key="StatusBarBackground">#F1F5F9</Color>
+    <Color x:Key="TopBarBackground">#FFFFFF</Color>
+    
+    <!-- 其他 -->
+    <Color x:Key="CardOptionBackground">#F8FAFC</Color>
+
+    <!-- 交互态（悬停/按下/焦点/柔和底色）——设计系统 v2 -->
+    <Color x:Key="PrimaryHover">#1765CC</Color>
+    <Color x:Key="PrimaryPressed">#0D47A1</Color>
+    <Color x:Key="PrimarySoft">#E8F0FE</Color>
+    <Color x:Key="SecondaryHover">#00B34A</Color>
+    <Color x:Key="DangerHover">#E5163D</Color>
+    <Color x:Key="DangerSoft">#FDECEF</Color>
+    <Color x:Key="SuccessSoft">#E6F7ED</Color>
+    <Color x:Key="WarningSoft">#FFF7E0</Color>
+    <Color x:Key="InfoSoft">#E8F3FE</Color>
+    <Color x:Key="HoverOverlay">#F3F6FB</Color>
+    <Color x:Key="FocusRing">#4285F4</Color>
+    <Color x:Key="DisabledBackground">#E9ECEF</Color>
+    <Color x:Key="DisabledText">#ADB5BD</Color>
+    
+    <!-- 渐变色 -->
+    <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource PrimaryGradientStart}" Offset="0"/>
+        <GradientStop Color="{StaticResource PrimaryGradientEnd}" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="SuccessGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00c853" Offset="0"/>
+        <GradientStop Color="#69f0ae" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="DangerGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#ff1744" Offset="0"/>
+        <GradientStop Color="#ff5252" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#1a73e8" Offset="0"/>
+        <GradientStop Color="#4285f4" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <!-- 统计卡片渐变 -->
+    <LinearGradientBrush x:Key="StatCardBlueGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource StatCardBlueStart}" Offset="0"/>
+        <GradientStop Color="{StaticResource StatCardBlueEnd}" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="StatCardGreenGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource StatCardGreenStart}" Offset="0"/>
+        <GradientStop Color="{StaticResource StatCardGreenEnd}" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="StatCardOrangeGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource StatCardOrangeStart}" Offset="0"/>
+        <GradientStop Color="{StaticResource StatCardOrangeEnd}" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="StatCardPurpleGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource StatCardPurpleStart}" Offset="0"/>
+        <GradientStop Color="{StaticResource StatCardPurpleEnd}" Offset="1"/>
+    </LinearGradientBrush>
+    
+    <!-- 收入类型标签颜色 -->
+    <Color x:Key="IncomeLaborBg">#E3F2FD</Color>
+    <Color x:Key="IncomeLaborText">#1565C0</Color>
+    <Color x:Key="IncomeBusinessBg">#E8F5E9</Color>
+    <Color x:Key="IncomeBusinessText">#2E7D32</Color>
+    <Color x:Key="IncomePropertyBg">#FFF3E0</Color>
+    <Color x:Key="IncomePropertyText">#E65100</Color>
+    <Color x:Key="IncomeTransferBg">#E3F2FD</Color>
+    <Color x:Key="IncomeTransferText">#1565C0</Color>
+    <Color x:Key="IncomeOtherBg">#F3E5F5</Color>
+    <Color x:Key="IncomeOtherText">#7B1FA2</Color>
+    
+</ResourceDictionary>

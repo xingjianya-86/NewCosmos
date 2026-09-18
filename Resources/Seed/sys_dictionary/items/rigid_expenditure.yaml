@@ -1,0 +1,15 @@
+# 刚性支出类型字典（固定 ID）
+# 分类 ID=60，字典项 ID 范围: 60001-60999
+# 依据：《刚性支出困难家庭认定办法》（民政部2024年10月）
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 60001, category: "RigidExpenditureTypes", item_key: "Living", item_value: "生活支出", sort_order: 1, is_active: true }
+      - { id: 60002, category: "RigidExpenditureTypes", item_key: "Medical", item_value: "医疗支出", sort_order: 2, is_active: true }
+      - { id: 60003, category: "RigidExpenditureTypes", item_key: "Education", item_value: "教育支出", sort_order: 3, is_active: true }
+      - { id: 60004, category: "RigidExpenditureTypes", item_key: "DisabilityRehab", item_value: "残疾康复支出", sort_order: 4, is_active: true }
+      - { id: 60005, category: "RigidExpenditureTypes", item_key: "Housing", item_value: "住房支出", sort_order: 5, is_active: true }
+      - { id: 60006, category: "RigidExpenditureTypes", item_key: "Other", item_value: "其他支出", sort_order: 6, is_active: true }

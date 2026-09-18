@@ -1,0 +1,14 @@
+# 健康状况字典（固定 ID）
+# 分类 ID=20，字典项 ID 范围: 20001-20999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 20001, category: "HealthStatuses", item_key: "Healthy", item_value: "健康或良好", sort_order: 1, is_active: true }
+      - { id: 20002, category: "HealthStatuses", item_key: "Weak", item_value: "一般或较弱", sort_order: 2, is_active: true }
+      - { id: 20003, category: "HealthStatuses", item_key: "SevereIllness", item_value: "重病", sort_order: 3, is_active: true }
+      - { id: 20004, category: "HealthStatuses", item_key: "SevereDisability", item_value: "重残", sort_order: 4, is_active: true }
+      - { id: 20005, category: "HealthStatuses", item_key: "SevereIllnessAndDisability", item_value: "重病且重残", sort_order: 5, is_active: true }
+      - { id: 20006, category: "HealthStatuses", item_key: "Other", item_value: "其他", sort_order: 6, is_active: true }

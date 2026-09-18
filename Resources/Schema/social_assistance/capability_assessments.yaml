@@ -1,0 +1,98 @@
+# 能力鉴定表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 特困人员生活自理能力评估表 - 评估6项自理能力，确定照料护理等级
+
+tables:
+  - name: nc_biz_capability_assessments
+    comment: "[经济状况] 能力鉴定表 - 评估特困人员自理能力（进食/穿衣/上下床/如厕/行走/洗澡），确定照料护理等级"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: assessment_date
+        type: DATE
+        nullable: false
+        comment: 评估日期
+      - name: assessor_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 评估人
+      # 六项考核指标（0=不能完成, 1=能完成）
+      - name: eating
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 进食能力 (0=不能, 1=能)
+      - name: dressing
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 穿衣能力 (0=不能, 1=能)
+      - name: getting_in_out_bed
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 上下床能力 (0=不能, 1=能)
+      - name: using_toilet
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 如厕能力 (0=不能, 1=能)
+      - name: indoor_walking
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 室内行走能力 (0=不能, 1=能)
+      - name: bathing
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 洗澡能力 (0=不能, 1=能)
+      # 自动计算结果
+      - name: completed_items
+        type: INTEGER
+        nullable: true
+        comment: 能完成的项目数
+      - name: self_care_level
+        type: VARCHAR(20)
+        nullable: true
+        comment: 自理能力等级
+      - name: care_level
+        type: VARCHAR(20)
+        nullable: true
+        comment: 照料等级
+      - name: remark
+        type: VARCHAR(500)
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_capability_assessments_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_capability_assessments_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

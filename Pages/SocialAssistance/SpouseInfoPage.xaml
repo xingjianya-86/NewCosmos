@@ -1,0 +1,119 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.SpouseInfoPage"
+             x:DataType="SpouseInfoViewModel"
+             Title="配偶信息" BackgroundColor="{StaticResource Background}">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="配偶信息" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="填写配偶基本信息与健康状况" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+                <Border Style="{StaticResource CardBorder}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="配偶信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Switch Grid.Column="1" IsToggled="{Binding SpouseEnabled}" OnColor="{StaticResource Primary}"/>
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding SpouseEnabled}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="基本信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="12">
+                            <Entry Grid.Row="0" Grid.Column="0" Placeholder="姓名" Text="{Binding Name}"/>
+                            <Entry Grid.Row="0" Grid.Column="1" Placeholder="身份证号" Text="{Binding IdCard}" Keyboard="Numeric"/>
+                            <Picker Grid.Row="1" Grid.Column="0" Title="性别" SelectedItem="{Binding Gender}" x:Name="GenderPicker"/>
+                            <Entry Grid.Row="2" Grid.Column="0" Placeholder="民族" Text="{Binding Ethnicity}"/>
+                            <Entry Grid.Row="2" Grid.Column="1" Placeholder="联系电话" Text="{Binding Phone}" Keyboard="Telephone"/>
+                            <Entry Grid.Row="3" Grid.Column="0" Placeholder="户籍地址" Text="{Binding HukouAddress}"/>
+                            <Picker Grid.Row="3" Grid.Column="1" Title="文化程度" SelectedItem="{Binding EducationLevel}" x:Name="EducationPicker"/>
+                            <Entry Grid.Row="4" Grid.Column="0" Placeholder="政治面貌" Text="{Binding PoliticalStatus}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding SpouseEnabled}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="健康与劳动能力" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Switch Grid.Column="1" IsToggled="{Binding HealthEnabled}" OnColor="{StaticResource Primary}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsEnabled="{Binding HealthEnabled}">
+                            <Picker Grid.Row="0" Grid.Column="0" Title="健康状况" SelectedItem="{Binding HealthStatus}" x:Name="HealthPicker"/>
+                            <Picker Grid.Row="0" Grid.Column="1" Title="劳动能力" SelectedItem="{Binding WorkCapacity}" x:Name="WorkCapacityPicker"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <Entry Placeholder="主要疾病" Text="{Binding PrimaryDisease}"/>
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="是否重病" VerticalOptions="Center"/><Switch IsToggled="{Binding IsSevereDisease}" OnColor="{StaticResource Error}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding SpouseEnabled}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="残疾信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Switch Grid.Column="1" IsToggled="{Binding DisabilityEnabled}" OnColor="{StaticResource Primary}"/>
+                        </Grid>
+                        <VerticalStackLayout Spacing="12" IsEnabled="{Binding DisabilityEnabled}">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="是否残疾" VerticalOptions="Center"/><Switch IsToggled="{Binding IsDisabled}"/>
+                                <Label Text="是否重残" VerticalOptions="Center"/><Switch IsToggled="{Binding IsSevereDisability}"/>
+                            </HorizontalStackLayout>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <Entry Placeholder="残疾证号" Text="{Binding DisabilityCertificateNo}"/>
+                                <Entry Grid.Column="1" Placeholder="残疾类型" Text="{Binding DisabilityType}"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding SpouseEnabled}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="就业与收入" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Switch Grid.Column="1" IsToggled="{Binding EmploymentEnabled}" OnColor="{StaticResource Primary}"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsEnabled="{Binding EmploymentEnabled}">
+                            <Entry Placeholder="就业状况" Text="{Binding EmploymentStatus}"/>
+                            <Entry Grid.Column="1" Placeholder="工作单位" Text="{Binding WorkUnit}"/>
+                            <Entry Grid.Row="1" Grid.Column="0" Placeholder="主要收入来源" Text="{Binding MainIncomeSource}"/>
+                            <Entry Grid.Row="1" Grid.Column="1" Placeholder="年收入(元)" Text="{Binding AnnualIncome}" Keyboard="Numeric"/>
+                            <Entry Grid.Row="2" Grid.Column="0" Placeholder="自理能力" Text="{Binding SelfCareAbility}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+        <Grid Grid.Row="2" BackgroundColor="{StaticResource White}" Padding="20,12" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+            <Button Grid.Column="1" Text="保存" Style="{StaticResource ButtonPrimary}" MinimumWidthRequest="100"/>
+            <Button Grid.Column="2" Text="下一步" Style="{StaticResource ButtonPrimary}" MinimumWidthRequest="100"/>
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,44 @@
+# 证明单位模板Schema定义
+database: 证明单位模板
+version: 1.0
+description: 低收入证明文件接收单位与专属模板映射（全局共享）
+
+tables:
+  # ── 证明单位模板表 ──
+  - name: nc_config_proof_unit_templates
+    comment: 证明接收单位与专属模板映射表（单位名唯一，全局共享）
+    columns:
+      - name: id
+        type: bigserial
+        nullable: false
+        primaryKey: true
+        comment: 自增主键
+      - name: unit_name
+        type: character varying(200)
+        nullable: false
+        comment: 接收单位名称（如 区民政局/市人社局/XX学校）
+      - name: template_id
+        type: bigint
+        nullable: false
+        comment: 关联 nc_biz_templates.id（专属证明模板）
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 创建人用户ID
+      - name: updated_by
+        type: integer
+        nullable: true
+        comment: 最后修改人用户ID
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间
+    indexes:
+      - name: idx_proof_unit_templates_unit_name
+        columns: [unit_name]
+        unique: true
+        comment: 单位名称唯一

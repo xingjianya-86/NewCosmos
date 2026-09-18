@@ -1,0 +1,145 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ChangeManagement.HeadChangePage"
+             x:DataType="HeadChangeViewModel"
+             Title="户主变更"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 可选新户主列表 交替行色（白 / #F8F9FA） -->
+        <DataTemplate x:Key="HeadEligibleEvenRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="White">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
+                                    <Span Text=" · "/>
+                                    <Span Text="{Binding Gender}"/>
+                                    <Span Text=" "/>
+                                    <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="HeadEligibleOddRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
+                                    <Span Text=" · "/>
+                                    <Span Text="{Binding Gender}"/>
+                                    <Span Text=" "/>
+                                    <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="HeadEligibleSelector"
+            EvenTemplate="{StaticResource HeadEligibleEvenRow}"
+            OddTemplate="{StaticResource HeadEligibleOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（绿色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="户主变更" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="仅变更户主，其他信息不变" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 当前户主信息 -->
+                <Label Text="当前户主" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="{Binding CurrentHeadName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding CurrentHeadIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <Border Grid.Column="2" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                            <Label Text="{Binding CurrentClassificationName}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- 选择新户主 -->
+                <Label Text="请选择新户主（仅显示非户主成员）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                <CollectionView ItemsSource="{Binding EligibleMembers}" SelectionMode="Single" SelectedItem="{Binding SelectedNewHead}"
+                    ItemTemplate="{StaticResource HeadEligibleSelector}">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无可选成员" Style="{StaticResource EmptyStateLabel}"/>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+
+                <!-- 变更原因 -->
+                <Label Text="变更原因" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <Editor Text="{Binding ChangeReason}" Placeholder="请详细描述变更原因..." HeightRequest="100"/>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="确认变更" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmChangeCommand}" MinimumWidthRequest="100"/>
+                <Button Grid.Column="2" Text="返回" Style="{StaticResource ButtonOutline}" Command="{Binding GoBackCommand}" MinimumWidthRequest="100"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载..."/>
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,80 @@
+# 大学生管理Schema定义
+database: 大学生管理
+version: 1.0
+description: 低收入家庭大学生档案（家庭成员→大学生关联，用于毕业/择业期管理）
+
+tables:
+  # ── 大学生档案表 ──
+  - name: nc_biz_college_students
+    comment: 大学生档案表（关联家庭成员，记录学历/学制/毕业年份）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联低收入申请ID，关联nc_biz_applications.id
+      - name: family_member_id
+        type: BIGINT
+        nullable: false
+        comment: 关联家庭成员ID，关联nc_biz_family_members.id
+      - name: student_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 大学生姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 身份证号
+      - name: education_level
+        type: VARCHAR(50)
+        nullable: true
+        comment: 学历层次（本科/专科）
+      - name: school_name
+        type: VARCHAR(200)
+        nullable: true
+        comment: 学校名称
+      - name: school_duration
+        type: INTEGER
+        nullable: true
+        comment: 学制（3=三年制/4=四年制/5=五年制）
+      - name: enrollment_year
+        type: INTEGER
+        nullable: true
+        comment: 入学年份
+      - name: graduation_year
+        type: INTEGER
+        nullable: true
+        comment: 毕业年份（入学年份+学制）
+      - name: status
+        type: VARCHAR(20)
+        defaultValue: '在读'
+        nullable: false
+        comment: 状态（在读/已毕业/已退出）
+      - name: remark
+        type: TEXT
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_college_students_family_member_id
+        columns: [family_member_id]
+      - name: idx_college_students_application_id
+        columns: [application_id]
+      - name: idx_college_students_graduation_year
+        columns: [graduation_year]

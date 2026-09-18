@@ -1,0 +1,457 @@
+# 社会救助申请表 Schema 定义
+database: cosmos_app
+version: 1.0
+description: 社会救助申请表，含户主信息、家庭住址、身体状况、从业情况、银行信息等
+
+tables:
+  - name: nc_biz_applications
+    comment: 社会救助申请表
+    columns:
+      # ── 主键与编号 ──
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 申请编号
+      
+      # ── 户主基本信息 ──
+      - name: applicant_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 申请人姓名
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 申请人身份证号
+      - name: applicant_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 申请人手机号
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        defaultValue: '男'
+        comment: 性别（男/女）
+      - name: ethnicity
+        type: VARCHAR(50)
+        nullable: true
+        comment: 民族
+      - name: marital_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: hukou_type
+        type: VARCHAR(20)
+        nullable: true
+        comment: 户口性质
+      - name: education_level
+        type: VARCHAR(20)
+        nullable: true
+        comment: 文化程度
+      - name: political_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 政治面貌
+      - name: hukou_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 户籍地址
+      - name: hukou_city_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍城市ID
+      - name: hukou_county_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍区县ID
+      - name: hukou_town_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍乡镇ID
+      - name: hukou_village_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍村ID
+      - name: disability_card_no
+        type: VARCHAR(2)
+        nullable: true
+        comment: 残疾证号末2位
+      
+      # ── 家庭住址 ──
+      - name: province
+        type: VARCHAR(50)
+        nullable: true
+        comment: 省份
+      - name: city
+        type: VARCHAR(50)
+        nullable: true
+        comment: 城市
+      - name: district
+        type: VARCHAR(50)
+        nullable: true
+        comment: 区县
+      - name: town
+        type: VARCHAR(50)
+        nullable: true
+        comment: 乡镇街道
+      - name: community
+        type: VARCHAR(100)
+        nullable: true
+        comment: 社区村
+      - name: city_id
+        type: INTEGER
+        nullable: true
+        comment: 城市ID
+      - name: county_id
+        type: INTEGER
+        nullable: true
+        comment: 区县ID
+      - name: town_id
+        type: INTEGER
+        nullable: true
+        comment: 乡镇ID
+      - name: village_id
+        type: INTEGER
+        nullable: true
+        comment: 村ID
+      - name: address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 详细地址
+      
+      # ── 身体状况 ──
+      - name: physical_condition
+        type: VARCHAR(50)
+        nullable: true
+        comment: 身体状况
+      - name: disease_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 一级疾病
+      - name: secondary_disease_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 二级疾病
+      - name: disease_code
+        type: VARCHAR(20)
+        nullable: true
+        comment: 疾病编码（ICD-10，输入后自动回填疾病名称与一级分类）
+      - name: is_severe_disease
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否重病（经办人人工判定复选框）
+      - name: disability_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 残疾类型
+      - name: disability_level
+        type: VARCHAR(20)
+        nullable: true
+        comment: 残疾等级
+      - name: health_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 健康状况
+      
+      # ── 从业情况 ──
+      - name: employment_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 从业情况
+      - name: work_unit
+        type: VARCHAR(200)
+        nullable: true
+        comment: 工作单位
+      - name: income_source
+        type: VARCHAR(200)
+        nullable: true
+        comment: 收入来源
+      
+      # ── 银行信息 ──
+      - name: bank_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 开户银行
+      - name: bank_account
+        type: VARCHAR(30)
+        nullable: true
+        comment: 银行账号
+      
+      # ── 申请信息 ──
+      - name: family_size
+        type: INTEGER
+        nullable: true
+        defaultValue: 1
+        comment: 家庭人数
+      - name: confirmed_family_size
+        type: INTEGER
+        nullable: true
+        comment: 核定家庭人数
+      - name: is_single_rescue
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否单独救助
+      - name: support_mode
+        type: VARCHAR(20)
+        nullable: true
+        comment: 救助方式
+      - name: application_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 申请原因
+      - name: application_reason_detail
+        type: VARCHAR(500)
+        nullable: true
+        comment: 申请原因详情
+      - name: caregiver_type
+        type: VARCHAR(20)
+        nullable: true
+        comment: 照料护理人类型
+      - name: destitute_support_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 特困供养分类
+      - name: support_institution_id
+        type: INTEGER
+        nullable: true
+        comment: 特困供养机构ID
+      
+      # ── 经济状况 ──
+      - name: work_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 务工收入合计
+      - name: business_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 经营收入合计
+      - name: property_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 财产性收入合计
+      - name: transfer_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 转移性收入合计
+      - name: other_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 其他收入合计
+      - name: total_family_income
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 家庭总收入
+      - name: per_capita_income
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 人均收入
+      - name: rigid_expenditure
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 刚性支出
+      - name: alimony_income
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 赡养费收入
+      - name: family_land_area
+        type: DECIMAL(10,4)
+        nullable: true
+        comment: 家庭耕地面积
+      - name: self_farmed_land_area
+        type: DECIMAL(10,4)
+        nullable: true
+        comment: 自耕面积
+      - name: subleased_land_area
+        type: DECIMAL(10,4)
+        nullable: true
+        comment: 转包面积
+      - name: contracted_land_area
+        type: DECIMAL(10,4)
+        nullable: true
+        comment: 承包面积
+      - name: land_income_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 土地收入合计
+      - name: subsidy_total
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 补贴合计
+      - name: total_confirmed_land_area
+        type: DECIMAL(10,4)
+        nullable: true
+        comment: 确权总面积
+      - name: confirmed_person_count
+        type: INTEGER
+        nullable: true
+        comment: 确权人数
+      
+      # ── 分类结果 ──
+      - name: is_eligible
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否符合条件
+      - name: classification_result
+        type: VARCHAR(50)
+        nullable: true
+        comment: 分类结果
+      - name: classified_subsidy_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 分类补贴类型
+      - name: classified_subsidy_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 分类补贴金额
+      - name: household_monthly_guarantee_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 户月保障金额
+      - name: person_category_protection_total_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 人员分类保障总金额
+      - name: caregiver_subsidy_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 照料护理补贴金额
+      - name: total_guarantee_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 保障金总额
+      
+      # ── 停保信息 ──
+      - name: stop_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 停保原因
+      - name: stop_date
+        type: DATE
+        nullable: true
+        comment: 停保日期
+      - name: stop_remark
+        type: VARCHAR(200)
+        nullable: true
+        comment: 停保备注
+      
+      # ── 状态与流程 ──
+      - name: status
+        type: VARCHAR(20)
+        nullable: true
+        defaultValue: 'Draft'
+        comment: 申请状态
+      - name: current_step
+        type: INTEGER
+        nullable: true
+        defaultValue: 1
+        comment: 当前步骤
+      - name: submit_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 提交时间
+      - name: submit_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 提交人
+      
+      # ── 来源追溯 ──
+      - name: is_special_approval
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否通过一事一议豁免
+      - name: special_approval_id
+        type: BIGINT
+        nullable: true
+        comment: 关联 nc_biz_special_approvals.id
+      - name: source_type
+        type: VARCHAR(50)
+        nullable: true
+        defaultValue: 'NewApplication'
+        comment: 数据来源类型
+      - name: source_table
+        type: VARCHAR(100)
+        nullable: true
+        comment: 历史数据来源表名
+      - name: source_id
+        type: BIGINT
+        nullable: true
+        comment: 历史数据来源记录ID
+      - name: original_application_id
+        type: BIGINT
+        nullable: true
+        comment: 变更链上游申请ID
+      - name: data_completed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 数据补全完成时间（导入库建档档案：NULL=待补全，非空=已补全）
+      - name: first_approved_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 首次成为保障对象（归档/审批通过）时间；新增及审批时间统计口径，写入一次不覆盖
+      
+      # ── 审计字段 ──
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 更新人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    # 历史 Bug 修复：indexes 原本写在顶层（tables 的兄弟节点），DatabaseSchema 模型没有
+    # 顶层 Indexes 属性 + IgnoreUnmatchedProperties → 全系统最热表的 6 个索引从未被创建。
+    # 现归位为表的子属性；应用内"Schema 修复"或初始化会幂等补建（CREATE INDEX IF NOT EXISTS）。
+    indexes:
+      - name: idx_applications_application_no
+        columns: [application_no]
+        unique: true
+      - name: idx_applications_applicant_id_card
+        columns: [applicant_id_card]
+      - name: idx_applications_status
+        columns: [status]
+      - name: idx_applications_created_at
+        columns: [created_at]
+      - name: idx_applications_source
+        columns: [source_type, source_table]
+      - name: idx_applications_original
+        columns: [original_application_id]
+      - name: idx_applications_first_approved_at
+        columns: [first_approved_at]

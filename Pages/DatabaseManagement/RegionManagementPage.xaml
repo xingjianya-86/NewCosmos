@@ -1,0 +1,345 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.DatabaseManagement.RegionManagementPage"
+             x:DataType="RegionManagementViewModel"
+             Title="行政区划管理"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="&#xE774; 同步Schema"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="#33FFFFFF"
+                                TextColor="White"
+                                FontSize="14"
+                                Command="{Binding SyncSchemaCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                        <Button Text="&#xE9F9; 初始化"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="White"
+                                TextColor="{StaticResource Primary}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                Command="{Binding InitializeFromSeedCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="行政区划管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="管理黑龙江省地市区划数据" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="320,*" BackgroundColor="{StaticResource Background}">
+
+            <!-- 左侧面板：三级行政区划树 -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorderElevated}" Padding="0" Margin="16">
+                <ScrollView>
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+
+                        <!-- 地级市选择器 -->
+                        <Picker Grid.Row="0"
+                                Title="请选择地级市"
+                                ItemsSource="{Binding Cities}"
+                                ItemDisplayBinding="{Binding CityName, x:DataType=ent:RegionCity}"
+                                SelectedItem="{Binding SelectedCity}"
+                                Margin="8,8,8,0" FontSize="15"/>
+
+                        <Label Grid.Row="1" Text="{Binding CountyHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="2" ItemsSource="{Binding Counties}" SelectionMode="Single" SelectedItem="{Binding SelectedCounty}" MaximumHeightRequest="200">
+                            <CollectionView.EmptyView>
+                                <Label Text="选择地级市后显示区县数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:RegionCounty">
+                                    <Grid Padding="12,10" Margin="0,0,0,2" ColumnDefinitions="*,Auto">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Grid.Column="0" Text="{Binding CountyName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Grid.Column="1" Text="{Binding CityName}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <Label Grid.Row="3" Text="{Binding TownHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="4" ItemsSource="{Binding Towns}" SelectionMode="Single" SelectedItem="{Binding SelectedTown}" MaximumHeightRequest="200">
+                            <CollectionView.EmptyView>
+                                <Label Text="选择区县后显示乡镇数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:RegionTown">
+                                    <Grid Padding="12,8" Margin="0,0,0,2" ColumnDefinitions="Auto,*">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Grid.Column="0" Text="{Binding TownType}" FontSize="14" TextColor="{StaticResource Primary}" Margin="0,0,8,0"/>
+                                        <Label Grid.Column="1" Text="{Binding TownName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <Label Grid.Row="5" Text="{Binding VillageHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="6" ItemsSource="{Binding Villages}" SelectionMode="Single" SelectedItem="{Binding SelectedVillage}" MaximumHeightRequest="200">
+                            <CollectionView.EmptyView>
+                                <Label Text="选择乡镇后显示村级数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:RegionVillage">
+                                    <Grid Padding="12,6" Margin="0,0,0,1">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Text="{Binding VillageName}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                    </Grid>
+                </ScrollView>
+            </Border>
+
+            <!-- 右侧面板：详情 + 编辑 -->
+            <Grid Grid.Column="1">
+                <Border Style="{StaticResource CardBorderElevated}" Padding="0" Margin="0,16,16,16">
+                    <Grid RowDefinitions="Auto,*,Auto">
+
+                        <!-- 头部 + 操作按钮 -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="16" Margin="0,0,0,8">
+                            <Label Grid.Column="0" Text="{Binding RegionHeaderText}" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8">
+
+                                <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsCountyLevel}">
+                                    <Button Text="&#xE710; 新增镇" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditCountyCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteCountyCommand}" Opacity="{Binding ManageOpacity}"/>
+                                </HorizontalStackLayout>
+
+                                <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsTownLevel}">
+                                    <Button Text="&#xE710; 新增村" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                </HorizontalStackLayout>
+
+                                <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsVillageLevel}">
+                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                </HorizontalStackLayout>
+
+                                <Label Text="请从左侧选择" FontSize="15" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"
+                                       IsVisible="{Binding SelectedCounty, Converter={StaticResource NullToInverseBoolConverter}}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 信息展示 -->
+                        <ScrollView Grid.Row="1" Padding="16,0">
+                            <VerticalStackLayout Spacing="8">
+
+                                <VerticalStackLayout IsVisible="{Binding SelectedCounty, Converter={StaticResource NullToInverseBoolConverter}}">
+                                    <Label Text="请先从左侧选择地级市" FontSize="16" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,40"/>
+                                </VerticalStackLayout>
+
+                                <Border IsVisible="{Binding IsCountyLevel}" BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="16">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="名称：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedCounty.CountyName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="代码：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedCounty.CountyCode}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="地市：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedCounty.CityName}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <Border IsVisible="{Binding IsTownLevel}" BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="16">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="名称：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedTown.TownName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="代码：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedTown.TownCode}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="类型：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedTown.TownType}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <Border IsVisible="{Binding IsVillageLevel}" BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="16">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="名称：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedVillage.VillageName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="代码：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedVillage.VillageCode}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <Label Text="类型：" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding SelectedVillage.VillageType}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                            </VerticalStackLayout>
+                        </ScrollView>
+
+                        <!-- 编辑表单 -->
+                        <Grid Grid.Row="2" IsVisible="{Binding IsEditing}" Padding="16" BackgroundColor="{StaticResource Gray100}">
+                            <VerticalStackLayout Spacing="8">
+                                <Entry Text="{Binding EditName}" Placeholder="名称" WidthRequest="300"/>
+                                <Entry Text="{Binding EditCode}" Placeholder="行政区划代码" WidthRequest="200"/>
+                                <Entry Text="{Binding EditCityName}" Placeholder="所属地级市" WidthRequest="200"
+                                       IsVisible="{Binding IsCountyLevel}"/>
+                                <Entry Text="{Binding EditTownType}" Placeholder="类型（镇/乡/街道）" WidthRequest="200"
+                                       IsVisible="{Binding IsTownLevel}"/>
+                                <Entry Text="{Binding EditVillageType}" Placeholder="类型（村委会/居委会）" WidthRequest="200"
+                                       IsVisible="{Binding IsVillageLevel}"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Button Text="保存" Style="{StaticResource ButtonPrimary}"
+                                            Command="{Binding SaveCountyCommand}"
+                                            IsVisible="{Binding IsCountyLevel}"/>
+                                    <Button Text="保存" Style="{StaticResource ButtonPrimary}"
+                                            Command="{Binding SaveTownCommand}"
+                                            IsVisible="{Binding IsTownLevel}"/>
+                                    <Button Text="保存" Style="{StaticResource ButtonPrimary}"
+                                            Command="{Binding SaveVillageCommand}"
+                                            IsVisible="{Binding IsVillageLevel}"/>
+                                    <Button Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelEditCommand}"/>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                    </Grid>
+                </Border>
+
+                <Grid BackgroundColor="#40FFFFFF"
+                      Grid.Row="0" Grid.RowSpan="2"
+                      IsVisible="{Binding IsLoading}"
+                      HorizontalOptions="Fill" VerticalOptions="Fill" ZIndex="10">
+                    <components:LoadingOverlay IsLoading="{Binding IsLoading}"
+                                               LoadingText="正在加载区域..."/>
+                </Grid>
+            </Grid>
+
+        </Grid>
+
+        <!-- 进度弹窗覆盖层 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              BackgroundColor="#80000000"
+              IsVisible="{Binding Progress.IsProgressVisible}"
+              HorizontalOptions="Fill"
+              VerticalOptions="Fill">
+            <components:ProgressPopupView
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                Title="{Binding Progress.ProgressTitle}"
+                Progress="{Binding Progress.ProgressValue}"
+                ProgressText="{Binding Progress.ProgressText}"
+                Steps="{Binding Progress.ProgressSteps}"
+                CanClose="{Binding Progress.CanCloseProgress}"
+                CloseCommand="{Binding Progress.CloseProgressCommand}"/>
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

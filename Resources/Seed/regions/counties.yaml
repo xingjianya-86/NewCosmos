@@ -1,0 +1,160 @@
+# 黑龙江省县区种子数据（固定ID）
+# 共125个县级行政单位
+# ID范围：1001-9999
+database: regions
+version: 1.0
+
+tables:
+  - name: nc_regions_counties
+    data:
+      # 哈尔滨市 (2301) - 18个县区
+      - { id: 1001, county_name: "道里区", county_code: "230102", city_name: "哈尔滨市", sort_order: 1, is_active: true }
+      - { id: 1002, county_name: "南岗区", county_code: "230103", city_name: "哈尔滨市", sort_order: 2, is_active: true }
+      - { id: 1003, county_name: "道外区", county_code: "230104", city_name: "哈尔滨市", sort_order: 3, is_active: true }
+      - { id: 1004, county_name: "平房区", county_code: "230108", city_name: "哈尔滨市", sort_order: 4, is_active: true }
+      - { id: 1005, county_name: "松北区", county_code: "230109", city_name: "哈尔滨市", sort_order: 5, is_active: true }
+      - { id: 1006, county_name: "香坊区", county_code: "230110", city_name: "哈尔滨市", sort_order: 6, is_active: true }
+      - { id: 1007, county_name: "呼兰区", county_code: "230111", city_name: "哈尔滨市", sort_order: 7, is_active: true }
+      - { id: 1008, county_name: "阿城区", county_code: "230112", city_name: "哈尔滨市", sort_order: 8, is_active: true }
+      - { id: 1009, county_name: "双城区", county_code: "230113", city_name: "哈尔滨市", sort_order: 9, is_active: true }
+      - { id: 1010, county_name: "依兰县", county_code: "230123", city_name: "哈尔滨市", sort_order: 10, is_active: true }
+      - { id: 1011, county_name: "方正县", county_code: "230124", city_name: "哈尔滨市", sort_order: 11, is_active: true }
+      - { id: 1012, county_name: "宾县", county_code: "230125", city_name: "哈尔滨市", sort_order: 12, is_active: true }
+      - { id: 1013, county_name: "巴彦县", county_code: "230126", city_name: "哈尔滨市", sort_order: 13, is_active: true }
+      - { id: 1014, county_name: "木兰县", county_code: "230127", city_name: "哈尔滨市", sort_order: 14, is_active: true }
+      - { id: 1015, county_name: "通河县", county_code: "230128", city_name: "哈尔滨市", sort_order: 15, is_active: true }
+      - { id: 1016, county_name: "延寿县", county_code: "230129", city_name: "哈尔滨市", sort_order: 16, is_active: true }
+      - { id: 1017, county_name: "尚志市", county_code: "230183", city_name: "哈尔滨市", sort_order: 17, is_active: true }
+      - { id: 1018, county_name: "五常市", county_code: "230184", city_name: "哈尔滨市", sort_order: 18, is_active: true }
+
+      # 齐齐哈尔市 (2302) - 16个县区
+      - { id: 1019, county_name: "龙沙区", county_code: "230202", city_name: "齐齐哈尔市", sort_order: 19, is_active: true }
+      - { id: 1020, county_name: "建华区", county_code: "230203", city_name: "齐齐哈尔市", sort_order: 20, is_active: true }
+      - { id: 1021, county_name: "铁锋区", county_code: "230204", city_name: "齐齐哈尔市", sort_order: 21, is_active: true }
+      - { id: 1022, county_name: "昂昂溪区", county_code: "230205", city_name: "齐齐哈尔市", sort_order: 22, is_active: true }
+      - { id: 1023, county_name: "富拉尔基区", county_code: "230206", city_name: "齐齐哈尔市", sort_order: 23, is_active: true }
+      - { id: 1024, county_name: "碾子山区", county_code: "230207", city_name: "齐齐哈尔市", sort_order: 24, is_active: true }
+      - { id: 1025, county_name: "梅里斯达斡尔族区", county_code: "230208", city_name: "齐齐哈尔市", sort_order: 25, is_active: true }
+      - { id: 1026, county_name: "龙江县", county_code: "230221", city_name: "齐齐哈尔市", sort_order: 26, is_active: true }
+      - { id: 1027, county_name: "依安县", county_code: "230223", city_name: "齐齐哈尔市", sort_order: 27, is_active: true }
+      - { id: 1028, county_name: "泰来县", county_code: "230224", city_name: "齐齐哈尔市", sort_order: 28, is_active: true }
+      - { id: 1029, county_name: "甘南县", county_code: "230225", city_name: "齐齐哈尔市", sort_order: 29, is_active: true }
+      - { id: 1030, county_name: "富裕县", county_code: "230227", city_name: "齐齐哈尔市", sort_order: 30, is_active: true }
+      - { id: 1031, county_name: "克山县", county_code: "230229", city_name: "齐齐哈尔市", sort_order: 31, is_active: true }
+      - { id: 1032, county_name: "克东县", county_code: "230230", city_name: "齐齐哈尔市", sort_order: 32, is_active: true }
+      - { id: 1033, county_name: "拜泉县", county_code: "230231", city_name: "齐齐哈尔市", sort_order: 33, is_active: true }
+      - { id: 1034, county_name: "讷河市", county_code: "230281", city_name: "齐齐哈尔市", sort_order: 34, is_active: true }
+
+      # 鸡西市 (2303) - 9个县区
+      - { id: 1035, county_name: "鸡冠区", county_code: "230302", city_name: "鸡西市", sort_order: 35, is_active: true }
+      - { id: 1036, county_name: "恒山区", county_code: "230303", city_name: "鸡西市", sort_order: 36, is_active: true }
+      - { id: 1037, county_name: "滴道区", county_code: "230304", city_name: "鸡西市", sort_order: 37, is_active: true }
+      - { id: 1038, county_name: "梨树区", county_code: "230305", city_name: "鸡西市", sort_order: 38, is_active: true }
+      - { id: 1039, county_name: "城子河区", county_code: "230306", city_name: "鸡西市", sort_order: 39, is_active: true }
+      - { id: 1040, county_name: "麻山区", county_code: "230307", city_name: "鸡西市", sort_order: 40, is_active: true }
+      - { id: 1041, county_name: "鸡东县", county_code: "230321", city_name: "鸡西市", sort_order: 41, is_active: true }
+      - { id: 1042, county_name: "虎林市", county_code: "230381", city_name: "鸡西市", sort_order: 42, is_active: true }
+      - { id: 1043, county_name: "密山市", county_code: "230382", city_name: "鸡西市", sort_order: 43, is_active: true }
+
+      # 鹤岗市 (2304) - 8个县区
+      - { id: 1044, county_name: "向阳区", county_code: "230402", city_name: "鹤岗市", sort_order: 44, is_active: true }
+      - { id: 1045, county_name: "工农区", county_code: "230403", city_name: "鹤岗市", sort_order: 45, is_active: true }
+      - { id: 1046, county_name: "南山区", county_code: "230404", city_name: "鹤岗市", sort_order: 46, is_active: true }
+      - { id: 1047, county_name: "兴安区", county_code: "230405", city_name: "鹤岗市", sort_order: 47, is_active: true }
+      - { id: 1048, county_name: "东山区", county_code: "230406", city_name: "鹤岗市", sort_order: 48, is_active: true }
+      - { id: 1049, county_name: "兴山区", county_code: "230407", city_name: "鹤岗市", sort_order: 49, is_active: true }
+      - { id: 1050, county_name: "萝北县", county_code: "230421", city_name: "鹤岗市", sort_order: 50, is_active: true }
+      - { id: 1051, county_name: "绥滨县", county_code: "230422", city_name: "鹤岗市", sort_order: 51, is_active: true }
+
+      # 双鸭山市 (2305) - 8个县区
+      - { id: 1052, county_name: "尖山区", county_code: "230502", city_name: "双鸭山市", sort_order: 52, is_active: true }
+      - { id: 1053, county_name: "岭东区", county_code: "230503", city_name: "双鸭山市", sort_order: 53, is_active: true }
+      - { id: 1054, county_name: "四方台区", county_code: "230505", city_name: "双鸭山市", sort_order: 54, is_active: true }
+      - { id: 1055, county_name: "宝山区", county_code: "230506", city_name: "双鸭山市", sort_order: 55, is_active: true }
+      - { id: 1056, county_name: "集贤县", county_code: "230521", city_name: "双鸭山市", sort_order: 56, is_active: true }
+      - { id: 1057, county_name: "友谊县", county_code: "230522", city_name: "双鸭山市", sort_order: 57, is_active: true }
+      - { id: 1058, county_name: "宝清县", county_code: "230523", city_name: "双鸭山市", sort_order: 58, is_active: true }
+      - { id: 1059, county_name: "饶河县", county_code: "230524", city_name: "双鸭山市", sort_order: 59, is_active: true }
+
+      # 大庆市 (2306) - 10个县区
+      - { id: 1060, county_name: "萨尔图区", county_code: "230602", city_name: "大庆市", sort_order: 60, is_active: true }
+      - { id: 1061, county_name: "龙凤区", county_code: "230603", city_name: "大庆市", sort_order: 61, is_active: true }
+      - { id: 1062, county_name: "让胡路区", county_code: "230604", city_name: "大庆市", sort_order: 62, is_active: true }
+      - { id: 1063, county_name: "红岗区", county_code: "230605", city_name: "大庆市", sort_order: 63, is_active: true }
+      - { id: 1064, county_name: "大同区", county_code: "230606", city_name: "大庆市", sort_order: 64, is_active: true }
+      - { id: 1065, county_name: "肇州县", county_code: "230621", city_name: "大庆市", sort_order: 65, is_active: true }
+      - { id: 1066, county_name: "肇源县", county_code: "230622", city_name: "大庆市", sort_order: 66, is_active: true }
+      - { id: 1067, county_name: "林甸县", county_code: "230623", city_name: "大庆市", sort_order: 67, is_active: true }
+      - { id: 1068, county_name: "杜尔伯特蒙古族自治县", county_code: "230624", city_name: "大庆市", sort_order: 68, is_active: true }
+      - { id: 1069, county_name: "大庆高新技术产业开发区", county_code: "230671", city_name: "大庆市", sort_order: 69, is_active: true }
+
+      # 伊春市 (2307) - 10个县区
+      - { id: 1070, county_name: "伊美区", county_code: "230717", city_name: "伊春市", sort_order: 70, is_active: true }
+      - { id: 1071, county_name: "乌翠区", county_code: "230718", city_name: "伊春市", sort_order: 71, is_active: true }
+      - { id: 1072, county_name: "友好区", county_code: "230719", city_name: "伊春市", sort_order: 72, is_active: true }
+      - { id: 1073, county_name: "嘉荫县", county_code: "230722", city_name: "伊春市", sort_order: 73, is_active: true }
+      - { id: 1074, county_name: "汤旺县", county_code: "230723", city_name: "伊春市", sort_order: 74, is_active: true }
+      - { id: 1075, county_name: "丰林县", county_code: "230724", city_name: "伊春市", sort_order: 75, is_active: true }
+      - { id: 1076, county_name: "大箐山县", county_code: "230725", city_name: "伊春市", sort_order: 76, is_active: true }
+      - { id: 1077, county_name: "南岔县", county_code: "230726", city_name: "伊春市", sort_order: 77, is_active: true }
+      - { id: 1078, county_name: "金林区", county_code: "230751", city_name: "伊春市", sort_order: 78, is_active: true }
+      - { id: 1079, county_name: "铁力市", county_code: "230781", city_name: "伊春市", sort_order: 79, is_active: true }
+
+      # 佳木斯市 (2308) - 10个县区
+      - { id: 1080, county_name: "向阳区", county_code: "230803", city_name: "佳木斯市", sort_order: 80, is_active: true }
+      - { id: 1081, county_name: "前进区", county_code: "230804", city_name: "佳木斯市", sort_order: 81, is_active: true }
+      - { id: 1082, county_name: "东风区", county_code: "230805", city_name: "佳木斯市", sort_order: 82, is_active: true }
+      - { id: 1083, county_name: "郊区", county_code: "230811", city_name: "佳木斯市", sort_order: 83, is_active: true }
+      - { id: 1084, county_name: "桦南县", county_code: "230822", city_name: "佳木斯市", sort_order: 84, is_active: true }
+      - { id: 1085, county_name: "桦川县", county_code: "230826", city_name: "佳木斯市", sort_order: 85, is_active: true }
+      - { id: 1086, county_name: "汤原县", county_code: "230828", city_name: "佳木斯市", sort_order: 86, is_active: true }
+      - { id: 1087, county_name: "同江市", county_code: "230881", city_name: "佳木斯市", sort_order: 87, is_active: true }
+      - { id: 1088, county_name: "富锦市", county_code: "230882", city_name: "佳木斯市", sort_order: 88, is_active: true }
+      - { id: 1089, county_name: "抚远市", county_code: "230883", city_name: "佳木斯市", sort_order: 89, is_active: true }
+
+      # 七台河市 (2309) - 4个县区
+      - { id: 1090, county_name: "新兴区", county_code: "230902", city_name: "七台河市", sort_order: 90, is_active: true }
+      - { id: 1091, county_name: "桃山区", county_code: "230903", city_name: "七台河市", sort_order: 91, is_active: true }
+      - { id: 1092, county_name: "茄子河区", county_code: "230904", city_name: "七台河市", sort_order: 92, is_active: true }
+      - { id: 1093, county_name: "勃利县", county_code: "230921", city_name: "七台河市", sort_order: 93, is_active: true }
+
+      # 牡丹江市 (2310) - 10个县区
+      - { id: 1094, county_name: "东安区", county_code: "231002", city_name: "牡丹江市", sort_order: 94, is_active: true }
+      - { id: 1095, county_name: "阳明区", county_code: "231003", city_name: "牡丹江市", sort_order: 95, is_active: true }
+      - { id: 1096, county_name: "爱民区", county_code: "231004", city_name: "牡丹江市", sort_order: 96, is_active: true }
+      - { id: 1097, county_name: "西安区", county_code: "231005", city_name: "牡丹江市", sort_order: 97, is_active: true }
+      - { id: 1098, county_name: "林口县", county_code: "231025", city_name: "牡丹江市", sort_order: 98, is_active: true }
+      - { id: 1099, county_name: "绥芬河市", county_code: "231081", city_name: "牡丹江市", sort_order: 99, is_active: true }
+      - { id: 1100, county_name: "海林市", county_code: "231083", city_name: "牡丹江市", sort_order: 100, is_active: true }
+      - { id: 1101, county_name: "宁安市", county_code: "231084", city_name: "牡丹江市", sort_order: 101, is_active: true }
+      - { id: 1102, county_name: "穆棱市", county_code: "231085", city_name: "牡丹江市", sort_order: 102, is_active: true }
+      - { id: 1103, county_name: "东宁市", county_code: "231086", city_name: "牡丹江市", sort_order: 103, is_active: true }
+
+      # 黑河市 (2311) - 6个县区
+      - { id: 1104, county_name: "爱辉区", county_code: "231102", city_name: "黑河市", sort_order: 104, is_active: true }
+      - { id: 1105, county_name: "逊克县", county_code: "231123", city_name: "黑河市", sort_order: 105, is_active: true }
+      - { id: 1106, county_name: "孙吴县", county_code: "231124", city_name: "黑河市", sort_order: 106, is_active: true }
+      - { id: 1107, county_name: "北安市", county_code: "231181", city_name: "黑河市", sort_order: 107, is_active: true }
+      - { id: 1108, county_name: "五大连池市", county_code: "231182", city_name: "黑河市", sort_order: 108, is_active: true }
+      - { id: 1109, county_name: "嫩江市", county_code: "231183", city_name: "黑河市", sort_order: 109, is_active: true }
+
+      # 绥化市 (2312) - 10个县区
+      - { id: 1110, county_name: "北林区", county_code: "231202", city_name: "绥化市", sort_order: 110, is_active: true }
+      - { id: 1111, county_name: "望奎县", county_code: "231221", city_name: "绥化市", sort_order: 111, is_active: true }
+      - { id: 1112, county_name: "兰西县", county_code: "231222", city_name: "绥化市", sort_order: 112, is_active: true }
+      - { id: 1113, county_name: "青冈县", county_code: "231223", city_name: "绥化市", sort_order: 113, is_active: true }
+      - { id: 1114, county_name: "庆安县", county_code: "231224", city_name: "绥化市", sort_order: 114, is_active: true }
+      - { id: 1115, county_name: "明水县", county_code: "231225", city_name: "绥化市", sort_order: 115, is_active: true }
+      - { id: 1116, county_name: "绥棱县", county_code: "231226", city_name: "绥化市", sort_order: 116, is_active: true }
+      - { id: 1117, county_name: "安达市", county_code: "231281", city_name: "绥化市", sort_order: 117, is_active: true }
+      - { id: 1118, county_name: "肇东市", county_code: "231282", city_name: "绥化市", sort_order: 118, is_active: true }
+      - { id: 1119, county_name: "海伦市", county_code: "231283", city_name: "绥化市", sort_order: 119, is_active: true }
+
+      # 大兴安岭地区 (2327) - 7个县区
+      - { id: 1120, county_name: "漠河市", county_code: "232701", city_name: "大兴安岭地区", sort_order: 120, is_active: true }
+      - { id: 1121, county_name: "呼玛县", county_code: "232721", city_name: "大兴安岭地区", sort_order: 121, is_active: true }
+      - { id: 1122, county_name: "塔河县", county_code: "232722", city_name: "大兴安岭地区", sort_order: 122, is_active: true }
+      - { id: 1123, county_name: "加格达奇区", county_code: "232761", city_name: "大兴安岭地区", sort_order: 123, is_active: true }
+      - { id: 1124, county_name: "松岭区", county_code: "232762", city_name: "大兴安岭地区", sort_order: 124, is_active: true }
+      - { id: 1125, county_name: "新林区", county_code: "232763", city_name: "大兴安岭地区", sort_order: 125, is_active: true }
+      - { id: 1126, county_name: "呼中区", county_code: "232764", city_name: "大兴安岭地区", sort_order: 126, is_active: true }

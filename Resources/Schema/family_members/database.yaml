@@ -1,0 +1,237 @@
+# 家庭成员Schema定义
+database: 家庭成员
+version: 1.0
+description: 申请人的家庭成员信息
+
+tables:
+  # ── 家庭成员表 ──
+  - name: nc_biz_family_members
+    comment: 家庭成员表，记录申请人的家庭成员信息
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 成员姓名
+      - name: id_card
+        type: character varying(18)
+        nullable: true
+        comment: 身份证号码，18位
+      - name: is_applicant
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否为申请人/户主
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别：男、女
+      - name: birth_date
+        type: date
+        nullable: true
+        comment: 出生日期
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: character varying(20)
+        nullable: true
+        comment: 民族
+      - name: phone
+        type: character varying(20)
+        nullable: true
+        comment: 联系电话
+      - name: hukou_type
+        type: character varying(50)
+        nullable: true
+        comment: 户口性质：农业户口、非农业户口
+      - name: hukou_address
+        type: text
+        nullable: true
+        comment: 户籍地址
+      - name: marital_status
+        type: character varying(20)
+        nullable: true
+        comment: 婚姻状况：未婚、已婚、离异、丧偶
+      - name: education_level
+        type: character varying(20)
+        nullable: true
+        comment: 文化程度：小学、初中、高中、大专、本科等
+      - name: political_status
+        type: character varying(20)
+        nullable: true
+        comment: 政治面貌：群众、团员、党员
+      - name: relationship_to_head
+        type: character varying(20)
+        nullable: true
+        comment: 与户主关系：配偶、子女、父母、兄弟姐妹等
+      - name: health_status
+        type: character varying(20)
+        nullable: true
+        comment: 健康状况：健康、一般、较差
+      - name: work_capacity
+        type: character varying(20)
+        nullable: true
+        comment: 劳动能力：有劳动能力、部分丧失劳动能力、完全丧失劳动能力
+      - name: is_disabled
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否残疾人
+      - name: disability_type
+        type: character varying(20)
+        nullable: true
+        comment: 残疾类型：视力、听力、言语、肢体、智力、精神
+      - name: disability_level
+        type: character varying(20)
+        nullable: true
+        comment: 残疾等级：一级、二级、三级、四级
+      - name: is_severe_disability
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否重度残疾（一级、二级）
+      - name: disability_certificate_no
+        type: character varying(2)
+        nullable: true
+        comment: 残疾证号末2位
+      - name: disease_category
+        type: character varying(100)
+        nullable: true
+        comment: 疾病分类（一级疾病）
+      - name: disease_name
+        type: character varying(100)
+        nullable: true
+        comment: 疾病名称（二级疾病）
+      - name: secondary_disease
+        type: character varying(100)
+        nullable: true
+        comment: 二级疾病名称
+      - name: disease_code
+        type: character varying(20)
+        nullable: true
+        comment: 疾病编码（ICD-10，输入后自动回填疾病名称与一级分类）
+      - name: is_severe_disease
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否重病（经办人人工判定复选框）
+      - name: is_labor_exempt
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 免于劳动力判定（因照顾本户重病/重残亲属，经办人人工判定复选框）
+      - name: home_province
+        type: character varying(50)
+        nullable: true
+        comment: 家庭住址-省份
+      - name: home_city
+        type: character varying(50)
+        nullable: true
+        comment: 家庭住址-城市
+      - name: home_district
+        type: character varying(50)
+        nullable: true
+        comment: 家庭住址-区县
+      - name: home_town
+        type: character varying(50)
+        nullable: true
+        comment: 家庭住址-乡镇
+      - name: home_village
+        type: character varying(50)
+        nullable: true
+        comment: 家庭住址-村社区
+      - name: home_address
+        type: text
+        nullable: true
+        comment: 家庭住址-详细地址
+      - name: hukou_province
+        type: character varying(50)
+        nullable: true
+        comment: 户籍地址-省份
+      - name: hukou_city
+        type: character varying(50)
+        nullable: true
+        comment: 户籍地址-城市
+      - name: hukou_district
+        type: character varying(50)
+        nullable: true
+        comment: 户籍地址-区县
+      - name: hukou_town
+        type: character varying(50)
+        nullable: true
+        comment: 户籍地址-乡镇
+      - name: employment_status
+        type: character varying(20)
+        nullable: true
+        comment: 就业状况：在职、失业、退休、学生、无业
+      - name: work_unit
+        type: character varying(100)
+        nullable: true
+        comment: 工作单位
+      - name: main_income_source
+        type: character varying(50)
+        nullable: true
+        comment: 主要收入来源
+      - name: annual_income
+        type: numeric
+        nullable: true
+        defaultValue: 0
+        comment: 年收入（元）
+      - name: annual_support_fee
+        type: numeric(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 年赡养费（元）= 月赡养费×月数×家庭人数
+      - name: is_support_ability
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否有赡养能力
+      - name: monthly_support_fee
+        type: numeric(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 月赡养费（元/月）
+      - name: support_months
+        type: integer
+        nullable: true
+        defaultValue: 12
+        comment: 赡养月数（月）
+      - name: family_size
+        type: integer
+        nullable: true
+        defaultValue: 1
+        comment: 赡养家庭人数（人）
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 最后更新时间
+      - name: member_category
+        type: character varying(20)
+        nullable: true
+        comment: 成员分类（SharedLiving=共同生活成员, Support=赡养抚养扶养, HouseholdHead=户主）
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_family_members_application_id
+        columns: [application_id]
+      - name: idx_family_members_id_card
+        columns: [id_card]

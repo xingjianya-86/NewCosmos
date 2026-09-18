@@ -1,0 +1,127 @@
+# 赡养/抚养/扶养人表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 赡养/抚养/扶养人信息 - 记录有赡养/抚养/扶养义务的人员，用于计算赡养费收入
+
+tables:
+  - name: nc_biz_supporters
+    comment: "[经济状况] 赡养/抚养/扶养人表 - 记录有赡养义务的人员信息，用于计算赡养费收入"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与户主关系
+      - name: person_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 人员类型：赡养/抚养/扶养
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: INTEGER
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: VARCHAR(20)
+        nullable: true
+        comment: 民族
+      - name: marital_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: health_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 健康状况
+      - name: employment_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 就业状况
+      - name: work_unit
+        type: VARCHAR(100)
+        nullable: true
+        comment: 工作单位
+      - name: employer_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 单位地址
+      - name: position
+        type: VARCHAR(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 家庭住址
+      - name: monthly_income_capacity
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 月收入能力（元）
+      - name: promised_support_fee
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 承诺赡养费用（每月）
+      - name: annual_support_fee
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 年度赡养费用
+      - name: support_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 赡养金额（元）
+      - name: family_size
+        type: INTEGER
+        nullable: true
+        comment: 赡养人家庭人数
+      - name: is_support_ability
+        type: BOOLEAN
+        nullable: true
+        defaultValue: true
+        comment: 是否有赡养能力
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_supporters_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_supporters_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

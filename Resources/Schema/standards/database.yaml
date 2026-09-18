@@ -1,0 +1,198 @@
+# 标准配置数据库Schema定义
+database: 标准配置数据库
+version: 1.0
+description: 收入标准、补贴标准、特困供养标准等配置数据
+
+tables:
+  - name: nc_config_income_standards
+    comment: nc_config_income_standards
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: id
+      - name: hukou_type
+        type: character varying(50)
+        nullable: false
+        comment: hukou_type
+      - name: monthly_standard
+        type: NUMERIC(18,2)
+        nullable: false
+        comment: monthly_standard
+      - name: effective_start_date
+        type: date
+        nullable: false
+        comment: effective_start_date
+      - name: effective_end_date
+        type: date
+        nullable: false
+        comment: effective_end_date
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: created_at
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: updated_at
+
+  - name: nc_config_subsidy_standards
+    comment: nc_config_subsidy_standards
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: id
+      - name: hukou_type
+        type: character varying(50)
+        nullable: false
+        comment: hukou_type
+      - name: per_person_amount
+        type: NUMERIC(18,2)
+        nullable: false
+        comment: per_person_amount
+      - name: effective_start_date
+        type: date
+        nullable: false
+        comment: effective_start_date
+      - name: effective_end_date
+        type: date
+        nullable: false
+        comment: effective_end_date
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: created_at
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: updated_at
+
+  - name: nc_config_destitute_standards
+    comment: nc_config_destitute_standards
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: id
+      - name: hukou_type
+        type: character varying(50)
+        nullable: false
+        comment: hukou_type
+      - name: support_mode
+        type: character varying(50)
+        nullable: false
+        comment: support_mode
+      - name: monthly_standard
+        type: NUMERIC(18,2)
+        nullable: false
+        comment: monthly_standard
+      - name: effective_start_date
+        type: date
+        nullable: false
+        comment: effective_start_date
+      - name: effective_end_date
+        type: date
+        nullable: false
+        comment: effective_end_date
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: created_at
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: updated_at
+
+  - name: nc_config_subsidy_prices
+    comment: nc_config_subsidy_prices
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: id
+      - name: year
+        type: integer
+        nullable: false
+        comment: year
+      - name: subsidy_type
+        type: character varying(50)
+        nullable: false
+        comment: subsidy_type
+      - name: subsidy_type_name
+        type: character varying(100)
+        nullable: false
+        comment: subsidy_type_name
+      - name: price_per_acre
+        type: NUMERIC(10,2)
+        nullable: false
+        comment: price_per_acre
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: created_at
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: updated_at
+
+  - name: nc_config_system_standards
+    comment: nc_config_system_standards
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: id
+      - name: config_key
+        type: character varying(100)
+        nullable: false
+        comment: config_key
+      - name: config_value
+        type: NUMERIC(18,2)
+        nullable: false
+        comment: config_value
+      - name: display_name
+        type: character varying(100)
+        nullable: false
+        comment: display_name
+      - name: unit
+        type: character varying(20)
+        nullable: true
+        comment: unit
+      - name: category
+        type: character varying(50)
+        nullable: true
+        comment: category
+      - name: sort_order
+        type: integer
+        nullable: true
+        comment: sort_order
+      - name: description
+        type: character varying(200)
+        nullable: true
+        comment: description
+      - name: effective_start_date
+        type: date
+        nullable: true
+        comment: effective_start_date
+      - name: effective_end_date
+        type: date
+        nullable: true
+        comment: effective_end_date
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: created_at
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: updated_at
+    indexes:
+      - name: idx_system_standards_category
+        columns: [category]
+

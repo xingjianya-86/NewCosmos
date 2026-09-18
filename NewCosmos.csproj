@@ -1,0 +1,225 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+		<MauiEnableXamlCBindingWithSourceCompilation>false</MauiEnableXamlCBindingWithSourceCompilation>
+		<!-- XAML 源生成充气器：编译期生成强类型代码，替代运行时解析 -->
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+		<!-- GlobalXmlns 隐式命名空间（预览特性）：全局 xmlns 前缀注册依赖此开关 -->
+		<EnablePreviewFeatures>true</EnablePreviewFeatures>
+		<DefineConstants>$(DefineConstants);MauiAllowImplicitXmlnsDeclaration</DefineConstants>
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>NewCosmos</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+		<!-- NPOI 2.8+ 要求显式接受 OSMF EULA -->
+		<AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+		<!-- 仅保留CA1416（Windows-only项目的合理抑制）和MVVMTK0045（MAUI XAML编译不支持partial property） -->
+		<!-- CA2252：GlobalXmlns 隐式命名空间为已显式选择加入的预览特性，生成代码中的标注无需告警 -->
+		<NoWarn>$(NoWarn);CA1416;MVVMTK0045;CA2252</NoWarn>
+
+		<!-- Microsoft.Windows.Storage.Pickers（文件夹选择器）在 WinAppSDK 1.8 存在本地化缺陷：
+		     仅自包含部署可用。全配置启用 WinAppSDK 自包含，保证调试与发布均能弹出文件夹选择器。 -->
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+
+		<!-- Display name -->
+		<ApplicationTitle>帝皇权杖δ-me13</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.newcosmos.app</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.1.20260919</ApplicationDisplayVersion>
+		<ApplicationVersion>20260919</ApplicationVersion>
+
+		<!-- MSIX Packaging -->
+		<WindowsPackageType>None</WindowsPackageType>
+		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+		<AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+		<GenerateTestArtifacts>False</GenerateTestArtifacts>
+		<AppxBundle>Never</AppxBundle>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<!-- 发布优化（仅 Release）：ReadyToRun 预编译显著减少首次启动 JIT 开销，加快启动速度 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<!-- 仅保留简体中文卫星资源，减少启动时加载的本地化程序集数量 -->
+		<SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+		<!-- 显式关闭裁剪：Npgsql/EPPlus 等依赖大量使用反射，裁剪会引发运行时异常 -->
+		<PublishTrimmed>false</PublishTrimmed>
+		<!-- 发布不产出 PDB：libSkiaSharp.pdb 等符号文件体积巨大（~87MB），排除后减小磁盘占用与 IO -->
+		<DebugType>none</DebugType>
+		<DebugSymbols>false</DebugSymbols>
+		<!-- 完全自包含发布：.NET 运行时与 WinAppSDK 运行时均随包分发，部署机无需安装
+		     .NET Desktop Runtime / Windows App Runtime（仅当显式指定 RID 发布时启用，避免影响普通 build） -->
+		<SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<MauiIcon Include="Resources\AppIcon\appicon.png" />
+	</ItemGroup>
+
+	<!-- 排除备份文件 -->
+	<ItemGroup>
+		<Compile Remove="**\*.back" />
+		<Compile Remove="backups\**" />
+		<Compile Remove="backup\**" />
+		<Compile Remove="Scripts\**" />
+		<MauiXaml Remove="backups\**" />
+		<MauiXaml Remove="backup\**" />
+		<None Remove="backups\**" />
+		<None Remove="backup\**" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">
+			<_Parameter1>windows10.0.17763.0</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+		<PackageReference Include="Serilog" Version="4.4.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
+		<PackageReference Include="Npgsql" Version="10.0.3" />
+		<PackageReference Include="BCrypt.Net-Next" Version="4.2.1" />
+		<PackageReference Include="YamlDotNet" Version="18.1.0" />
+		<PackageReference Include="EPPlus" Version="8.6.3" />
+		<PackageReference Include="ExcelDataReader" Version="3.9.0" />
+		<PackageReference Include="ExcelDataReader.DataSet" Version="3.9.0" />
+		<PackageReference Include="TinyPinyin" Version="1.1.0" />
+		<PackageReference Include="NPOI" Version="2.8.0" />
+		<!-- NPOI 2.8.0 传递引入 SourceLink 链（Microsoft.Build.Tasks.Git 8.0.0），
+		     其 CVE-2026-62900（GHSA-23fw-v26w-5fgq）无 8.0.0 修补版，
+		     此处显式引用已修补的 10.0.303（NuGet 最高版本获胜规则压过传递依赖）消除 NU1902。
+		     该包为纯构建期工具、不进发布产物；本项目无 git 仓库，任务实际 no-op -->
+		<PackageReference Include="Microsoft.Build.Tasks.Git" Version="10.0.303" />
+		<PackageReference Include="PDFsharp" Version="6.1.1" />
+		<PackageReference Include="System.Management" Version="10.0.10" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- database.ini 含数据库凭据，绝不随构建产物/安装包分发；
+		     部署机由配置向导生成，开发机由 ConfigService 回退到项目 config/ 目录读取 -->
+		<None Include="config\**" Exclude="config\database.ini">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<MauiXaml Update="Pages\UserManagement\OrganizationImportPage.xaml" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="Resources\Backgrounds\**\*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<Link>backgrounds\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</None>
+	</ItemGroup>
+
+	<!-- 值班模块：政务值班表模板存储于模板库 nc_biz_templates（文书模板管理页上传），
+	     Resources\Templates\ 下的 xlsx 仅为上传前的参考原件，不参与编译打包 -->
+	<ItemGroup>
+		<None Remove="Resources\Templates\**\*.xlsx" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Resources\Seed\**\*.yaml" />
+		<Content Include="Resources\Seed\**\*.csv">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="Resources\Schema\**\*.yaml">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="Resources\PdfJs\**">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<!-- PostgreSQL 备份工具（pg_dump 及依赖 DLL） -->
+	<ItemGroup>
+		<None Include="Resources\PostgreSQL\**">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<!-- 彩票模块：Python 脚本自动复制到输出目录 -->
+	<ItemGroup>
+		<None Include="Scripts\Lottery\**\*.py">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="Scripts\Lottery\**\*.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="Scripts\Lottery\**\*.sql">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</None>
+		<!-- 预训练模型随包分发（新装机免重训）；用户已重训的模型升级时不被覆盖（iss onlyifdoesntexist） -->
+		<None Include="Scripts\Lottery\**\*.keras">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="Scripts\Lottery\models\**\*.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\models\%(Filename)%(Extension)</Link>
+		</None>
+	</ItemGroup>
+
+	<!-- Python 嵌入式环境：随应用分发（None 仅复制、不进 PRI 资源，避免 WinUI 将 .cpython-312 等误判为资源限定符告警） -->
+	<!-- 本项目不含任何 MAUI CSS 样式表（Resources/Styles 均为 XAML），必须关闭 MAUI 默认 css 归类：
+	     否则 MauiSdk 会在 targets 后置阶段把 .css 从 None 组 Remove 并归入 MauiCss，
+	     导致 python-embed（sklearn 数据文件）的 css 不被复制——曾致 sklearn 导入崩溃、模型训练失败 -->
+	<PropertyGroup>
+		<EnableDefaultCssItems>false</EnableDefaultCssItems>
+	</PropertyGroup>
+	<ItemGroup>
+		<None Include="python-embed\**\*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</None>
+		<!-- 显式声明 .css（sklearn 数据文件等）：与 EnableDefaultCssItems=false 配合保证 python-embed 下的 css 按普通文件复制 -->
+		<None Include="python-embed\**\*.css">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="Resources\Icd10\**\*.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<!-- ZeroTier 接入向导：随包分发安装包（客户端离线安装用） -->
+	<ItemGroup>
+		<None Include="Resources\ZeroTier\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+</Project>

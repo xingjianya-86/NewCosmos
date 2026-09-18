@@ -1,0 +1,295 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.DutyManagement"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.DutyManagement.DutyMemberPage"
+             x:DataType="vm:DutyMemberViewModel"
+             Title="值班成员管理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 头部横幅 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
+                    <VerticalStackLayout Spacing="14">
+
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回值班表" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="值班成员管理" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="四组名单维护 · 一人可属多组 · 组内顺序即轮转顺序" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <Label Text="{Binding GroupSummaryText}" FontSize="13" TextColor="#CCFFFFFF"/>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 工具栏 -->
+                <Grid Margin="20,16,20,0" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
+                    <Picker Grid.Column="0" ItemsSource="{Binding GroupFilterOptions}"
+                            SelectedItem="{Binding SelectedGroupFilter}"
+                            WidthRequest="140" HeightRequest="34"/>
+                    <Button Grid.Column="2" Text="下载导入模板" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding DownloadImportTemplateCommand}"/>
+                    <Button Grid.Column="3" Text="批量导入" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}" Opacity="{Binding ManageOpacity}"
+                            Command="{Binding OpenImportPanelCommand}"/>
+                    <Button Grid.Column="4" Text="+ 新增成员" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonPrimary}"
+                            Command="{Binding StartAddMemberCommand}" Opacity="{Binding ManageOpacity}"/>
+                </Grid>
+
+                <!-- 编辑区 -->
+                <Border Margin="20,12,20,0" Style="{StaticResource CardBorder}" Padding="16" IsVisible="{Binding IsEditing}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="成员信息" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                            <Label Grid.Row="0" Grid.Column="0" Text="姓名 *" FontSize="13" VerticalOptions="Center"/>
+                            <Entry Grid.Row="0" Grid.Column="1" Text="{Binding EditName}" Placeholder="请输入姓名" HeightRequest="36"/>
+
+                            <Label Grid.Row="0" Grid.Column="2" Text="电话" FontSize="13" VerticalOptions="Center"/>
+                            <Entry Grid.Row="0" Grid.Column="3" Text="{Binding EditPhone}" Placeholder="选填" HeightRequest="36" Keyboard="Telephone"/>
+
+                            <Label Grid.Row="1" Grid.Column="0" Text="备注" FontSize="13" VerticalOptions="Center"/>
+                            <Entry Grid.Row="1" Grid.Column="1,3" Text="{Binding EditRemark}" Placeholder="选填" HeightRequest="36"/>
+
+                            <HorizontalStackLayout Grid.Row="2" Grid.Column="0,3" Spacing="4">
+                                <CheckBox IsChecked="{Binding EditIsActive}" VerticalOptions="Center"/>
+                                <Label Text="启用（参与轮转）" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+
+                            <!-- 入职时间 -->
+                            <HorizontalStackLayout Grid.Row="3" Grid.Column="0,2" Spacing="4">
+                                <CheckBox IsChecked="{Binding EditHasJoinDate}" VerticalOptions="Center"/>
+                                <Label Text="入职时间" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <DatePicker Grid.Row="3" Grid.Column="1" Date="{Binding EditJoinDate}" IsEnabled="{Binding EditHasJoinDate}" HeightRequest="36"/>
+
+                            <!-- 离职时间 -->
+                            <HorizontalStackLayout Grid.Row="3" Grid.Column="2" Spacing="4">
+                                <CheckBox IsChecked="{Binding EditHasExitDate}" VerticalOptions="Center"/>
+                                <Label Text="离职时间" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <DatePicker Grid.Row="3" Grid.Column="3" Date="{Binding EditExitDate}" IsEnabled="{Binding EditHasExitDate}" HeightRequest="36"/>
+                        </Grid>
+
+                        <Label Text="所属组（可多选；中层管理组成员同时属男生/女生组时，值班日冲突自动顺延）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="入职/离职时间按日精确参与轮转：值班日当天须已入职且未离职；历史班次不受影响。长期请假请在成员列表点「请假」登记；支持补登记过去日期（会删除受影响月份排班、需重新生成，须填写事由）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <HorizontalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="4">
+                                <CheckBox IsChecked="{Binding EditInLeader}" VerticalOptions="Center"/>
+                                <Label Text="领导组" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="4">
+                                <CheckBox IsChecked="{Binding EditInMiddle}" VerticalOptions="Center"/>
+                                <Label Text="中层管理组" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="4">
+                                <CheckBox IsChecked="{Binding EditInMale}" VerticalOptions="Center"/>
+                                <Label Text="男生组" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="4">
+                                <CheckBox IsChecked="{Binding EditInFemale}" VerticalOptions="Center"/>
+                                <Label Text="女生组" FontSize="13" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                            <Button Text="保存" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="18,4" Command="{Binding SaveMemberCommand}"/>
+                            <Button Text="取消" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="18,4" Command="{Binding CancelEditCommand}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 成员列表 -->
+                <CollectionView ItemsSource="{Binding FilteredMembers}" Margin="20,12,20,0">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:DutyMemberView">
+                            <Border Style="{StaticResource CardBorder}" Padding="14,10" Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="150,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Border StrokeShape="RoundRectangle 8" Padding="6,1" BackgroundColor="#E8F5E9" IsVisible="{Binding IsActive}">
+                                                <Label Text="启用" FontSize="10" TextColor="#2E7D32"/>
+                                            </Border>
+                                            <Border StrokeShape="RoundRectangle 8" Padding="6,1" BackgroundColor="#ECEFF1" IsVisible="{Binding IsInactive}">
+                                                <Label Text="停用" FontSize="10" TextColor="#78909C"/>
+                                            </Border>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding Phone}" FontSize="12" TextColor="{StaticResource TextTertiary}" IsVisible="{Binding HasPhone}"/>
+                                    </VerticalStackLayout>
+
+                                    <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                        <Label Text="{Binding GroupsDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                        <Label FontSize="11" TextColor="{StaticResource TextTertiary}">
+                                            <Label.Text>
+                                                <MultiBinding StringFormat="入职 {0} · 离职 {1}">
+                                                    <Binding Path="JoinDateDisplay"/>
+                                                    <Binding Path="ExitDateDisplay"/>
+                                                </MultiBinding>
+                                            </Label.Text>
+                                        </Label>
+                                    </VerticalStackLayout>
+
+                                    <Button Grid.Column="2" Text="&#xE74A;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                            Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveUpMemberCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="3" Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                            Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveDownMemberCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="4" Text="请假" FontSize="12" Style="{StaticResource ButtonSmall}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=OpenLeavePanelCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="5" Text="编辑" FontSize="12" Style="{StaticResource ButtonSmall}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=StartEditMemberCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="6" Text="删除" FontSize="12" Style="{StaticResource ButtonSmall}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=DeleteMemberCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 请假面板 -->
+        <Grid Grid.Row="0" IsVisible="{Binding IsLeavePanelVisible}" BackgroundColor="#66000000">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <Border Style="{StaticResource CardBorder}" Padding="20" WidthRequest="500">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="{Binding LeavePanelTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseLeavePanelCommand}" Padding="4,0"/>
+                        </Grid>
+
+                        <!-- 请假记录列表 -->
+                        <CollectionView ItemsSource="{Binding LeaveRecords}" HeightRequest="180">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:DutyLeaveView">
+                                    <Border StrokeShape="RoundRectangle 8" Padding="12,8" Margin="0,0,0,6" BackgroundColor="#F8FAFC">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                                <Label Text="{Binding RangeDisplay}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Text="{Binding Reason}" FontSize="11" TextColor="{StaticResource TextTertiary}" IsVisible="{Binding HasReason}"/>
+                                            </VerticalStackLayout>
+                                            <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="6,1" BackgroundColor="#FFF7ED" VerticalOptions="Center">
+                                                <Label Text="{Binding Days, StringFormat='{0} 天'}" FontSize="10" TextColor="#EA580C"/>
+                                            </Border>
+                                            <Button Grid.Column="2" Text="删除" FontSize="11" Style="{StaticResource ButtonSmall}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=DeleteLeaveCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无请假记录" FontSize="12" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Padding="10"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+
+                        <!-- 新增请假表单 -->
+                        <Label Text="登记请假（会删除受影响月份排班、需到值班表页重新生成；支持补登记过去日期，须填写事由）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="6">
+                            <Label Grid.Column="0" Text="开始" FontSize="13" VerticalOptions="Center"/>
+                            <DatePicker Grid.Column="1" Date="{Binding LeaveStartDate}" WidthRequest="130" HeightRequest="36"/>
+                            <Label Grid.Column="2" Text="结束" FontSize="13" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <DatePicker Grid.Column="3" Date="{Binding LeaveEndDate}" WidthRequest="130" HeightRequest="36"/>
+                            <Label Grid.Column="4" Text="事由" FontSize="13" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <Entry Grid.Column="5" Text="{Binding LeaveReason}" Placeholder="选填；补登记必填" HeightRequest="36"/>
+                        </Grid>
+
+                        <Label Text="{Binding BackfillHintText}" IsVisible="{Binding IsBackfillHintVisible}"
+                               FontSize="12" TextColor="#B45309" LineBreakMode="WordWrap"/>
+
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                            <Button Text="登记" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="18,4" Command="{Binding SaveLeaveCommand}"/>
+                            <Button Text="关闭" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="18,4" Command="{Binding CloseLeavePanelCommand}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- 批量导入面板 -->
+        <Grid Grid.Row="0" IsVisible="{Binding IsImportPanelVisible}" BackgroundColor="#66000000">            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <Border Style="{StaticResource CardBorder}" Padding="20" WidthRequest="560">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="批量导入值班成员" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseImportPanelCommand}" Padding="4,0"/>
+                        </Grid>
+
+                        <Label Text="队列名单模式：每组「序号 + 姓名」成对填写，序号即该组轮转顺序（按值升序、组内唯一、允许跳号）。导入为全量对齐——名单里没列到的库内成员将从其所在组移除（某组全空 = 清空该组）。请使用「下载导入模板」生成的标准模板填写。"
+                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <Label Grid.Column="0" Text="{Binding ImportFilePath}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" LineBreakMode="MiddleTruncation"/>
+                            <Button Grid.Column="1" Text="选择文件" FontSize="13" HeightRequest="34" Padding="14,4"
+                                    Style="{StaticResource ButtonOutline}" Command="{Binding SelectImportFileCommand}"/>
+                            <Button Grid.Column="2" Text="预览" FontSize="13" HeightRequest="34" Padding="14,4"
+                                    Style="{StaticResource ButtonOutline}" Command="{Binding PreviewImportCommand}"/>
+                        </Grid>
+
+                        <Label Text="{Binding ImportSummaryText}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                               IsVisible="{Binding IsImportPreviewLoaded}"/>
+
+                        <Border StrokeShape="RoundRectangle 8" Padding="10" BackgroundColor="#F8FAFC" IsVisible="{Binding HasImportLog}">
+                            <CollectionView ItemsSource="{Binding ImportLogLines}" HeightRequest="170">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Label Text="{Binding .}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap" Padding="0,2"/>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Border>
+
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                            <Button Text="开始导入" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="18,4"
+                                    Command="{Binding StartImportCommand}" IsEnabled="{Binding IsImportPreviewLoaded}"/>
+                            <Button Text="关闭" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="18,4" Command="{Binding CloseImportPanelCommand}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+        <!-- SnackBar -->
+        <Grid Grid.Row="0" VerticalOptions="End" HorizontalOptions="Center" Margin="0,0,0,24" InputTransparent="True">
+            <components:SnackBarView Message="{Binding SnackBarMessage}"
+                                     Type="{Binding SnackBarType}"
+                                     IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

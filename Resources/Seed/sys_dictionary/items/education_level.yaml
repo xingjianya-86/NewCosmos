@@ -1,0 +1,15 @@
+# 学历字典（固定 ID）
+# 分类 ID=14，字典项 ID 范围: 14001-14999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 14001, category: "EducationLevels", item_key: "Illiterate", item_value: "文盲/半文盲", sort_order: 1, is_active: true }
+      - { id: 14002, category: "EducationLevels", item_key: "Primary", item_value: "小学", sort_order: 2, is_active: true }
+      - { id: 14003, category: "EducationLevels", item_key: "JuniorHigh", item_value: "初中", sort_order: 3, is_active: true }
+      - { id: 14004, category: "EducationLevels", item_key: "SeniorHigh", item_value: "高中/中专", sort_order: 4, is_active: true }
+      - { id: 14005, category: "EducationLevels", item_key: "College", item_value: "大专", sort_order: 5, is_active: true }
+      - { id: 14006, category: "EducationLevels", item_key: "Bachelor", item_value: "本科", sort_order: 6, is_active: true }
+      - { id: 14007, category: "EducationLevels", item_key: "Postgraduate", item_value: "研究生及以上", sort_order: 7, is_active: true }

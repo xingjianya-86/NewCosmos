@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.FormSteps.ApplicationFormStep4View"
+             x:Name="StepRoot"
+             x:DataType="ApplicationFormViewModel">
+
+    <!-- Step4: 入户调查 — 从 ApplicationFormPage.xaml 提取；可见性由宿主页面按 CurrentStep 懒加载控制 -->
+    <VerticalStackLayout Spacing="16">
+
+        <!-- 调查基本信息 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="📋 调查基本信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" RowSpacing="8">
+                    <Label Text="调查日期" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <DatePicker Grid.Column="1" Date="{Binding SurveyDate}" Format="yyyy-MM-dd" HeightRequest="38"
+                                IsEnabled="{Binding IsSurveyDateEditable}"/>
+                    <Label Grid.Column="2" Text="调查员" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Grid.Column="3" Text="{Binding SurveyorName}" Placeholder="姓名" HeightRequest="38"/>
+                </Grid>
+                <!-- 补全模式：调查日期锁定为导入库纳入时间 -->
+                <Label Text="导入库建档补全：入户调查日期取纳入时间，不可修改"
+                       IsVisible="{Binding IsSurveyDateLocked}"
+                       FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" RowSpacing="8">
+                    <Label Text="所属机构" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Grid.Column="1" Text="{Binding SurveyorOrganization}" Placeholder="民政机构名称" HeightRequest="38"/>
+                    <Label Grid.Column="2" Text="受访人" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Label Grid.Column="3" Text="{Binding ApplicantName}" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 申请原因 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="📝 申请原因" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <Label Text="申请理由" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding ApplicationReasonOptions}" SelectedItem="{Binding SelectedApplicationReasonObj}" ItemDisplayBinding="{Binding Display}" HeightRequest="38"/>
+                </Grid>
+                <Label Text="原因详情" Style="{StaticResource FormFieldLabelStyle}"/>
+                <Editor Text="{Binding ApplicationReasonDetail}" Placeholder="选择申请理由后自动填充模板，可编辑修改..." HeightRequest="200" MaxLength="500"/>
+                <Label HorizontalOptions="End" FontSize="12" TextColor="{StaticResource TextSecondary}">
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="已输入: "/>
+                            <Span Text="{Binding ApplicationReasonDetailLength, StringFormat='{0}'}"/>
+                            <Span Text="/500 字"/>
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 调查结论 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="✅ 调查结论" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <Label Text="结论" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding SurveyConclusionOptions}" SelectedItem="{Binding SurveyConclusion}" HeightRequest="38"/>
+                </Grid>
+                <Label Text="备注" Style="{StaticResource FormFieldLabelStyle}"/>
+                <Editor Text="{Binding SurveyNotes}" Placeholder="补充说明（选填）" HeightRequest="80"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </VerticalStackLayout>
+
+</ContentView>

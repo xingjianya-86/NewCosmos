@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ArchiveManagement.ProofUnitTemplateManagePage"
+             x:DataType="ProofUnitTemplateManageViewModel"
+             Title="单位模板维护"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto, *">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="单位模板维护" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="管理证明材料模板与格式配置" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- ========== 浏览模式：列表 ========== -->
+                <VerticalStackLayout Spacing="16" IsVisible="{Binding IsBrowsing}">
+                    <Border Style="{StaticResource CardBorder}" Padding="20">
+                        <VerticalStackLayout Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                                    <Label Text="单位模板列表" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                                    <Label Text="{Binding UnitTemplates.Count, StringFormat='({0})'}"
+                                           FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                                <Button Grid.Column="1" Text="新增单位模板" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding StartCreateCommand}"/>
+                            </Grid>
+
+                            <BoxView Style="{StaticResource Divider}"/>
+
+                            <CollectionView ItemsSource="{Binding UnitTemplates}"
+                                            SelectionMode="Single"
+                                            SelectedItem="{Binding SelectedUnitTemplate}"
+                                            HeightRequest="420">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="ent:ProofUnitTemplateItem">
+                                        <Border StrokeShape="RoundRectangle 8" StrokeThickness="1"
+                                                Stroke="{StaticResource Gray200}"
+                                                BackgroundColor="{StaticResource Gray50}"
+                                                Padding="14,10" Margin="0,3">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
+                                                <VerticalStackLayout Spacing="2">
+                                                    <Label Text="{Binding UnitName}" FontSize="15" FontAttributes="Bold"
+                                                           TextColor="{StaticResource TextPrimary}"/>
+                                                    <Label Text="{Binding TemplateName, StringFormat='模板: {0}'}" FontSize="12"
+                                                           TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                                </VerticalStackLayout>
+                                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                                    <Label Text="{Binding FileType}" Style="{StaticResource ChipInfoText}"/>
+                                                </Border>
+                                                <VerticalStackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
+                                                    <Label Text="{Binding CreatedAtDisplay}" FontSize="11"
+                                                           TextColor="{StaticResource TextTertiary}"/>
+                                                    <Label Text="{Binding UpdatedAtDisplay}" FontSize="11"
+                                                           TextColor="{StaticResource TextTertiary}"/>
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <VerticalStackLayout Spacing="8" Padding="0,40" HorizontalOptions="Center">
+                                        <Label Text="&#xE7C3;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                               TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                        <Label Text="尚未配置单位模板" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
+                                        <Label Text="点击右上角「新增单位模板」，为接收单位上传专属证明模板文件" FontSize="12"
+                                               TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"/>
+                                    </VerticalStackLayout>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+
+                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8" HorizontalOptions="End">
+                                <Button Text="编辑" Style="{StaticResource ButtonOutline}"
+                                        Command="{Binding StartEditCommand}"
+                                        IsEnabled="{Binding HasSelectedTemplate}"/>
+                                <Button Text="删除" Style="{StaticResource ButtonDanger}"
+                                        Command="{Binding DeleteCommand}"
+                                        IsEnabled="{Binding HasSelectedTemplate}"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- ========== 表单模式：新增/编辑 ========== -->
+                <Border Style="{StaticResource CardBorder}" Padding="20" IsVisible="{Binding IsEditingForm}">
+                    <VerticalStackLayout Spacing="14">
+                        <Label Text="{Binding FormTitle}" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                        <BoxView Style="{StaticResource Divider}"/>
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="接收单位名称" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Entry Text="{Binding UnitName}" Placeholder="如：XX市民政局 / XX街道办" FontSize="14"/>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="证明模板文件（.docx / .xlsx，含 {字段} 占位符）"
+                                   FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 6" Padding="12,8">
+                                    <Label Text="{Binding FileName}" FontSize="13" VerticalOptions="Center"
+                                           TextColor="{StaticResource TextSecondary}"
+                                           IsVisible="{Binding FileName, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                    <Label Text="未选择文件（编辑时留空表示保留原模板）" FontSize="13"
+                                           TextColor="{StaticResource TextTertiary}"
+                                           IsVisible="{Binding FileName, Converter={StaticResource NullToInverseBoolConverter}}"/>
+                                </Border>
+                                <Button Grid.Column="1" Text="选择文件" Style="{StaticResource ButtonOutline}"
+                                        Command="{Binding SelectFileCommand}"/>
+                            </Grid>
+                            <Label Text="{Binding TemplateType, StringFormat='识别类型: {0}'}" FontSize="12"
+                                   TextColor="{StaticResource TextTertiary}"
+                                   IsVisible="{Binding FileName, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="字段映射配置 JSON（可选，留空则按 {占位符} 直接替换）"
+                                   FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Editor Text="{Binding ConfigJson}" Placeholder="字段映射 JSON 配置，可留空（例: { &quot;fields&quot;: [...] }）" HeightRequest="80"
+                                    FontSize="12" FontFamily="Consolas"/>
+                        </VerticalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Button Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelEditCommand}"
+                                    HorizontalOptions="End"/>
+                            <Button Grid.Column="1" Text="{Binding IsCreateMode, Converter={StaticResource BoolToTextConverter}, ConverterParameter=保存模板|保存修改}"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding SaveCommand}"
+                                    IsEnabled="{Binding IsSaving, Converter={StaticResource BoolToInverseConverter}}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2" IsLoading="{Binding IsBusy}" LoadingText="正在处理..."/>
+    </Grid>
+</ContentPage>

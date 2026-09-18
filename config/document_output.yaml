@@ -1,0 +1,30 @@
+# 文档输出路径配置
+# 参考设计方案：第九章 9.10
+
+# ── 输出目录配置 ──
+output:
+  base_directory: "{AppData}/CosmosApp/ArchiveOutput"  # 文档输出根目录，{AppData}为系统应用数据目录
+  subdirectories:
+    docx: "docx"                    # Word文档子目录
+    xlsx: "xlsx"                    # Excel表格子目录
+    pdf: "pdf"                      # PDF文档子目录
+    temp: "temp"                    # 临时文件子目录
+  file_naming:
+    pattern: "{template_id}_{申请编号}"  # 文件命名模式
+    date_format: "yyyyMMdd_HHmmss"      # 日期格式
+  cleanup:
+    temp_file_retention_hours: 24   # 临时文件保留时间（小时）
+    max_temp_files: 1000            # 最大临时文件数量
+
+# ── PDF配置 ──
+pdf:
+  enabled: true                     # 是否启用PDF生成
+  storage: "database"               # 存储方式：database=存数据库, filesystem=存文件系统
+  compression: true                 # 是否启用PDF压缩
+  naming: "{template_id}_{申请编号}_{timestamp}"  # PDF文件命名模式
+
+# ── 模板缓存配置 ──
+template_cache:
+  enabled: true                     # 是否启用模板缓存
+  max_items: 50                     # 最大缓存模板数量
+  expire_minutes: 30                # 缓存过期时间（分钟）

@@ -1,0 +1,329 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ArchiveManagement.ArchiveProductionPage"
+             x:DataType="ArchiveProductionViewModel"
+             Title="档案制作中心"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:AutoFillColorConverter x:Key="AutoFillColorConverter"/>
+        <converters:AutoFillBorderColorConverter x:Key="AutoFillBorderColorConverter"/>
+        <converters:AutoFillIconConverter x:Key="AutoFillIconConverter"/>
+
+        <DataTemplate x:Key="SidebarGroupEvenRow" x:DataType="results:SidebarGroup">
+            <VerticalStackLayout Spacing="0" BackgroundColor="White">
+                <!-- 分组标题 -->
+                <Border Padding="16,10"
+                        BackgroundColor="{StaticResource Gray50}"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 0">
+                    <Label Text="{Binding GroupName}"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}"/>
+                </Border>
+
+                <!-- 分组内的数据项 -->
+                <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="results:SidebarItem">
+                            <Grid Padding="16,8"
+                                  ColumnDefinitions="Auto,Auto,*,Auto"
+                                  ColumnSpacing="8"
+                                  BackgroundColor="{Binding IsAutoFilled, Converter={StaticResource AutoFillColorConverter}}">
+
+                                <!-- 左边框指示器 -->
+                                <BoxView Grid.Column="0"
+                                         WidthRequest="3"
+                                         VerticalOptions="Fill"
+                                         Color="{Binding IsAutoFilled, Converter={StaticResource AutoFillBorderColorConverter}, ConverterParameter={Binding IsMatchable}}"/>
+
+                                <!-- 自动填充图标 -->
+                                <Label Grid.Column="1"
+                                       Text="{Binding IsAutoFilled, Converter={StaticResource AutoFillIconConverter}, ConverterParameter={Binding IsMatchable}}"
+                                       FontSize="12"
+                                       TextColor="{StaticResource Secondary}"
+                                       VerticalOptions="Center"
+                                       WidthRequest="16"/>
+
+                                <!-- 字段内容 -->
+                                <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                    <Label Text="{Binding Label}"
+                                           FontSize="12"
+                                           TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding Value}"
+                                           FontSize="14"
+                                           TextColor="{StaticResource TextPrimary}"
+                                           LineBreakMode="WordWrap"/>
+                                </VerticalStackLayout>
+
+                                <!-- 复制按钮 -->
+                                <Button Grid.Column="3"
+                                        Text="&#xE8C8;"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        FontSize="12"
+                                        Padding="6,4"
+                                        BackgroundColor="Transparent"
+                                        TextColor="{StaticResource TextSecondary}"
+                                        VerticalOptions="Center"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveProductionViewModel}}, Path=CopyFieldCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </DataTemplate>
+        <DataTemplate x:Key="SidebarGroupOddRow" x:DataType="results:SidebarGroup">
+            <VerticalStackLayout Spacing="0" BackgroundColor="#F8F9FA">
+                <!-- 分组标题 -->
+                <Border Padding="16,10"
+                        BackgroundColor="{StaticResource Gray50}"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 0">
+                    <Label Text="{Binding GroupName}"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}"/>
+                </Border>
+
+                <!-- 分组内的数据项 -->
+                <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="results:SidebarItem">
+                            <Grid Padding="16,8"
+                                  ColumnDefinitions="Auto,Auto,*,Auto"
+                                  ColumnSpacing="8"
+                                  BackgroundColor="{Binding IsAutoFilled, Converter={StaticResource AutoFillColorConverter}}">
+
+                                <!-- 左边框指示器 -->
+                                <BoxView Grid.Column="0"
+                                         WidthRequest="3"
+                                         VerticalOptions="Fill"
+                                         Color="{Binding IsAutoFilled, Converter={StaticResource AutoFillBorderColorConverter}, ConverterParameter={Binding IsMatchable}}"/>
+
+                                <!-- 自动填充图标 -->
+                                <Label Grid.Column="1"
+                                       Text="{Binding IsAutoFilled, Converter={StaticResource AutoFillIconConverter}, ConverterParameter={Binding IsMatchable}}"
+                                       FontSize="12"
+                                       TextColor="{StaticResource Secondary}"
+                                       VerticalOptions="Center"
+                                       WidthRequest="16"/>
+
+                                <!-- 字段内容 -->
+                                <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                    <Label Text="{Binding Label}"
+                                           FontSize="12"
+                                           TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding Value}"
+                                           FontSize="14"
+                                           TextColor="{StaticResource TextPrimary}"
+                                           LineBreakMode="WordWrap"/>
+                                </VerticalStackLayout>
+
+                                <!-- 复制按钮 -->
+                                <Button Grid.Column="3"
+                                        Text="&#xE8C8;"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        FontSize="12"
+                                        Padding="6,4"
+                                        BackgroundColor="Transparent"
+                                        TextColor="{StaticResource TextSecondary}"
+                                        VerticalOptions="Center"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveProductionViewModel}}, Path=CopyFieldCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="SidebarGroupRowSelector"
+            EvenTemplate="{StaticResource SidebarGroupEvenRow}"
+            OddTemplate="{StaticResource SidebarGroupOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 数据源标签 -->
+                    <Border Grid.Column="2" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12" Padding="12,6" VerticalOptions="Center">
+                        <Label Text="{Binding DataSourceType}" FontSize="13" TextColor="White"/>
+                    </Border>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8B4;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="档案制作中心" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="{Binding StatusText}" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 主内容：左侧表单 + 右侧边栏 -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,320" ColumnSpacing="0">
+
+            <!-- 左侧：业务信息 + 快捷操作 -->
+            <ScrollView Grid.Column="0">
+                <VerticalStackLayout Padding="16" Spacing="16">
+
+                    <!-- 业务信息卡片 -->
+                    <Border Style="{StaticResource CardBorder}"
+                            IsVisible="{Binding HasBusinessData}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="业务信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="16">
+                                <Label Text="业务类型:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding BusinessTypeDisplay}" FontSize="14" VerticalOptions="Center"/>
+
+                                <Label Grid.Row="1" Text="申请人:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding ApplicantName}" FontSize="14" VerticalOptions="Center"/>
+
+                                <Label Grid.Row="2" Text="身份证号:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="2" Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="14" VerticalOptions="Center"/>
+
+                                <Label Grid.Row="3" Text="家庭信息:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="3" Grid.Column="1" Text="{Binding FamilyInfo}" FontSize="14" VerticalOptions="Center"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 自动填充统计 -->
+                    <Border Style="{StaticResource CardBorder}"
+                            IsVisible="{Binding HasBusinessData}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="自动填充统计" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
+                                    <Label Text="{Binding AutoFilledCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
+                                    <Label Text="已自动填充" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" Spacing="4">
+                                    <Label Text="{Binding SidebarTotalCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                                    <Label Text="总字段数" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="4">
+                                    <Label Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="28" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
+                                    <Label Text="点击右侧复制" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 快捷操作卡片 -->
+                    <Border Style="{StaticResource CardBorder}"
+                            IsVisible="{Binding HasBusinessData}">
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="快捷操作" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <Grid ColumnDefinitions="*" ColumnSpacing="12">
+                                <Button Text="&#xE8F5; 档案输出"
+                                        FontFamily="Segoe MDL2 Assets"
+                                        Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding NavigateToOutputCommand}"
+                                        IsEnabled="{Binding IsReady}"
+                                        HeightRequest="60"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 无数据提示 -->
+                    <Border Style="{StaticResource CardBorder}" Padding="40"
+                            IsVisible="{Binding HasBusinessData, Converter={StaticResource BoolToInverseConverter}}">
+                        <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
+                            <Label Text="&#xE8F5;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                            <Label Text="请从工作流页面选择记录进入" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 右侧信息边栏 -->
+            <Border Grid.Column="1"
+                    BackgroundColor="{StaticResource White}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 0">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- 边栏标题 -->
+                    <Grid Grid.Row="0" Padding="16,12" BackgroundColor="{StaticResource Gray50}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="来源数据" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
+                        <Label Grid.Column="2" Text="{Binding DataSourceType}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    </Grid>
+
+                    <BoxView Grid.Row="0" HeightRequest="1" BackgroundColor="{StaticResource Gray200}" VerticalOptions="End"/>
+
+                    <!-- 边栏数据列表 -->
+                    <CollectionView Grid.Row="1"
+                                    ItemsSource="{Binding SidebarGroups}"
+                                    SelectionMode="None"
+                                    ItemTemplate="{StaticResource SidebarGroupRowSelector}">
+
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,60">
+                                <Label Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" Margin="0,8,0,0"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 底部操作栏 -->
+        <Border Grid.Row="2" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                <Button Text="&#xE72B; 返回"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding GoBackCommand}"
+                        Style="{StaticResource ButtonOutline}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="2"
+                        Text="&#xE8F5; 开始制作"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding NavigateToOutputCommand}"
+                        IsEnabled="{Binding IsReady}"
+                        Style="{StaticResource ButtonPrimary}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding StatusText}"/>
+
+
+    </Grid>
+
+</ContentPage>

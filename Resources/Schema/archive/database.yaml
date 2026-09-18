@@ -1,0 +1,231 @@
+# 档案归档与打印记录Schema定义
+database: 档案归档
+version: 1.0
+description: 档案归档、归档文件、打印记录
+
+tables:
+  # ── 档案归档主表 ──
+  - name: nc_biz_archives
+    comment: 档案归档主表，记录归档的申请信息
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: archive_no
+        type: character varying(32)
+        nullable: false
+        comment: 归档编号，唯一标识
+      - name: archive_type
+        type: character varying(50)
+        nullable: true
+        comment: 归档类型：NewApplication=新申请, Change=变更, Stop=停保
+      - name: classification_result
+        type: character varying(100)
+        nullable: true
+        comment: 分类结果代码，如RuralSubsistence、UrbanLowIncome
+      - name: archived_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 归档时间
+      - name: archived_by
+        type: character varying(100)
+        nullable: true
+        comment: 归档操作人
+      - name: output_files
+        type: jsonb
+        nullable: true
+        comment: 输出文件列表，JSON格式存储文件路径
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_archives_app_id
+        columns: [application_id]
+      - name: idx_archives_type
+        columns: [archive_type]
+
+  # ── 归档文件表 ──
+  - name: nc_biz_archive_files
+    comment: 归档文件表，存储归档生成的文档文件
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: archive_id
+        type: bigint
+        nullable: false
+        comment: 关联档案ID，关联nc_biz_archives.id
+      - name: template_id
+        type: character varying(100)
+        nullable: true
+        comment: 模板ID，标识使用的文档模板
+      - name: file_name
+        type: character varying(500)
+        nullable: true
+        comment: 文件名
+      - name: file_type
+        type: character varying(20)
+        nullable: true
+        comment: 文件类型：docx=Word文档, xlsx=Excel表格, pdf=PDF文档
+      - name: file_size
+        type: bigint
+        nullable: true
+        comment: 文件大小（字节）
+      - name: output_path
+        type: character varying(1000)
+        nullable: true
+        comment: 文件输出路径
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+    indexes:
+      - name: idx_archive_files_archive_id
+        columns: [archive_id]
+
+  # ── 打印记录表 ──
+  - name: nc_biz_print_records
+    comment: 打印记录表，记录文档打印历史
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: true
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: archive_id
+        type: bigint
+        nullable: true
+        comment: 关联档案ID，关联nc_biz_archives.id
+      - name: template_id
+        type: character varying(100)
+        nullable: true
+        comment: 模板ID，标识使用的文档模板（历史原因：实为数值型模板ID，但以varchar存储；代码侧写入时转字符串、读取时转回long，勿改列类型）
+      - name: file_name
+        type: character varying(500)
+        nullable: true
+        comment: 打印文件名
+      - name: file_path
+        type: character varying(1000)
+        nullable: true
+        comment: 本地文件路径
+      - name: pdf_path
+        type: character varying(1000)
+        nullable: true
+        comment: PDF备份文件路径
+      - name: pdf_size
+        type: bigint
+        nullable: true
+        comment: PDF文件大小（字节）
+      - name: pdf_hash
+        type: character varying(64)
+        nullable: true
+        comment: PDF文件哈希值，用于完整性校验
+      - name: printer_name
+        type: character varying(200)
+        nullable: true
+        comment: 打印机名称
+      - name: copies
+        type: integer
+        nullable: true
+        comment: 打印份数
+      - name: is_duplex
+        type: boolean
+        nullable: true
+        comment: 是否双面打印
+      - name: status
+        type: character varying(20)
+        nullable: false
+        comment: 打印状态：Pending=待打印, Printing=打印中, Completed=已完成, Failed=失败
+      - name: error_message
+        type: text
+        nullable: true
+        comment: 错误信息，打印失败时记录原因
+      - name: retry_count
+        type: integer
+        nullable: true
+        comment: 重试次数
+      - name: operator_name
+        type: character varying(100)
+        nullable: true
+        comment: 操作人姓名
+      - name: operator_id
+        type: integer
+        nullable: true
+        comment: 操作人ID，关联nc_sys_users.id
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 创建时间
+      - name: completed_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 完成时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+      # ── 以下列为 PrintRecordService 实际读写、但备份库 DDL 缺失的漂移列（全部可空，供 schema 同步 ALTER 补齐）──
+      - name: batch_no
+        type: character varying(100)
+        nullable: true
+        comment: 打印批次号（PrintRecordService使用）
+      - name: business_type
+        type: character varying(50)
+        nullable: true
+        comment: 业务类型（PrintRecordService使用）
+      - name: business_id
+        type: bigint
+        nullable: true
+        comment: 业务ID（PrintRecordService使用）
+      - name: template_name
+        type: character varying(200)
+        nullable: true
+        comment: 模板名称（PrintRecordService使用）
+      - name: pdf_data
+        type: bytea
+        nullable: true
+        comment: PDF文件内容（PrintRecordService使用）
+      - name: source_data
+        type: bytea
+        nullable: true
+        comment: 源文件内容（PrintRecordService使用）
+      - name: source_type
+        type: character varying(50)
+        nullable: true
+        comment: 源文件类型（PrintRecordService使用）
+      - name: source_size
+        type: bigint
+        nullable: true
+        comment: 源文件大小（字节）（PrintRecordService使用）
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注（PrintRecordService使用）
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间（PrintRecordService使用）
+    indexes:
+      - name: idx_print_records_application_id
+        columns: [application_id]
+      - name: idx_print_records_batch_no
+        columns: [batch_no]
+      - name: idx_print_records_business
+        columns: [business_type, business_id]

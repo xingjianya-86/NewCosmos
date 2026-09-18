@@ -1,0 +1,85 @@
+# 申请表扩展字段 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 申请主表扩展字段 - 照料类型、赡养费、土地面积、保障金明细等
+
+alterTables:
+  - name: nc_biz_applications
+    comment: 社会救助申请表 - 扩展字段
+    addColumns:
+      # ── 照料相关 ──
+      - name: caregiver_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: '照料类型：无/亲属照料/机构照料'
+      - name: destitute_support_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: '特困供养分类：集中供养/分散供养'
+      - name: support_institution_id
+        type: BIGINT
+        nullable: true
+        comment: 特困供养机构ID
+      
+      # ── 赡养收入 ──
+      - name: alimony_income
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 赡养费收入（元）
+      
+      # ── 保障金明细 ──
+      - name: caregiver_subsidy_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 照料护理补贴金额（元）
+      - name: person_category_protection_total_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 人员分类保障总金额（元）
+      
+      # ── 土地相关 ──
+      - name: family_land_area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 家庭土地面积（亩）
+      - name: self_farmed_land_area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 自种土地面积（亩）
+      - name: subleased_land_area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 转租土地面积（亩）
+      - name: contracted_land_area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 承包土地面积（亩）
+      - name: land_income_total
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 土地收入合计（元）
+      - name: subsidy_total
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 补贴合计（元）
+      
+      # ── 确权土地 ──
+      - name: total_confirmed_land_area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 确权土地总面积（亩）
+      - name: confirmed_person_count
+        type: INTEGER
+        nullable: true
+        defaultValue: '0'
+        comment: 确权人数

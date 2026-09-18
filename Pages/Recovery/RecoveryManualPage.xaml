@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             x:Class="NewCosmos.Pages.Recovery.RecoveryManualPage"
+             x:DataType="RecoveryManualViewModel"
+             Title="后补追缴 - 手工录入"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（橙色渐变，与后补追缴搜索页同域配色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回后补追缴" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8D1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="手工录入追缴信息" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="手动补录追缴人员信息及追缴周期明细" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 卡片1：人员信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
+                                    BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
+                                <Label Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                       TextColor="{StaticResource Info}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="追缴人员" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴人员姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding PersonName}" Placeholder="请输入追缴人员姓名"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding IdCard}" Placeholder="请输入身份证号"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
+                                <Label Text="追缴分类 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding SourceTypeList}"
+                                        SelectedItem="{Binding SelectedSourceType}"
+                                        ItemDisplayBinding="{Binding Value}"
+                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 卡片2：追缴信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
+                                    BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
+                                <Label Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                       TextColor="{StaticResource Primary}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="追缴明细" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴原因" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding RecoveryReason}" Placeholder="请输入追缴原因"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="每月保障标准 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding MonthlyAmount}" Keyboard="Numeric" Placeholder="请输入每月保障标准"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
+                                <Label Text="追缴周期" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Grid ColumnDefinitions="Auto,*,Auto,*,Auto" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="起始" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    <Picker Grid.Column="1" ItemsSource="{Binding YearList}"
+                                            SelectedItem="{Binding StartYear}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="2" Text="年" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    <Picker Grid.Column="3" ItemsSource="{Binding MonthList}"
+                                            SelectedItem="{Binding StartMonthValue}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="4" Text="月" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="4">
+                                <Label Text="追缴终止月" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Grid ColumnDefinitions="Auto,*,Auto,*,Auto" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="终止" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    <Picker Grid.Column="1" ItemsSource="{Binding YearList}"
+                                            SelectedItem="{Binding EndYear}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="2" Text="年" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    <Picker Grid.Column="3" ItemsSource="{Binding MonthList}"
+                                            SelectedItem="{Binding EndMonthValue}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="4" Text="月" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="4">
+                                <Label Text="应追缴总额" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                    <Border BackgroundColor="{StaticResource PrimarySoft}"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8"
+                                            Padding="12,8"
+                                            VerticalOptions="Center">
+                                        <Label Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}"
+                                               FontSize="18"
+                                               FontAttributes="Bold"
+                                               TextColor="{StaticResource Primary}"/>
+                                    </Border>
+                                    <Label Grid.Column="1"
+                                           Text="{Binding RecoveryMonths, StringFormat='累计 {0} 个月'}"
+                                           FontSize="14"
+                                           TextColor="{StaticResource TextSecondary}"
+                                           VerticalOptions="Center"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 卡片3：到账状态 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
+                                    BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
+                                <Label Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                       TextColor="{StaticResource Warning}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="到账状态" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="已到账金额" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding RecoveredAmount}" Keyboard="Numeric" Placeholder="请输入已到账金额"
+                                   Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 错误消息 -->
+                <Label Text="{Binding ErrorMessage}"
+                       TextColor="Red"
+                       FontSize="14"
+                       IsVisible="{Binding HasError}"
+                       HorizontalOptions="Center"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="取消" Style="{StaticResource ButtonOutline}"
+                        Command="{Binding GoBackCommand}" MinimumWidthRequest="100"/>
+                <Button Grid.Column="2" Text="保存草稿" Style="{StaticResource ButtonOutline}"
+                        Command="{Binding SaveDraftCommand}" MinimumWidthRequest="120"/>
+                <Button Grid.Column="3" Text="保存并打印" Style="{StaticResource ButtonPrimary}"
+                        Command="{Binding SaveAndPrintCommand}" MinimumWidthRequest="120"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载遮罩（覆盖全部行） -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsVisible="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}" />
+
+    </Grid>
+
+</ContentPage>

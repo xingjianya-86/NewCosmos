@@ -1,0 +1,15 @@
+# 资产类别字典（固定 ID）
+# 分类 ID=33，字典项 ID 范围: 33001-33099
+# 依据：《中华人民共和国社会救助法》第41条
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 33001, category: "AssetTypes", item_key: "RealEstate", item_value: "房产", sort_order: 1, is_active: true }
+      - { id: 33002, category: "AssetTypes", item_key: "Vehicle", item_value: "车辆", sort_order: 2, is_active: true }
+      - { id: 33003, category: "AssetTypes", item_key: "Deposit", item_value: "存款", sort_order: 3, is_active: true }
+      - { id: 33004, category: "AssetTypes", item_key: "Securities", item_value: "有价证券", sort_order: 4, is_active: true }
+      - { id: 33005, category: "AssetTypes", item_key: "Insurance", item_value: "商业保险", sort_order: 5, is_active: true }
+      - { id: 33006, category: "AssetTypes", item_key: "Other", item_value: "其他资产", sort_order: 6, is_active: true }

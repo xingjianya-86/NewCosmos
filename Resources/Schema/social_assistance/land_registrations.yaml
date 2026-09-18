@@ -1,0 +1,81 @@
+# 土地登记表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 土地登记信息 - 记录家庭承包土地的面积、用途和预期收益
+
+tables:
+  - name: nc_biz_land_registrations
+    comment: "[经济状况] 土地登记表 - 记录家庭承包土地信息（面积/用途/单价），计算土地预期收益"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: owner_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 土地所有人姓名
+      - name: owner_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 所有人身份证号
+      - name: land_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 土地类型
+      - name: land_usage
+        type: VARCHAR(50)
+        nullable: false
+        comment: 土地用途：自行种植/转包他人/承包土地
+      - name: measurement_type
+        type: VARCHAR(20)
+        nullable: true
+        comment: 计量方式
+      - name: area
+        type: NUMERIC(10,4)
+        nullable: false
+        defaultValue: '0'
+        comment: 面积（亩）
+      - name: price
+        type: NUMERIC(10,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 单价（元/亩）
+      - name: subtotal
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 小计（元）
+      - name: location
+        type: VARCHAR(200)
+        nullable: true
+        comment: 地块位置
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_land_registrations_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_land_registrations_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

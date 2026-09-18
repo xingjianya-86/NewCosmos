@@ -1,0 +1,182 @@
+database: rigid_expenditure
+version: 1.0
+description: 刚性支出困难家庭数据库
+
+tables:
+  - name: nc_biz_rigid_expenditure_families
+    comment: 刚性支出家庭数据表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: applicant_name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 户主姓名
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 户主身份证号
+      - name: guarantee_size
+        type: INTEGER
+        default: 0
+        comment: 保障人口数
+      - name: apply_reason
+        type: VARCHAR(100)
+        comment: 申请原因
+      - name: hukou_type
+        type: VARCHAR(20)
+        comment: 户籍类型
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(500)
+        comment: 家庭住址
+      - name: province
+        type: VARCHAR(50)
+        comment: 所属省级
+      - name: city
+        type: VARCHAR(50)
+        comment: 所属市级
+      - name: district
+        type: VARCHAR(50)
+        comment: 所属区县
+      - name: street
+        type: VARCHAR(50)
+        comment: 所属街道
+      - name: community
+        type: VARCHAR(100)
+        comment: 所属社区
+      - name: include_month
+        type: VARCHAR(10)
+        comment: 纳入月份
+      - name: member_names
+        type: TEXT
+        comment: 家庭成员姓名（分号分隔）
+      - name: member_id_cards
+        type: TEXT
+        comment: 家庭成员身份证号（分号分隔）
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_rigid_expenditure_family_id_card
+        type: UNIQUE
+        columns: [applicant_id_card]
+    indexes:
+      - name: idx_rigid_expenditure_families_id_card
+        columns: [applicant_id_card]
+      - name: idx_rigid_expenditure_families_district
+        columns: [district]
+      - name: idx_rigid_expenditure_families_street
+        columns: [street]
+
+  - name: nc_biz_rigid_expenditure_persons
+    comment: 刚性支出人员数据表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: family_id
+        type: BIGINT
+        comment: 所属家庭ID
+      - name: head_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 户主身份证号
+      - name: name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 身份证号
+      - name: relationship
+        type: VARCHAR(20)
+        comment: 与户主关系
+      - name: gender
+        type: VARCHAR(10)
+        comment: 性别
+      - name: ethnicity
+        type: VARCHAR(20)
+        comment: 民族
+      - name: marital_status
+        type: VARCHAR(20)
+        comment: 婚姻状况
+      - name: education_level
+        type: VARCHAR(20)
+        comment: 文化程度
+      - name: political_status
+        type: VARCHAR(20)
+        comment: 政治面貌
+      - name: employment_status
+        type: VARCHAR(50)
+        comment: 就业状况
+      - name: monthly_income
+        type: NUMERIC(12,2)
+        comment: 月收入（元）
+      - name: is_disabled
+        type: BOOLEAN
+        default: false
+        comment: 是否残疾人
+      - name: disability_certificate
+        type: VARCHAR(50)
+        comment: 残疾证号
+      - name: disability_type
+        type: VARCHAR(20)
+        comment: 残疾类别
+      - name: disability_level
+        type: VARCHAR(10)
+        comment: 残疾等级
+      - name: work_capacity
+        type: VARCHAR(20)
+        comment: 劳动能力
+      - name: health_status
+        type: VARCHAR(20)
+        comment: 健康状况
+      - name: hukou_type
+        type: VARCHAR(20)
+        comment: 户籍类型
+      - name: is_poverty_policy_population
+        type: BOOLEAN
+        default: false
+        comment: 是否属脱贫享受政策人口
+      - name: region
+        type: VARCHAR(200)
+        comment: 所属区划
+      - name: address
+        type: VARCHAR(500)
+        comment: 家庭地址
+      - name: include_month
+        type: VARCHAR(10)
+        comment: 纳入月份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_rigid_expenditure_person_id_card
+        type: UNIQUE
+        columns: [id_card]
+    indexes:
+      - name: idx_rigid_expenditure_persons_id_card
+        columns: [id_card]
+      - name: idx_rigid_expenditure_persons_head_id_card
+        columns: [head_id_card]
+      - name: idx_rigid_expenditure_persons_family_id
+        columns: [family_id]
+
+views: []

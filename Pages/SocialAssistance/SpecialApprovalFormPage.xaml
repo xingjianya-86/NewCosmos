@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.SpecialApprovalFormPage"
+             x:DataType="SpecialApprovalFormViewModel"
+             Title="一事一议申报表" BackgroundColor="{StaticResource Background}">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 状态信息 -->
+                    <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="2">
+                        <Label Text="{Binding StatusText}" FontSize="14" FontAttributes="Bold"
+                               TextColor="{Binding IsReviewed, Converter={StaticResource BoolToColorConverter}}"
+                               HorizontalTextAlignment="End"/>
+                        <Label Text="{Binding FormNo}" FontSize="12" TextColor="#E6FFFFFF"
+                               HorizontalTextAlignment="End" IsVisible="{Binding FormNo, Converter={StaticResource StringNotEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="一事一议申报表" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="特殊困难群众救助申报" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 户主信息（只读） -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="👤 申请人信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowSpacing="8">
+                            <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding ApplicantName}" FontSize="16" FontAttributes="Bold"/>
+                            <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="16"/>
+                            <Label Text="联系电话" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding ApplicantPhone}" FontSize="16"/>
+                            <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding FamilySizeText}" FontSize="16"/>
+                            <Label Text="家庭住址" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding FamilyAddress}" FontSize="16"/>
+                            <Label Text="申请类别" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Column="1" Text="{Binding ClassificationName}" FontSize="16"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 申报内容 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="📋 申报内容" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <Label Text="申请救助家庭基本情况" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Editor Text="{Binding BasicSituation}" HeightRequest="120" FontSize="15"
+                                Placeholder="请填写家庭基本情况、经济状况等"/>
+
+                        <Label Text="一事一议说明情况（可选用预案快速填充）" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Picker ItemsSource="{Binding TemplateOptions}"
+                                SelectedItem="{Binding SelectedTemplateOption}"
+                                ItemDisplayBinding="{Binding Key}"
+                                HeightRequest="38" FontSize="15"/>
+                        <Label Text="选择预案后自动填充下方内容，可继续编辑；也可选择“（手工填写）”直接录入。"
+                               FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Editor Text="{Binding SpecialMatters}" HeightRequest="220" FontSize="15"
+                                Placeholder="请写明特殊困难、存在争议和有关情况说明..."/>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="填报单位" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ReportUnit}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="经办人员" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding HandlerName}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="填报时间" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <DatePicker Date="{Binding FormDate, Mode=TwoWay}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="乡镇民政办审核结果" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding AuditResult}" FontSize="15" HeightRequest="38"
+                                       Placeholder="如：同意纳入"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 会议审议 -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsSubmitted}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="🤝 会议审议" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="{Binding StatusText}" FontSize="13" FontAttributes="Bold"
+                                   TextColor="{StaticResource Warning}"/>
+                        </Grid>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="会议日期" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <DatePicker Date="{Binding MeetingDate}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="会议地点" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding MeetingLocation}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="会议议题" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding MeetingTopic}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="参会人员" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding MeetingMembers}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label Text="会议纪要" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Editor Text="{Binding MeetingSummary}" HeightRequest="100" FontSize="15"/>
+
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="指定救助分类" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding OverrideClassificationOptions}"
+                                        SelectedItem="{Binding SelectedOverrideClassification}"
+                                        ItemDisplayBinding="{Binding Display}"
+                                        HeightRequest="38" FontSize="15"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="审批人姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApproverName}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                <Label Text="审批人职务" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApproverTitle}" FontSize="15" HeightRequest="38"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Label Text="审批人单位" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Entry Text="{Binding ApproverOrganization}" FontSize="15" HeightRequest="38"/>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                              IsVisible="{Binding IsReviewed, Converter={StaticResource BoolToInverseConverter}}">
+                            <Button Text="✓ 审议通过" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding ApproveReviewCommand}"
+                                    IsEnabled="{Binding CanReview}"/>
+                            <Button Grid.Column="1" Text="✕ 审议驳回" Style="{StaticResource ButtonDanger}"
+                                    Command="{Binding RejectReviewCommand}"
+                                    IsEnabled="{Binding CanReview}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid Grid.Row="2" BackgroundColor="{StaticResource White}" Padding="20,12"
+              ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+            <Button Grid.Column="1" Text="保存草稿" Style="{StaticResource ButtonOutline}" Command="{Binding SaveDraftCommand}"/>
+            <Button Grid.Column="2" Text="提交申报" Style="{StaticResource ButtonPrimary}"
+                    Command="{Binding SubmitCommand}"
+                    IsVisible="{Binding IsSubmitted, Converter={StaticResource BoolToInverseConverter}}"/>
+            <Button Grid.Column="3" Text="生成申报表文档" Style="{StaticResource ButtonSecondary}"
+                    Command="{Binding GenerateDocumentCommand}"/>
+        </Grid>
+    </Grid>
+</ContentPage>

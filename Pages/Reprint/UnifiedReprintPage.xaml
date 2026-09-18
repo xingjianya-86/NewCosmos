@@ -1,0 +1,505 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Reprint.UnifiedReprintPage"
+             x:DataType="UnifiedReprintViewModel"
+             Title="历史补打中心"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+    </ContentPage.Resources>
+
+    <Grid x:Name="Root" RowDefinitions="Auto,Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="14">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题行：图标 + 标题（标准结构，图标垂直居中） -->
+                <HorizontalStackLayout Spacing="14" VerticalOptions="Center">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14" VerticalOptions="Center">
+                        <Label Text="&#xE749;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="历史补打中心" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="按人检索跨域文书 · 支持按月批量补打" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- Tab 切换行（独立一行，右对齐） -->
+                <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                    <Button Text="按人补打" FontSize="13" HeightRequest="34" Padding="18,0" CornerRadius="6"
+                            BackgroundColor="{Binding IsBatchMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8EEF4|#1a73e8'}"
+                            TextColor="{Binding IsBatchMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#FFFFFF'}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="person"/>
+                    <Button Text="批量打印" FontSize="13" HeightRequest="34" Padding="18,0" CornerRadius="6"
+                            BackgroundColor="{Binding IsBatchMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#E8EEF4'}"
+                            TextColor="{Binding IsBatchMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"
+                            Command="{Binding SwitchTabCommand}" CommandParameter="batch"/>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- ══════════ Tab1 按人补打（三栏） ══════════ -->
+        <Grid Grid.Row="2" IsVisible="{Binding IsBatchMode, Converter={StaticResource BoolToInverseConverter}}"
+              ColumnDefinitions="320,400,*" ColumnSpacing="12" Padding="12,12,12,12">
+
+            <!-- 左栏：搜索 → 人（主体） → 分类分支 → 记录（四级钻取；人名单占 * 行有界渲染，分支/记录 BindableLayout 少条目自然展开） -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+
+                <!-- Row0：搜索与月份过滤 -->
+                <Border Grid.Row="0" Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="White">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <SearchBar Placeholder="按姓名/身份证筛选（可留空）"
+                                       Text="{Binding SearchKeyword}"
+                                       SearchCommand="{Binding RefreshPersonsCommand}"
+                                       HeightRequest="36" BackgroundColor="{StaticResource Gray100}"/>
+                            <Button Grid.Column="1" Text="搜索" Style="{StaticResource ButtonPrimary}"
+                                    HeightRequest="36" Padding="14,0" VerticalOptions="Center"
+                                    Command="{Binding RefreshPersonsCommand}"/>
+                        </Grid>
+                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                <Label Text="年份" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding FilterYearOptions}"
+                                        SelectedItem="{Binding FilterYear}" HeightRequest="36" FontSize="13"/>
+                            </Grid>
+                            <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                <Label Text="月份" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding MonthOptions}"
+                                        SelectedIndex="{Binding MonthFilterIndex}" HeightRequest="36" FontSize="13"/>
+                            </Grid>
+                            <Grid Grid.Row="2" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                <Label Text="分类" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding DomainFilterOptions}"
+                                        SelectedIndex="{Binding DomainFilterIndex}" HeightRequest="36" FontSize="13"/>
+                            </Grid>
+                        </Grid>
+                        <Label Text="月份按B线业务周期（上月15日~本月15日）筛选；分类可单独筛选名单" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Row1：人员名单（占满剩余高度，有界渲染） -->
+                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="人员名单" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding PersonResults.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                            </Border>
+                        </Grid>
+                        <Label Grid.Row="1" Text="{Binding MonthFilterHint}" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <CollectionView Grid.Row="2" ItemsSource="{Binding PersonResults}"
+                                        SelectionMode="Single"
+                                        SelectedItem="{Binding SelectedPerson}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ReprintPerson">
+                                    <!-- 高亮由 VM 维护 IsSelected（VSM 在 CollectionView 中有选中残留问题） -->
+                                    <Border Padding="10,8" Margin="0,2"
+                                            BackgroundColor="{Binding IsSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8F0FE|#FAFAFA'}"
+                                            StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <VerticalStackLayout Spacing="1">
+                                                <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Text="{Binding IdCard}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding DomainSummary}" FontSize="10" TextColor="{StaticResource Primary}"/>
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="{Binding LatestTime, StringFormat='{0:MM-dd}'}" FontSize="11" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无名单" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,10"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+                    </Grid>
+                </Border>
+
+                <!-- Row2：名下分类（选中人后出现；条目≤5，BindableLayout 自然展开） -->
+                <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White" IsVisible="{Binding HasSelectedPerson}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="名下分类（点击查看文书）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Branches}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="ReprintBranch">
+                                    <!-- Source={x:Reference Root}：页面级 BindingContext；RelativeSource AncestorType 只匹配可视化树元素，无法解析 ViewModel -->
+                                    <Border Padding="10,8"
+                                            BackgroundColor="{Binding IsSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8F0FE|#FAFAFA'}"
+                                            StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding BindingContext.SelectBranchCommand, Source={x:Reference Root}}"
+                                                CommandParameter="{Binding .}"/>
+                                        </Border.GestureRecognizers>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <VerticalStackLayout Spacing="1">
+                                                <Label Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Text="{Binding LatestTime, StringFormat='最近 {0:yyyy-MM-dd}'}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="{Binding Count}" FontSize="12" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Row3：分支内记录（选中分支后出现；BindableLayout） -->
+                <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White" IsVisible="{Binding HasSelectedBranch}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="记录（点击切换）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding BranchRecords}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="ReprintArchiveItem">
+                                    <Border Padding="10,8"
+                                            BackgroundColor="{Binding IsSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8F0FE|#FAFAFA'}"
+                                            StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding BindingContext.SelectRecordCommand, Source={x:Reference Root}}"
+                                                CommandParameter="{Binding .}"/>
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="1">
+                                            <Label Text="{Binding BusinessTime, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding ArchiveVersionText}" FontSize="10" TextColor="{StaticResource WarningDark}" IsVisible="{Binding HasArchiveVersion}"/>
+                                            <Label Text="{Binding Extra}" FontSize="11" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- 中栏：文书清单 + 历史打印 + 打印设置 + 操作 -->
+            <ScrollView Grid.Column="1" Padding="0,10,0,10">
+                <VerticalStackLayout Spacing="12">
+
+                    <!-- 选中提示 -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding HasSelectedRecord}" BackgroundColor="White">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="1">
+                                <Label Text="{Binding SelectedRecordName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding SelectedRecordIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding SelectedRecordExtra}" FontSize="12" TextColor="{StaticResource Primary}"/>
+                                <Label Text="{Binding SelectedRecordNo, StringFormat='文号 {0}'}" FontSize="11" TextColor="{StaticResource TextTertiary}"
+                                       IsVisible="{Binding SelectedRecordNo, Converter={StaticResource StringNotEmptyConverter}}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <!-- ArchiveSet 域：模板选择（组合 Output） -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsArchiveSetMode}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="选择打印模板" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Picker ItemsSource="{Binding Output.Templates}"
+                                    SelectedItem="{Binding Output.SelectedPreviewTemplate}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
+                                    HeightRequest="40"/>
+                            <Label Text="{Binding Output.StatusText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 核查域：模板直打 -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsAssetMode}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="选择核查模板（直打）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Picker ItemsSource="{Binding AssetTemplates}"
+                                    SelectedItem="{Binding SelectedAssetTemplate}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
+                                    HeightRequest="40"/>
+                            <HorizontalStackLayout Spacing="12">
+                                <Button Text="预览" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
+                                        Command="{Binding PreviewAssetCommand}"/>
+                                <Button Text="打印" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
+                                        Command="{Binding PrintAssetCommand}"/>
+                                <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                    <Label Text="生成PDF" FontSize="13"/>
+                                    <Switch IsToggled="{Binding IsGeneratePdf}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 动态管理域：留痕原样补打 / 重新生成 -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsDynamicMode}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="打印留痕（选中后可原样补打）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                    <Label Text="{Binding DynamicHistory.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                                </Border>
+                            </Grid>
+                            <CollectionView ItemsSource="{Binding DynamicHistory}"
+                                            SelectionMode="Single"
+                                            SelectedItem="{Binding SelectedDynamicHistory}"
+                                            MaximumHeightRequest="200">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="DynamicPrintHistoryItem">
+                                        <Border Padding="8,6" Margin="0,2" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 6">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <VerticalStackLayout Spacing="1">
+                                                    <Label Text="{Binding DisplayTime}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                    <Label Text="{Binding OperatorName}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                                </VerticalStackLayout>
+                                                <Border Grid.Column="1" Padding="6,2" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 4"
+                                                        IsVisible="{Binding HasPdfData}" VerticalOptions="Center">
+                                                    <Label Text="可原样补打" FontSize="10" TextColor="{StaticResource SecondaryDark}"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="该档案暂无打印留痕（可点「重新生成」出第一份）" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,8"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Grid.Column="0" Text="原样补打（预览留痕PDF）" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding ReprintOriginalCommand}"/>
+                                <Button Grid.Column="1" Text="重新生成（预览现势数据）" Style="{StaticResource ButtonPrimary}"
+                                        BackgroundColor="{StaticResource WarningDark}"
+                                        Command="{Binding RegenerateCommand}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                                <Label Text="打印机" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding DynamicPrinterNames}" SelectedItem="{Binding SelectedDynamicPrinter}" HeightRequest="36"/>
+                                <Label Grid.Column="2" Text="份数" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Grid.Column="3" Text="{Binding DynamicCopies}" Keyboard="Numeric" WidthRequest="60" HeightRequest="36" HorizontalTextAlignment="Center"/>
+                            </Grid>
+                            <Button Text="打印当前档案（选中打印机）" Style="{StaticResource ButtonPrimary}"
+                                    BackgroundColor="{StaticResource WarningDark}"
+                                    Command="{Binding PrintDynamicCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 打印设置 + 操作按钮（ArchiveSet 域，组合 Output） -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsArchiveSetMode}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="打印设置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                                <Label Grid.Row="0" Text="打印机" FontSize="14" VerticalOptions="Center"/>
+                                <Picker Grid.Row="0" Grid.Column="1"
+                                        ItemsSource="{Binding Output.PrinterNames}"
+                                        SelectedItem="{Binding Output.SelectedPrinter}"/>
+                                <Label Grid.Row="1" Text="倍数(份)" FontSize="14" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
+                                    <Button Text="−" Command="{Binding Output.DecreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                    <Entry Text="{Binding Output.Copies}" Keyboard="Numeric" WidthRequest="60" HeightRequest="36"
+                                           HorizontalTextAlignment="Center" VerticalOptions="Center"/>
+                                    <Button Text="+" Command="{Binding Output.IncreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Spacing="8">
+                                    <Label Text="双面打印" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
+                                    <Label Text="生成PDF" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding Output.GeneratePdf}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding Output.PreviewCommand}"
+                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                                <Button Grid.Column="1" Text="打印" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding Output.PrintCommand}"
+                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                            </Grid>
+                            <VerticalStackLayout Spacing="4" IsVisible="{Binding Output.IsGenerating}">
+                                <Label Text="{Binding Output.ProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <ProgressBar Progress="{Binding Output.Progress}" ProgressColor="{StaticResource Primary}" HeightRequest="6"/>
+                            </VerticalStackLayout>
+                            <Button Text="一键打印全部模板" Style="{StaticResource ButtonPrimary}"
+                                    BackgroundColor="{StaticResource WarningDark}"
+                                    Command="{Binding Output.PrintAllCommand}"
+                                    IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 历史打印留痕（ArchiveSet/核查域；动态域在专属卡内展示，置后不抢补打入口） -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding ShowPrintHistory}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="历史打印留痕" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                    <Label Text="{Binding PrintRecords.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                                </Border>
+                            </Grid>
+                            <CollectionView ItemsSource="{Binding PrintRecords}" HeightRequest="120" SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="PrintRecordDisplayItem">
+                                        <Border Padding="8,6" Margin="0,2" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 6">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <VerticalStackLayout Spacing="1">
+                                                    <Label Text="{Binding TemplateName}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                                    <Label Text="{Binding PrinterName, StringFormat='打印机: {0}'}" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                                </VerticalStackLayout>
+                                                <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                                    <Label Text="{Binding DisplayTime}" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                                    <Label Text="{Binding OperatorName}" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="该记录暂无历史打印留痕" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,8"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 右栏：PDF 预览 -->
+            <Border Grid.Column="2" BackgroundColor="{StaticResource SurfaceVariant}" StrokeThickness="0" StrokeShape="RoundRectangle 10">
+                <Grid Padding="8">
+                    <controls:PdfPreviewView PdfFilePath="{Binding Output.PdfFilePath}"
+                                             IsVisible="{Binding Output.HasPdf}"
+                                             VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16"
+                                         IsVisible="{Binding Output.HasPdf, Converter={StaticResource BoolToInverseConverter}}">
+                        <Label Text="&#xE894;" FontFamily="Segoe Fluent Icons" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="选择左侧人员与分类后点击预览" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="14"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ══════════ Tab2 批量打印 ══════════ -->
+        <ScrollView Grid.Row="2" IsVisible="{Binding IsBatchMode}">
+            <VerticalStackLayout Padding="16,12,16,16" Spacing="12">
+
+                <!-- 批量条件 -->
+                <Border Style="{StaticResource CardBorder}" Padding="16" BackgroundColor="White">
+                    <VerticalStackLayout Spacing="12">
+                        <!-- 头部：标题 + 刷新 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="批量条件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="刷新名单" Style="{StaticResource ButtonPrimary}"
+                                    HeightRequest="36" Padding="20,0" Command="{Binding BatchSearchCommand}"/>
+                        </Grid>
+
+                        <!-- 两列标签-控件：业务域 | 批量方式 · 年份 | 月份 · 关键词 · 模板 -->
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,*,Auto,*" RowSpacing="10" ColumnSpacing="10">
+                            <!-- 行1：业务域 | 批量方式 -->
+                            <Label Grid.Row="0" Grid.Column="0" Text="业务域" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                            <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding BatchDomainOptions}"
+                                    SelectedIndex="{Binding BatchDomainIndex}" HeightRequest="38"/>
+                            <Label Grid.Row="0" Grid.Column="2" Text="批量方式" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding IsBatchDynamicMode, Converter={StaticResource BoolToInverseConverter}}"/>
+                            <Picker Grid.Row="0" Grid.Column="3" ItemsSource="{Binding BatchModeOptions}"
+                                    SelectedIndex="{Binding BatchModeIndex}" HeightRequest="38"
+                                    IsVisible="{Binding IsBatchDynamicMode, Converter={StaticResource BoolToInverseConverter}}"/>
+
+                            <!-- 行2：年份 | 月份（含全部） -->
+                            <Label Grid.Row="1" Grid.Column="0" Text="年份" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                            <Picker Grid.Row="1" Grid.Column="1" ItemsSource="{Binding BatchYearOptions}"
+                                    SelectedItem="{Binding BatchYear}" HeightRequest="38"/>
+                            <Label Grid.Row="1" Grid.Column="2" Text="月份" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                            <Picker Grid.Row="1" Grid.Column="3" ItemsSource="{Binding BatchMonthOptions}"
+                                    SelectedIndex="{Binding BatchMonthIndex}" HeightRequest="38"/>
+
+                            <!-- 行3：关键词（跨列，动态域不需要） -->
+                            <Label Grid.Row="2" Grid.Column="0" Text="关键词" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding IsBatchDynamicMode, Converter={StaticResource BoolToInverseConverter}}"/>
+                            <Entry Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Placeholder="可留空 = 按年月加载全部"
+                                   Text="{Binding BatchKeyword}" HeightRequest="38"
+                                   IsVisible="{Binding IsBatchDynamicMode, Converter={StaticResource BoolToInverseConverter}}"/>
+
+                            <!-- 行4：模板（跨列，核查域恒显；档案集域仅「指定模板」模式） -->
+                            <Label Grid.Row="3" Grid.Column="0" Text="模板" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding ShowBatchTemplatePicker}"/>
+                            <Picker Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" ItemsSource="{Binding BatchTemplates}"
+                                    SelectedItem="{Binding SelectedBatchTemplate}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
+                                    HeightRequest="38" IsVisible="{Binding ShowBatchTemplatePicker}"/>
+                        </Grid>
+
+                        <!-- 月份口径：B线业务周期 -->
+                        <Label Text="月份按B线业务周期（上月15日~本月15日）筛选；选「全部」不限定时间（动态管理域需选具体月份）"
+                               FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <Label Text="{Binding BatchResultSummary}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 批量记录列表 -->
+                <Border Style="{StaticResource CardBorder}" Padding="16" BackgroundColor="White">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="筛选结果" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding BatchRecords.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                            </Border>
+                        </Grid>
+                        <CollectionView ItemsSource="{Binding BatchRecords}" MaximumHeightRequest="300" SelectionMode="None">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ReprintArchiveItem">
+                                    <Border Padding="10,8" Margin="0,2" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="1">
+                                                <Label Text="{Binding IdCard}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding Extra}" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="2" Text="{Binding BusinessTime, StringFormat='{0:yyyy-MM-dd}'}" FontSize="11" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无筛选结果（先筛选记录再执行批量）" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,12"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+
+                        <!-- 打印机设置（ArchiveSet 批量用 Output 设置） -->
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" IsVisible="{Binding IsArchiveSetMode, Converter={StaticResource BoolToInverseConverter}}">
+                            <Label Text="打印机" FontSize="13" VerticalOptions="Center"/>
+                            <Picker Grid.Column="1" ItemsSource="{Binding Output.PrinterNames}" SelectedItem="{Binding Output.SelectedPrinter}" HeightRequest="38"/>
+                            <Label Grid.Column="2" Text="双面" FontSize="13" VerticalOptions="Center"/>
+                            <Switch Grid.Column="3" IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}" HorizontalOptions="Start"/>
+                        </Grid>
+
+                        <Button Text="开始批量打印" Style="{StaticResource ButtonPrimary}" BackgroundColor="{StaticResource WarningDark}"
+                                Command="{Binding BatchRunCommand}"
+                                IsEnabled="{Binding BatchIsGenerating, Converter={StaticResource BoolToInverseConverter}}"/>
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding BatchIsGenerating}">
+                            <Label Text="{Binding BatchProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <ProgressBar Progress="{Binding BatchProgress}" ProgressColor="{StaticResource Primary}" HeightRequest="6"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载蒙版 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsOverallBusy}"
+                                   LoadingText="正在加载..."/>
+    </Grid>
+
+</ContentPage>

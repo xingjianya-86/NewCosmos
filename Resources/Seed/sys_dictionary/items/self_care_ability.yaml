@@ -1,0 +1,11 @@
+# 自理能力字典（固定 ID）
+# 分类 ID=22，字典项 ID 范围: 22001-22999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 22001, category: "SelfCareAbilities", item_key: "Independent", item_value: "自理", sort_order: 1, is_active: true }
+      - { id: 22002, category: "SelfCareAbilities", item_key: "SemiDependent", item_value: "半失能", sort_order: 2, is_active: true }
+      - { id: 22003, category: "SelfCareAbilities", item_key: "Dependent", item_value: "失能", sort_order: 3, is_active: true }

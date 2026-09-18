@@ -1,0 +1,411 @@
+# 资产核查模块 Schema 定义
+# 来源说明（2026-07-27，依据 backup/db/new_cosmos_20260727_054917.sql 与代码交叉核对重建）：
+#   1) nc_biz_asset_checks / nc_biz_asset_check_agents / nc_biz_asset_check_operators /
+#      nc_biz_asset_check_reports —— 按生产库 pg_dump 实际结构逐列还原（含 community、deleted_at）。
+#      注意：生产库中这四张表均无主键约束、无唯一约束（仅 6 个普通索引）；
+#      本文件按规范在 id 列声明 primaryKey（仅影响新建库，不会改动既有库）。
+#   2) nc_biz_asset_verifications / nc_biz_asset_report_history —— 生产库不存在（42P01），
+#      依据 Services/Domain/AssetVerification/AssetVerificationService.cs、
+#      AssetVerificationReportService.cs、StatisticsService.cs 及实体类重建。
+#   旧版本文件使用了 default:/primary_key:/unique_constraints: 等非规范键名（解析时被忽略），
+#   本次已统一为 defaultValue:/primaryKey:/constraints: 规范键名。
+database: 资产核查模块
+version: 1.0
+description: 资产核查（快速核查申请、代理人、经办人、PDF报告存储、按档案核查、核查月报历史）
+
+tables:
+  # ── 核查主表（生产库实表）──
+  - name: nc_biz_asset_checks
+    comment: 资产核查申请记录表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: batch_id
+        type: VARCHAR(50)
+        nullable: false
+        comment: 批次号
+      - name: applicant_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 申请人姓名
+      - name: applicant_id_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 申请人证件类型
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 申请人身份证号
+      - name: relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与户主关系
+      - name: is_head
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'false'
+        comment: 是否户主
+      - name: head_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 户主身份证号
+      - name: family_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 家庭住址
+      - name: application_reason
+        type: VARCHAR(500)
+        nullable: true
+        comment: 申请原因
+      - name: application_date
+        type: DATE
+        nullable: false
+        comment: 申请日期
+      - name: contact_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 联系电话
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: "'0'"
+        comment: 状态(0-已提交,1-有报告,2-已完成,3-已拒绝)
+      - name: created_at
+        type: TIMESTAMP(6)
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP(6)
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 更新时间
+      - name: community
+        type: VARCHAR(100)
+        nullable: true
+        comment: 村社区
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 软删除时间(NULL=未删除)
+    indexes:
+      - name: idx_asset_checks_batch_id
+        columns: [batch_id]
+      - name: idx_asset_checks_head_date
+        columns: [head_id_card, application_date]
+      - name: idx_asset_checks_id_card
+        columns: [applicant_id_card]
+
+  # ── 代理人表（生产库实表）──
+  - name: nc_biz_asset_check_agents
+    comment: 资产核查代理人信息表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: batch_id
+        type: VARCHAR(50)
+        nullable: false
+        comment: 批次号(唯一)
+      - name: is_agent
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'false'
+        comment: 是否代理人
+      - name: agent_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 代理人姓名
+      - name: agent_id_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代理人证件类型
+      - name: agent_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 代理人身份证号
+      - name: agent_relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代理人与申请人关系
+      - name: created_at
+        type: TIMESTAMP(6)
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+
+  # ── 经办人（操作员）表（生产库实表）──
+  - name: nc_biz_asset_check_operators
+    comment: 资产核查操作员信息表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: batch_id
+        type: VARCHAR(50)
+        nullable: false
+        comment: 批次号(唯一)
+      - name: operator_user_id
+        type: BIGINT
+        nullable: true
+        comment: 操作员用户ID
+      - name: operator_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 操作员姓名
+      - name: operator_account
+        type: VARCHAR(100)
+        nullable: true
+        comment: 操作员账号
+      - name: operator_unit_name
+        type: VARCHAR(200)
+        nullable: true
+        comment: 操作员所属单位
+      - name: created_at
+        type: TIMESTAMP(6)
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+
+  # ── PDF 报告存储表（生产库实表）──
+  - name: nc_biz_asset_check_reports
+    comment: 资产核查PDF报告存储表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: check_id
+        type: BIGINT
+        nullable: false
+        comment: 关联核查记录ID(nc_biz_asset_checks.id)
+      - name: batch_id
+        type: VARCHAR(50)
+        nullable: false
+        comment: 批次号
+      - name: applicant_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 申请人姓名
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 申请人身份证号
+      - name: report_file_name
+        type: VARCHAR(500)
+        nullable: false
+        comment: 原始PDF文件名
+      - name: report_data
+        type: BYTEA
+        nullable: false
+        comment: PDF文件二进制数据
+      - name: file_hash
+        type: VARCHAR(64)
+        nullable: false
+        comment: SHA256文件哈希(去重用)
+      - name: is_valid
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'true'
+        comment: 验证是否通过(文件名含姓名)
+      - name: report_date
+        type: DATE
+        nullable: false
+        defaultValue: 'CURRENT_DATE'
+        comment: 报告日期
+      - name: notes
+        type: VARCHAR(500)
+        nullable: true
+        comment: 验证备注消息
+      - name: created_at
+        type: TIMESTAMP(6)
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: created_by
+        type: BIGINT
+        nullable: true
+        comment: 创建人用户ID
+    indexes:
+      - name: idx_check_reports_batch_id
+        columns: [batch_id]
+      - name: idx_check_reports_check_id
+        columns: [check_id]
+      - name: idx_check_reports_file_hash
+        columns: [file_hash]
+
+  # ── 按档案的资产核查表（生产库缺失，依代码重建）──
+  # 使用方：AssetVerificationService（增改查）、StatisticsService（Pending 计数）
+  - name: nc_biz_asset_verifications
+    comment: 档案资产核查记录表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: archive_id
+        type: BIGINT
+        nullable: false
+        comment: 关联档案ID(nc_biz_archives.id)
+      - name: archive_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 档案对象姓名（实体字段，当前代码未写入）
+      - name: archive_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 档案对象身份证号（实体字段，当前代码未写入）
+      - name: verification_year
+        type: INTEGER
+        nullable: false
+        comment: 核查年份
+      - name: verification_month
+        type: INTEGER
+        nullable: false
+        comment: 核查月份
+      - name: verification_type
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: "'Quick'"
+        comment: 核查类型（Quick-快速核查）
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: "'Pending'"
+        comment: 状态（Pending-待核查,Completed-已完成）
+      - name: total_asset_value
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 资产总值（元）
+      - name: housing_asset_value
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 房产资产值（元）（实体字段，当前代码未写入）
+      - name: vehicle_asset_value
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 车辆资产值（元）（实体字段，当前代码未写入）
+      - name: financial_asset_value
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 金融资产值（元）（实体字段，当前代码未写入）
+      - name: business_asset_value
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 经营资产值（元）（实体字段，当前代码未写入）
+      - name: verification_result
+        type: VARCHAR(200)
+        nullable: true
+        comment: 核查结果
+      - name: remarks
+        type: VARCHAR(500)
+        nullable: true
+        comment: 备注
+      - name: completed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 完成时间
+      - name: completed_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 完成人
+      - name: created_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 更新人
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 更新时间
+    constraints:
+      - name: uk_asset_verifications_archive_period
+        type: UNIQUE
+        columns: [archive_id, verification_year, verification_month]
+    indexes:
+      - name: idx_asset_verifications_status
+        columns: [status]
+      - name: idx_asset_verifications_period
+        columns: [verification_year, verification_month]
+
+  # ── 资产核查月报历史表（生产库缺失，依代码重建）──
+  # 使用方：AssetVerificationReportService.GetReportHistoryAsync / SaveReportHistoryAsync
+  - name: nc_biz_asset_report_history
+    comment: 资产核查月报生成历史表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 报表年份
+      - name: month
+        type: INTEGER
+        nullable: false
+        comment: 报表月份
+      - name: report_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 报表类型
+      - name: total_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 核查任务总数
+      - name: completed_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 已完成数
+      - name: pending_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 待处理数
+      - name: error_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 异常数
+      - name: generated_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 生成人
+      - name: generated_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 生成时间
+      - name: file_path
+        type: VARCHAR(500)
+        nullable: true
+        comment: 导出文件路径
+    indexes:
+      - name: idx_asset_report_history_year_time
+        columns: [year, generated_at]

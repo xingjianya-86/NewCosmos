@@ -1,0 +1,68 @@
+# 转移收入表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 转移收入明细 - 记录养老金、低保金、残疾人补贴等政策性转移收入
+
+tables:
+  - name: nc_biz_transfer_incomes
+    comment: "[经济状况] 转移性收入表 - 记录养老金、低保金、残疾人补贴等政策性转移收入"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: INTEGER
+        nullable: true
+        comment: 成员年龄
+      - name: income_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 收入类型：养老金/低保金/残疾人补贴/其他补贴
+      - name: monthly_amount
+        type: NUMERIC
+        nullable: true
+        comment: 月金额
+      - name: months_or_times
+        type: INTEGER
+        nullable: true
+        comment: 发放月数或次数
+      - name: total_amount
+        type: NUMERIC
+        nullable: true
+        comment: 总金额（月收入）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_transfer_incomes_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_transfer_incomes_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

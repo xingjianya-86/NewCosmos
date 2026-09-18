@@ -1,0 +1,198 @@
+database: subsidy_imports
+version: 2.0
+description: 农业补贴导入数据库 - 导入种植/轮作/地力补贴台账数据
+
+tables:
+  - name: nc_biz_planting_subsidy
+    comment: "[导入台账] 种植补贴表 - 导入玉米/大豆/水稻等种植面积数据，用于补贴计算"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址
+      - name: total_acreage
+        type: NUMERIC(18,2)
+        comment: 总种植面积
+      - name: corn_acreage
+        type: NUMERIC(18,2)
+        comment: 玉米面积
+      - name: soybean_acreage
+        type: NUMERIC(18,2)
+        comment: 大豆面积
+      - name: rice_total_acreage
+        type: NUMERIC(18,2)
+        comment: 稻谷总面积
+      - name: rice_surface_water_acreage
+        type: NUMERIC(18,2)
+        comment: 地表水灌溉稻谷面积
+      - name: rice_groundwater_acreage
+        type: NUMERIC(18,2)
+        comment: 地下水灌溉稻谷面积
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_planting_subsidy_card_year
+        type: UNIQUE
+        columns: [id_card, data_year]
+    indexes:
+      - name: idx_planting_subsidy_id_card
+        columns: [id_card]
+      - name: idx_planting_subsidy_data_year
+        columns: [data_year]
+
+  - name: nc_biz_rotation_subsidy
+    comment: "[导入台账] 轮作补贴表 - 导入轮作补贴面积和金额数据"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 收款人姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址
+      - name: rotation_area
+        type: NUMERIC(18,2)
+        comment: 轮作面积（亩）
+      - name: subsidy_amount
+        type: NUMERIC(18,2)
+        comment: 补贴金额
+      - name: account_number
+        type: VARCHAR(50)
+        comment: 银行账号
+      - name: bank_name
+        type: VARCHAR(100)
+        comment: 银行名称
+      - name: bank_branch
+        type: VARCHAR(100)
+        comment: 开户网点
+      - name: subsidy_type
+        type: VARCHAR(50)
+        comment: 补贴类型（社保卡/非社保卡）
+      - name: rotation_type
+        type: VARCHAR(100)
+        comment: 轮作类型
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_rotation_subsidy_card_year
+        type: UNIQUE
+        columns: [id_card, data_year]
+    indexes:
+      - name: idx_rotation_subsidy_id_card
+        columns: [id_card]
+      - name: idx_rotation_subsidy_data_year
+        columns: [data_year]
+
+  - name: nc_biz_soil_subsidy
+    comment: "[导入台账] 地力补贴表 - 导入耕地地力保护补贴数据"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 收款人姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址
+      - name: subsidy_amount
+        type: NUMERIC(18,2)
+        comment: 补贴金额
+      - name: account_number
+        type: VARCHAR(50)
+        comment: 银行账号
+      - name: bank_name
+        type: VARCHAR(100)
+        comment: 银行名称
+      - name: bank_branch
+        type: VARCHAR(100)
+        comment: 开户网点
+      - name: subsidy_type
+        type: VARCHAR(50)
+        comment: 补贴类型（社保卡/非社保卡）
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_soil_subsidy_card_year
+        type: UNIQUE
+        columns: [id_card, data_year]
+    indexes:
+      - name: idx_soil_subsidy_id_card
+        columns: [id_card]
+      - name: idx_soil_subsidy_data_year
+        columns: [data_year]
+
+views: []

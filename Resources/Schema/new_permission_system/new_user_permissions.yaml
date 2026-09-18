@@ -1,0 +1,52 @@
+database: 新权限系统
+version: 1.0
+description: 用户直接权限表结构
+
+tables:
+  - name: nc_perm_user_permissions
+    comment: 用户直接权限表
+    description: 为特定用户直接分配权限，不通过角色
+    columns:
+      - name: user_id
+        type: INTEGER
+        nullable: false
+        comment: 用户ID（引用 nc_sys_users 表）
+      - name: permission_code
+        type: VARCHAR(50)
+        nullable: false
+        comment: 权限代码
+      - name: granted_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 授权时间
+      - name: granted_by
+        type: INTEGER
+        comment: 授权人ID（引用 nc_sys_users 表）
+    constraints:
+      - name: pk_nc_perm_user_permissions
+        type: PRIMARY KEY
+        columns: [user_id, permission_code]
+      - name: fk_nc_perm_user_permissions_user
+        type: FOREIGN KEY
+        columns: [user_id]
+        references:
+          table: nc_sys_users
+          column: id
+          onDelete: CASCADE
+      - name: fk_nc_perm_user_permissions_granted_by
+        type: FOREIGN KEY
+        columns: [granted_by]
+        references:
+          table: nc_sys_users
+          column: id
+          onDelete: SET NULL
+    indexes:
+      - name: idx_nc_perm_user_permissions_user_id
+        columns: [user_id]
+      - name: idx_nc_perm_user_permissions_permission_code
+        columns: [permission_code]
+
+usage_notes:
+  - 用户最终权限 = 角色权限 ∪ 用户直接权限
+  - 用于临时授权或特殊权限需求
+  - 建议优先使用角色管理权限

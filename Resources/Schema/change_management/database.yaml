@@ -1,0 +1,162 @@
+# 变更管理Schema定义
+database: 变更管理
+version: 1.0
+description: 变更记录、快照、明细、渐退期详情
+
+tables:
+  # ── 变更记录主表 ──
+  - name: nc_biz_change_records
+    comment: 变更记录主表，记录所有档案变更历史
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: change_no
+        type: character varying(32)
+        nullable: false
+        comment: 变更编号，唯一标识
+      - name: change_type
+        type: character varying(50)
+        nullable: false
+        comment: 变更类型：EconomicChange=经济状况变更, MemberChange=成员变更, HeadOnlyChange=仅户主变更, HeadWithMemberChange=户主及成员变更
+      - name: change_category
+        type: character varying(50)
+        nullable: true
+        comment: 变更类别：FundChange=资金变更, MemberAttribute=成员属性变更, MemberChange=成员增减变更
+      - name: change_reason
+        type: text
+        nullable: true
+        comment: 变更原因说明
+      - name: change_reason_type
+        type: character varying(50)
+        nullable: true
+        comment: 变更原因类型，如"经济复核"、"成员死亡"、"户籍变动"
+      - name: change_date
+        type: date
+        nullable: true
+        comment: 变更日期
+      - name: change_remark
+        type: text
+        nullable: true
+        comment: 变更备注
+      - name: original_application_id
+        type: bigint
+        nullable: true
+        comment: 原始申请ID，用于追溯变更源头
+      - name: old_classification
+        type: character varying(100)
+        nullable: true
+        comment: 变更前分类代码，如RuralSubsistence
+      - name: new_classification
+        type: character varying(100)
+        nullable: true
+        comment: 变更后分类代码，如RuralLowIncome
+      - name: old_per_capita_income
+        type: numeric
+        nullable: true
+        comment: 变更前人均年收入（元）
+      - name: new_per_capita_income
+        type: numeric
+        nullable: true
+        comment: 变更后人均年收入（元）
+      - name: old_guarantee_amount
+        type: numeric
+        nullable: true
+        comment: 变更前月保障金额（元）
+      - name: new_guarantee_amount
+        type: numeric
+        nullable: true
+        comment: 变更后月保障金额（元）
+      - name: triggered_grace_period
+        type: boolean
+        nullable: true
+        comment: 是否触发渐退期，从低保降为低收入时触发
+      - name: triggered_stop
+        type: boolean
+        nullable: true
+        comment: 是否触发停保，收入超标或不符合条件时触发
+      - name: operator_name
+        type: character varying(100)
+        nullable: true
+        comment: 操作人姓名
+      - name: operator_id
+        type: integer
+        nullable: true
+        comment: 操作人ID，关联nc_sys_users.id
+      - name: changed_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 变更时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_change_records_application_id
+        columns: [application_id]
+
+  # ── 变更快照表 ──
+  - name: nc_biz_change_snapshots
+    comment: 变更快照表，保存变更前后的完整申请数据
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: change_id
+        type: bigint
+        nullable: false
+        comment: 关联变更记录ID，关联nc_biz_change_records.id
+      - name: snapshot_type
+        type: character varying(20)
+        nullable: false
+        comment: 快照类型：Before=变更前, After=变更后
+      - name: snapshot_data
+        type: jsonb
+        nullable: false
+        comment: 完整申请数据快照，JSON格式
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+
+  # ── 变更明细表 ──
+  - name: nc_biz_change_details
+    comment: 变更明细表，记录每个字段的变更详情
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: change_id
+        type: bigint
+        nullable: false
+        comment: 关联变更记录ID，关联nc_biz_change_records.id
+      - name: field_name
+        type: character varying(100)
+        nullable: true
+        comment: 字段名，如"applicant_name"、"family_size"
+      - name: field_label
+        type: character varying(200)
+        nullable: true
+        comment: 字段中文名，如"申请人姓名"、"家庭人数"
+      - name: old_value
+        type: text
+        nullable: true
+        comment: 变更前值
+      - name: new_value
+        type: text
+        nullable: true
+        comment: 变更后值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间

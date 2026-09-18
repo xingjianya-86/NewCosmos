@@ -1,0 +1,535 @@
+# 临时救助Schema定义
+database: temp_relief
+version: 1.0
+description: 临时救助业务（大额救助/小额快速救助），申请人来源仅限导入台账库与低保申请库
+
+tables:
+  # ── 临时救助申请主表 ──
+  - name: nc_biz_temp_relief_applications
+    comment: 临时救助申请主表（大额/小额两类，同一身份证每年仅限一条申请）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_no
+        type: VARCHAR(50)
+        nullable: false
+        comment: 申请编号（LZ+yyyyMMdd+seq:D4）
+      - name: relief_type
+        type: VARCHAR(20)
+        nullable: false
+        comment: 救助类型：Large大额救助 / Small小额快速救助
+      - name: apply_year
+        type: VARCHAR(4)
+        nullable: false
+        comment: 申请年份（由申请日期派生，用于"每年仅一次"唯一约束）
+      - name: source_type
+        type: VARCHAR(30)
+        nullable: false
+        comment: 申请人来源：ImportTab导入台账 / Application低保申请库
+      - name: source_table
+        type: VARCHAR(100)
+        nullable: false
+        comment: 来源表名（白名单内）
+      - name: source_family_id
+        type: BIGINT
+        nullable: false
+        comment: 来源家庭/申请记录ID
+
+      # ── 户主快照（选中来源后快照，防台账变动影响历史单据） ──
+      - name: applicant_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 申请人姓名
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 申请人身份证号
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: INTEGER
+        nullable: true
+        comment: 年龄
+      - name: phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 联系电话
+      # ── 救助对象快照（从家庭成员中选定的实际救助对象；户主恒为 applicant_*，不得变更） ──
+      - name: beneficiary_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 救助对象姓名（家庭成员中选定；空时视为申请人本人）
+      - name: beneficiary_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 救助对象身份证号
+      - name: beneficiary_gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 救助对象性别
+      - name: beneficiary_age
+        type: INTEGER
+        nullable: true
+        comment: 救助对象年龄
+      - name: beneficiary_relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 救助对象与户主关系（户主/配偶/子女等）
+      - name: family_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 家庭住址（省+市+县区+镇社区+详细地址拼接，打印展示用）
+      - name: family_province
+        type: VARCHAR(50)
+        nullable: true
+        comment: 家庭住址-省
+      - name: family_city
+        type: VARCHAR(50)
+        nullable: true
+        comment: 家庭住址-市
+      - name: family_district
+        type: VARCHAR(50)
+        nullable: true
+        comment: 家庭住址-县区
+      - name: family_town
+        type: VARCHAR(100)
+        nullable: true
+        comment: 家庭住址-镇社区
+      - name: family_detail
+        type: VARCHAR(200)
+        nullable: true
+        comment: 家庭住址-详细地址
+      - name: hukou_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 户籍所在地（省+市+县区+镇社区拼接，打印展示用）
+      - name: hukou_province
+        type: VARCHAR(50)
+        nullable: true
+        comment: 户籍所在地-省
+      - name: hukou_city
+        type: VARCHAR(50)
+        nullable: true
+        comment: 户籍所在地-市
+      - name: hukou_district
+        type: VARCHAR(50)
+        nullable: true
+        comment: 户籍所在地-县区
+      - name: hukou_town
+        type: VARCHAR(100)
+        nullable: true
+        comment: 户籍所在地-镇社区
+      - name: town
+        type: VARCHAR(100)
+        nullable: true
+        comment: 所在镇/街道（公示表用）
+      - name: village
+        type: VARCHAR(100)
+        nullable: true
+        comment: 所在村/社区（公示表用）
+      - name: family_size
+        type: INTEGER
+        nullable: true
+        comment: 家庭共同生活成员数
+      - name: family_category
+        type: VARCHAR(100)
+        nullable: true
+        comment: 家庭类别（低保/特困/边缘等，来自来源）
+      - name: bank_name
+        type: VARCHAR(200)
+        nullable: true
+        comment: 开户行（银行卡开户行；来源台账 bank_name 预填，可手工修改）
+      - name: bank_account
+        type: VARCHAR(64)
+        nullable: true
+        comment: 银行卡号/一卡通账号（来源台账 one_card_account 优先、否则 bank_account 预填；汇总表"一卡通账号"取此列）
+      - name: hukou_type
+        type: VARCHAR(10)
+        nullable: true
+        comment: 户籍类型快照（农村/城镇；rural/urban 台账按表名固定，其余取来源表 hukou_type；审核审批表勾选清单城乡判定用）
+
+      # ── 申请内容 ──
+      - name: policy_enjoyed
+        type: TEXT
+        nullable: true
+        comment: 享受的政策救助情况（入户调查表）
+      - name: family_member_status
+        type: TEXT
+        nullable: true
+        comment: 家庭成员状态（入户调查表）
+      - name: difficulty_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 主困难类型（疾病/意外灾害/教育支出/其他困难；明细见 nc_biz_temp_relief_diseases/accidents/educations）
+      - name: difficulty_reason
+        type: TEXT
+        nullable: false
+        comment: 申请救助原因/困难情况
+      - name: apply_date
+        type: DATE
+        nullable: false
+        comment: 申请日期
+      - name: report_unit
+        type: VARCHAR(200)
+        nullable: true
+        comment: 填报单位（入户调查表）
+      - name: report_time
+        type: TIMESTAMP
+        nullable: true
+        comment: 填报时间（入户调查表）
+
+      # ── 金额（仅小额使用；大额金额不填写） ──
+      - name: small_amount_level
+        type: VARCHAR(100)
+        nullable: true
+        comment: 小额所选定额档位名（冗余）
+      - name: confirm_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 确定金额（小额=所选档位金额；大额为空）
+
+      # ── 流程记录 ──
+      - name: publicize_start_date
+        type: DATE
+        nullable: true
+        comment: 公示开始日期
+      - name: publicize_end_date
+        type: DATE
+        nullable: true
+        comment: 公示结束日期
+      - name: verify_result
+        type: TEXT
+        nullable: true
+        comment: 入户核实情况（审批表）
+      - name: acceptance_person
+        type: VARCHAR(100)
+        nullable: true
+        comment: 乡镇验收人（民政助理）（验收报告）
+
+      # ── 状态审计 ──
+      - name: status
+        type: VARCHAR(20)
+        defaultValue: Draft
+        nullable: false
+        comment: 状态：Draft草稿/Confirmed已确认/Stopped已终止
+      - name: confirmed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 确认时间
+      - name: confirmed_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 确认人
+      - name: stopped_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 终止时间
+      - name: stopped_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 终止人
+      - name: stop_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 终止原因
+
+      # ── 通用审计字段 ──
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 更新人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    constraints: []
+    indexes:
+      - name: uk_temp_relief_idcard_year
+        columns: [applicant_id_card, apply_year]
+        unique: true
+        where: deleted_at IS NULL
+        comment: 同一身份证同一年度仅允许一条有效申请（终止也占名额，软删除释放名额）
+      - name: idx_temp_relief_application_no
+        columns: [application_no]
+      - name: idx_temp_relief_apply_date
+        columns: [apply_date]
+      - name: idx_temp_relief_status
+        columns: [status]
+
+  # ── 家庭成员明细表（审批表 5 行：姓名/性别/关系/身份证/工作单位/年收入） ──
+  - name: nc_biz_temp_relief_members
+    comment: 临时救助家庭成员明细表（审批表逐行展示）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联临时救助申请ID，关联nc_biz_temp_relief_applications.id
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 成员姓名
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别
+      - name: relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与户主关系
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 身份证号
+      - name: work_unit
+        type: VARCHAR(200)
+        nullable: true
+        comment: 工作单位
+      - name: annual_income
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 年收入（元）
+      - name: sort_order
+        type: INTEGER
+        defaultValue: 0
+        nullable: false
+        comment: 排序号
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_temp_relief_members_application_id
+        columns: [application_id]
+
+  # ── 疾病明细表（困难类型=疾病时，可多条） ──
+  - name: nc_biz_temp_relief_diseases
+    comment: 临时救助疾病明细表（一对多，诊断结果/编码/医院/治疗时间/费用）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联临时救助申请ID，关联nc_biz_temp_relief_applications.id
+      - name: disease_name
+        type: VARCHAR(300)
+        nullable: true
+        comment: 疾病诊断结果
+      - name: disease_code
+        type: VARCHAR(50)
+        nullable: true
+        comment: 疾病编码（ICD-10）
+      - name: member_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 患病成员姓名（该条疾病归属的家庭成员；空表示未指定）
+      - name: hospital
+        type: VARCHAR(200)
+        nullable: true
+        comment: 所在医院
+      - name: treat_start_date
+        type: DATE
+        nullable: true
+        comment: 治疗开始日期
+      - name: treat_end_date
+        type: DATE
+        nullable: true
+        comment: 治疗结束日期
+      - name: medical_total
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 医疗费用总额（元）
+      - name: insurance_paid
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 医保/其他报销金额（元）
+      - name: self_paid
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 个人自付费用（元）
+      - name: sort_order
+        type: INTEGER
+        defaultValue: 0
+        nullable: false
+        comment: 排序号
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_temp_relief_diseases_application_id
+        columns: [application_id]
+
+  # ── 意外灾害明细表（困难类型=意外灾害时，可多条） ──
+  - name: nc_biz_temp_relief_accidents
+    comment: 临时救助意外灾害明细表（一对多，类型/时间/地点/损失/责任）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联临时救助申请ID，关联nc_biz_temp_relief_applications.id
+      - name: accident_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 意外/灾害类型（火灾/交通事故/溺水/人身伤害/其他意外）
+      - name: member_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 受灾成员姓名（该条灾害归属的家庭成员；空表示未指定）
+      - name: happen_date
+        type: DATE
+        nullable: true
+        comment: 发生时间
+      - name: happen_place
+        type: VARCHAR(200)
+        nullable: true
+        comment: 发生地点
+      - name: injury_situation
+        type: VARCHAR(500)
+        nullable: true
+        comment: 人身伤害/伤残情况
+      - name: property_loss
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 财产损失金额（元）
+      - name: compensation_paid
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 已获保险/赔偿金额（元）
+      - name: responsibility_desc
+        type: VARCHAR(500)
+        nullable: true
+        comment: 责任认定情况（交警/消防认定、第三方责任）
+      - name: material_desc
+        type: VARCHAR(500)
+        nullable: true
+        comment: 佐证材料说明（公安/消防/交警证明等）
+      - name: sort_order
+        type: INTEGER
+        defaultValue: 0
+        nullable: false
+        comment: 排序号
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_temp_relief_accidents_application_id
+        columns: [application_id]
+
+  # ── 教育支出明细表（困难类型=教育支出时，可多条） ──
+  - name: nc_biz_temp_relief_educations
+    comment: 临时救助教育支出明细表（一对多，学生/阶段/学校/学费）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联临时救助申请ID，关联nc_biz_temp_relief_applications.id
+      - name: student_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 就学家庭成员姓名
+      - name: education_stage
+        type: VARCHAR(50)
+        nullable: true
+        comment: 就学阶段（学前教育/小学/初中/高中/中职/高职/大学）
+      - name: school_name
+        type: VARCHAR(200)
+        nullable: true
+        comment: 就读学校
+      - name: school_duration
+        type: INTEGER
+        nullable: true
+        comment: 学制（3=三年制/4=四年制/5=五年制）
+      - name: tuition_fee
+        type: NUMERIC(14,2)
+        nullable: true
+        comment: 学费/住宿费（扣除教育救助后自付，元）
+      - name: fee_date
+        type: DATE
+        nullable: true
+        comment: 缴费时间
+      - name: sort_order
+        type: INTEGER
+        defaultValue: 0
+        nullable: false
+        comment: 排序号
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_temp_relief_educations_application_id
+        columns: [application_id]

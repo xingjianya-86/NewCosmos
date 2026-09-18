@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.AssetVerification.AssetVerificationHomePage"
+             x:DataType="AssetVerificationHomeViewModel"
+             Title="家庭经济状况核对"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 返回行 -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 标题与职责 -->
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="家庭经济状况核对" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="居民家庭经济状况核对 · 授权报告上传与月度审核" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 模块统计栏 -->
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule  Grid.Column="0"  Value="{Binding PendingReportCountText}" Caption="待上传报告（份）"/>
+                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyCompletedText}" Caption="本月已完成（件）"/>
+                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyNewText}" Caption="本月新增（件）"/>
+                            <components:StatCapsule  Grid.Column="3"  Value="{Binding YearTotalText}" Caption="全年累计（件）"/>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 子功能卡片区 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="业务办理" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+
+                        <!-- 快速经济核对 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE721;"
+                                                IconBackgroundColor="#FFFBEB" IconColor="{StaticResource ModuleAssetVerification}"
+                                                Title="快速经济核对" Description="发起单户家庭经济状况核对申请"
+                                                Command="{Binding OpenQuickVerificationCommand}"
+                                                Opacity="{Binding AssetVerificationOpacity}"/>
+
+                        <!-- 月度审核 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE8FB;"
+                                                IconBackgroundColor="#FFFBEB" IconColor="{StaticResource ModuleAssetVerification}"
+                                                Title="月度审核" Description="核对报告上传、复核与批量处理"
+                                                Command="{Binding OpenMonthlyAuditCommand}"
+                                                Opacity="{Binding AssetVerificationOpacity}"/>
+
+                        <!-- 核对月报表 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE81E;"
+                                                IconBackgroundColor="#FFFBEB" IconColor="{StaticResource ModuleAssetVerification}"
+                                                Title="核对月报表" Description="按月生成、导出核对统计报表"
+                                                Command="{Binding OpenMonthlyReportCommand}"
+                                                Opacity="{Binding AssetVerificationOpacity}"/>
+
+                    </Grid>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

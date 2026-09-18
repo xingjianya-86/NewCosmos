@@ -1,0 +1,75 @@
+# 农村种植补贴数据库Schema定义
+# 版本: 1.0
+# 说明: 种植补贴数据导入
+
+database: 种植补贴数据库
+version: 1.0
+description: 农村种植补贴数据管理
+
+tables:
+  - name: nc_biz_planting_subsidy
+    comment: 农村种植补贴数据表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址
+      - name: total_acreage
+        type: NUMERIC(18,2)
+        comment: 总种植面积
+      - name: corn_acreage
+        type: NUMERIC(18,2)
+        comment: 玉米面积
+      - name: soybean_acreage
+        type: NUMERIC(18,2)
+        comment: 大豆面积
+      - name: rice_total_acreage
+        type: NUMERIC(18,2)
+        comment: 稻谷总面积
+      - name: rice_surface_water_acreage
+        type: NUMERIC(18,2)
+        comment: 地表水灌溉稻谷面积
+      - name: rice_groundwater_acreage
+        type: NUMERIC(18,2)
+        comment: 地下水灌溉稻谷面积
+      - name: original_file
+        type: VARCHAR(500)
+        comment: 原始文件名（多个用逗号分隔）
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_planting_subsidy_card_year
+        type: UNIQUE
+        columns: [id_card, data_year]
+    indexes:
+      - name: idx_planting_subsidy_id_card
+        columns: [id_card]
+      - name: idx_planting_subsidy_data_year
+        columns: [data_year]

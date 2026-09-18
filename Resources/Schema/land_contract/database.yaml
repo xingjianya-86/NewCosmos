@@ -1,0 +1,127 @@
+# 农村土地承包权归户Schema定义
+database: 农村土地承包权归户
+version: 2.0
+description: 农村土地承包权归户数据 - 承包方总表和地块明细表，用于土地收入计算
+
+tables:
+  # ── 承包方总表 ──
+  - name: nc_biz_land_contract_contractor
+    comment: "[经济状况] 农村土地承包权归户-承包方总表 - 记录承包方基本信息和合同面积"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: contractor_name
+        type: character varying(100)
+        nullable: false
+        comment: 承包方（代表）姓名
+      - name: contractor_pinyin
+        type: character varying(200)
+        nullable: true
+        comment: 承包方姓名拼音（辅助查询）
+      - name: employer_name
+        type: character varying(200)
+        nullable: true
+        comment: 发包方名称
+      - name: total_contract_area
+        type: numeric
+        nullable: true
+        comment: 合同总面积（亩）
+      - name: total_measured_area
+        type: numeric
+        nullable: true
+        comment: 实测总面积（亩）
+      - name: data_year
+        type: integer
+        nullable: true
+        defaultValue: EXTRACT(year FROM CURRENT_DATE)
+        comment: 数据年份
+      - name: imported_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 更新时间
+    indexes:
+      - name: idx_land_contract_contractor_name
+        columns: [contractor_name]
+      - name: idx_land_contract_contractor_year
+        columns: [data_year]
+
+  # ── 地块明细表 ──
+  - name: nc_biz_land_contract_plot
+    comment: "[经济状况] 农村土地承包权归户-地块明细表 - 记录每个地块的位置/面积/四至信息"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: contractor_id
+        type: bigint
+        nullable: false
+        comment: 关联承包方ID，关联nc_biz_land_contract_contractor.id
+      - name: plot_name
+        type: character varying(100)
+        nullable: true
+        comment: 地块名称
+      - name: plot_code
+        type: character varying(100)
+        nullable: true
+        comment: 地块代码
+      - name: location_east
+        type: character varying(100)
+        nullable: true
+        comment: 东至
+      - name: location_south
+        type: character varying(100)
+        nullable: true
+        comment: 南至
+      - name: location_west
+        type: character varying(100)
+        nullable: true
+        comment: 西至
+      - name: location_north
+        type: character varying(100)
+        nullable: true
+        comment: 北至
+      - name: contract_area
+        type: numeric
+        nullable: true
+        defaultValue: 0
+        comment: 合同面积（亩）
+      - name: measured_area
+        type: numeric
+        nullable: true
+        defaultValue: 0
+        comment: 实测面积（亩）
+      - name: remarks
+        type: character varying(255)
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 更新时间
+    indexes:
+      - name: idx_land_contract_plot_contractor_id
+        columns: [contractor_id]
+      - name: idx_land_contract_plot_code
+        columns: [plot_code]

@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.FamilyMembersPage"
+             x:DataType="FamilyMembersViewModel"
+             Title="家庭成员" BackgroundColor="{StaticResource Background}">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="家庭成员" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="管理共同生活家庭成员信息" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="12">
+                <Label Text="共同生活成员" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <CollectionView ItemsSource="{Binding Members}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无家庭成员，点击下方“+ 添加成员”" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="MemberItem">
+                            <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,4">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Switch IsToggled="{Binding IsEnabled}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/> <Span Text=" "/>
+                                                    <Span Text="{Binding Gender}"/> <Span Text=" "/>
+                                                    <Span Text="{Binding Age,StringFormat='{0}岁'}"/> <Span Text=" "/>
+                                                    <Span Text="{Binding HealthStatus}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="2" Text="编辑详情" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource Primary}" FontSize="14" CornerRadius="8" Padding="12,0" HeightRequest="36"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <Button Text="+ 添加成员" Command="{Binding AddNewMemberCommand}" BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource Primary}" CornerRadius="8" HeightRequest="44"/>
+            </VerticalStackLayout>
+        </ScrollView>
+        <Grid Grid.Row="2" BackgroundColor="{StaticResource White}" Padding="20,12" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+            <Button Grid.Column="1" Text="保存" Command="{Binding SaveCommand}" Style="{StaticResource ButtonPrimary}" MinimumWidthRequest="100"/>
+            <Button Grid.Column="2" Text="下一步" Style="{StaticResource ButtonPrimary}" MinimumWidthRequest="100"/>
+        </Grid>
+    </Grid>
+</ContentPage>

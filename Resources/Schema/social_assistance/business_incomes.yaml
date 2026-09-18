@@ -1,0 +1,94 @@
+# 经营收入明细表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 家庭经营收入明细 - 记录个体经营、开店等经营性收入
+
+tables:
+  - name: nc_biz_business_incomes
+    comment: "[经济状况] 经营收入明细表 - 记录个体经营、开店、种植养殖等经营性收入，净收入=营业收入-营业成本"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: company_name
+        type: VARCHAR(200)
+        nullable: true
+        comment: 企业/个体名称
+      - name: vendor_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 经营类型
+      - name: registered_capital
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 注册资本（元）
+      - name: business_scope
+        type: VARCHAR(500)
+        nullable: true
+        comment: 经营范围
+      - name: operating_income
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 营业收入（元）
+      - name: operating_cost
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 营业成本（元）
+      - name: net_income
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 净收入（元）
+      - name: address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 经营地址
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: INTEGER
+        nullable: true
+        comment: 成员年龄
+      - name: monthly_income
+        type: NUMERIC(18,2)
+        nullable: true
+        comment: 月收入（元）
+    indexes:
+      - name: idx_business_incomes_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_business_incomes_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

@@ -1,0 +1,34 @@
+# 保障分类代码字典（固定 ID）
+# 分类 ID=1，字典项 ID 范围: 1001-1999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      # 低保类（官方名称：最低生活保障对象；城乡同值，按 hukou_type 区分）
+      - { id: 1001, category: "ClassificationCodes", item_key: "RuralSubsistence", item_value: "最低生活保障对象", sort_order: 1, is_active: true }
+      - { id: 1002, category: "ClassificationCodes", item_key: "UrbanSubsistence", item_value: "最低生活保障对象", sort_order: 2, is_active: true }
+      - { id: 1003, category: "ClassificationCodes", item_key: "RuralLowIncomeSingle", item_value: "最低生活保障对象（单人）", sort_order: 3, is_active: true }
+      - { id: 1004, category: "ClassificationCodes", item_key: "UrbanLowIncomeSingle", item_value: "最低生活保障对象（单人）", sort_order: 4, is_active: true }
+      
+      # 低收入类（官方名称：最低生活保障边缘家庭）
+      - { id: 1010, category: "ClassificationCodes", item_key: "RuralLowIncome", item_value: "最低生活保障边缘家庭", sort_order: 10, is_active: true }
+      - { id: 1011, category: "ClassificationCodes", item_key: "UrbanLowIncome", item_value: "最低生活保障边缘家庭", sort_order: 11, is_active: true }
+      
+      # 特困供养类（官方名称：特困人员）
+      - { id: 1020, category: "ClassificationCodes", item_key: "RuralDestituteCentralized", item_value: "特困人员（集中供养）", sort_order: 20, is_active: true }
+      - { id: 1021, category: "ClassificationCodes", item_key: "UrbanDestituteCentralized", item_value: "特困人员（集中供养）", sort_order: 21, is_active: true }
+      - { id: 1022, category: "ClassificationCodes", item_key: "RuralDestituteScattered", item_value: "特困人员（分散供养）", sort_order: 22, is_active: true }
+      - { id: 1023, category: "ClassificationCodes", item_key: "UrbanDestituteScattered", item_value: "特困人员（分散供养）", sort_order: 23, is_active: true }
+      
+      # 刚性支出类（官方名称：刚性支出困难家庭）
+      - { id: 1030, category: "ClassificationCodes", item_key: "RuralRigidExpenditure", item_value: "刚性支出困难家庭", sort_order: 30, is_active: true }
+      - { id: 1031, category: "ClassificationCodes", item_key: "UrbanRigidExpenditure", item_value: "刚性支出困难家庭", sort_order: 31, is_active: true }
+      
+      # 停保类
+      - { id: 1040, category: "ClassificationCodes", item_key: "RuralIncomeExceeded", item_value: "收入超标", sort_order: 40, is_active: true }
+      - { id: 1041, category: "ClassificationCodes", item_key: "UrbanIncomeExceeded", item_value: "收入超标", sort_order: 41, is_active: true }
+      - { id: 1042, category: "ClassificationCodes", item_key: "IneligibleWithLabor", item_value: "不符合认定条件（有劳动力）", sort_order: 42, is_active: true }
+      - { id: 1043, category: "ClassificationCodes", item_key: "Ineligible", item_value: "不符合认定条件", sort_order: 43, is_active: true }
+      - { id: 1044, category: "ClassificationCodes", item_key: "IneligibleOther", item_value: "不符合认定条件（其他）", sort_order: 44, is_active: true }

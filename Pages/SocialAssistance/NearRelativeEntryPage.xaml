@@ -1,0 +1,365 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.NearRelativeEntryPage"
+             x:DataType="NearRelativeEntryViewModel"
+             Title="近亲属备案"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 对象卡片列表 交替行色（白 / #F8F9FA） -->
+        <DataTemplate x:Key="NearRelativeEvenRow" x:DataType="NearRelativeLinkRow">
+            <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="White">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1"
+                                Text="✕ 删除此行"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveLinkCommand}"
+                                CommandParameter="{Binding .}"
+                                BackgroundColor="Transparent"
+                                TextColor="#E81123"
+                                FontSize="12"
+                                Padding="4"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="与工作人员关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="姓名" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="身份证号" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="关联申请ID（可选）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="性别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="出生年月" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="户籍地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="居住地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭住址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭人口/共同生活人数" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="社会救助种类/保障类别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="月保障金（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="报账金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="报账金额" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="救助起始时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="申请时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="申请原因" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭主要困难" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="家庭经济情况调查情况" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="乡镇（街道）意见" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0" Grid.ColumnSpan="2">
+                            <Label Text="动态管理记录" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="NearRelativeOddRow" x:DataType="NearRelativeLinkRow">
+            <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="#F8F9FA">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1"
+                                Text="✕ 删除此行"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveLinkCommand}"
+                                CommandParameter="{Binding .}"
+                                BackgroundColor="Transparent"
+                                TextColor="#E81123"
+                                FontSize="12"
+                                Padding="4"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="与工作人员关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="姓名" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="身份证号" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="关联申请ID（可选）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="性别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="出生年月" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="户籍地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="居住地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭住址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭人口/共同生活人数" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="社会救助种类/保障类别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="月保障金（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="报账金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="报账金额" Keyboard="Numeric" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="救助起始时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="申请时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" FontSize="13"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="申请原因" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
+                            <Label Text="家庭主要困难" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="家庭经济情况调查情况" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="乡镇（街道）意见" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0" Grid.ColumnSpan="2">
+                            <Label Text="动态管理记录" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="NearRelativeSelector"
+            EvenTemplate="{StaticResource NearRelativeEvenRow}"
+            OddTemplate="{StaticResource NearRelativeOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="近亲属备案" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="同一申请人员对应一份备案信息，维护联系方式与银行账号" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 工具栏：选择已有备案 / 新增 / 删除 -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Padding="16,12" BackgroundColor="{StaticResource White}">
+            <Picker ItemsSource="{Binding StaffBriefs}"
+                    SelectedItem="{Binding SelectedBrief}"
+                    Title="选择已有备案（或直接新增）"
+                    FontSize="14"/>
+            <Button Grid.Column="1"
+                    Text="新增"
+                    Command="{Binding NewEntryCommand}"
+                    BackgroundColor="{StaticResource Secondary}"
+                    TextColor="{StaticResource White}"
+                    Padding="14,8"
+                    FontSize="13"/>
+            <Button Grid.Column="2"
+                    Text="删除本条"
+                    Command="{Binding DeleteCommand}"
+                    BackgroundColor="#E81123"
+                    TextColor="{StaticResource White}"
+                    Padding="14,8"
+                    FontSize="13"/>
+        </Grid>
+
+        <!-- 表单主体 -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <!-- 状态提示 -->
+                <Label Text="{Binding StatusText}" FontSize="13" TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+
+                <!-- 工作人员信息 -->
+                <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="14">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="社会救助经办（工作）人员基本情况" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="姓名" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding StaffName}" Placeholder="工作人员姓名" FontSize="14"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="身份证号" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding StaffIdCard}" Placeholder="身份证号" FontSize="14"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Spacing="4" Margin="0,8,0,0">
+                                <Label Text="联系方式" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding StaffPhone}" Placeholder="联系电话" FontSize="14"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="4" Margin="0,8,0,0">
+                                <Label Text="工作单位" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding WorkUnit}" Placeholder="工作单位" FontSize="14"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="2" Spacing="4" Margin="0,8,0,0">
+                                <Label Text="职务（职级）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding Position}" Placeholder="职务（职级）" FontSize="14"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="4" Margin="0,8,0,0">
+                                <Label Text="乡镇（街道）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding Town}" Placeholder="所在乡镇/街道" FontSize="14"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 备案对象列表 -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="近亲属享受社会救助情况" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="一名工作人员可对应多名救助对象，行数不限" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1"
+                            Text="＋ 添加对象"
+                            Command="{Binding AddLinkCommand}"
+                            BackgroundColor="{StaticResource Secondary}"
+                            TextColor="{StaticResource White}"
+                            Padding="14,8"
+                            FontSize="13"
+                            VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- 对象卡片 -->
+                <CollectionView ItemsSource="{Binding Links}" SelectionMode="None"
+                    ItemTemplate="{StaticResource NearRelativeSelector}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="10"/>
+                    </CollectionView.ItemsLayout>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部保存 -->
+        <Border Grid.Row="3" Padding="16,12" BackgroundColor="{StaticResource White}">
+            <Button Text="保存备案"
+                    Command="{Binding SaveCommand}"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="{StaticResource White}"
+                    FontSize="15"
+                    FontAttributes="Bold"
+                    HeightRequest="44"/>
+        </Border>
+    </Grid>
+</ContentPage>

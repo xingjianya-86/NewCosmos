@@ -1,0 +1,44 @@
+# 业务时间线参数配置
+# 参考设计方案：第十章 业务时间线设计
+
+# ── 时间线配置 ──
+timelines:
+  # 经济复核时间线
+  economic_review:
+    end_day: 10                    # 每月截止日（10号）
+    cycle_days: 30                 # 复核周期天数
+    weekend_adjust: "previous_workday"  # 周末调整策略：previous_workday=顺延至前一个工作日
+
+  # 业务流程时间线
+  business_process:
+    # 统计结算日（月报/首页周期 = [上月(结算日+1)日, 本月(结算日+1)日)）。
+    # 2026-09 起上级业务截止 20 号 → 20；实际生效值由 app.ini 的 BCycleSettleDay 注入
+    # （BusinessCycleHelper，本文件该键仅作文档描述）。
+    cycle_end_day: 20              # 统计结算日（20号）；原 15 号
+    cycle_start_offset: -30        # 周期开始偏移量（负数表示向前推30天）
+    meeting_day: 7                 # 会议日（每月7号）
+    acceptance_deadline_offset: -3 # 受理截止偏移量（会议日前3天）
+    publicity_days: 7              # 公示天数
+    holiday_check_days: [10, 11, 12, 13, 14, 15]  # 节假日检查日期范围
+    holiday_penalty_days: 5        # 节假日顺延天数上限
+    weekend_adjust: "previous_workday"  # 周末调整策略
+
+  # 临时救助验收时间线（C线；公示固定日历日，调查核实倒推）
+  # 说明（2026-09）：当前实现为 BusinessTimelineService 内置常量，本段仅作文档描述。
+  temp_relief:
+    publicity_start_day: 10         # 公示固定开始日（日历日，不顺延）
+    publicity_end_day: 12           # 公示固定结束日（日历日，不顺延）
+    investigation_workdays:
+      normal: 10                    # 普通群体：入户调查核实10个工作日
+      simplified: 5                 # 特殊群体（低保/特困/低保边缘/建档立卡/刚性/优抚）：5个工作日
+    acceptance_offset: "next_workday"  # 验收日期 = 公示结束的次一个工作日
+    current_roll_day: 12            # 当前周期锚点：今天>12日滚入下月
+
+# ── 节假日服务配置 ──
+# 现状说明（2026-09）：节假日数据已数据化，权威来源为 nc_sys_holidays 表（值班模块维护：
+# 节假日维护页 API 下载 / 手工增删）；HolidayService 以内存快照读取该表。
+# 本段为参数描述文档，代码未读取（阈值以内置常量与 nc_duty_settings 为准）。
+holiday_service:
+  data_source: "database"          # 数据源：database=nc_sys_holidays 表（API 下载或手工维护）
+  fallback: "static_2026"          # 兜底：表为空时使用内置 2026 年静态快照（HolidayService 内置）
+  api_url: "https://timor.tech/api/holiday/year/{year}"  # 下载接口；可在 nc_duty_settings.holiday_api_url 覆盖

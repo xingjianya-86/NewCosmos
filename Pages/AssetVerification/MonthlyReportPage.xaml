@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.AssetVerification.MonthlyReportPage"
+             x:DataType="MonthlyReportViewModel"
+             Title="{Binding Title}"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（橙色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8EF;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="{Binding Title}" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="核对名册 · 数据导出" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="16">
+
+                <!-- 核对周期提示 -->
+                <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="16,8">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border Grid.Column="0" BackgroundColor="{StaticResource Primary}" StrokeThickness="0" StrokeShape="RoundRectangle 4" Padding="8,3"
+                                VerticalOptions="Center">
+                            <Label Text="核对周期" FontSize="13" FontAttributes="Bold" TextColor="White"/>
+                        </Border>
+                        <Label Grid.Column="1" Text="{Binding PeriodText}" FontSize="14"
+                               TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 筛选区 -->
+                <Border Style="{StaticResource CardBorderElevated}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="36" HeightRequest="36" StrokeShape="RoundRectangle 18"
+                                    BackgroundColor="{StaticResource PrimarySoft}" Padding="0" StrokeThickness="0">
+                                <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                       TextColor="{StaticResource Primary}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="报表周期" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <Picker Grid.Column="0" Title="选择年份"
+                                    ItemsSource="{Binding YearOptions}"
+                                    SelectedItem="{Binding SelectedYear}"/>
+                            <Picker Grid.Column="1" Title="选择月份"
+                                    ItemsSource="{Binding MonthOptions}"
+                                    SelectedItem="{Binding SelectedMonth}"/>
+                            <Picker Grid.Column="2" Title="选择周"
+                                    ItemsSource="{Binding WeekOptions}"
+                                    SelectedItem="{Binding SelectedWeek}"
+                                    ItemDisplayBinding="{Binding DisplayText}"
+                                    IsVisible="{Binding IsWeeklyMode}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 统计卡片 -->
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                    <!-- 已提交申请 -->
+                    <Border Grid.Column="0" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16,12">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE91B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center"/>
+                                <Label Text="已提交申请" FontSize="13" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding SubmittedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 有报告未建档 -->
+                    <Border Grid.Column="1" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16,12">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                                <Label Text="有报告未建档" FontSize="13" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding HasReportCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 已完成建档 -->
+                    <Border Grid.Column="2" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16,12">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SecondaryDark}" VerticalOptions="Center"/>
+                                <Label Text="已完成建档" FontSize="13" TextColor="{StaticResource SecondaryDark}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding ArchivedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 申请被拒 -->
+                    <Border Grid.Column="3" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="16,12">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
+                                <Label Text="申请被拒" FontSize="13" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding RejectedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- 全部汇总 -->
+                <Border Style="{StaticResource CardBorder}" Padding="16,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Border BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="8"
+                                VerticalOptions="Center">
+                            <Label Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{StaticResource Primary}"
+                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Border>
+                        <Label Grid.Column="1" Text="{Binding TotalLabel}" FontSize="15" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Label Grid.Column="2" Text="{Binding TotalCount, StringFormat='{0} 人'}"
+                               FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Primary}"
+                               VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 月报表输出 -->
+                <Border Style="{StaticResource CardBorderElevated}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="36" HeightRequest="36" StrokeShape="RoundRectangle 18"
+                                    BackgroundColor="{StaticResource PrimarySoft}" Padding="0" StrokeThickness="0">
+                                <Label Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                       TextColor="{StaticResource Primary}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="{Binding ReportTypeLabel, StringFormat='{0}表输出'}" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <Label Text="选择时间周期后，点击下方按钮导出核查人员名册。"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <Button Grid.Column="0"
+                                    Text="已提交申请"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding ExportPendingCommand}"
+                                    IsEnabled="{Binding CanExport}"
+                                    HeightRequest="44"/>
+                            <Button Grid.Column="1"
+                                    Text="有报告未建档"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding ExportCompletedCommand}"
+                                    IsEnabled="{Binding CanExport}"
+                                    HeightRequest="44"/>
+                            <Button Grid.Column="2"
+                                    Text="全部导出"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding ExportAllMonthlyCommand}"
+                                    IsEnabled="{Binding CanExport}"
+                                    HeightRequest="44"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 全局导出：有报告未建档 -->
+                <Border Style="{StaticResource CardBorderElevated}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="36" HeightRequest="36" StrokeShape="RoundRectangle 18"
+                                    BackgroundColor="{StaticResource WarningSoft}" Padding="0" StrokeThickness="0">
+                                <Label Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                       TextColor="{StaticResource WarningDark}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="全局导出" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <Label Text="导出所有月份中指定状态的人员（含同户全部成员），不限于当前选择的月份。"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+
+                        <Button Text="导出全部已提交申请人员"
+                                Style="{StaticResource ButtonPrimary}"
+                                Command="{Binding ExportAllSubmittedCommand}"
+                                HeightRequest="44"/>
+
+                        <Button Text="导出全部有报告未建档人员"
+                                Style="{StaticResource ButtonPrimary}"
+                                Command="{Binding ExportAllHasReportCommand}"
+                                HeightRequest="44"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+
+</ContentPage>

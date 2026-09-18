@@ -1,0 +1,82 @@
+# 标准配置数据库Schema定义
+database: 标准配置数据库
+version: 1.0
+description: 统一标准配置管理
+
+tables:
+  # ── 标准配置表 ──
+  - name: nc_config_standards
+    comment: 标准配置表，存储各类政策标准参数
+    columns:
+      - name: id
+        type: bigserial
+        nullable: false
+        primaryKey: true
+        comment: 主键ID（自增，来自 nc_config_standards_id_seq）
+      - name: standard_type
+        type: character varying(50)
+        nullable: false
+        comment: 标准类型，如"低保标准"、"低收入标准"、"特困标准"
+      - name: standard_name
+        type: character varying(100)
+        nullable: false
+        comment: 标准名称，如"2026年农村低保标准"
+      - name: hukou_type
+        type: character varying(50)
+        nullable: true
+        comment: 户籍类型：农村、城市
+      - name: support_mode
+        type: character varying(50)
+        nullable: true
+        comment: 供养方式：集中供养、分散供养
+      - name: standard_value
+        type: NUMERIC(18,2)
+        nullable: false
+        comment: 标准值（元/月或元/年）
+      - name: unit
+        type: character varying(20)
+        nullable: true
+        defaultValue: "''"
+        comment: 单位：元/月、元/年
+      - name: effective_start_date
+        type: date
+        nullable: false
+        comment: 生效开始日期
+      - name: effective_end_date
+        type: date
+        nullable: true
+        comment: 生效结束日期，为空表示长期有效
+      - name: version
+        type: integer
+        nullable: true
+        defaultValue: 1
+        comment: 版本号，用于乐观并发控制
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用，false表示停用该标准
+      - name: description
+        type: text
+        nullable: true
+        comment: 标准说明描述
+      - name: created_by
+        type: character varying(100)
+        nullable: true
+        comment: 创建人用户名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 最后更新时间
+    indexes:
+      - name: idx_nc_config_standards_type
+        columns: [standard_type]
+      - name: idx_nc_config_standards_active
+        columns: [is_active]
+

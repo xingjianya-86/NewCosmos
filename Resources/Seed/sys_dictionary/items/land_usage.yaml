@@ -1,0 +1,13 @@
+# 土地用途字典（固定 ID）
+# 分类 ID=50，字典项 ID 范围: 50001-50999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 50001, category: "LandUsage", item_key: "耕地", item_value: "耕地", sort_order: 1, is_active: true }
+      - { id: 50002, category: "LandUsage", item_key: "园地", item_value: "园地", sort_order: 2, is_active: true }
+      - { id: 50003, category: "LandUsage", item_key: "林地", item_value: "林地", sort_order: 3, is_active: true }
+      - { id: 50004, category: "LandUsage", item_key: "草地", item_value: "草地", sort_order: 4, is_active: true }
+      - { id: 50005, category: "LandUsage", item_key: "其他", item_value: "其他", sort_order: 5, is_active: true }

@@ -1,0 +1,68 @@
+# 车辆表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 家庭车辆信息 - 记录家庭成员拥有的机动车辆，用于资产核查
+
+tables:
+  - name: nc_biz_vehicles
+    comment: "[经济状况] 车辆表 - 记录家庭成员拥有的机动车辆（轿车/货车/农机等），用于资产核查"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: vehicle_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 车辆类型：轿车/面包车/货车/拖拉机等
+      - name: brand
+        type: VARCHAR(100)
+        nullable: true
+        comment: 品牌
+      - name: model
+        type: VARCHAR(100)
+        nullable: true
+        comment: 型号
+      - name: license_plate
+        type: VARCHAR(20)
+        nullable: true
+        comment: 车牌号
+      - name: purchase_year
+        type: INTEGER
+        nullable: true
+        comment: 购买年份
+      - name: purchase_price
+        type: NUMERIC
+        nullable: true
+        comment: 购买价格（元）
+      - name: estimated_value
+        type: NUMERIC
+        nullable: true
+        comment: 估计价值（元）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_vehicles_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_vehicles_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

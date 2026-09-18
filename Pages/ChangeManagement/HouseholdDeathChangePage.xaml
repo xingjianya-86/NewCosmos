@@ -1,0 +1,145 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ChangeManagement.HouseholdDeathChangePage"
+             x:DataType="HouseholdDeathChangeViewModel"
+             Title="户主死亡变更"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 可选新户主列表 交替行色（白 / #F8F9FA） -->
+        <DataTemplate x:Key="HouseholdDeathEligibleEvenRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="White">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
+                                    <Span Text=" · "/>
+                                    <Span Text="{Binding Gender}"/>
+                                    <Span Text=" "/>
+                                    <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="HouseholdDeathEligibleOddRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
+                                    <Span Text=" · "/>
+                                    <Span Text="{Binding Gender}"/>
+                                    <Span Text=" "/>
+                                    <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="HouseholdDeathEligibleSelector"
+            EvenTemplate="{StaticResource HouseholdDeathEligibleEvenRow}"
+            OddTemplate="{StaticResource HouseholdDeathEligibleOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="*,Auto" RowSpacing="0">
+
+        <!-- 内容区域（单页表单） -->
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 原户主信息（只读） -->
+                <Label Text="原户主信息（只读）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}">
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="姓名" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding OriginalHeadName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="身份证号" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding OriginalHeadIdCard}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="2" Spacing="4">
+                            <Label Text="家庭人口" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding OriginalFamilySize, StringFormat='{0}人'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="3" Spacing="4">
+                            <Label Text="当前保障" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding OriginalGuaranteeAmount, StringFormat='{0:F2} 元/月'}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- 死亡信息 -->
+                <Label Text="死亡信息" Style="{StaticResource SectionTitleLabel}" Margin="0" TextColor="{StaticResource Error}"/>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="死亡日期" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <DatePicker Date="{Binding DeathDate}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="8">
+                                <Label Text="死亡证明编号" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding DeathCertificateNo}" Placeholder="选填"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="死亡原因" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding DeathReason}" Placeholder="请填写死亡原因" HeightRequest="80"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 选择新户主 -->
+                <Label Text="请选择新户主" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                <CollectionView ItemsSource="{Binding EligibleMembers}" SelectionMode="Single" SelectedItem="{Binding SelectedNewHead}"
+                    ItemTemplate="{StaticResource HouseholdDeathEligibleSelector}">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无可选成员" Style="{StaticResource EmptyStateLabel}"/>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="1" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="返回" Style="{StaticResource ButtonOutline}" MinimumWidthRequest="100" Command="{Binding GoBackCommand}"/>
+                <Button Grid.Column="2" Text="停旧建新并去规划新档案" Style="{StaticResource ButtonSuccess}" Command="{Binding SubmitCommand}" MinimumWidthRequest="200"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载..."/>
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,12 @@
+# 救助类别字典（固定 ID）
+# 分类 ID=35，字典项 ID 范围: 35001-35099
+# 依据：《中华人民共和国社会救助法》第15条
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 35001, category: "AssistanceCategories", item_key: "BasicLiving", item_value: "基本生活救助", sort_order: 1, is_active: true }
+      - { id: 35002, category: "AssistanceCategories", item_key: "Specialized", item_value: "专项社会救助", sort_order: 2, is_active: true }
+      - { id: 35003, category: "AssistanceCategories", item_key: "Emergency", item_value: "急难社会救助", sort_order: 3, is_active: true }

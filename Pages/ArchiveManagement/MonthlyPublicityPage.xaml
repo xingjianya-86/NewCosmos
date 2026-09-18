@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ArchiveManagement.MonthlyPublicityPage"
+             x:DataType="MonthlyPublicityViewModel"
+             Title="每月公示文档输出"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE7B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="每月公示文档输出" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="公示人员以导入库为准（不参考当前库）" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="380,*" ColumnSpacing="0">
+
+            <!-- 左侧：参数 + 村列表 -->
+            <ScrollView Grid.Column="0">
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <!-- 参数区 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="公示参数" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
+                                <Label Text="公示年月" FontSize="14" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding YearOptions}"
+                                        SelectedItem="{Binding SelectedYear}" Title="年"/>
+                                <Label Grid.Column="2" Text="年" FontSize="14" VerticalOptions="Center"/>
+                                <Picker Grid.Column="3" ItemsSource="{Binding MonthOptions}"
+                                        SelectedItem="{Binding SelectedMonth}" Title="月"/>
+                            </Grid>
+                            <Label Text="数据源：农村低保 / 城市低保 / 低保边缘 / 特困供养 / 刚性支出（导入库全部在保家庭，不分月）"
+                                   FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                            <Button Text="加载公示名单" Style="{StaticResource ButtonPrimary}" Command="{Binding LoadCommand}"/>
+                            <Border IsVisible="{Binding HasData}" Style="{StaticResource ChipInfo}" HorizontalOptions="Start">
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding TotalCount, StringFormat='共 {0} 户'}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                                    <Label Text="{Binding VillageCount, StringFormat=' / {0} 个村'}" Style="{StaticResource ChipInfoText}"/>
+                                </HorizontalStackLayout>
+                            </Border>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 村列表 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="按村分组" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <CollectionView ItemsSource="{Binding VillageGroups}"
+                                            SelectedItem="{Binding SelectedVillage}"
+                                            SelectionMode="Single"
+                                            MaximumHeightRequest="520">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="PublicityVillageGroupItem">
+                                        <Grid Padding="8,6" Style="{StaticResource TableRowInteractive}">
+                                            <Label Text="{Binding Display}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="点击上方「加载公示名单」查看" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 右侧：公示名单表格 -->
+            <Border Grid.Column="1" BackgroundColor="{StaticResource SurfaceVariant}" StrokeThickness="0" Padding="16">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="公示名单预览" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="{Binding SelectedVillage.Village, StringFormat='{0} 村'}" FontSize="13"
+                               TextColor="{StaticResource Warning}" FontAttributes="Bold" VerticalOptions="Center"/>
+                    </Grid>
+
+                    <Border Style="{StaticResource CardBorder}" Padding="0">
+                        <CollectionView ItemsSource="{Binding FamilyItems}" SelectionMode="None">
+                            <CollectionView.Header>
+                                <Grid ColumnDefinitions="50,*,110,80,110,100,110,*"
+                                      BackgroundColor="{StaticResource CardOptionBackground}" Padding="10,8">
+                                    <Label Text="序号" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="1" Text="户主姓名" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="2" Text="救助类别" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="3" Text="保障人数" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="4" Text="基础保障金额" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="5" Text="分类施保" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="6" Text="合计金额" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="7" Text="备注" Style="{StaticResource TableHeaderLabel}"/>
+                                </Grid>
+                            </CollectionView.Header>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="PublicityFamilyDisplayRow">
+                                    <Grid ColumnDefinitions="50,*,110,80,110,100,110,*" Padding="10,6" Style="{StaticResource TableRowInteractive}">
+                                        <Label Text="{Binding Index}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="1" Text="{Binding Name}" FontSize="14" FontAttributes="Bold"
+                                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="2" Text="{Binding Category}" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="{Binding GuaranteeSize}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="4" Text="{Binding BaseAmount, StringFormat='{0:N2}'}" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="5" Text="{Binding ClassifiedAmount, StringFormat='{0:N2}'}" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="6" Text="{Binding TotalAmount, StringFormat='{0:N2}'}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="7" Text="{Binding Remark}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" LineBreakMode="TailTruncation"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                            <CollectionView.EmptyView>
+                                <Label Text="请先在左侧选择村" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+                    </Border>
+
+                    <!-- 输出区 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding OutputHint}" FontSize="13" TextColor="{StaticResource WarningDark}"/>
+                                <Label Text="按村逐份输出《公共_每月公示名单》，输出目录「输出\公示文件」" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding OutputMessage}" FontSize="12" TextColor="{StaticResource Success}" IsVisible="{Binding HasOutputMessage}"
+                                       LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="生成公示文档" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding GenerateDocumentsCommand}"
+                                    IsEnabled="{Binding IsOutputAvailable}" HeightRequest="38"/>
+                        </Grid>
+                    </Border>
+
+                </VerticalStackLayout>
+            </Border>
+
+        </Grid>
+
+        <!-- 加载蒙版 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

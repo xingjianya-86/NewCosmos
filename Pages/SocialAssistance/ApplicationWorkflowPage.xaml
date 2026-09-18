@@ -1,0 +1,624 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.ApplicationWorkflowPage"
+             x:DataType="ApplicationWorkflowViewModel"
+             Title="业务申请工作流"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToFontAttributeConverter x:Key="BoolToFontAttributeConverter"/>
+        <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter"/>
+
+        <!-- 五 TAB 统一卡片模板：结构完全一致，差异仅由 WorkflowCardItem 承载
+             （姓名 / 状态标签 / 单人保 / 身份证 / 元信息 / 申请添加时间 / 地址 / 操作按钮） -->
+        <DataTemplate x:Key="WorkflowCardEven" x:DataType="results:WorkflowCardItem">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                <Border.Shadow>
+                    <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
+                </Border.Shadow>
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+
+                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮 -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Padding="10,3" StrokeThickness="0" StrokeShape="RoundRectangle 999"
+                                    BackgroundColor="{StaticResource InfoSoft}" VerticalOptions="Center">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Warning">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Danger">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Success">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Neutral">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource PrimaryDark}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Warning">
+                                            <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Danger">
+                                            <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Success">
+                                            <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Neutral">
+                                            <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center"
+                                    IsVisible="{Binding ShowSingleRescue}">
+                                <Label Text="单人保" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="档案制作"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowArchiveButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="编辑"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Warning}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowEditButtons}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=EditDraftCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="删除"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Error}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowEditButtons}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=DeleteDraftCommand}"
+                                    CommandParameter="{Binding .}"/>
+                        </HorizontalStackLayout>
+                    </Grid>
+
+                    <!-- 身份证号 -->
+                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="13"
+                           TextColor="{StaticResource TextSecondary}"/>
+
+                    <!-- 元信息（与户主关系 / 编号） + 申请添加时间 -->
+                    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
+                        <VerticalStackLayout Spacing="2" IsVisible="{Binding HasMeta}">
+                            <Label Text="{Binding MetaLabel}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding MetaValue}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="申请添加时间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="12"
+                                   TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 家庭地址（仅资产核查两 Tab） -->
+                    <VerticalStackLayout Grid.Row="3" Spacing="2" IsVisible="{Binding HasAddress}">
+                        <Label Text="家庭地址" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Address}" FontSize="13"
+                               TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="WorkflowCardOdd" x:DataType="results:WorkflowCardItem">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="#F8F9FA">
+                <Border.Shadow>
+                    <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
+                </Border.Shadow>
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+
+                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮 -->
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Padding="10,3" StrokeThickness="0" StrokeShape="RoundRectangle 999"
+                                    BackgroundColor="{StaticResource InfoSoft}" VerticalOptions="Center">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Warning">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Danger">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Success">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Border" Binding="{Binding StatusKind}" Value="Neutral">
+                                        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource PrimaryDark}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Warning">
+                                            <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Danger">
+                                            <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Success">
+                                            <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Neutral">
+                                            <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Border>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center"
+                                    IsVisible="{Binding ShowSingleRescue}">
+                                <Label Text="单人保" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="档案制作"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowArchiveButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="编辑"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Warning}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowEditButtons}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=EditDraftCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="删除"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Error}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowEditButtons}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=DeleteDraftCommand}"
+                                    CommandParameter="{Binding .}"/>
+                        </HorizontalStackLayout>
+                    </Grid>
+
+                    <!-- 身份证号 -->
+                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="13"
+                           TextColor="{StaticResource TextSecondary}"/>
+
+                    <!-- 元信息（与户主关系 / 编号） + 申请添加时间 -->
+                    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
+                        <VerticalStackLayout Spacing="2" IsVisible="{Binding HasMeta}">
+                            <Label Text="{Binding MetaLabel}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding MetaValue}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="申请添加时间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="12"
+                                   TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 家庭地址（仅资产核查两 Tab） -->
+                    <VerticalStackLayout Grid.Row="3" Spacing="2" IsVisible="{Binding HasAddress}">
+                        <Label Text="家庭地址" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Address}" FontSize="13"
+                               TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <converters:AlternatingRowTemplateSelector x:Key="WorkflowCardSelector"
+            EvenTemplate="{StaticResource WorkflowCardEven}"
+            OddTemplate="{StaticResource WorkflowCardOdd}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="近亲属备案"
+                                Command="{Binding OpenNearRelativeCommand}"
+                                BackgroundColor="#33FFFFFF"
+                                TextColor="White"
+                                FontSize="14"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="业务申请工作流" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="查看各阶段业务状态，办理与档案制作" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Tab 栏 -->
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,*,*,*,*"
+              Padding="16,12"
+              BackgroundColor="{StaticResource White}"
+              ColumnSpacing="8">
+
+            <!-- Tab 0: 已提交资产核查 -->
+            <Border Grid.Column="0"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE8AB;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="已提交经济核对"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Secondary}"
+                            IsVisible="{Binding SubmittedCount, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding SubmittedCount}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 1: 有报告未建档 -->
+            <Border Grid.Column="1"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE8E5;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="有报告未建档"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab1Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Warning}"
+                            IsVisible="{Binding HasReportCount, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding HasReportCount}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 2: 草稿 -->
+            <Border Grid.Column="2"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE74F;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="草稿"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab2Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Error}"
+                            IsVisible="{Binding DraftCount, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding DraftCount}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="2"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 3: 已建档未提交 -->
+            <Border Grid.Column="3"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab3Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE7C4;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="已建档未提交"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab3Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Warning}"
+                            IsVisible="{Binding ArchiveBuiltCount, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding ArchiveBuiltCount}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="3"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 4: 已完结档案 -->
+            <Border Grid.Column="4"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab4Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE7C8;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="已完结"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab4Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Success}"
+                            IsVisible="{Binding ArchiveCompletedCount, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding ArchiveCompletedCount}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="4"/>
+                </Border.GestureRecognizers>
+            </Border>
+        </Grid>
+
+        <!-- 搜索栏 -->
+        <Border Grid.Row="2"
+                BackgroundColor="{StaticResource White}"
+                StrokeThickness="0"
+                Padding="16,8">
+            <Border BackgroundColor="{StaticResource Gray100}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 24"
+                    Padding="16,8"
+                    HorizontalOptions="Fill">
+                <Grid ColumnDefinitions="Auto, *">
+                    <Label Text="&#xE721;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           TextColor="{StaticResource Gray500}"
+                           VerticalOptions="Center"
+                           Margin="0,0,8,0"/>
+                    <Entry Grid.Column="1"
+                           Placeholder="搜索姓名、身份证号..."
+                           Text="{Binding SearchText}"
+                           FontSize="16"
+                           BackgroundColor="Transparent"
+                           ReturnCommand="{Binding SearchCommand}"/>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- 错误提示条：加载失败时显式暴露，禁止静默空列表 -->
+        <Border Grid.Row="3"
+                Padding="16,8,16,0"
+                StrokeThickness="0"
+                BackgroundColor="Transparent"
+                IsVisible="{Binding HasError}">
+            <Border BackgroundColor="{StaticResource Error}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="14,10">
+                <HorizontalStackLayout Spacing="8">
+                    <Label Text="&#xE783;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           TextColor="{StaticResource White}"
+                           VerticalOptions="Center"/>
+                    <Label Text="{Binding ErrorMessage}"
+                           FontSize="13"
+                           TextColor="{StaticResource White}"
+                           VerticalOptions="Center"
+                           LineBreakMode="WordWrap"/>
+                </HorizontalStackLayout>
+            </Border>
+        </Border>
+
+        <!-- 数据列表 -->
+        <Grid Grid.Row="4" Padding="16,8" VerticalOptions="Fill">
+
+            <!-- Tab 0: 已提交资产核查列表 -->
+            <CollectionView ItemsSource="{Binding SubmittedItems}"
+                            SelectionMode="None"
+                            VerticalOptions="Fill"
+                            IsVisible="{Binding IsTab0Selected}"
+                            ItemTemplate="{StaticResource WorkflowCardSelector}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                        <Label Text="&#xE8AB;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="暂无已提交的经济核对记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <!-- Tab 1: 有报告未建档列表 -->
+            <CollectionView ItemsSource="{Binding HasReportItems}"
+                            SelectionMode="None"
+                            VerticalOptions="Fill"
+                            IsVisible="{Binding IsTab1Selected}"
+                            ItemTemplate="{StaticResource WorkflowCardSelector}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                        <Label Text="&#xE8E5;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="暂无有报告未建档的记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <!-- Tab 2: 草稿列表 -->
+            <CollectionView ItemsSource="{Binding DraftItems}"
+                            SelectionMode="None"
+                            VerticalOptions="Fill"
+                            IsVisible="{Binding IsTab2Selected}"
+                            ItemTemplate="{StaticResource WorkflowCardSelector}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                        <Label Text="&#xE74F;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="暂无草稿记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <!-- Tab 3: 已建档未提交列表 -->
+            <CollectionView ItemsSource="{Binding ArchiveBuiltItems}"
+                            SelectionMode="None"
+                            VerticalOptions="Fill"
+                            IsVisible="{Binding IsTab3Selected}"
+                            ItemTemplate="{StaticResource WorkflowCardSelector}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                        <Label Text="&#xE7C4;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="暂无已建档未提交记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <!-- Tab 4: 已完结档案列表 -->
+            <CollectionView ItemsSource="{Binding ArchiveCompletedItems}"
+                            SelectionMode="None"
+                            VerticalOptions="Fill"
+                            IsVisible="{Binding IsTab4Selected}"
+                            ItemTemplate="{StaticResource WorkflowCardSelector}">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                        <Label Text="&#xE7C8;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="暂无已完结档案" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </Grid>
+
+        <!-- 分页控件 -->
+        <components:PaginationBarView Grid.Row="5"/>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="6"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载数据..."/>
+    </Grid>
+
+</ContentPage>

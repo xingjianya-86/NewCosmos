@@ -1,0 +1,42 @@
+database: 新权限系统
+version: 1.0
+description: 权限缓存版本表结构
+
+tables:
+  - name: nc_perm_cache_version
+    comment: 权限缓存版本控制表
+    description: 用于控制权限缓存失效
+    columns:
+      - name: key
+        type: VARCHAR(50)
+        primaryKey: true
+        comment: 缓存键名
+      - name: version
+        type: BIGINT
+        nullable: false
+        default: "1"
+        comment: 版本号
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+
+initial_data:
+  - key: permissions
+    version: 1
+    description: 权限缓存版本
+  - key: initialized
+    version: 0
+    description: 初始化标记
+
+cache_invalidation_rules:
+  - trigger: INSERT/UPDATE/DELETE on nc_perm_role_permissions
+    action: INCREMENT permissions version
+  - trigger: INSERT/UPDATE/DELETE on nc_perm_user_permissions
+    action: INCREMENT permissions version
+  - trigger: INSERT/UPDATE/DELETE on nc_sys_user_roles
+    action: INCREMENT permissions version
+
+notes:
+  - 当version变化时，客户端应刷新权限缓存
+  - 减少数据库查询，提高性能

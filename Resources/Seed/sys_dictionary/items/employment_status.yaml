@@ -1,0 +1,14 @@
+# 就业状况字典（固定 ID）
+# 分类 ID=30，字典项 ID 范围: 30001-30999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 30001, category: "EmploymentStatuses", item_key: "Employed", item_value: "在职", sort_order: 1, is_active: true }
+      - { id: 30002, category: "EmploymentStatuses", item_key: "Unemployed", item_value: "失业", sort_order: 2, is_active: true }
+      - { id: 30003, category: "EmploymentStatuses", item_key: "Farming", item_value: "务农", sort_order: 3, is_active: true }
+      - { id: 30004, category: "EmploymentStatuses", item_key: "Student", item_value: "学生", sort_order: 4, is_active: true }
+      - { id: 30005, category: "EmploymentStatuses", item_key: "Retired", item_value: "退休", sort_order: 5, is_active: true }
+      - { id: 30006, category: "EmploymentStatuses", item_key: "Other", item_value: "其他", sort_order: 6, is_active: true }

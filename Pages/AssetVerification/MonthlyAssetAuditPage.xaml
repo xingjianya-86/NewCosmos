@@ -1,0 +1,228 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.AssetVerification.MonthlyAssetAuditPage"
+             x:DataType="MonthlyAssetAuditViewModel"
+             Title="月度审核"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（橙色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE898;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="月度审核" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="按月核查资产状况与数据审核" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="420,*" ColumnSpacing="0">
+
+            <!-- 左侧面板 -->
+            <ScrollView Grid.Column="0">
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <!-- 报表周期 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="报表周期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
+                                <Picker Grid.Column="0" HeightRequest="40" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="年" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="2" HeightRequest="40" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="月" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </Grid>
+                            <Label Text="{Binding PeriodText}" FontSize="15" TextColor="{StaticResource Primary}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 核对概览 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="核对概览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                                <Border Grid.Column="0" Grid.Row="0" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="已提交" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
+                                        <Label Text="{Binding SubmittedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Grid.Column="1" Grid.Row="0" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="有报告" FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="{Binding HasReportCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Grid.Column="0" Grid.Row="1" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="已完成" FontSize="14" TextColor="{StaticResource SecondaryDark}"/>
+                                        <Label Text="{Binding ArchivedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Grid.Column="1" Grid.Row="1" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="已拒绝" FontSize="14" TextColor="{StaticResource Error}"/>
+                                        <Label Text="{Binding RejectedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                            <Label HorizontalOptions="End" TextColor="{StaticResource TextSecondary}" FontSize="14" Text="{Binding TotalCount, StringFormat='总计 {0} 条'}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 待核对人员 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="待核对人员" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                    <Label Text="{Binding MatchTasks.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold" VerticalOptions="Center"/>
+                                </Border>
+                                <Button Grid.Column="2" Text="打印报告" FontSize="13" Padding="10,2" HeightRequest="30"
+                                        BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}" CornerRadius="6"
+                                        VerticalOptions="Center"
+                                        Command="{Binding PrintSelectedCommand}"
+                                        IsEnabled="{Binding CanPrintReport}"/>
+                            </Grid>
+                            <!-- 人员名单搜索：姓名/身份证号关键字 -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Entry Grid.Column="0" Placeholder="搜索姓名/身份证号" Text="{Binding SearchKeyword}"
+                                       HeightRequest="36" FontSize="14" IsTextPredictionEnabled="False"
+                                       Completed="OnSearchEntryCompleted"/>
+                                <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="36"
+                                        BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
+                                        Command="{Binding SearchCommand}"/>
+                            </Grid>
+                            <CollectionView ItemsSource="{Binding MatchTasks}" HeightRequest="180" SelectionMode="Single" SelectedItem="{Binding SelectedMatchTask}">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="assetsvc:AssetVerificationTask">
+                                        <Border Padding="12,8" Margin="0,4" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                <Label Grid.Column="0" Text="{Binding ArchiveName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+
+                                                <!-- 状态徽章（柔和 Chip：已提交/有报告/已完成/已拒绝） -->
+                                                <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                                    <Border.Triggers>
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已提交">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource InfoSoft}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="有报告">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已完成">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已拒绝">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
+                                                        </DataTrigger>
+                                                    </Border.Triggers>
+                                                    <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}">
+                                                        <Label.Triggers>
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已提交">
+                                                                <Setter Property="TextColor" Value="{StaticResource PrimaryDark}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="有报告">
+                                                                <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已完成">
+                                                                <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已拒绝">
+                                                                <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                                            </DataTrigger>
+                                                        </Label.Triggers>
+                                                    </Label>
+                                                </Border>
+
+                                                <Button Grid.Column="2" Text="不予认定" FontSize="12" Padding="10,2" HeightRequest="30"
+                                                        BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}" CornerRadius="6" VerticalOptions="Center"
+                                                        IsVisible="{Binding CanReject}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type MonthlyAssetAuditViewModel}}, Path=RejectCheckCommand}"
+                                                        CommandParameter="{Binding .}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="暂无待核对人员" Style="{StaticResource EmptyStateLabel}" Margin="0,24,0,0"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 批量上传 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="批量上传" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Border Grid.Column="0" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="待上传" FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="{Binding UploadPendingCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Grid.Column="1" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="失败" FontSize="14" TextColor="{StaticResource Error}"/>
+                                        <Label Text="{Binding UploadErrorCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                            <Button Text="选择文件夹并批量上传" Style="{StaticResource ButtonPrimary}" Command="{Binding BatchUploadCommand}" HeightRequest="44" FontSize="16" IsEnabled="{Binding IsUploading, Converter={x:Static converters:BoolToInverseConverter.Instance}}"/>
+                            <Grid IsVisible="{Binding IsUploading}" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ProgressBar Grid.Column="0" Progress="{Binding UploadProgressPercent}" HeightRequest="16"/>
+                                <Label Grid.Column="1" Text="{Binding UploadProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 比对信息 -->
+                    <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasSelectedMatchTask}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="比对信息" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding MatchInfoText}" FontSize="14" TextColor="{StaticResource Gray800}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 右侧 PDF 预览 -->
+            <Border Grid.Column="1" BackgroundColor="{StaticResource SurfaceVariant}" StrokeThickness="0">
+                <Grid>
+                    <controls:PdfPreviewView x:Name="PdfPreview" PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16" IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}">
+                        <Label Text="选择左侧人员后显示PDF预览" Style="{StaticResource EmptyStateLabel}" FontSize="20"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,12 @@
+# 残疾等级字典（固定 ID）
+# 分类 ID=23，字典项 ID 范围: 23001-23999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 23001, category: "DisabilityLevels", item_key: "Level1", item_value: "一级（极重度）", sort_order: 1, is_active: true }
+      - { id: 23002, category: "DisabilityLevels", item_key: "Level2", item_value: "二级（重度）", sort_order: 2, is_active: true }
+      - { id: 23003, category: "DisabilityLevels", item_key: "Level3", item_value: "三级（中度）", sort_order: 3, is_active: true }
+      - { id: 23004, category: "DisabilityLevels", item_key: "Level4", item_value: "四级（轻度）", sort_order: 4, is_active: true }

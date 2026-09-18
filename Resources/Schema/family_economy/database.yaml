@@ -1,0 +1,1211 @@
+# 家庭经济状况数据库Schema定义
+# 版本3.0: 与实际数据库表结构完全对齐（2026-07-11）
+database: 家庭经济状况数据库
+version: 3.0
+description: 收入/支出/资产/供养/土地的独立子表，与实际DB一一对应
+
+tables:
+  # ───────── 收入子表 ─────────
+  
+  # ── 务工收入表 ──
+  - name: nc_biz_labor_incomes
+    comment: 务工收入表，记录家庭成员的工资性收入
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: income_sub_type
+        type: character varying
+        nullable: true
+        comment: 收入子类型
+      - name: work_unit
+        type: character varying
+        nullable: true
+        comment: 工作单位
+      - name: work_type
+        type: character varying
+        nullable: true
+        comment: 工作类型
+      - name: work_place
+        type: character varying
+        nullable: true
+        comment: 工作地点
+      - name: monthly_income
+        type: numeric
+        nullable: true
+        comment: 月收入（元）
+      - name: months_worked
+        type: integer
+        nullable: true
+        comment: 工作月数
+      - name: annual_income
+        type: numeric
+        nullable: true
+        comment: 年收入（元）
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: integer
+        nullable: true
+        comment: 成员年龄
+
+  # ── 经营收入表 ──
+  - name: nc_biz_business_incomes
+    comment: 经营收入表，记录家庭经营性收入
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: company_name
+        type: character varying
+        nullable: true
+        comment: 公司/店铺名称
+      - name: vendor_type
+        type: character varying
+        nullable: true
+        comment: 经营类型
+      - name: registered_capital
+        type: numeric
+        nullable: true
+        comment: 注册资本
+      - name: business_scope
+        type: character varying
+        nullable: true
+        comment: 经营范围
+      - name: operating_income
+        type: numeric
+        nullable: true
+        comment: 经营收入
+      - name: operating_cost
+        type: numeric
+        nullable: true
+        comment: 经营成本
+      - name: net_income
+        type: numeric
+        nullable: true
+        comment: 净收入
+      - name: address
+        type: character varying
+        nullable: true
+        comment: 地址
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: integer
+        nullable: true
+        comment: 成员年龄
+      - name: monthly_income
+        type: numeric
+        nullable: true
+        comment: 月收入
+
+  # ── 财产性收入表 ──
+  - name: nc_biz_property_incomes
+    comment: 财产性收入表，记录存款利息、租金等收入
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: income_type
+        type: character varying
+        nullable: true
+        comment: 收入类型
+      - name: amount
+        type: numeric
+        nullable: true
+        comment: 金额
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: integer
+        nullable: true
+        comment: 成员年龄
+      - name: property_description
+        type: character varying
+        nullable: true
+        comment: 财产描述
+    indexes:
+      - name: idx_property_incomes_application_id
+        columns: [application_id]
+
+  # ── 转移性收入表 ──
+  - name: nc_biz_transfer_incomes
+    comment: 转移性收入表，记录养老金、补助等转移性收入
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: income_type
+        type: character varying
+        nullable: true
+        comment: 收入类型
+      - name: monthly_amount
+        type: numeric
+        nullable: true
+        comment: 月金额
+      - name: months_or_times
+        type: integer
+        nullable: true
+        comment: 发放月数或次数
+      - name: total_amount
+        type: numeric
+        nullable: true
+        comment: 总金额
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: integer
+        nullable: true
+        comment: 成员年龄
+
+  # ── 其他收入表 ──
+  - name: nc_biz_other_incomes
+    comment: "[经济状况] 其他收入表 - 记录不属于务工/经营/财产/转移的其他零散收入"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联 nc_biz_applications.id
+      - name: income_type
+        type: character varying
+        nullable: true
+        comment: 收入类型（自定义分类，如临时工、馈赠等）
+      - name: amount
+        type: numeric
+        nullable: true
+        comment: 金额（元）
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+
+  # ── 补贴表 ──
+  - name: nc_biz_subsidies
+    comment: "[经济状况] 农业补贴明细表 - 记录家庭各类农业补贴（地力/大豆/玉米/轮作），按面积×单价计算，支持份额系数"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联 nc_biz_applications.id
+      - name: subsidy_type
+        type: character varying
+        nullable: false
+        comment: 补贴类型：地力补贴/大豆补贴/玉米补贴/地表水水稻/地下水水稻/轮作补贴
+      - name: area
+        type: numeric
+        nullable: true
+        comment: 面积（亩）
+      - name: unit_price
+        type: numeric
+        nullable: true
+        comment: 单价（元/亩）
+      - name: count
+        type: integer
+        nullable: true
+        comment: 数量/倍数（用于多茬作物）
+      - name: ratio_factor
+        type: numeric
+        nullable: true
+        comment: 份额系数（0-1，用于按户内份额分配补贴）
+      - name: original_amount
+        type: numeric
+        nullable: true
+        comment: 原始金额（元）= 面积 × 单价 × 数量
+      - name: amount
+        type: numeric
+        nullable: true
+        comment: 实际金额（元）= 原始金额 × 份额系数
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 关联成员姓名（补贴归属人）
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 关联成员身份证号
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+
+  # ── 养殖收入表 ──
+  - name: nc_biz_breeding_incomes
+    comment: "[经济状况] 养殖收入表 - 记录家庭养殖收入（牛/羊/猪/禽类等）"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: breeding_type
+        type: character varying
+        nullable: true
+        comment: 养殖类型
+      - name: quantity
+        type: integer
+        nullable: true
+        comment: 数量
+      - name: annual_income
+        type: numeric
+        nullable: true
+        comment: 年收入
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+    indexes:
+      - name: idx_breeding_incomes_application_id
+        columns: [application_id]
+
+  # ───────── 支出 ─────────
+  
+  # ── 刚性支出表 ──
+  - name: nc_biz_rigid_expenditures
+    comment: 刚性支出表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: expenditure_type
+        type: character varying
+        nullable: true
+        comment: 支出类型
+      - name: amount
+        type: numeric
+        nullable: true
+        comment: 金额
+      - name: person_description
+        type: character varying
+        nullable: true
+        comment: 涉及人员说明
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ───────── 财产子表 ─────────
+  
+  # ── 房产表 ──
+  - name: nc_biz_properties
+    comment: 房产表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: property_type
+        type: character varying
+        nullable: true
+        comment: 房产类型
+      - name: address
+        type: character varying
+        nullable: true
+        comment: 房产地址
+      - name: housing_structure
+        type: character varying
+        nullable: true
+        comment: 房屋结构
+      - name: housing_nature
+        type: character varying
+        nullable: true
+        comment: 房屋性质
+      - name: area
+        type: numeric
+        nullable: true
+        comment: 建筑面积
+      - name: room_count
+        type: integer
+        nullable: true
+        comment: 房间数量
+      - name: build_year
+        type: integer
+        nullable: true
+        comment: 建造年份
+      - name: estimated_value
+        type: numeric
+        nullable: true
+        comment: 评估价值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ── 车辆表 ──
+  - name: nc_biz_vehicles
+    comment: 车辆表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: vehicle_type
+        type: character varying
+        nullable: true
+        comment: 车辆类型
+      - name: brand
+        type: character varying
+        nullable: true
+        comment: 车辆品牌
+      - name: model
+        type: character varying
+        nullable: true
+        comment: 车辆型号
+      - name: license_plate
+        type: character varying
+        nullable: true
+        comment: 车牌号码
+      - name: purchase_year
+        type: integer
+        nullable: true
+        comment: 购买年份
+      - name: purchase_price
+        type: numeric
+        nullable: true
+        comment: 购买价格
+      - name: estimated_value
+        type: numeric
+        nullable: true
+        comment: 评估价值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ── 金融资产表 ──
+  - name: nc_biz_financial_assets
+    comment: 金融资产表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: has_cash
+        type: boolean
+        nullable: true
+        comment: 是否持有现金
+      - name: cash_amount
+        type: numeric
+        nullable: true
+        comment: 现金金额
+      - name: has_bank_deposit
+        type: boolean
+        nullable: true
+        comment: 是否有银行存款
+      - name: bank_deposit_amount
+        type: numeric
+        nullable: true
+        comment: 银行存款金额
+      - name: has_securities
+        type: boolean
+        nullable: true
+        comment: 是否有证券
+      - name: securities_amount
+        type: numeric
+        nullable: true
+        comment: 证券金额
+      - name: has_commercial_insurance
+        type: boolean
+        nullable: true
+        comment: 是否有商业保险
+      - name: commercial_insurance_type
+        type: character varying
+        nullable: true
+        comment: 保险类型
+      - name: commercial_insurance_amount
+        type: numeric
+        nullable: true
+        comment: 保险现金价值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ───────── 土地确权 ─────────
+  
+  # ── 土地确权主表 ──
+  - name: nc_biz_land_confirmations
+    comment: 土地确权主表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: contractor_name
+        type: character varying
+        nullable: true
+        comment: 承包方名称
+      - name: village_name
+        type: character varying
+        nullable: true
+        comment: 所在村名
+      - name: total_confirmed_area
+        type: numeric
+        nullable: true
+        comment: 确权总面积
+      - name: total_shares
+        type: numeric
+        nullable: true
+        comment: 总股数
+      - name: total_person_count
+        type: integer
+        nullable: true
+        comment: 确权总人数
+      - name: dry_field_area
+        type: numeric
+        nullable: true
+        comment: 旱田面积
+      - name: wet_field_area
+        type: numeric
+        nullable: true
+        comment: 水田面积
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+    indexes:
+      - name: idx_land_confirmations_application_id
+        columns: [application_id]
+
+  # ── 土地确权明细表 ──
+  - name: nc_biz_land_confirmation_records
+    comment: 土地确权明细表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: confirmation_id
+        type: bigint
+        nullable: false
+        comment: 关联确权主表ID
+      - name: member_name
+        type: character varying
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: character varying
+        nullable: true
+        comment: 成员身份证号
+      - name: land_plot_info
+        type: character varying
+        nullable: true
+        comment: 地块信息
+      - name: plot_code
+        type: character varying
+        nullable: true
+        comment: 地块编号
+      - name: contract_area
+        type: numeric
+        nullable: true
+        comment: 承包面积
+      - name: measured_area
+        type: numeric
+        nullable: true
+        comment: 实测面积
+      - name: land_area
+        type: numeric
+        nullable: true
+        comment: 土地面积
+      - name: land_usage
+        type: character varying
+        nullable: true
+        comment: 土地用途
+      - name: unit_price
+        type: numeric
+        nullable: true
+        comment: 单价
+      - name: is_imported
+        type: boolean
+        nullable: true
+        comment: 是否从外部导入
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+    indexes:
+      - name: idx_land_confirmation_records_confirmation_id
+        columns: [confirmation_id]
+
+  # ── 土地确权人员表 ──
+  - name: nc_biz_land_confirmation_persons
+    comment: 土地确权人员表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: confirmation_id
+        type: bigint
+        nullable: false
+        comment: 关联确权主表ID
+      - name: name
+        type: character varying
+        nullable: true
+        comment: 人员姓名
+      - name: id_card
+        type: character varying
+        nullable: true
+        comment: 身份证号
+      - name: land_status
+        type: character varying
+        nullable: true
+        comment: 土地状态
+      - name: land_inherit_to
+        type: character varying
+        nullable: true
+        comment: 继承人姓名
+      - name: shares_count
+        type: double precision
+        nullable: true
+        comment: 份额数
+      - name: total_land_area
+        type: double precision
+        nullable: true
+        comment: 总土地面积
+      - name: birth_date
+        type: date
+        nullable: true
+        comment: 出生日期
+      - name: is_imported
+        type: boolean
+        nullable: true
+        comment: 是否从外部导入
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+    indexes:
+      - name: idx_land_confirmation_persons_confirmation_id
+        columns: [confirmation_id]
+
+  # ───────── 土地登记 ─────────
+  
+  # ── 土地登记表 ──
+  - name: nc_biz_land_registrations
+    comment: 土地登记表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: owner_name
+        type: character varying
+        nullable: true
+        comment: 所有人姓名
+      - name: owner_id_card
+        type: character varying
+        nullable: true
+        comment: 所有人身份证号
+      - name: land_type
+        type: character varying
+        nullable: true
+        comment: 土地类型
+      - name: land_usage
+        type: character varying
+        nullable: false
+        comment: 土地用途
+      - name: measurement_type
+        type: character varying
+        nullable: true
+        comment: 测量方式
+      - name: area
+        type: numeric
+        nullable: false
+        comment: 面积
+      - name: price
+        type: numeric
+        nullable: false
+        comment: 单价
+      - name: subtotal
+        type: numeric
+        nullable: true
+        comment: 小计
+      - name: location
+        type: character varying
+        nullable: true
+        comment: 位置
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ───────── 供养相关 ─────────
+  
+  # ── 赡养/抚养/扶养人表 ──
+  - name: nc_biz_supporters
+    comment: 赡养/抚养/扶养人表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: character varying(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: character varying(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: character varying(50)
+        nullable: true
+        comment: 与申请人关系
+      - name: person_type
+        type: character varying(50)
+        nullable: true
+        comment: 人员类型
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: character varying(20)
+        nullable: true
+        comment: 民族
+      - name: marital_status
+        type: character varying(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: health_status
+        type: character varying(50)
+        nullable: true
+        comment: 健康状况
+      - name: employment_status
+        type: character varying(50)
+        nullable: true
+        comment: 就业状况
+      - name: work_unit
+        type: character varying(100)
+        nullable: true
+        comment: 工作单位
+      - name: employer_address
+        type: character varying(500)
+        nullable: true
+        comment: 单位地址
+      - name: position
+        type: character varying(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: character varying(500)
+        nullable: true
+        comment: 家庭住址
+      - name: monthly_income_capacity
+        type: numeric
+        nullable: true
+        comment: 月收入能力
+      - name: promised_support_fee
+        type: numeric
+        nullable: true
+        comment: 承诺赡养费
+      - name: annual_support_fee
+        type: numeric
+        nullable: true
+        comment: 年应付赡养费
+      - name: support_amount
+        type: numeric
+        nullable: true
+        comment: 实际给付金额
+      - name: family_size
+        type: integer
+        nullable: true
+        comment: 赡养人家庭人数
+      - name: is_support_ability
+        type: boolean
+        nullable: true
+        comment: 是否具有赡养能力
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ── 照料人表 ──
+  - name: nc_biz_caregivers
+    comment: 照料人表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: cared_member_id
+        type: bigint
+        nullable: true
+        comment: 被照料成员ID
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 照料人姓名
+      - name: id_card
+        type: character varying(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: character varying(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: character varying(50)
+        nullable: true
+        comment: 与被照料人关系
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: character varying(20)
+        nullable: true
+        comment: 民族
+      - name: health_status
+        type: character varying(50)
+        nullable: true
+        comment: 健康状况
+      - name: work_unit
+        type: character varying(100)
+        nullable: true
+        comment: 工作单位
+      - name: position
+        type: character varying(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: character varying(500)
+        nullable: true
+        comment: 家庭住址
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ── 监护人表 ──
+  - name: nc_biz_guardians
+    comment: 监护人表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 监护人姓名
+      - name: id_card
+        type: character varying(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: character varying(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: character varying(50)
+        nullable: true
+        comment: 与被监护人关系
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: character varying(20)
+        nullable: true
+        comment: 民族
+      - name: marital_status
+        type: character varying(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: employment_status
+        type: character varying(50)
+        nullable: true
+        comment: 就业状况
+      - name: work_unit
+        type: character varying(100)
+        nullable: true
+        comment: 工作单位
+      - name: position
+        type: character varying(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: character varying(500)
+        nullable: true
+        comment: 家庭住址
+      - name: main_income_source
+        type: character varying(100)
+        nullable: true
+        comment: 主要收入来源
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ───────── 自理能力 + 近亲属 ─────────
+  
+  # ── 自理能力评估表 ──
+  - name: nc_biz_self_care_assessments
+    comment: 自理能力评估表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: can_eat_independently
+        type: boolean
+        nullable: true
+        comment: 是否能自主用餐
+      - name: can_dress_independently
+        type: boolean
+        nullable: true
+        comment: 是否能自主穿衣
+      - name: can_get_in_out_of_bed
+        type: boolean
+        nullable: true
+        comment: 是否能自主上下床
+      - name: can_use_toilet_independently
+        type: boolean
+        nullable: true
+        comment: 是否能自主如厕
+      - name: can_walk_indoors
+        type: boolean
+        nullable: true
+        comment: 是否能室内自主行走
+      - name: can_bathe_independently
+        type: boolean
+        nullable: true
+        comment: 是否能自主洗澡
+      - name: assessment_date
+        type: date
+        nullable: true
+        comment: 评估日期
+      - name: assessor_name
+        type: character varying(100)
+        nullable: true
+        comment: 评估人姓名
+      - name: remarks
+        type: text
+        nullable: true
+        comment: 评估备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间
+
+  # ── 近亲属备案表 ──
+  - name: nc_biz_kinship_filings
+    comment: 近亲属备案表
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID
+      - name: handler_name
+        type: character varying(100)
+        nullable: true
+        comment: 经办人姓名
+      - name: handler_relation
+        type: character varying(50)
+        nullable: true
+        comment: 与申请人关系
+      - name: handler_phone
+        type: character varying(11)
+        nullable: true
+        comment: 经办人电话
+      - name: handler_work_unit
+        type: character varying(200)
+        nullable: true
+        comment: 经办人工作单位
+      - name: handler_position
+        type: character varying(100)
+        nullable: true
+        comment: 经办人职务
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注说明
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间

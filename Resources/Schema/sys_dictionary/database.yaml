@@ -1,0 +1,198 @@
+# 系统字典数据库Schema定义
+database: 系统字典数据库
+version: 2.0
+description: 系统字典数据库 - 存储下拉选项、枚举值等标准化数据，支持双表结构（旧表+新表）+ 变更审计
+
+tables:
+  # ── 新版字典分类表 ──
+  - name: nc_dict_categories
+    comment: "[字典] 字典分类表 - 定义系统中所有下拉选项的分类，如性别、民族、婚姻状况等"
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: category
+        type: character varying(100)
+        nullable: false
+        comment: 分类编码（唯一），如 gender、disability_level、hukou_type
+      - name: display_name
+        type: character varying(100)
+        nullable: true
+        defaultValue: "''"
+        comment: 分类显示名称，如"性别"、"残疾等级"
+      - name: description
+        type: text
+        nullable: true
+        comment: 分类详细说明
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+    indexes:
+      - name: idx_dict_categories_sort
+        columns: [sort_order]
+
+  # ── 新版字典项表 ──
+  - name: nc_dict_items
+    comment: "[字典] 字典项表 - 存储各分类下的具体选项值，如男/女、一级/二级残疾等"
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: category
+        type: character varying(100)
+        nullable: false
+        comment: 所属分类编码，关联 nc_dict_categories.category
+      - name: item_key
+        type: character varying(100)
+        nullable: false
+        comment: 字典项键值（分类内唯一），如 male、first_grade
+      - name: item_value
+        type: text
+        nullable: true
+        comment: 字典项显示值，如"男"、"一级"
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+      - name: description
+        type: character varying(200)
+        nullable: true
+        comment: 字典项说明
+
+  # ── 字典分类变更审计表 ──
+  - name: nc_dict_categories_updates
+    comment: "[字典] 字典分类变更记录表 - 记录分类的增删改操作，用于审计追溯"
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: category
+        type: character varying(100)
+        nullable: true
+        comment: 变更的分类编码
+      - name: display_name
+        type: character varying(100)
+        nullable: true
+        comment: 变更后的显示名称
+      - name: description
+        type: text
+        nullable: true
+        comment: 变更后的说明
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 变更后的排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 变更后的启用状态
+      - name: source
+        type: character varying(20)
+        nullable: true
+        defaultValue: "'user'"
+        comment: 变更来源：user=用户操作、system=系统自动
+      - name: action
+        type: character varying(20)
+        nullable: true
+        defaultValue: "'update'"
+        comment: 操作类型：insert/update/delete
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 变更时间
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 操作人ID，关联 nc_sys_users.id
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+    indexes:
+      - name: idx_dict_categories_updates_created
+        columns: [created_at]
+
+  # ── 字典项变更审计表 ──
+  - name: nc_dict_items_updates
+    comment: "[字典] 字典项变更记录表 - 记录字典项的增删改操作，用于审计追溯"
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: category
+        type: character varying(100)
+        nullable: true
+        comment: 所属分类编码
+      - name: item_key
+        type: character varying(100)
+        nullable: true
+        comment: 变更的字典项键值
+      - name: item_value
+        type: text
+        nullable: true
+        comment: 变更后的显示值
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 变更后的排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 变更后的启用状态
+      - name: description
+        type: character varying(200)
+        nullable: true
+        comment: 变更后的说明
+      - name: source
+        type: character varying(20)
+        nullable: true
+        defaultValue: "'user'"
+        comment: 变更来源：user=用户操作、system=系统自动
+      - name: action
+        type: character varying(20)
+        nullable: true
+        defaultValue: "'update'"
+        comment: 操作类型：insert/update/delete
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 变更时间
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 操作人ID，关联 nc_sys_users.id
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+    indexes:
+      - name: idx_dict_items_updates_created
+        columns: [created_at]
+

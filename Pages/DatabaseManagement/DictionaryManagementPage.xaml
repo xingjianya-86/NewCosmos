@@ -1,0 +1,228 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.DatabaseManagement.DictionaryManagementPage"
+             x:DataType="DictionaryManagementViewModel"
+             Title="数据字典管理"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="&#xE774; 同步Schema"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="#33FFFFFF"
+                                TextColor="White"
+                                FontSize="14"
+                                Command="{Binding SyncSchemaCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                        <Button Text="&#xE9F9; 初始化"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="White"
+                                TextColor="{StaticResource Primary}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                Command="{Binding InitializeFromSeedCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="数据字典管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="管理系统数据字典与编码表" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="320,*" BackgroundColor="{StaticResource Background}">
+
+            <!-- 左侧面板：分类列表 -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorderElevated}" Padding="0" Margin="16">
+                <Grid RowDefinitions="Auto,*">
+
+                    <Label Grid.Row="0" Text="字典分类" Style="{StaticResource SectionTitleLabel}" Margin="16,16,16,12"/>
+
+                    <ScrollView Grid.Row="1">
+                        <CollectionView ItemsSource="{Binding Categories}" SelectionMode="Single" SelectedItem="{Binding SelectedCategory}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无分类" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="results:DictCategoryView">
+                                    <Grid Padding="16,12" Margin="8,0,8,4">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Text="{Binding DisplayName}" FontSize="16" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </ScrollView>
+
+                </Grid>
+            </Border>
+
+            <!-- 右侧面板 -->
+            <Grid Grid.Column="1">
+                <Border Style="{StaticResource CardBorderElevated}" Padding="0" Margin="0,16,16,16">
+                    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+                        <!-- 字典项 头部 -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="16" Margin="0,0,0,8">
+                            <Label Grid.Column="0" Text="{Binding SelectedCategory.DisplayName, StringFormat='字典项 - {0}'}" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                                <Button Text="&#xE710; 新增" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddItemCommand}" Opacity="{Binding ManageOpacity}"/>
+                                <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditItemCommand}" IsEnabled="{Binding SelectedItem, Converter={StaticResource NullToBoolConverter}}" Opacity="{Binding ManageOpacity}"/>
+                                <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteItemCommand}" IsEnabled="{Binding SelectedItem, Converter={StaticResource NullToBoolConverter}}" Opacity="{Binding ManageOpacity}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 字典项 表头 -->
+                        <Grid Grid.Row="1" ColumnDefinitions="60,*,80,50,Auto" Padding="12,8" Margin="16,0" BackgroundColor="{StaticResource Gray100}">
+                            <Label Grid.Column="0" Text="键" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="1" Text="值" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="2" Text="状态" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="3" Text="序号" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="Center"/>
+                            <Label Grid.Column="4" Text="描述" Style="{StaticResource TableHeaderLabel}"/>
+                        </Grid>
+
+                        <!-- 字典项列表 -->
+                        <CollectionView Grid.Row="2" ItemsSource="{Binding Items}" SelectionMode="Single" SelectedItem="{Binding SelectedItem}" Margin="16,0">
+                            <CollectionView.EmptyView>
+                                <Label Text="请选择分类" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="results:DictItemView">
+                                    <Grid ColumnDefinitions="60,*,80,50,Auto" Padding="12" Margin="0,0,0,4">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Grid.Column="0" Text="{Binding ItemKey}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Grid.Column="1" Text="{Binding ItemValue}" FontSize="15" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                        <Border Grid.Column="2" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                            <Label Text="{Binding Status}" Style="{StaticResource ChipNeutralText}"/>
+                                        </Border>
+                                        <Label Grid.Column="3" Text="{Binding SortOrder}" FontSize="14" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"/>
+                                        <Label Grid.Column="4" Text="{Binding Description}" FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation" MaxLines="1"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <!-- 字典项 编辑表单 -->
+                        <Grid Grid.Row="3" IsVisible="{Binding IsEditing}" ColumnDefinitions="*,Auto" Padding="16" BackgroundColor="{StaticResource Gray100}">
+                            <VerticalStackLayout Grid.Column="0" Spacing="8">
+                                <Entry Text="{Binding EditItemKey}" Placeholder="字典项键" WidthRequest="200"/>
+                                <Entry Text="{Binding EditItemValue}" Placeholder="字典项值" WidthRequest="300"/>
+                                <Entry Text="{Binding EditItemDescription}" Placeholder="描述" WidthRequest="300"/>
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                <Button Text="保存" Style="{StaticResource ButtonPrimary}" Command="{Binding SaveItemCommand}"/>
+                                <Button Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelEditCommand}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                    </Grid>
+                </Border>
+
+            </Grid>
+
+        </Grid>
+
+        <!-- 进度弹窗覆盖层 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              BackgroundColor="#80000000"
+              IsVisible="{Binding Progress.IsProgressVisible}"
+              HorizontalOptions="Fill"
+              VerticalOptions="Fill">
+            <components:ProgressPopupView
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                Title="{Binding Progress.ProgressTitle}"
+                Progress="{Binding Progress.ProgressValue}"
+                ProgressText="{Binding Progress.ProgressText}"
+                Steps="{Binding Progress.ProgressSteps}"
+                CanClose="{Binding Progress.CanCloseProgress}"
+                CloseCommand="{Binding Progress.CloseProgressCommand}"/>
+        </Grid>
+
+        <!-- SnackBar 提示 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              VerticalOptions="End"
+              HorizontalOptions="Fill"
+              Padding="24,0,24,80"
+              InputTransparent="True">
+            <components:SnackBarView
+                Message="{Binding SnackBarMessage}"
+                Type="{Binding SnackBarType}"
+                IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

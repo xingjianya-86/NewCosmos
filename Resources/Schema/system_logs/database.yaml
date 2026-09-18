@@ -1,0 +1,256 @@
+# 系统日志与版本表 Schema 定义
+# 来源：backup/cosmos_backup_20260618_073641.sql（pg_dump 权威 DDL，
+# 旧表名 cosmos_application_logs / app_versions / user_activity_logs /
+# permission_change_logs / role_change_logs 按 nc_ 命名规范迁移）
+database: 系统日志与版本
+version: 2.0
+description: 系统日志与版本管理 - 申请操作日志、应用版本记录、用户活动日志、权限变更日志、角色变更日志
+
+tables:
+  # ── 申请操作日志表 ──
+  - name: nc_biz_application_logs
+    comment: "[系统] 申请操作日志表 - 记录申请的创建/修改/提交/审核等全生命周期操作"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 日志ID，主键
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 申请ID
+      - name: action
+        type: character varying(50)
+        nullable: false
+        comment: 操作类型：创建申请/修改信息/提交申请/审核通过/审核驳回等
+      - name: action_detail
+        type: text
+        nullable: true
+        comment: 操作详情
+      - name: old_value
+        type: text
+        nullable: true
+        comment: 旧值（JSON格式）
+      - name: new_value
+        type: text
+        nullable: true
+        comment: 新值（JSON格式）
+      - name: operator_name
+        type: character varying(100)
+        nullable: true
+        comment: 操作人姓名
+      - name: operator_id
+        type: character varying(50)
+        nullable: true
+        comment: 操作人ID
+      - name: operated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 操作时间
+    indexes:
+      - name: idx_biz_application_logs_application_id
+        columns: [application_id]
+      - name: idx_biz_application_logs_operated_at
+        columns: [operated_at]
+
+  # ── 应用版本记录表 ──
+  - name: nc_sys_app_versions
+    comment: "[系统] 应用版本记录表 - 记录应用版本更新历史，用于版本比对和升级提示"
+    columns:
+      - name: id
+        type: SERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: version
+        type: character varying(50)
+        nullable: false
+        comment: 版本号
+      - name: build_number
+        type: character varying(50)
+        nullable: true
+        comment: 构建号
+      - name: channel
+        type: character varying(50)
+        nullable: true
+        comment: 发布渠道
+      - name: notes
+        type: text
+        nullable: true
+        comment: 版本说明
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+    indexes:
+      - name: idx_sys_app_versions_created_at
+        columns: [created_at]
+
+  # ── 用户活动日志表 ──
+  - name: nc_sys_user_activity_logs
+    comment: "[系统] 用户活动日志表 - 记录用户登录、操作等行为日志"
+    columns:
+      - name: id
+        type: SERIAL
+        nullable: false
+        primaryKey: true
+        comment: 日志ID
+      - name: user_id
+        type: integer
+        nullable: true
+        comment: 用户ID，关联nc_sys_users.id
+      - name: activity_type
+        type: character varying(50)
+        nullable: false
+        comment: 活动类型
+      - name: description
+        type: text
+        nullable: true
+        comment: 活动描述
+      - name: ip_address
+        type: character varying(50)
+        nullable: true
+        comment: IP地址
+      - name: user_agent
+        type: text
+        nullable: true
+        comment: 用户代理
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+    indexes:
+      - name: idx_sys_user_activity_logs_created_at
+        columns: [created_at]
+      - name: idx_sys_user_activity_logs_user_id
+        columns: [user_id]
+
+  # ── 权限变更日志表 ──
+  - name: nc_sys_permission_change_logs
+    comment: "[系统] 权限变更日志表 - 记录权限分配/回收的变更历史"
+    columns:
+      - name: id
+        type: SERIAL
+        nullable: false
+        primaryKey: true
+        comment: 日志ID
+      - name: user_id
+        type: integer
+        nullable: true
+        comment: 操作用户ID，关联nc_sys_users.id
+      - name: permission_id
+        type: integer
+        nullable: true
+        comment: 权限ID
+      - name: change_type
+        type: character varying(50)
+        nullable: false
+        comment: 变更类型
+      - name: old_value
+        type: text
+        nullable: true
+        comment: 旧值
+      - name: new_value
+        type: text
+        nullable: true
+        comment: 新值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+    indexes:
+      - name: idx_sys_permission_change_logs_created_at
+        columns: [created_at]
+      - name: idx_sys_permission_change_logs_user_id
+        columns: [user_id]
+
+  # ── 角色变更日志表 ──
+  - name: nc_sys_role_change_logs
+    comment: "[系统] 角色变更日志表 - 记录角色分配/回收的变更历史"
+    columns:
+      - name: id
+        type: SERIAL
+        nullable: false
+        primaryKey: true
+        comment: 日志ID
+      - name: user_id
+        type: integer
+        nullable: true
+        comment: 操作用户ID，关联nc_sys_users.id
+      - name: role_id
+        type: integer
+        nullable: true
+        comment: 角色ID
+      - name: change_type
+        type: character varying(50)
+        nullable: false
+        comment: 变更类型
+      - name: old_value
+        type: text
+        nullable: true
+        comment: 旧值
+      - name: new_value
+        type: text
+        nullable: true
+        comment: 新值
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+    indexes:
+      - name: idx_sys_role_change_logs_created_at
+        columns: [created_at]
+      - name: idx_sys_role_change_logs_user_id
+        columns: [user_id]
+
+  # ── 客户端版本台账表 ──
+  - name: nc_sys_client_versions
+    comment: "[系统] 客户端版本台账 - 记录各乡镇客户端版本与最后在线，用于在线升级跟踪"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: client_id
+        type: character varying(64)
+        nullable: false
+        comment: 客户端标识（本机 %LOCALAPPDATA%\NewCosmos\client_id.txt 持久 GUID）
+      - name: machine_name
+        type: character varying(128)
+        nullable: true
+        comment: 机器名
+      - name: user_name
+        type: character varying(100)
+        nullable: true
+        comment: 最后登录用户（姓名）
+      - name: app_version
+        type: character varying(50)
+        nullable: true
+        comment: 客户端应用版本（config/app.ini 的 Version）
+      - name: first_seen_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 首次上报时间
+      - name: last_seen_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 最后在线时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 更新时间
+    indexes:
+      - name: idx_sys_client_versions_last_seen
+        columns: [last_seen_at]
+      - name: idx_sys_client_versions_client_id
+        columns: [client_id]

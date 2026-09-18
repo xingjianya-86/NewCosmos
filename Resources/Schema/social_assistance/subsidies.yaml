@@ -1,0 +1,84 @@
+# 农业补贴表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 农业补贴明细（地力/大豆/玉米/水稻/轮作） - 按面积×单价计算，支持份额系数分配
+
+tables:
+  - name: nc_biz_subsidies
+    comment: "[经济状况] 农业补贴明细表 - 记录家庭各类农业补贴（地力/大豆/玉米/轮作），按面积×单价计算，支持份额系数"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: subsidy_type
+        type: VARCHAR(50)
+        nullable: false
+        comment: 补贴类型：地力补贴/大豆补贴/玉米补贴/地表水水稻/地下水水稻/轮作补贴
+      - name: area
+        type: NUMERIC(10,4)
+        nullable: true
+        defaultValue: '0'
+        comment: 面积（亩）
+      - name: unit_price
+        type: NUMERIC(10,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 单价（元/亩）
+      - name: count
+        type: INTEGER
+        nullable: true
+        defaultValue: '1'
+        comment: 数量/倍数
+      - name: ratio_factor
+        type: NUMERIC(5,4)
+        nullable: true
+        defaultValue: '1'
+        comment: 比例系数（用于按份额分配）
+      - name: original_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 原始金额（元）
+      - name: amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 实际金额（元）
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 关联成员姓名
+      - name: member_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 关联成员身份证号
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_subsidies_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_subsidies_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

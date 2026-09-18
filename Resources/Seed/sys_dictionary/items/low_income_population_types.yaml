@@ -1,0 +1,15 @@
+# 低收入人口类型字典（固定 ID）
+# 分类 ID=37，字典项 ID 范围: 37001-37099
+# 依据：国办发〔2023〕39号
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 37001, category: "LowIncomePopulationTypes", item_key: "Subsistence", item_value: "最低生活保障对象", sort_order: 1, is_active: true }
+      - { id: 37002, category: "LowIncomePopulationTypes", item_key: "Destitute", item_value: "特困人员", sort_order: 2, is_active: true }
+      - { id: 37003, category: "LowIncomePopulationTypes", item_key: "SubsistenceEdge", item_value: "最低生活保障边缘家庭", sort_order: 3, is_active: true }
+      - { id: 37004, category: "LowIncomePopulationTypes", item_key: "RigidExpenditure", item_value: "刚性支出困难家庭", sort_order: 4, is_active: true }
+      - { id: 37005, category: "LowIncomePopulationTypes", item_key: "OtherDifficulty", item_value: "其他困难人员", sort_order: 5, is_active: true }
+      - { id: 37006, category: "LowIncomePopulationTypes", item_key: "PovertyMonitoring", item_value: "防止返贫监测对象", sort_order: 6, is_active: true }

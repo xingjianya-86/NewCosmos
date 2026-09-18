@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             x:Class="NewCosmos.Pages.SocialAssistance.CollegeStudentManagementPage"
+             x:DataType="CollegeStudentManagementViewModel"
+             Title="大学生管理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToFontAttributeConverter x:Key="BoolToFontAttributeConverter"/>
+
+        <!-- Tab0 可关联成员列表 交替行色（白 / #F8F9FA） -->
+        <DataTemplate x:Key="EligibleStudentEvenRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="2">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberCategory}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding GenderAgeDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding HouseholdHeadName, StringFormat='户主: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding Phone, StringFormat='电话: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding HomeLocationDisplay, StringFormat='所在: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="关联" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddStudentCommand}"
+                            CommandParameter="{Binding .}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="EligibleStudentOddRow" x:DataType="ent:FamilyMember">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="2">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberCategory}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding GenderAgeDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding HouseholdHeadName, StringFormat='户主: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding Phone, StringFormat='电话: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding HomeLocationDisplay, StringFormat='所在: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="关联" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddStudentCommand}"
+                            CommandParameter="{Binding .}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="EligibleStudentSelector"
+            EvenTemplate="{StaticResource EligibleStudentEvenRow}"
+            OddTemplate="{StaticResource EligibleStudentOddRow}"/>
+
+        <!-- Tab1 已关联列表 交替行色 -->
+        <DataTemplate x:Key="AssociatedStudentEvenRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                        <Button Text="编辑" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditStudentCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="删除" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Error}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteStudentCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="AssociatedStudentOddRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                        <Button Text="编辑" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditStudentCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="删除" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Error}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteStudentCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="AssociatedStudentSelector"
+            EvenTemplate="{StaticResource AssociatedStudentEvenRow}"
+            OddTemplate="{StaticResource AssociatedStudentOddRow}"/>
+
+        <!-- Tab2 不在范围内列表 交替行色 -->
+        <DataTemplate x:Key="NotInScopeStudentEvenRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="编辑" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditStudentCommand}"
+                            CommandParameter="{Binding .}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="NotInScopeStudentOddRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="编辑" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditStudentCommand}"
+                            CommandParameter="{Binding .}" VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="NotInScopeStudentSelector"
+            EvenTemplate="{StaticResource NotInScopeStudentEvenRow}"
+            OddTemplate="{StaticResource NotInScopeStudentOddRow}"/>
+
+        <!-- Tab3 今年毕业列表 交替行色 -->
+        <DataTemplate x:Key="GraduatingStudentEvenRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="去变更" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.NavigateToChangeManagementCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="GraduatingStudentOddRow" x:DataType="ent:CollegeStudent">
+            <Border Style="{StaticResource CardBorder}" Padding="12" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="3">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding StudentName}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchoolName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <HorizontalStackLayout Spacing="12">
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        </HorizontalStackLayout>
+                        <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
+                            <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="去变更" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.NavigateToChangeManagementCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="GraduatingStudentSelector"
+            EvenTemplate="{StaticResource GraduatingStudentEvenRow}"
+            OddTemplate="{StaticResource GraduatingStudentOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回低收入人口救助帮扶" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="大学生管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="18-23周岁家庭成员的大学生档案关联与毕业管理" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Tab 栏 -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" Padding="12,8" ColumnSpacing="8"
+              BackgroundColor="{StaticResource White}">
+            <!-- Tab 0: 可关联成员 -->
+            <Border Grid.Column="0" StrokeShape="RoundRectangle 8" Padding="10,8"
+                    BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                    <Label Text="{Binding EligibleCountText}" FontSize="14" FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="可关联"
+                           FontSize="12"
+                           FontAttributes="{Binding IsTab0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 1: 已关联 -->
+            <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="10,8"
+                    BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                    <Label Text="{Binding AssociatedCountText}" FontSize="14" FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="已关联"
+                           FontSize="12"
+                           FontAttributes="{Binding IsTab1Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 2: 不在范围内 -->
+            <Border Grid.Column="2" StrokeShape="RoundRectangle 8" Padding="10,8"
+                    BackgroundColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                    <Label Text="{Binding NotInScopeCountText}" FontSize="14" FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="已退出"
+                           FontSize="12"
+                           FontAttributes="{Binding IsTab2Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="2"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <!-- Tab 3: 今年毕业 -->
+            <Border Grid.Column="3" StrokeShape="RoundRectangle 8" Padding="10,8"
+                    BackgroundColor="{Binding IsTab3Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                    <Label Text="{Binding GraduatingCountText}" FontSize="14" FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="今年毕业"
+                           FontSize="12"
+                           FontAttributes="{Binding IsTab3Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="3"/>
+                </Border.GestureRecognizers>
+            </Border>
+        </Grid>
+
+        <!-- 内容区（4个Tab叠放，IsVisible切换） -->
+        <Grid Grid.Row="2">
+
+            <!-- Tab0: 可关联成员 -->
+            <ScrollView IsVisible="{Binding IsTab0Selected}">
+                <VerticalStackLayout Padding="16" Spacing="12">
+                    <!-- 搜索栏 -->
+                    <Border BackgroundColor="{StaticResource White}" StrokeThickness="0" Padding="16,12" StrokeShape="RoundRectangle 8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0" StrokeShape="RoundRectangle 20" Padding="12,6">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                    <Label Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                           TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
+                                    <Entry Grid.Column="1" Placeholder="输入姓名或身份证号搜索"
+                                           Text="{Binding SearchKeyword}" FontSize="14"
+                                           BackgroundColor="Transparent"
+                                           ReturnCommand="{Binding SearchMembersCommand}"/>
+                                </Grid>
+                            </Border>
+                            <Button Grid.Column="1" Text="搜索" Style="{StaticResource ButtonSmall}"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    Command="{Binding SearchMembersCommand}" WidthRequest="70" HeightRequest="36"/>
+                        </Grid>
+                    </Border>
+                    <!-- 列表 -->
+                    <CollectionView ItemsSource="{Binding EligibleMembers}" SelectionMode="None"
+                    ItemTemplate="{StaticResource EligibleStudentSelector}">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
+                                <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                       TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
+                                <Label Text="未找到符合条件（18-23周岁且未关联）的家庭成员"
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="14" Margin="0,10,0,0"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Tab1: 已关联 -->
+            <ScrollView IsVisible="{Binding IsTab1Selected}">
+                <VerticalStackLayout Padding="16" Spacing="8">
+                    <CollectionView ItemsSource="{Binding AssociatedStudents}" SelectionMode="None"
+                    ItemTemplate="{StaticResource AssociatedStudentSelector}">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
+                                <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                       TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
+                                <Label Text="暂无已关联大学生档案"
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="14" Margin="0,10,0,0"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Tab2: 不在范围内（已退出/超择业期） -->
+            <ScrollView IsVisible="{Binding IsTab2Selected}">
+                <VerticalStackLayout Padding="16" Spacing="8">
+                    <CollectionView ItemsSource="{Binding NotInScopeStudents}" SelectionMode="None"
+                    ItemTemplate="{StaticResource NotInScopeStudentSelector}">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
+                                <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                       TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
+                                <Label Text="暂无不在范围内的人员"
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="14" Margin="0,10,0,0"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Tab3: 今年毕业 -->
+            <ScrollView IsVisible="{Binding IsTab3Selected}">
+                <VerticalStackLayout Padding="16" Spacing="8">
+                    <CollectionView ItemsSource="{Binding GraduatingStudents}" SelectionMode="None"
+                    ItemTemplate="{StaticResource GraduatingStudentSelector}">
+                        <CollectionView.EmptyView>
+                            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
+                                <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                       TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
+                                <Label Text="今年暂无毕业大学生"
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="14" Margin="0,10,0,0"/>
+                            </VerticalStackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+        </Grid>
+
+        <!-- 编辑表单覆盖层 -->
+        <Grid Grid.Row="0" Grid.RowSpan="4"
+              BackgroundColor="#80000000"
+              IsVisible="{Binding IsEditorVisible}"
+              Padding="40">
+            <Border BackgroundColor="{StaticResource White}"
+                    StrokeShape="RoundRectangle 12"
+                    Padding="24"
+                    WidthRequest="560"
+                    VerticalOptions="Center"
+                    HorizontalOptions="Center">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="{Binding EditorTitle}" FontSize="18" FontAttributes="Bold"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="大学生姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding EditStudentName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding EditIdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                          IsVisible="{Binding IsSchoolInfoRequired}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="学校名称 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding EditSchoolName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="学历层次 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding EducationLevelOptions}"
+                                    SelectedItem="{Binding EditEducationLevel}"
+                                    Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                          IsVisible="{Binding IsSchoolInfoRequired}">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="学年制 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding SchoolDurationOptions}"
+                                    SelectedItem="{Binding EditSchoolDuration}"
+                                    Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="入学年份 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding EnrollmentYearOptions}"
+                                    SelectedItem="{Binding EditEnrollmentYear}"
+                                    Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="状态" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Picker ItemsSource="{Binding StatusOptions}"
+                                SelectedItem="{Binding EditStatus}"
+                                Style="{StaticResource FormFieldPickerStyle}"/>
+                    </VerticalStackLayout>
+
+                    <Label Text="{Binding ErrorMessage}" TextColor="Red" FontSize="13"
+                           IsVisible="{Binding HasError}" HorizontalOptions="Center"/>
+
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,8,0,0">
+                        <Button Grid.Column="1" Text="取消" Style="{StaticResource ButtonOutline}"
+                                Command="{Binding CancelEditCommand}" MinimumWidthRequest="100"/>
+                        <Button Grid.Column="2" Text="保存" Style="{StaticResource ButtonPrimary}"
+                                Command="{Binding SaveStudentCommand}" MinimumWidthRequest="120"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsVisible="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}" />
+
+    </Grid>
+</ContentPage>

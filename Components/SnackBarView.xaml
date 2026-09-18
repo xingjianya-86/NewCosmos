@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NewCosmos.Components.SnackBarView"
+             x:Name="ThisView">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- .NET 9 中 Frame 已弃用，迁移为 Border：CornerRadius→StrokeShape，HasShadow→显式 Shadow -->
+            <Style x:Key="SnackBarFrameStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="#10B981"/>
+                <Setter Property="StrokeShape" Value="RoundRectangle 8"/>
+                <Setter Property="StrokeThickness" Value="0"/>
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="Black" Opacity="0.25" Radius="12" Offset="0,4"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Padding" Value="16,12"/>
+                <Setter Property="HorizontalOptions" Value="Center"/>
+                <Setter Property="MinimumWidthRequest" Value="300"/>
+                <Setter Property="MaximumWidthRequest" Value="600"/>
+            </Style>
+
+            <Style x:Key="SnackBarMessageStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="VerticalTextAlignment" Value="Center"/>
+                <Setter Property="HorizontalTextAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="SnackBarIconStyle" TargetType="Label">
+                <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="VerticalTextAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="SnackBarCloseButtonStyle" TargetType="Button">
+                <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+                <Setter Property="Text" Value="&#xE8BB;"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="BackgroundColor" Value="Transparent"/>
+                <Setter Property="WidthRequest" Value="32"/>
+                <Setter Property="HeightRequest" Value="32"/>
+                <Setter Property="CornerRadius" Value="16"/>
+                <Setter Property="Padding" Value="0"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <Border x:Name="SnackBarFrame" Style="{StaticResource SnackBarFrameStyle}">
+        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto">
+            <Label x:Name="IconLabel"
+                   Grid.Column="0"
+                   Text="&#xE73E;"
+                   Style="{StaticResource SnackBarIconStyle}"
+                   Margin="0,0,12,0"/>
+
+            <Label Grid.Column="1"
+                   Text="{Binding Message, Source={x:Reference ThisView}}"
+                   Style="{StaticResource SnackBarMessageStyle}"
+                   LineBreakMode="TailTruncation"
+                   MaxLines="2"/>
+
+            <Button Grid.Column="2"
+                     Style="{StaticResource SnackBarCloseButtonStyle}"
+                     Command="{Binding CloseCommand, Source={x:Reference ThisView}}"
+                     Margin="8,0,0,0"/>
+        </Grid>
+    </Border>
+
+</ContentView>

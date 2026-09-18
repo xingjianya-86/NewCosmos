@@ -1,0 +1,84 @@
+# 务工收入明细表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 家庭成员务工收入明细 - 记录工资性收入，按月收入×工作月数计算年收入
+
+tables:
+  - name: nc_biz_labor_incomes
+    comment: "[经济状况] 务工收入明细表 - 记录家庭成员工资性收入，年收入=月收入×工作月数"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 成员姓名
+      - name: member_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 成员身份证号
+      - name: member_age
+        type: INTEGER
+        nullable: true
+        comment: 成员年龄
+      - name: income_sub_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 收入子类型：工资/奖金/津贴
+      - name: work_unit
+        type: VARCHAR(200)
+        nullable: true
+        comment: 工作单位
+      - name: work_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 工种
+      - name: work_place
+        type: VARCHAR(200)
+        nullable: true
+        comment: 工作地点
+      - name: monthly_income
+        type: NUMERIC
+        nullable: true
+        comment: 月收入（元）
+      - name: months_worked
+        type: INTEGER
+        nullable: true
+        comment: 工作月数
+      - name: annual_income
+        type: NUMERIC
+        nullable: true
+        comment: 年收入（元）
+      - name: remark
+        type: TEXT
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_labor_incomes_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_labor_incomes_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

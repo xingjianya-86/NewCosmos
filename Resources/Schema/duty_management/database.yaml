@@ -1,0 +1,352 @@
+# 值班管理数据库 Schema 定义
+database: 值班管理数据库
+version: 1.1
+description: 值班管理数据库 - 值班人员分组（领导/中层/男生/女生）、轮转游标、月度值班班次、请假记录与功能设置
+
+tables:
+  # ── 值班人员表 ──
+  - name: nc_duty_members
+    comment: "[值班] 值班人员表 - 值班成员基础信息（独立维护，与登录账号无关）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: character varying(50)
+        nullable: false
+        comment: 姓名
+      - name: phone
+        type: character varying(20)
+        nullable: true
+        comment: 联系电话（选填）
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用（停用后不再参与轮转，历史班次保留）
+      - name: join_date
+        type: date
+        nullable: true
+        comment: 入职时间（值班日当天须已入职才参与轮转；空=不限制）
+      - name: exit_date
+        type: date
+        nullable: true
+        comment: 离职时间（值班日当天须未离职才参与轮转；空=在职）
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 列表显示排序号
+      - name: remark
+        type: character varying(200)
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+    indexes:
+      - name: idx_duty_members_name
+        columns: [name]
+
+  # ── 成员分组表 ──
+  - name: nc_duty_member_groups
+    comment: "[值班] 成员分组表 - 一人可属多组（如中层管理组成员可同时属男生组），组内 sort_order 即该组轮转顺序"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: member_id
+        type: BIGINT
+        nullable: false
+        comment: 成员ID，关联 nc_duty_members.id
+      - name: group_code
+        type: character varying(20)
+        nullable: false
+        comment: 组编码：LEADER=领导组、MIDDLE=中层管理组、MALE=男生组、FEMALE=女生组
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 组内轮转顺序号
+    indexes:
+      - name: idx_duty_member_groups_member
+        columns: [member_id]
+      - name: idx_duty_member_groups_group
+        columns: [group_code]
+      - name: uq_duty_member_groups
+        columns: [member_id, group_code]
+        unique: true
+    foreignKeys:
+      - name: fk_duty_member_groups_member
+        columns: [member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: CASCADE
+
+  # ── 请假记录表 ──
+  - name: nc_duty_leaves
+    comment: "[值班] 请假记录表 - 成员请假区间（含长期请假），生成值班表时该区间内顺延跳过并消耗轮次"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: member_id
+        type: BIGINT
+        nullable: false
+        comment: 成员ID，关联 nc_duty_members.id
+      - name: start_date
+        type: date
+        nullable: false
+        comment: 请假开始日期（含）
+      - name: end_date
+        type: date
+        nullable: false
+        comment: 请假结束日期（含，须不早于开始日期）
+      - name: reason
+        type: character varying(200)
+        nullable: true
+        comment: 请假事由（选填）
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: idx_duty_leaves_member
+        columns: [member_id]
+      - name: idx_duty_leaves_start
+        columns: [start_date]
+    foreignKeys:
+      - name: fk_duty_leaves_member
+        columns: [member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: CASCADE
+
+  # ── 轮转游标表 ──
+  - name: nc_duty_rotation_state
+    comment: "[值班] 轮转游标表 - 每组×每日期类型一条轮转线，记录最近一次值班的成员（NULL=尚未轮转）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: group_code
+        type: character varying(20)
+        nullable: false
+        comment: 组编码
+      - name: date_type
+        type: character varying(20)
+        nullable: false
+        comment: 日期类型：WORKDAY=工作日、RESTDAY=休息日、HOLIDAY=法定节假日
+      - name: last_member_id
+        type: BIGINT
+        nullable: true
+        comment: 最近一次值班的成员ID（NULL=该轮转线尚未轮转）
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+    indexes:
+      - name: uq_duty_rotation_state
+        columns: [group_code, date_type]
+        unique: true
+    foreignKeys:
+      - name: fk_duty_rotation_state_member
+        columns: [last_member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: SET NULL
+
+  # ── 值班班次表 ──
+  - name: nc_duty_schedules
+    comment: "[值班] 值班班次表 - 按月生成固化的每日班次；date_type 与 member_name 为生成时快照，历史不受后续数据变动影响"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: duty_date
+        type: date
+        nullable: false
+        comment: 值班日期（与组编码联合唯一：每天每组一条）
+      - name: date_type
+        type: character varying(20)
+        nullable: false
+        comment: 日期类型快照：WORKDAY/RESTDAY/HOLIDAY（生成时依据节假日数据判定）
+      - name: group_code
+        type: character varying(20)
+        nullable: false
+        comment: 组编码
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 值班成员ID（显示值：手工换人后指向新成员；轮转消耗事实见 rotation_member_id）
+      - name: rotation_member_id
+        type: BIGINT
+        nullable: true
+        comment: 轮转消耗成员ID（生成时写入，串班/代班/撤销重放不修改——跨月接续与重生成确定性的事实依据；旧数据为空时回退 member_id）
+      - name: member_name
+        type: character varying(50)
+        nullable: false
+        comment: 值班成员姓名快照（成员删除后历史仍可显示）
+      - name: year
+        type: integer
+        nullable: false
+        comment: 年（冗余，按月查询）
+      - name: month
+        type: integer
+        nullable: false
+        comment: 月（冗余，按月查询）
+      - name: is_adjusted
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否手工调整过
+      - name: remark
+        type: character varying(200)
+        nullable: true
+        comment: 备注（如调班原因）
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: uq_duty_schedules
+        columns: [duty_date, group_code]
+        unique: true
+      - name: idx_duty_schedules_year_month
+        columns: [year, month]
+    foreignKeys:
+      - name: fk_duty_schedules_member
+        columns: [member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: SET NULL
+
+  # ── 值班设置表 ──
+  - name: nc_duty_settings
+    comment: "[值班] 值班设置表 - 功能开关与参数（key-value），如 restday_leader_same_pair、holiday_api_url"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: setting_key
+        type: character varying(50)
+        nullable: false
+        comment: 设置键（唯一）
+      - name: setting_value
+        type: character varying(200)
+        nullable: true
+        comment: 设置值
+      - name: remark
+        type: character varying(200)
+        nullable: true
+        comment: 说明
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+    indexes:
+      - name: uq_duty_settings_key
+        columns: [setting_key]
+        unique: true
+
+  # ── 值班班务调整表（串班/代班） ──
+  - name: nc_duty_shift_changes
+    comment: "[值班] 班务调整表 - 串班(SWAP=相互对调两天的班)与代班(SUBSTITUTE=单向顶班一次)留痕，支持撤销；from/to 存姓名快照，成员删除后历史仍可显示"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: change_type
+        type: character varying(20)
+        nullable: false
+        comment: 调整类型：SWAP=串班(相互对调)/SUBSTITUTE=代班(单向顶班)
+      - name: from_member_id
+        type: BIGINT
+        nullable: true
+        comment: 原班人员ID（串班=甲方/代班=被代者）
+      - name: from_member_name
+        type: character varying(50)
+        nullable: false
+        comment: 原班人员姓名快照
+      - name: duty_date
+        type: date
+        nullable: false
+        comment: 被调整的班次日期（串班=甲方的班日/代班=被代的班日）
+      - name: to_member_id
+        type: BIGINT
+        nullable: true
+        comment: 对方人员ID（串班=乙方/代班=代班者）
+      - name: to_member_name
+        type: character varying(50)
+        nullable: false
+        comment: 对方人员姓名快照
+      - name: to_duty_date
+        type: date
+        nullable: true
+        comment: 对方被换出的班日（仅 SWAP=乙方的班日；SUBSTITUTE 为空）
+      - name: group_code
+        type: character varying(20)
+        nullable: false
+        comment: 组编码快照（串班/代班限同组）
+      - name: reason
+        type: character varying(200)
+        nullable: true
+        comment: 事由
+      - name: is_cancelled
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否已撤销
+      - name: cancelled_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 撤销时间
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: idx_duty_shift_changes_date
+        columns: [duty_date]
+      - name: idx_duty_shift_changes_type
+        columns: [change_type, is_cancelled]
+    foreignKeys:
+      - name: fk_duty_shift_changes_from
+        columns: [from_member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: SET NULL
+      - name: fk_duty_shift_changes_to
+        columns: [to_member_id]
+        references:
+          table: nc_duty_members
+          columns: [id]
+        onDelete: SET NULL

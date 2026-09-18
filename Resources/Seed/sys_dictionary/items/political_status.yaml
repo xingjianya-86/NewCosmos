@@ -1,0 +1,13 @@
+# 政治面貌字典（固定 ID）
+# 分类 ID=15，字典项 ID 范围: 15001-15999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 15001, category: "PoliticalStatuses", item_key: "CPCMember", item_value: "中共党员", sort_order: 1, is_active: true }
+      - { id: 15002, category: "PoliticalStatuses", item_key: "CYLMembers", item_value: "共青团员", sort_order: 2, is_active: true }
+      - { id: 15003, category: "PoliticalStatuses", item_key: "Masses", item_value: "群众", sort_order: 3, is_active: true }
+      - { id: 15004, category: "PoliticalStatuses", item_key: "DemocraticParty", item_value: "民主党派", sort_order: 4, is_active: true }
+      - { id: 15005, category: "PoliticalStatuses", item_key: "Other", item_value: "其他", sort_order: 5, is_active: true }

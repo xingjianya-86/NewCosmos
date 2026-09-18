@@ -1,0 +1,170 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.CapabilityAssessmentPage"
+             x:DataType="CapabilityAssessmentViewModel"
+             Title="能力鉴定"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 修复：本页此前引用 StringToColorConverter 但未在任何资源字典声明，运行时会抛 StaticResource 未找到 -->
+        <converters:StringToColorConverter x:Key="StringToColorConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8EF;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="自理能力（评估指标）" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="根据身体状况与照护情况确定等级" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1" Padding="16">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 评估日期和评估人 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="12">
+                        <Label Text="评估日期" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                        <DatePicker Grid.Column="1" Date="{Binding AssessmentDate}" Format="yyyy-MM-dd" VerticalOptions="Center"/>
+                        <Label Grid.Column="2" Text="评估人" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                        <Entry Grid.Column="3" Text="{Binding AssessorName}" Placeholder="姓名" VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 六项考核指标 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="考核指标" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Label Text="请勾选被评估人能够自主完成的项目" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+
+                        <!-- 第一行：进食、穿衣、上下床 -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <Border StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="进食" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主进食" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding Eating}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="穿衣" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主穿脱衣服" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding Dressing}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="上下床" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主上下床" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding GettingInOutOfBed}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+
+                        <!-- 第二行：如厕、室内行走、洗澡 -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <Border StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="如厕" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主如厕" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding UsingToilet}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="室内行走" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主室内行走" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding IndoorWalking}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="洗澡" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主洗澡" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Switch IsToggled="{Binding Bathing}" HorizontalOptions="Start"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 评估结果 -->
+                <Border StrokeShape="RoundRectangle 12" Padding="16"
+                        BackgroundColor="{StaticResource CardBackground}"
+                        Stroke="{Binding LevelColor, Converter={StaticResource StringToColorConverter}}"
+                        StrokeThickness="2">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="评估结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="能完成项目数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding CompletedItems, StringFormat='{0}/6 项'}" FontSize="24" FontAttributes="Bold"
+                                       TextColor="{Binding LevelColor, Converter={StaticResource StringToColorConverter}}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="自理能力等级" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Border StrokeShape="RoundRectangle 16" Padding="12,4"
+                                        BackgroundColor="{Binding LevelColor, Converter={StaticResource StringToColorConverter}}"
+                                        HorizontalOptions="Start">
+                                    <Label Text="{Binding SelfCareLevel}" FontSize="14" FontAttributes="Bold" TextColor="White"/>
+                                </Border>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
+                                <Label Text="照料等级" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding CareLevelDisplay}" FontSize="16" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 备注 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="备注" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Editor Text="{Binding Remark}" Placeholder="请输入备注信息（选填）" HeightRequest="80"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部保存按钮 -->
+        <Border Grid.Row="2" BackgroundColor="{StaticResource White}" StrokeThickness="0" Padding="16">
+            <Button Text="保存评估结果" Style="{StaticResource ButtonPrimary}" HeightRequest="48"
+                    Command="{Binding SaveCommand}"/>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在保存..."/>
+    </Grid>
+
+</ContentPage>

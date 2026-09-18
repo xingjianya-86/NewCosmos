@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:local="clr-namespace:NewCosmos.Models.Lottery"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.Lottery"
+             x:Class="NewCosmos.Pages.Lottery.LotteryPredictionPage"
+             x:DataType="vm:LotteryPredictionViewModel"
+             Title="智能预测"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 渐变头部 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="智能预测" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="融合算法 · 机器学习(LSTM) + LotteryML" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 预测设置 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="预测设置" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+                    <Border Style="{StaticResource CardBorder}" Padding="16">
+                        <VerticalStackLayout Spacing="0">
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="彩种" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Picker ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}" ItemDisplayBinding="{Binding Name}" HeightRequest="44" VerticalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Spacing="4" Grid.Column="1">
+                                    <Label Text="算法" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Picker ItemsSource="{Binding AlgorithmOptions}" SelectedItem="{Binding SelectedAlgorithmOption}" ItemDisplayBinding="{Binding Name}" HeightRequest="44" VerticalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Spacing="4" Grid.Column="2">
+                                    <Label Text="注数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Picker ItemsSource="{Binding PredictionCountOptions}" SelectedItem="{Binding PredictionCount}" HeightRequest="44" VerticalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,10,0,0">
+                                <Label Text="最新开奖日期" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                <Label Text="{Binding LatestDrawDate}" Grid.Column="1" FontSize="13" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- 预测结果列表 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="预测结果" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+                    <Label Text="策略契合度不代表中奖概率；彩票中奖为随机事件，请理性购彩。" FontSize="11" TextColor="{StaticResource TextTertiary}" Margin="4,0,4,0"/>
+                    <CollectionView ItemsSource="{Binding Predictions}" SelectionMode="None" HeightRequest="300">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:PredictionResult">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,10" Padding="14">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                                        <Label Text="{Binding AlgorithmName}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="{Binding ConfidenceScore, StringFormat='策略契合度: {0:F1}%'}" Grid.Column="1" TextColor="{StaticResource TextTertiary}"/>
+                                        <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="8">
+                                            <Label Text="红球" TextColor="{StaticResource TextTertiary}"/>
+                                            <Label Text="{Binding PredictedRedJson}" TextColor="#E53935" FontAttributes="Bold"/>
+                                        </HorizontalStackLayout>
+                                        <HorizontalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="8">
+                                            <Label Text="蓝球" TextColor="{StaticResource TextTertiary}"/>
+                                            <Label Text="{Binding PredictedBlueJson}" TextColor="#1E88E5" FontAttributes="Bold"/>
+                                        </HorizontalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="1" Style="{StaticResource StatusBar}">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Padding="20,12">
+                <Button Text="生成预测" Command="{Binding ExecutePredictionCommand}" HeightRequest="48" BackgroundColor="{StaticResource Primary}" TextColor="White"/>
+                <Button Text="保存结果" Command="{Binding SavePredictionsCommand}" HeightRequest="48" Grid.Column="1" BackgroundColor="{StaticResource Success}" TextColor="White"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.RowSpan="2" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+    </Grid>
+</ContentPage>

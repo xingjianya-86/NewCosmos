@@ -1,0 +1,12 @@
+# 所有权状态字典（固定 ID）
+# 分类 ID=38，字典项 ID 范围: 38001-38099
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 38001, category: "OwnershipStatus", item_key: "SelfOwned", item_value: "自有", sort_order: 1, is_active: true }
+      - { id: 38002, category: "OwnershipStatus", item_key: "JointOwned", item_value: "共有", sort_order: 2, is_active: true }
+      - { id: 38003, category: "OwnershipStatus", item_key: "Rented", item_value: "租赁", sort_order: 3, is_active: true }
+      - { id: 38004, category: "OwnershipStatus", item_key: "Other", item_value: "其他", sort_order: 4, is_active: true }

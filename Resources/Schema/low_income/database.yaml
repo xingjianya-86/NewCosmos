@@ -1,0 +1,250 @@
+# 低收入家庭Schema定义
+database: 低收入家庭
+version: 2.0
+description: 低收入家庭数据管理 - 导入台账数据，用于救助资格审核
+
+tables:
+  # ── 低收入家庭表 ──
+  - name: nc_biz_low_income_families
+    comment: "[导入台账] 低收入家庭表 - 导入低收入家庭基本信息（户主/人数/收入/地址）"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: applicant_name
+        type: character varying(100)
+        nullable: false
+        comment: 户主姓名
+      - name: applicant_id_card
+        type: character varying(20)
+        nullable: false
+        comment: 户主身份证号
+      - name: family_size
+        type: integer
+        nullable: true
+        defaultValue: 1
+        comment: 家庭人数
+      - name: annual_income
+        type: numeric
+        nullable: true
+        defaultValue: 0
+        comment: 家庭年收入（元）
+      - name: phone
+        type: character varying(20)
+        nullable: true
+        comment: 联系电话
+      - name: address
+        type: character varying(255)
+        nullable: true
+        comment: 家庭地址
+      - name: township
+        type: character varying(100)
+        nullable: true
+        comment: 乡镇
+      - name: village
+        type: character varying(100)
+        nullable: true
+        comment: 村
+      - name: remark
+        type: character varying(255)
+        nullable: true
+        comment: 备注
+      - name: status
+        type: character varying(50)
+        nullable: true
+        defaultValue: 'Draft'
+        comment: 状态：Draft=草稿, Approved=已审批, Completed=已完成
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 更新时间
+      - name: imported_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 导入时间
+    indexes:
+      - name: idx_low_income_families_id_card
+        columns: [applicant_id_card]
+      - name: idx_low_income_families_status
+        columns: [status]
+
+  # ── 低收入人员表 ──
+  - name: nc_biz_low_income_persons
+    comment: "[导入台账] 低收入人员表 - 记录低收入家庭成员详细信息（健康/残疾/就业/就学）"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: family_id
+        type: bigint
+        nullable: false
+        comment: 关联家庭ID，关联nc_biz_low_income_families.id
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: character varying(20)
+        nullable: false
+        comment: 身份证号
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别
+      - name: birth_date
+        type: date
+        nullable: true
+        comment: 出生日期
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: character varying(50)
+        nullable: true
+        comment: 民族
+      - name: relationship
+        type: character varying(50)
+        nullable: true
+        comment: 与户主关系
+      - name: health_status
+        type: character varying(50)
+        nullable: true
+        comment: 健康状况
+      - name: disability_level
+        type: character varying(50)
+        nullable: true
+        comment: 残疾等级
+      - name: disability_type
+        type: character varying(50)
+        nullable: true
+        comment: 残疾类型
+      - name: work_capacity
+        type: character varying(50)
+        nullable: true
+        comment: 劳动能力
+      - name: education_level
+        type: character varying(50)
+        nullable: true
+        comment: 文化程度
+      - name: marital_status
+        type: character varying(50)
+        nullable: true
+        comment: 婚姻状况
+      - name: employment_status
+        type: character varying(50)
+        nullable: true
+        comment: 就业状况
+      - name: is_disabled
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否残疾
+      - name: disability_certificate
+        type: character varying(50)
+        nullable: true
+        comment: 残疾证号
+      - name: self_care_ability
+        type: character varying(50)
+        nullable: true
+        comment: 生活自理能力
+      - name: disease_type
+        type: character varying(100)
+        nullable: true
+        comment: 患病病种
+      - name: school_name
+        type: character varying(100)
+        nullable: true
+        comment: 在读学校名称
+      - name: school_nature
+        type: character varying(50)
+        nullable: true
+        comment: 在读学校性质
+      - name: enrollment_date
+        type: date
+        nullable: true
+        comment: 入学时间
+      - name: poverty_flag
+        type: boolean
+        nullable: true
+        defaultValue: false
+        comment: 是否建档立卡
+      - name: registration_type
+        type: character varying(50)
+        nullable: true
+        comment: 户籍性质
+      - name: admission_month
+        type: character varying(20)
+        nullable: true
+        comment: 最初享受月份
+      - name: community
+        type: character varying(100)
+        nullable: true
+        comment: 所属社区
+      - name: family_address
+        type: character varying(255)
+        nullable: true
+        comment: 家庭地址
+      - name: support_institution
+        type: character varying(100)
+        nullable: true
+        comment: 供养机构
+      - name: caregiver_name
+        type: character varying(100)
+        nullable: true
+        comment: 照料护理人姓名
+      - name: support_mode
+        type: character varying(50)
+        nullable: true
+        comment: 供养方式
+      - name: certificate_number
+        type: character varying(50)
+        nullable: true
+        comment: 低保（特困）证号
+      - name: protection_amount
+        type: numeric
+        nullable: true
+        comment: 分类施保金额（元）
+      - name: political_status
+        type: character varying(50)
+        nullable: true
+        comment: 政治面貌
+      - name: operator_town
+        type: character varying(100)
+        nullable: true
+        comment: 经办乡镇
+      - name: protection_category
+        type: character varying(50)
+        nullable: true
+        comment: 救助类别
+      - name: imported_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 更新时间
+    indexes:
+      - name: idx_low_income_persons_family_id
+        columns: [family_id]
+      - name: idx_low_income_persons_id_card
+        columns: [id_card]

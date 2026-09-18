@@ -1,0 +1,158 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.SocialAssistance.GracePeriodExpiringListPage"
+             x:DataType="GracePeriodExpiringListViewModel"
+             Title="渐退期到期处理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE898;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="渐退期到期处理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="渐退期已到期未处理的救助户请及时处理" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 统计栏 -->
+        <Grid Grid.Row="1" Padding="20,10" ColumnDefinitions="*,*,*,*" ColumnSpacing="12"
+              BackgroundColor="{StaticResource White}">
+            <components:StatCapsule Grid.Column="0" IsLight="True" Value="{Binding ExpiringCountText}" Caption="临期/已到期未处理（户）"/>
+            <components:StatCapsule Grid.Column="1" IsLight="True" Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
+            <Grid Grid.Column="2" Grid.ColumnSpan="2"/>
+        </Grid>
+
+        <!-- 顶部搜索栏 -->
+        <Border Grid.Row="2"
+                BackgroundColor="{StaticResource White}"
+                StrokeThickness="0"
+                Padding="24,16">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="4" Opacity="0.06"/>
+            </Border.Shadow>            <Border BackgroundColor="{StaticResource Gray100}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 24"
+                    Padding="16,8"
+                    HorizontalOptions="Fill">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <Label Text="&#xE721;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           TextColor="{StaticResource Gray500}"
+                           VerticalOptions="Center"
+                           Margin="0,0,8,0"/>
+                    <Entry Grid.Column="1"
+                           Placeholder="搜索申请人姓名、身份证号"
+                           Text="{Binding SearchText}"
+                           FontSize="16"
+                           BackgroundColor="Transparent"
+                           ReturnCommand="{Binding SearchCommand}"/>
+                    <Button Grid.Column="2"
+                            Text="搜索"
+                            Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding SearchCommand}"
+                            VerticalOptions="Center"
+                            Margin="8,0,0,0"/>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- 数据表格 -->
+        <Border Grid.Row="3"
+                Style="{StaticResource CardBorder}"
+                Padding="0"
+                Margin="24,16"
+                MinimumWidthRequest="900">
+
+            <Grid RowDefinitions="Auto, *, Auto">
+
+                <!-- 表头 -->
+                <Grid Grid.Row="0"
+                     Style="{StaticResource TableHeader}"
+                     Padding="16"
+                     ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, Auto">
+                    <Label Text="序号" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="1" Text="申请编号" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="2" Text="申请人" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="3" Text="身份证号" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="4" Text="渐退期" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="5" Text="过期天数" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="6" Text="原分类" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="7" Text="操作" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="Center"/>
+                </Grid>
+
+                <BoxView Grid.Row="0" Grid.ColumnSpan="8" HeightRequest="1"
+                         BackgroundColor="{StaticResource Gray300}" VerticalOptions="End"/>
+
+                <!-- 数据列表 -->
+                <CollectionView Grid.Row="1"
+                               ItemsSource="{Binding ExpiringItems}"
+                               SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无到期未处理的渐退期档案" Style="{StaticResource EmptyStateLabel}"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:GracePeriodExpiringItem">
+                            <Grid Padding="16"
+                                  Style="{StaticResource TableRowInteractive}"
+                                  ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, Auto">
+
+                                <Label Text="{Binding ApplicationId}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="{Binding ApplicantName}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="{Binding ApplicantIdCard}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="4"
+                                       Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}"
+                                       FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="5"
+                                       Text="{Binding ExpiredDays, StringFormat='{0} 天'}"
+                                       FontSize="15" VerticalOptions="Center"
+                                       TextColor="{StaticResource Danger}"/>
+                                <Label Grid.Column="6" Text="{Binding OriginalClassification}" FontSize="15" VerticalOptions="Center"/>
+
+                                <Button Grid.Column="7"
+                                        Text="重新核算"
+                                        Style="{StaticResource ButtonSmall}"
+                                        BackgroundColor="{StaticResource Primary}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type GracePeriodExpiringListViewModel}}, Path=ReReviewCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 分页控件 -->
+                <components:PaginationBarView Grid.Row="2" BackgroundColor="{StaticResource Gray50}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载数据..."/>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,110 @@
+# 照料人表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 照料人信息 - 记录特困供养人员的照料护理人，用于发放照料护理补贴
+
+tables:
+  - name: nc_biz_caregivers
+    comment: "[经济状况] 照料人表 - 记录特困人员的照料护理人信息，用于发放照料护理补贴"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: cared_member_id
+        type: BIGINT
+        nullable: true
+        comment: 被照料成员ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 照料人姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与被照料人关系
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: INTEGER
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: VARCHAR(20)
+        nullable: true
+        comment: 民族
+      - name: health_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 健康状况
+      - name: work_unit
+        type: VARCHAR(100)
+        nullable: true
+        comment: 工作单位
+      - name: position
+        type: VARCHAR(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 地址
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+      - name: marital_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: hukou_type
+        type: VARCHAR(20)
+        nullable: true
+        comment: 户籍类型
+      - name: education_level
+        type: VARCHAR(20)
+        nullable: true
+        comment: 教育程度
+      - name: political_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 政治面貌
+      - name: employment_status
+        type: TEXT
+        nullable: true
+        comment: 就业状况
+      - name: main_income_source
+        type: TEXT
+        nullable: true
+        comment: 主要收入来源
+    indexes:
+      - name: idx_caregivers_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_caregivers_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

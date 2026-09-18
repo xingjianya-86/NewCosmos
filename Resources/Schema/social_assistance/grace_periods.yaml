@@ -1,0 +1,79 @@
+# 渐退期记录表 Schema 定义
+# 渐退期从表：nc_biz_applications 6 个渐退期列迁移到独立表，一户一条有效记录
+database: cosmos_app
+version: 2.0
+description: 渐退期记录表 - 低保转低收入后按月递减发放，最多6个月过渡期
+
+tables:
+  - name: nc_biz_grace_periods
+    comment: "[流程] 渐退期记录表 - 低保转低收入后按月递减发放保障金，最多6个月过渡期"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: is_active
+        type: BOOLEAN
+        nullable: true
+        defaultValue: true
+        comment: 是否处于渐退期
+      - name: grace_period_months
+        type: INTEGER
+        nullable: true
+        comment: 渐退期月数
+      - name: start_date
+        type: DATE
+        nullable: true
+        comment: 渐退期开始日期
+      - name: end_date
+        type: DATE
+        nullable: true
+        comment: 渐退期结束日期
+      - name: original_classification
+        type: VARCHAR(50)
+        nullable: true
+        comment: 渐退前原分类结果
+      - name: original_guarantee_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        comment: 渐退前原保障金额
+      - name: started_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 渐退期触发时间
+      - name: ended_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 渐退期到期时间
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_grace_periods_application_id
+        columns: [application_id]
+      - name: idx_grace_periods_end_date
+        columns: [end_date]
+    foreignKeys:
+      - name: fk_grace_periods_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

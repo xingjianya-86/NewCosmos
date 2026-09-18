@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.StatCapsule">
+
+    <!-- 模块首页头部横幅内的统计胶囊（半透明白底，嵌于域色渐变上）。
+         用法：<components:StatCapsule Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
+         浅色变体（白底页面统计栏）：IsLight="True" → InfoSoft 底 + PrimaryDark 数值 -->
+    <Border x:Name="HostBorder" BackgroundColor="#26FFFFFF" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="14,10">
+        <VerticalStackLayout Spacing="2">
+            <Label x:Name="ValueLabel" Style="{StaticResource StatValueText}"/>
+            <Label x:Name="CaptionLabel" Style="{StaticResource StatLabelText}"/>
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

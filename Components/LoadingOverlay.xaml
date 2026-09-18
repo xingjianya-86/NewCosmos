@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NewCosmos.Components.LoadingOverlay"
+             x:Name="RootOverlay"
+             IsVisible="{Binding IsLoading, Source={x:Reference RootOverlay}}"
+             BackgroundColor="#80000000"
+             HorizontalOptions="Fill"
+             VerticalOptions="Fill"
+             InputTransparent="False"
+             ZIndex="999">
+
+    <Grid VerticalOptions="Center" HorizontalOptions="Center"
+          WidthRequest="280">
+
+        <!-- 现代风格卡片 -->
+        <Border Padding="32,24" StrokeShape="RoundRectangle 16" BackgroundColor="White">
+            <Border.Shadow>
+                <Shadow Brush="#40000000" Offset="0,4" Radius="16" Opacity="0.25"/>
+            </Border.Shadow>
+
+            <VerticalStackLayout Spacing="20" HorizontalOptions="Center">
+
+                <!-- 动画圆环 -->
+                <Grid WidthRequest="64" HeightRequest="64" HorizontalOptions="Center">
+                    <!-- 外圈 -->
+                    <Border WidthRequest="64" HeightRequest="64"
+                            StrokeShape="RoundRectangle 32"
+                            Stroke="{StaticResource Primary}"
+                            StrokeThickness="4"
+                            BackgroundColor="Transparent"/>
+
+                    <!-- 中心图标 -->
+                    <Label Text="&#xE80F;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="28"
+                           TextColor="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- 加载文字 -->
+                <Label x:Name="LoadingTextLabel"
+                       Text="{Binding LoadingText, Source={x:Reference RootOverlay}}"
+                       FontSize="16"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}"
+                       HorizontalOptions="Center"/>
+
+                <!-- 进度条（可选） -->
+                <Grid IsVisible="{Binding ShowProgress, Source={x:Reference RootOverlay}}" HeightRequest="6">
+                    <ProgressBar Progress="{Binding Progress, Source={x:Reference RootOverlay}}"
+                                 ProgressColor="{StaticResource Primary}"
+                                 HeightRequest="6"/>
+                </Grid>
+
+                <!-- 进度百分比（可选） -->
+                <Label IsVisible="{Binding ShowProgress, Source={x:Reference RootOverlay}}"
+                       FontSize="14"
+                       TextColor="{StaticResource Primary}"
+                       HorizontalOptions="Center">
+                    <Label.Text>
+                        <Binding Path="Progress, Source={x:Reference RootOverlay}" StringFormat="{}{0:P0}"/>
+                    </Label.Text>
+                </Label>
+
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentView>

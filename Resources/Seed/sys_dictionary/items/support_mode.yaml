@@ -1,0 +1,10 @@
+# 供养方式字典（固定 ID）
+# 分类 ID=3，字典项 ID 范围: 3001-3999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 3001, category: "SupportModes", item_key: "Centralized", item_value: "集中供养", sort_order: 1, is_active: true }
+      - { id: 3002, category: "SupportModes", item_key: "Scattered", item_value: "分散供养", sort_order: 2, is_active: true }

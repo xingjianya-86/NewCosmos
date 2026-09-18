@@ -1,0 +1,32 @@
+# 字段分组Schema定义
+database: 字段分组
+version: 2.0
+description: 表单字段分组配置 - 定义申请表单中各字段的分组显示
+
+tables:
+  # ── 字段分组表 ──
+  - name: nc_biz_field_groups
+    comment: "[配置] 字段分组表 - 定义申请表单字段的分组配置（分组代码/名称/排序）"
+    columns:
+      - name: group_code
+        type: character varying(50)
+        nullable: false
+        comment: 分组代码，唯一标识
+      - name: group_name
+        type: character varying(100)
+        nullable: false
+        comment: 分组名称
+      - name: sort_order
+        type: integer
+        nullable: false
+        defaultValue: 0
+        comment: 排序序号
+      - name: is_active
+        type: boolean
+        nullable: false
+        defaultValue: true
+        comment: 是否启用
+    indexes:
+      - name: idx_field_groups_code
+        columns: [group_code]
+        unique: true

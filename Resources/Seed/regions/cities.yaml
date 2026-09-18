@@ -1,0 +1,20 @@
+database: regions
+version: 1.0
+
+tables:
+  - name: nc_regions_cities
+    columns: [id, city_name, city_code, sort_order, is_active]
+    data:
+      - { id: 1,  city_name: "哈尔滨市",       city_code: "2301", sort_order: 1,  is_active: true }
+      - { id: 2,  city_name: "齐齐哈尔市",     city_code: "2302", sort_order: 2,  is_active: true }
+      - { id: 3,  city_name: "鸡西市",         city_code: "2303", sort_order: 3,  is_active: true }
+      - { id: 4,  city_name: "鹤岗市",         city_code: "2304", sort_order: 4,  is_active: true }
+      - { id: 5,  city_name: "双鸭山市",       city_code: "2305", sort_order: 5,  is_active: true }
+      - { id: 6,  city_name: "大庆市",         city_code: "2306", sort_order: 6,  is_active: true }
+      - { id: 7,  city_name: "伊春市",         city_code: "2307", sort_order: 7,  is_active: true }
+      - { id: 8,  city_name: "佳木斯市",       city_code: "2308", sort_order: 8,  is_active: true }
+      - { id: 9,  city_name: "七台河市",       city_code: "2309", sort_order: 9,  is_active: true }
+      - { id: 10, city_name: "牡丹江市",       city_code: "2310", sort_order: 10, is_active: true }
+      - { id: 11, city_name: "黑河市",         city_code: "2311", sort_order: 11, is_active: true }
+      - { id: 12, city_name: "绥化市",         city_code: "2312", sort_order: 12, is_active: true }
+      - { id: 13, city_name: "大兴安岭地区",   city_code: "2327", sort_order: 13, is_active: true }

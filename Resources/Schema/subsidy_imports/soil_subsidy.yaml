@@ -1,0 +1,69 @@
+# 农村地力补贴数据库Schema定义
+# 版本: 1.0
+# 说明: 地力补贴数据导入
+
+database: 地力补贴数据库
+version: 1.0
+description: 农村地力补贴数据管理
+
+tables:
+  - name: nc_biz_soil_subsidy
+    comment: 农村地力补贴数据表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 收款人姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址
+      - name: subsidy_amount
+        type: NUMERIC(18,2)
+        comment: 补贴金额
+      - name: account_number
+        type: VARCHAR(50)
+        comment: 银行账号
+      - name: bank_name
+        type: VARCHAR(100)
+        comment: 银行名称
+      - name: bank_branch
+        type: VARCHAR(100)
+        comment: 开户网点
+      - name: subsidy_type
+        type: VARCHAR(50)
+        comment: 补贴类型（社保卡/非社保卡）
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_soil_subsidy_card_year_type
+        type: UNIQUE
+        columns: [id_card, data_year, subsidy_type]
+    indexes:
+      - name: idx_soil_subsidy_id_card
+        columns: [id_card]
+      - name: idx_soil_subsidy_data_year
+        columns: [data_year]

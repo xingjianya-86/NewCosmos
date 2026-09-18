@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.NavigationViewItem"
+             x:Name="ThisView">
+    <Grid x:Name="RootGrid" Style="{StaticResource SidebarButton}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal"/>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="#1E3A5F"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="#2D4A6F"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Selected">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource SidebarItemSelected}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </VisualStateManager.VisualStateGroups>
+        <Grid.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding Source={x:Reference ThisView}, Path=TapCommand}" CommandParameter="{Binding Source={x:Reference ThisView}, Path=NavigationTarget}"/>
+        </Grid.GestureRecognizers>
+        <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+            <Label Text="{Binding Source={x:Reference ThisView}, Path=Icon}" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{Binding Source={x:Reference ThisView}, Path=IconColor}"/>
+            <Label Text="{Binding Source={x:Reference ThisView}, Path=Label}" FontSize="16" TextColor="{Binding Source={x:Reference ThisView}, Path=LabelColor}"/>
+        </HorizontalStackLayout>
+    </Grid>
+</ContentView>

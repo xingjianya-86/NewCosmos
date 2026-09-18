@@ -1,0 +1,59 @@
+# 刚性支出明细表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 家庭刚性支出明细（医疗/教育/残疾康复/生活） - 可在收入中扣减
+
+tables:
+  - name: nc_biz_rigid_expenditures
+    comment: "[经济状况] 刚性支出明细表 - 记录医疗/教育/残疾康复等必要支出，可在收入中扣减"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联成员ID
+      - name: expenditure_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 支出类型：医疗支出/教育支出/残疾康复支出/生活支出
+      - name: amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 支出金额（元）
+      - name: person_description
+        type: VARCHAR(200)
+        nullable: true
+        comment: 支出人员描述
+      - name: remark
+        type: TEXT
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_rigid_expenditures_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_rigid_expenditures_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

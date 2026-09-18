@@ -1,0 +1,623 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Main.MainPage"
+             x:DataType="MainViewModel"
+             NavigationPage.HasNavigationBar="False">
+
+    <ContentPage.Resources>
+        <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+
+        <!-- 侧边栏导航项（悬停/按下/选中态统一由样式承载） -->
+        <Style x:Key="SidebarNavItem" TargetType="Grid">
+            <Setter Property="HeightRequest" Value="44"/>
+            <Setter Property="BackgroundColor" Value="Transparent"/>
+            <Setter Property="VisualStateManager.VisualStateGroups">
+                <VisualStateGroupList>
+                    <VisualStateGroup x:Name="CommonStates">
+                        <VisualState x:Name="Normal"/>
+                        <VisualState x:Name="PointerOver">
+                            <VisualState.Setters>
+                                <Setter Property="BackgroundColor" Value="{StaticResource SidebarItemHover}"/>
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="Pressed">
+                            <VisualState.Setters>
+                                <Setter Property="BackgroundColor" Value="#334155"/>
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="Selected">
+                            <VisualState.Setters>
+                                <Setter Property="BackgroundColor" Value="{StaticResource SidebarItemSelected}"/>
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateGroupList>
+            </Setter>
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="64,Auto,*,32">
+
+        <!-- 顶部状态栏 -->
+        <Border Grid.Row="0" Style="{StaticResource TopBar}">
+            <Border.Shadow>
+                <Shadow Brush="#000000" Offset="0,2" Radius="4" Opacity="0.1"/>
+            </Border.Shadow>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20">
+                <!-- Logo 和标题 -->
+                <HorizontalStackLayout Grid.Column="0" Spacing="12">
+                    <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                        <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="现代化 · 专业 · 高效" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- 右侧操作区 -->
+                <HorizontalStackLayout Grid.Column="2" Spacing="20">
+                    <!-- 当前日期 -->
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Label Text="{Binding CurrentDateString}" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 用户信息 -->
+                    <Border StrokeShape="RoundRectangle 20" BackgroundColor="{StaticResource Gray100}" Padding="8,4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{Binding CurrentUserName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                    </Border>
+
+                    <!-- 设置按钮 -->
+                    <Button Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" WidthRequest="40" HeightRequest="40" CornerRadius="20"/>
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+
+        <!-- 警告横幅区（Schema + 渐退期到期提醒） -->
+        <VerticalStackLayout Grid.Row="1" Spacing="0">
+
+            <!-- Schema警告横幅 -->
+            <Border IsVisible="{Binding ShowSchemaWarning}"
+                    BackgroundColor="#FFF3CD"
+                    StrokeShape="RoundRectangle 0"
+                    Padding="16,10"
+                    Margin="10,5,10,5">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding SchemaWarningMessage}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
+                    <Label Grid.Column="2" Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                </Grid>
+            </Border>
+
+            <!-- 渐退期到期提醒横幅（点击跳转到渐退期到期处理页面） -->
+            <Border IsVisible="{Binding ShowGracePeriodWarning}"
+                    BackgroundColor="#FFF3CD"
+                    StrokeShape="RoundRectangle 0"
+                    Padding="16,10"
+                    Margin="10,5,10,5">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding NavigateToGracePeriodExpiringCommand}"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding GracePeriodExpiringBannerText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
+                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                </Grid>
+            </Border>
+
+            <!-- 普惠高龄待办提醒横幅（点击跳转到普惠高龄登记列表页） -->
+            <Border IsVisible="{Binding ShowElderlyReminder}"
+                    BackgroundColor="#FFF3CD"
+                    StrokeShape="RoundRectangle 0"
+                    Padding="16,10"
+                    Margin="10,5,10,5">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding ElderlyReminderText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
+                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                </Grid>
+            </Border>
+
+            <!-- 大学生毕业提醒横幅（点击跳转到大学生管理页面） -->
+            <Border IsVisible="{Binding ShowCollegeStudentReminder}"
+                    BackgroundColor="#FFF3CD"
+                    StrokeShape="RoundRectangle 0"
+                    Padding="16,10"
+                    Margin="10,5,10,5">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding NavigateToCollegeStudentCommand}"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding CollegeStudentReminderText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
+                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                </Grid>
+            </Border>
+
+        </VerticalStackLayout>
+
+        <!-- 主内容区 -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*">
+
+            <!-- 左侧导航栏（分组 + 全部真实跳转；唯一就地项为首页） -->
+            <Border Grid.Column="0" Style="{StaticResource Sidebar}" WidthRequest="200">
+                <ScrollView>
+                    <VerticalStackLayout Spacing="2" Padding="8,12">
+
+                        <!-- ── 工作台 ── -->
+                        <Label Text="工 作 台" Style="{StaticResource NavGroupHeader}"/>
+
+                        <Grid x:Name="NavHome" Style="{StaticResource SidebarNavItem}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Home"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="White"/>
+                                <Label Text="首页" FontSize="14" TextColor="White"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- ── 救助业务 ── -->
+                        <Label Text="救 助 业 务" Style="{StaticResource NavGroupHeader}"/>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessSocialAssistance}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="SocialAssistance"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE765;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="低收入人口救助帮扶" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessElderlyBenefit}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Elderly"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="高龄津贴发放" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessAssetVerification}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="AssetVerification"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="家庭经济状况核对" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- ── 核对 · 档案 ── -->
+                        <Label Text="核 对 · 档 案" Style="{StaticResource NavGroupHeader}"/>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessArchiveQuery}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Archive"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="救助档案管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessRecovery}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Recovery"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE8D1;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="后补追缴" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- ── 系统管理 ── -->
+                        <Label Text="系 统 管 理" Style="{StaticResource NavGroupHeader}"/>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessDatabaseManagement}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Database"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="数据中心" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessUserManagement}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="User"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="用户与权限管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessOrganizationManagement}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Organization"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="经办机构管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessTemplateManagement}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Settings"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE8B7;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="文书模板管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 彩票助手 -->
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessLottery}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Lottery"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="彩票助手" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 值班管理 -->
+                        <Grid Style="{StaticResource SidebarNavItem}" IsVisible="{Binding CanAccessDuty}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Duty"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE8C0;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="值班管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 分隔线 -->
+                        <BoxView HeightRequest="1" BackgroundColor="#334155" Margin="8,12"/>
+
+                        <!-- 退出登录 -->
+                        <Grid Style="{StaticResource SidebarNavItem}">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding LogoutCommand}"/>
+                            </Grid.GestureRecognizers>
+                            <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
+                                <Label Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource Error}"/>
+                                <Label Text="退出登录" FontSize="13" TextColor="{StaticResource Error}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Border>
+
+            <!-- 右侧工作区：仅仪表盘（统计概览 + 一域一卡直达入口） -->
+            <Grid Grid.Column="1" BackgroundColor="#F1F5F9">
+
+                <ScrollView>
+                    <VerticalStackLayout Padding="20" Spacing="20">
+
+                        <!-- 统计概览区 -->
+                        <Label Text="数据概览" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" Margin="0,0,0,8"/>
+
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+
+                            <!-- 本月总新增 -->
+                            <Border Grid.Column="0" Style="{StaticResource StatCard}" Background="{StaticResource StatCardBlueGradient}">
+                                <VerticalStackLayout Spacing="8">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="本月总新增" FontSize="16" TextColor="White" Opacity="0.9"/>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding MonthlyNewAdditions}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="统计周期内 新入保（户）" FontSize="14" TextColor="White" Opacity="0.8"/>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- 本月总退出 -->
+                            <Border Grid.Column="1" Style="{StaticResource StatCard}" Background="{StaticResource StatCardGreenGradient}">
+                                <VerticalStackLayout Spacing="8">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="本月总退出" FontSize="16" TextColor="White" Opacity="0.9"/>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding MonthlyExits}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="统计周期内 停保退出（户）" FontSize="14" TextColor="White" Opacity="0.8"/>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- 新申请经济核对 -->
+                            <Border Grid.Column="2" Style="{StaticResource StatCard}" Background="{StaticResource StatCardOrangeGradient}">
+                                <VerticalStackLayout Spacing="8">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="新申请经济核对" FontSize="16" TextColor="White" Opacity="0.9"/>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding NewAssetChecks}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="统计周期内 已申未出报告（件）" FontSize="14" TextColor="White" Opacity="0.8"/>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- 本月新增高龄老人 -->
+                            <Border Grid.Column="3" Style="{StaticResource StatCard}" Background="{StaticResource StatCardPurpleGradient}">
+                                <VerticalStackLayout Spacing="8">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="本月新增高龄老人" FontSize="16" TextColor="White" Opacity="0.9"/>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding MonthlyNewElderly}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="自然月受理登记（人）" FontSize="14" TextColor="White" Opacity="0.8"/>
+                                </VerticalStackLayout>
+                            </Border>
+
+                        </Grid>
+
+                        <!-- 业务模块直达区（一域一卡，细分功能在各模块首页内） -->
+                        <Label Text="业务模块" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" Margin="0,12,0,8"/>
+
+                        <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="16">
+
+                            <!-- 低收入人口救助帮扶 -->
+                            <Border Grid.Column="{Binding SocialAssistanceCol}" Grid.Row="{Binding SocialAssistanceRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessSocialAssistance}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE765;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="低收入人口救助帮扶" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="认定审核确认 · 动态管理" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="覆盖救助申请、保障对象动态管理、临时救助、月报表与渐退期到期处理" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="SocialAssistance"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 高龄津贴发放 -->
+                            <Border Grid.Column="{Binding ElderlyBenefitCol}" Grid.Row="{Binding ElderlyBenefitRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessElderlyBenefit}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F5F3FF" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleElderly}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="高龄津贴发放" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="申请登记 · 停发管理 · 类别复核" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="覆盖高龄津贴申请登记、停发办理、类别复核与月度报表" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Elderly"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 家庭经济状况核对 -->
+                            <Border Grid.Column="{Binding AssetVerificationCol}" Grid.Row="{Binding AssetVerificationRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessAssetVerification}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FFFBEB" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleAssetVerification}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="家庭经济状况核对" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="经济核对 · 报告审核" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="覆盖快速核对、报告上传月度审核与核对月报表" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="AssetVerification"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 救助档案管理 -->
+                            <Border Grid.Column="{Binding ArchiveQueryCol}" Grid.Row="{Binding ArchiveQueryRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessArchiveQuery}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="救助档案管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="历史档案检索查阅" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="现存低收入人口历史档案查询" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Archive"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 数据中心 -->
+                            <Border Grid.Column="{Binding DatabaseManagementCol}" Grid.Row="{Binding DatabaseManagementRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessDatabaseManagement}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F8FAFC" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="数据中心" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="备份恢复 · 数据导入导出" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="数据库管理、数据字典、标准配置、数据导入与区域数据维护" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Database"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 用户与权限管理 -->
+                            <Border Grid.Column="{Binding UserManagementCol}" Grid.Row="{Binding UserManagementRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessUserManagement}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FDF2F8" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleUser}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="用户与权限管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="账户 · 角色 · 权限配置" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="系统用户、角色权限与经办机构信息维护（经办机构亦可从左侧菜单进入）" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="User"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 彩票助手 -->
+                            <Border Grid.Column="{Binding LotteryCol}" Grid.Row="{Binding LotteryRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessLottery}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FFF7ED" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="#EA580C" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="彩票助手" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="机选 · 智能预测" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="双色球/大乐透历史数据、号码统计分析与智能预测" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Lottery"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 作者官网 -->
+                            <Border Grid.Column="{Binding Website1Col}" Grid.Row="{Binding Website1Row}" Style="{StaticResource ModuleCard}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="作者官网" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="软件更新 · 通告" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="用于软件更新以及通告" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="访问网站" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding OpenWebsite1Command}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 黑龙江民政官方网站 -->
+                            <Border Grid.Column="{Binding Website2Col}" Grid.Row="{Binding Website2Row}" Style="{StaticResource ModuleCard}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="黑龙江民政官网" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="黑龙江省民政厅" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="访问黑龙江省民政厅网上办事大厅" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="访问网站" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding OpenWebsite2Command}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 值班管理 -->
+                            <Border Grid.Column="{Binding DutyCol}" Grid.Row="{Binding DutyRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessDuty}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE8C0;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="值班管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="月度值班表 · 班务调整" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="值班表轮转生成、请假/串班/代班调整、节假日维护与政务值班表导出" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Duty"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 历史补打中心 -->
+                            <Border Grid.Column="{Binding ReprintCenterCol}" Grid.Row="{Binding ReprintCenterRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessReprint}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F0F9FF" StrokeShape="RoundRectangle 12">
+                                            <Label Text="&#xE749;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="历史补打中心" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="按人检索 · 批量补打" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="跨域按人检索低保/临时救助/普惠高龄/资产核查/动态管理档案，支持留痕原样补打与按月批量打印" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="ReprintCenter"/>
+                                </Grid>
+                            </Border>
+
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </ScrollView>
+
+            </Grid>
+
+        </Grid>
+
+        <!-- 底部状态栏 -->
+        <Border Grid.Row="3" Style="{StaticResource StatusBar}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20">
+                <HorizontalStackLayout Grid.Column="0" Spacing="16">
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="数据库:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Label Text="{Binding DatabaseStatusMessage}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <BoxView WidthRequest="1" HeightRequest="12" BackgroundColor="{StaticResource Gray300}"/>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="版本:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Label Text="{Binding AppVersion}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Button Text="检查更新" Style="{StaticResource ButtonOutline}" FontSize="12"
+                                HeightRequest="26" Padding="10,0" MinimumWidthRequest="0"
+                                VerticalOptions="Center" Margin="6,0,0,0"
+                                Command="{Binding CheckForUpdatesCommand}"/>
+                    </HorizontalStackLayout>
+                </HorizontalStackLayout>
+                <Label Grid.Column="2" Text="© 2026 帝皇权杖δ-me13 社会救助管理系统" FontSize="14" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</ContentPage>

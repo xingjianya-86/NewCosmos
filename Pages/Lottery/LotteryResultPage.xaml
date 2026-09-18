@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:local="clr-namespace:NewCosmos.Services.Lottery"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.Lottery"
+             x:Class="NewCosmos.Pages.Lottery.LotteryResultPage"
+             x:DataType="vm:LotteryResultViewModel"
+             Title="中奖结果"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <!-- 筛选胶囊容器：浅底 + 圆角描边，统一承载 Picker -->
+        <Style x:Key="FilterPickerBorder" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="{StaticResource CardOptionBackground}"/>
+            <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Setter Property="StrokeShape" Value="RoundRectangle 10"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="HeightRequest" Value="42"/>
+        </Style>
+        <Style x:Key="FilterPicker" TargetType="Picker">
+            <Setter Property="BackgroundColor" Value="Transparent"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="HorizontalOptions" Value="Fill"/>
+            <Setter Property="VerticalOptions" Value="Center"/>
+        </Style>
+        <Style x:Key="FilterPickerGlyph" TargetType="Label">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextColor" Value="{StaticResource Primary}"/>
+            <Setter Property="VerticalOptions" Value="Center"/>
+        </Style>
+        <Style x:Key="FilterPickerChevron" TargetType="Label">
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+            <Setter Property="Text" Value="&#xE70D;"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+            <Setter Property="VerticalOptions" Value="Center"/>
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 渐变头部 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE8D4;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="中奖结果" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="我的购彩记录 · 命中与奖金明细" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 汇总统计 -->
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                            <components:StatCapsule Grid.Row="0" Grid.Column="0" Value="{Binding TotalCountText}" Caption="累计注数"/>
+                            <components:StatCapsule Grid.Row="0" Grid.Column="1" Value="{Binding HitCountText}" Caption="已中奖"/>
+                            <components:StatCapsule Grid.Row="1" Grid.Column="0" Value="{Binding PrizeTotalText}" Caption="中奖金额"/>
+                            <components:StatCapsule Grid.Row="1" Grid.Column="1" Value="{Binding PendingCountText}" Caption="待开奖"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 筛选与操作 -->
+                <Border Style="{StaticResource CardBorder}" Margin="20,20,20,0" Padding="16">
+                    <VerticalStackLayout Spacing="14">
+
+                        <!-- 标题 -->
+                        <HorizontalStackLayout Spacing="10">
+                            <Border WidthRequest="32" HeightRequest="32" StrokeShape="RoundRectangle 16"
+                                    BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
+                                <Label Text="&#xE71C;" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                       TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Text="筛选条件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+
+                        <!-- 彩种 + 立即验证 -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Text="彩种" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            <Border Grid.Column="1" Style="{StaticResource FilterPickerBorder}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                    <Label Text="&#xE8D4;" Style="{StaticResource FilterPickerGlyph}"/>
+                                    <Picker Grid.Column="1" Style="{StaticResource FilterPicker}"
+                                            ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}"
+                                            ItemDisplayBinding="{Binding Name}"/>
+                                    <Label Grid.Column="2" Style="{StaticResource FilterPickerChevron}"/>
+                                </Grid>
+                            </Border>
+                            <Button Grid.Column="2" Text="立即验证" Command="{Binding VerifyNowCommand}"
+                                    HeightRequest="42" CornerRadius="10" Padding="16,0"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"/>
+                        </Grid>
+
+                        <!-- 状态 + 分页 -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                            <Border Grid.Column="0" Style="{StaticResource FilterPickerBorder}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                    <Label Text="&#xE9D5;" Style="{StaticResource FilterPickerGlyph}"/>
+                                    <Picker Grid.Column="1" Style="{StaticResource FilterPicker}"
+                                            ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilterOption}"
+                                            ItemDisplayBinding="{Binding Name}"/>
+                                    <Label Grid.Column="2" Style="{StaticResource FilterPickerChevron}"/>
+                                </Grid>
+                            </Border>
+                            <Button Grid.Column="1" Text="上一页" Command="{Binding GoPreviousPageCommand}"
+                                    WidthRequest="80" HeightRequest="42" CornerRadius="10"
+                                    IsEnabled="{Binding CanGoPreviousPage}"/>
+                            <Button Grid.Column="2" Text="下一页" Command="{Binding GoNextPageCommand}"
+                                    WidthRequest="80" HeightRequest="42" CornerRadius="10"
+                                    IsEnabled="{Binding CanGoNextPage}"/>
+                        </Grid>
+
+                        <Label Text="{Binding TotalCount, StringFormat='共 {0} 注'}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 购彩明细列表 -->
+                <VerticalStackLayout Margin="20,10,20,0" Spacing="8">
+                    <CollectionView ItemsSource="{Binding Records}" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:UserPurchaseRecord">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,8" Padding="14">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LotteryResultViewModel}}, Path=ViewRecordDetailCommand}"
+                                                              CommandParameter="{Binding .}"/>
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                                        <!-- 号码小球：命中开奖号码实心红/蓝，未命中浅底描边 -->
+                                        <HorizontalStackLayout BindableLayout.ItemsSource="{Binding NumberTokens}" Spacing="4">
+                                            <BindableLayout.ItemTemplate>
+                                                <DataTemplate x:DataType="local:LotteryNumberToken">
+                                                    <Border BackgroundColor="{Binding BackgroundColor}"
+                                                            Stroke="{Binding StrokeColor}" StrokeThickness="1"
+                                                            StrokeShape="RoundRectangle 12"
+                                                            WidthRequest="26" HeightRequest="26" Padding="0">
+                                                        <Label Text="{Binding Text}" TextColor="{Binding TextColor}"
+                                                               FontSize="12" FontAttributes="Bold"
+                                                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </BindableLayout.ItemTemplate>
+                                        </HorizontalStackLayout>
+                                        <Border Grid.Column="1" BackgroundColor="{Binding StatusBackgroundColor}" StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 8" Padding="10,3">
+                                            <Label Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}" FontSize="11" FontAttributes="Bold"/>
+                                        </Border>
+
+                                        <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="12">
+                                            <Label Text="{Binding Algorithm}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
+                                            <Label Text="{Binding PurchaseDate, StringFormat='{0:yyyy-MM-dd}'}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
+                                        </HorizontalStackLayout>
+
+                                        <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                            <Label Text="{Binding DrawNumber, StringFormat='期号 {0}'}" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
+                                            <Label Text="{Binding HitSummaryText}" Grid.Column="1" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
+                                            <Label Text="{Binding PrizeLevelText}" Grid.Column="2" TextColor="#B45309" FontSize="12" HorizontalOptions="End"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 空态 -->
+                    <Label Text="暂无购彩记录&#10;生成预测或机选后开奖即可自动验证"
+                           IsVisible="{Binding IsEmpty}"
+                           HorizontalTextAlignment="Center" TextColor="{StaticResource TextTertiary}"
+                           Margin="0,40,0,0" LineHeight="1.6"/>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.RowSpan="1" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+    </Grid>
+</ContentPage>

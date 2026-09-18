@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:NewCosmos.Controls"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyReportPage"
+             x:DataType="ElderlyReportViewModel"
+             Title="高龄津贴月报表"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（紫色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8EF;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="高龄津贴月报表" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="按月统计高龄津贴新增与停发数据" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="440,*" ColumnSpacing="0">
+
+            <!-- 左侧面板 -->
+            <ScrollView Grid.Column="0">
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <!-- 统计周期（自然月） -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="统计周期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
+                                <Picker Grid.Column="0" HeightRequest="40" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}"/>
+                                <Label Grid.Column="1" Text="年" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="2" HeightRequest="40" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}"/>
+                                <Label Grid.Column="3" Text="月" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </Grid>
+                            <Label Text="{Binding CycleRangeText}" FontSize="15" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding ReportTitleText}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <Button Text="刷新数据" Command="{Binding LoadRecordsCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="40"/>
+                            <Label Text="{Binding StatusText}" FontSize="15" TextColor="{StaticResource Primary}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 汇总卡片 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="新增" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
+                                    <Label Text="{Binding NewCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="停止" FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                                    <Label Text="{Binding StopCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- 明细表勾选 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                <Label Text="明细表" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Button Grid.Column="1" Text="全选" Command="{Binding SelectAllFormsCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="13"/>
+                                <Button Grid.Column="2" Text="清空" Command="{Binding ClearFormSelectionCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="13"/>
+                            </Grid>
+                            <Border BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4">
+                                <CollectionView ItemsSource="{Binding Forms}" SelectionMode="None">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="MonthlyFormOption">
+                                            <Grid ColumnDefinitions="Auto,*" Padding="4,2">
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalOptions="Center" Scale="0.9"/>
+                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="14" VerticalOptions="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Border>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Text="打印份数" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Entry Grid.Column="1" Text="{Binding Copies}" Keyboard="Numeric" WidthRequest="70" HeightRequest="34" HorizontalTextAlignment="Center"/>
+                            </Grid>
+                            <Button Text="预览选中明细表" Command="{Binding PreviewSelectedCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
+                            <Button Text="打印选中明细表（默认打印机）" Command="{Binding PrintSelectedCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <Button Text="导出选中明细表（源文件+PDF）" Command="{Binding ExportSelectedCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 右侧 PDF 预览 -->
+            <Grid Grid.Column="1" Margin="16,16,16,16">
+                <controls:PdfPreviewView PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                <Label Text="选择月份后勾选明细表并点击 预览 生成报表预览"
+                       Style="{StaticResource EmptyStateLabel}"
+                       IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}"/>
+            </Grid>
+
+        </Grid>
+
+        <!-- 加载蒙版 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2" IsLoading="{Binding IsBusy}" LoadingText="正在加载..."/>
+    </Grid>
+</ContentPage>

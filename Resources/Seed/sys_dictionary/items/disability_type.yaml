@@ -1,0 +1,15 @@
+# 残疾类型字典（固定 ID）
+# 分类 ID=24，字典项 ID 范围: 24001-24999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 24001, category: "DisabilityTypes", item_key: "Vision", item_value: "视力残疾", sort_order: 1, is_active: true }
+      - { id: 24002, category: "DisabilityTypes", item_key: "Hearing", item_value: "听力残疾", sort_order: 2, is_active: true }
+      - { id: 24003, category: "DisabilityTypes", item_key: "Speech", item_value: "言语残疾", sort_order: 3, is_active: true }
+      - { id: 24004, category: "DisabilityTypes", item_key: "Physical", item_value: "肢体残疾", sort_order: 4, is_active: true }
+      - { id: 24005, category: "DisabilityTypes", item_key: "Intellectual", item_value: "智力残疾", sort_order: 5, is_active: true }
+      - { id: 24006, category: "DisabilityTypes", item_key: "Mental", item_value: "精神残疾", sort_order: 6, is_active: true }
+      - { id: 24007, category: "DisabilityTypes", item_key: "Multiple", item_value: "多重残疾", sort_order: 7, is_active: true }

@@ -1,0 +1,78 @@
+# 金融资产表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 家庭金融资产信息 - 记录现金、存款、证券、商业保险等金融资产
+
+tables:
+  - name: nc_biz_financial_assets
+    comment: "[经济状况] 金融资产表 - 记录家庭金融资产（现金/存款/证券/商业保险），用于资产核查"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: has_cash
+        type: BOOLEAN
+        nullable: true
+        comment: 是否有现金
+      - name: cash_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 现金金额（元）
+      - name: has_bank_deposit
+        type: BOOLEAN
+        nullable: true
+        comment: 是否有银行存款
+      - name: bank_deposit_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 银行存款（元）
+      - name: has_securities
+        type: BOOLEAN
+        nullable: true
+        comment: 是否有有价证券
+      - name: securities_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 有价证券（元）
+      - name: has_commercial_insurance
+        type: BOOLEAN
+        nullable: true
+        comment: 是否有商业保险
+      - name: commercial_insurance_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 商业保险类型
+      - name: commercial_insurance_amount
+        type: NUMERIC(18,2)
+        nullable: true
+        defaultValue: '0'
+        comment: 商业保险金额（元）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_financial_assets_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_financial_assets_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

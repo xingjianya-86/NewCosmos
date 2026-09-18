@@ -1,0 +1,799 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 字体大小 -->
+    <x:Double x:Key="FontSizeSmall">14</x:Double>
+    <x:Double x:Key="FontSizeBody">16</x:Double>
+    <x:Double x:Key="FontSizeSubtitle">18</x:Double>
+    <x:Double x:Key="FontSizeTitle">20</x:Double>
+    <x:Double x:Key="FontSizeHeading">26</x:Double>
+    <x:Double x:Key="FontSizeDisplay">34</x:Double>
+    
+    <!-- 间距 -->
+    <x:Double x:Key="SpacingTiny">4</x:Double>
+    <x:Double x:Key="SpacingSmall">8</x:Double>
+    <x:Double x:Key="SpacingMedium">16</x:Double>
+    <x:Double x:Key="SpacingLarge">24</x:Double>
+    <x:Double x:Key="SpacingXLarge">32</x:Double>
+    
+    <!-- 圆角 -->
+    <x:Double x:Key="CornerRadiusSmall">4</x:Double>
+    <x:Double x:Key="CornerRadiusMedium">8</x:Double>
+    <x:Double x:Key="CornerRadiusLarge">12</x:Double>
+    <x:Double x:Key="CornerRadiusXLarge">16</x:Double>
+
+    <!-- 圆角形状（Border.StrokeShape 资源；Frame 已于 .NET 9 废弃，样式统一迁移到 Border） -->
+    <RoundRectangle x:Key="ShapeSmall" CornerRadius="{StaticResource CornerRadiusSmall}"/>
+    <RoundRectangle x:Key="ShapeMedium" CornerRadius="{StaticResource CornerRadiusMedium}"/>
+    <RoundRectangle x:Key="ShapeLarge" CornerRadius="{StaticResource CornerRadiusLarge}"/>
+    <RoundRectangle x:Key="ShapeXLarge" CornerRadius="{StaticResource CornerRadiusXLarge}"/>
+    <RoundRectangle x:Key="ShapeBadge" CornerRadius="12"/>
+    <RoundRectangle x:Key="ShapeFormField" CornerRadius="8"/>
+
+    <!-- 基础标签样式 -->
+    <Style TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+    </Style>
+
+    <!-- 标题样式 -->
+    <Style x:Key="LabelDisplay" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeDisplay}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="LabelHeading" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeHeading}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="LabelTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="LabelSubtitle" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSubtitle}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+    </Style>
+
+    <Style x:Key="LabelSmall" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+    </Style>
+
+    <!-- 输入框样式 -->
+    <Style TargetType="Entry">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="HeightRequest" Value="48"/>
+    </Style>
+
+    <Style x:Key="EntryBordered" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="Stroke" Value="{StaticResource Gray300}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
+    </Style>
+
+    <!-- 按钮样式（设计系统 v2：全部带 PointerOver/Pressed/Disabled 视觉状态） -->
+    <Style TargetType="Button">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+    </Style>
+
+    <Style x:Key="ButtonPrimary" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryHover}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryPressed}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource DisabledBackground}"/>
+                            <Setter Property="TextColor" Value="{StaticResource DisabledText}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ButtonSecondary" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Secondary}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Secondary}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource SecondaryHover}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource DisabledBackground}"/>
+                            <Setter Property="TextColor" Value="{StaticResource DisabledText}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ButtonOutline" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="{StaticResource Primary}"/>
+        <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
+        <Setter Property="BorderWidth" Value="1"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource PrimarySoft}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="TextColor" Value="{StaticResource DisabledText}"/>
+                            <Setter Property="BorderColor" Value="{StaticResource DisabledBackground}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ButtonDanger" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource DangerHover}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource DisabledBackground}"/>
+                            <Setter Property="TextColor" Value="{StaticResource DisabledText}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ButtonSuccess" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Success}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Success}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource SecondaryHover}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource DisabledBackground}"/>
+                            <Setter Property="TextColor" Value="{StaticResource DisabledText}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="WarningButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource Warning}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Padding" Value="16,0"/>
+    </Style>
+
+    <Style x:Key="ButtonSmall" TargetType="Button">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="HeightRequest" Value="36"/>
+        <Setter Property="Padding" Value="12,0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusSmall}"/>
+    </Style>
+
+    <!-- 卡片样式 -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeLarge}"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.08"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardElevated" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeXLarge}"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingLarge}"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.12"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardHoverable" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeLarge}"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
+    </Style>
+
+    <!-- 分隔线 -->
+    <Style x:Key="Divider" TargetType="BoxView">
+        <Setter Property="HeightRequest" Value="1"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray200}"/>
+        <Setter Property="Margin" Value="0,8"/>
+    </Style>
+
+    <!-- 搜索框 -->
+    <Style x:Key="SearchBar" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeXLarge}"/>
+        <Setter Property="Padding" Value="16,8"/>
+    </Style>
+
+    <!-- 徽章样式 -->
+    <Style x:Key="Badge" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeBadge}"/>
+        <Setter Property="Padding" Value="12,4"/>
+    </Style>
+
+    <Style x:Key="BadgeSuccess" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Success}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeBadge}"/>
+        <Setter Property="Padding" Value="12,4"/>
+    </Style>
+
+    <Style x:Key="BadgeWarning" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Warning}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeBadge}"/>
+        <Setter Property="Padding" Value="12,4"/>
+    </Style>
+
+    <Style x:Key="BadgeError" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeBadge}"/>
+        <Setter Property="Padding" Value="12,4"/>
+    </Style>
+
+    <!-- 表格样式 -->
+    <Style x:Key="TableHeader" TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+    </Style>
+
+    <Style x:Key="TableRow" TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+    </Style>
+
+    <Style x:Key="TableRowAlternate" TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+    </Style>
+
+    <!-- 侧边栏导航按钮样式 -->
+    <Style x:Key="SidebarButton" TargetType="Grid">
+        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+    </Style>
+
+    <Style x:Key="SidebarButtonSelected" TargetType="Grid">
+        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource SidebarItemSelected}"/>
+    </Style>
+
+    <!-- 统计卡片样式 -->
+    <Style x:Key="StatCard" TargetType="Border">
+        <Setter Property="Padding" Value="20"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+    </Style>
+
+    <!-- 功能模块卡片样式 -->
+    <Style x:Key="ModuleCard" TargetType="Border">
+        <Setter Property="Padding" Value="20"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+    </Style>
+
+    <!-- 顶部状态栏样式 -->
+    <Style x:Key="TopBar" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource TopBarBackground}"/>
+        <Setter Property="Padding" Value="20,12"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+    </Style>
+
+    <!-- 底部状态栏样式 -->
+    <Style x:Key="StatusBar" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource StatusBarBackground}"/>
+        <Setter Property="Padding" Value="20,8"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+    </Style>
+
+    <!-- 侧边栏样式 -->
+    <Style x:Key="Sidebar" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+    </Style>
+
+    <!-- 功能按钮组样式 -->
+    <Style x:Key="FunctionButton" TargetType="Button">
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="FunctionButtonPrimary" TargetType="Button" BasedOn="{StaticResource FunctionButton}">
+        <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+    </Style>
+
+    <Style x:Key="FunctionButtonOutline" TargetType="Button" BasedOn="{StaticResource FunctionButton}">
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="{StaticResource Primary}"/>
+        <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
+        <Setter Property="BorderWidth" Value="1"/>
+    </Style>
+
+    <!-- Tab 切换按钮 -->
+    <Style x:Key="ButtonTab" TargetType="Button">
+        <Setter Property="HeightRequest" Value="40"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="BorderWidth" Value="1"/>
+        <Setter Property="BorderColor" Value="Transparent"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                            <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+                            <Setter Property="BorderColor" Value="Transparent"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+                            <Setter Property="TextColor" Value="{StaticResource White}"/>
+                            <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
+                            <Setter Property="Opacity" Value="1"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="#F0F4FF"/>
+                            <Setter Property="TextColor" Value="{StaticResource Primary}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- 表单字段样式 -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+
+    <!-- 表单字段样式 - 默认状态 -->
+    <Style x:Key="FormFieldDefaultStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
+        <Setter Property="Stroke" Value="{StaticResource Gray300}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HeightRequest" Value="44"/>
+    </Style>
+
+    <!-- 表单字段样式 - 获得焦点 -->
+    <Style x:Key="FormFieldFocusedStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
+        <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HeightRequest" Value="44"/>
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="Black" Offset="0,1" Radius="4" Opacity="0.08"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 表单字段样式 - 验证失败 -->
+    <Style x:Key="FormFieldErrorStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource ErrorLight}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
+        <Setter Property="Stroke" Value="{StaticResource Error}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HeightRequest" Value="44"/>
+    </Style>
+
+    <!-- 表单字段样式 - 验证成功 -->
+    <Style x:Key="FormFieldSuccessStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessLight}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
+        <Setter Property="Stroke" Value="{StaticResource Success}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HeightRequest" Value="44"/>
+    </Style>
+
+    <!-- 表单标签样式 -->
+    <Style x:Key="FormFieldLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+        <Setter Property="HorizontalOptions" Value="Start"/>
+    </Style>
+
+    <!-- 表单输入框样式 -->
+    <Style x:Key="FormFieldEntryStyle" TargetType="Entry">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <!-- 表单选择器样式 -->
+    <Style x:Key="FormFieldPickerStyle" TargetType="Picker">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- 设计系统 v2 追加：现代化共享样式（页面波次逐步采用）        -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+
+    <!-- 输入控件统一排版（隐式：全局生效） -->
+    <Style TargetType="Picker">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="TitleColor" Value="{StaticResource Gray500}"/>
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+    </Style>
+
+    <Style TargetType="Editor">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+    </Style>
+
+    <Style TargetType="DatePicker">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+    </Style>
+
+    <!-- 现代卡片（Border 版，替代废弃的 Frame；页面迁移时用这些） -->
+    <Style x:Key="CardBorder" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
+    </Style>
+
+    <Style x:Key="CardBorderElevated" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="Padding" Value="{StaticResource SpacingLarge}"/>
+        <Setter Property="Shadow">
+            <Shadow Brush="{StaticResource Black}" Opacity="0.08" Radius="16" Offset="0,2"/>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardBorderInteractive" TargetType="Border" BasedOn="{StaticResource CardBorder}">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+                            <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                            <Setter Property="Stroke" Value="{StaticResource FocusRing}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- 柔和徽章（浅底深字，现代状态标签；Border 版） -->
+    <Style x:Key="ChipBase" TargetType="Border">
+        <Setter Property="StrokeThickness" Value="0"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 999"/>
+        <Setter Property="Padding" Value="10,3"/>
+        <Setter Property="HorizontalOptions" Value="Start"/>
+    </Style>
+
+    <Style x:Key="ChipSuccess" TargetType="Border" BasedOn="{StaticResource ChipBase}">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
+    </Style>
+    <Style x:Key="ChipWarning" TargetType="Border" BasedOn="{StaticResource ChipBase}">
+        <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
+    </Style>
+    <Style x:Key="ChipDanger" TargetType="Border" BasedOn="{StaticResource ChipBase}">
+        <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
+    </Style>
+    <Style x:Key="ChipInfo" TargetType="Border" BasedOn="{StaticResource ChipBase}">
+        <Setter Property="BackgroundColor" Value="{StaticResource InfoSoft}"/>
+    </Style>
+    <Style x:Key="ChipNeutral" TargetType="Border" BasedOn="{StaticResource ChipBase}">
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+    </Style>
+
+    <Style x:Key="ChipSuccessText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+    </Style>
+    <Style x:Key="ChipWarningText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+    </Style>
+    <Style x:Key="ChipDangerText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource Error}"/>
+    </Style>
+    <Style x:Key="ChipInfoText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource PrimaryDark}"/>
+    </Style>
+    <Style x:Key="ChipNeutralText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+    </Style>
+
+    <!-- 表格行（交互态悬停高亮） -->
+    <Style x:Key="TableRowInteractive" TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TableHeaderLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <!-- 页头与区块标题 -->
+    <Style x:Key="PageTitleLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SectionTitleLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeSubtitle}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <!-- 空状态 -->
+    <Style x:Key="EmptyStateLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+        <Setter Property="HorizontalOptions" Value="Center"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+        <Setter Property="Margin" Value="0,32"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- 模块首页共享样式（三大业务域 Home 页同构模板）               -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+
+    <!-- 侧边栏分组标题 -->
+    <Style x:Key="NavGroupHeader" TargetType="Label">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="#64748B"/>
+        <Setter Property="CharacterSpacing" Value="2"/>
+        <Setter Property="Margin" Value="16,14,0,4"/>
+    </Style>
+
+    <!-- 模块首页头部横幅（域色渐变背景由使用处指定 Background） -->
+    <Style x:Key="ModuleHeroHeader" TargetType="Border">
+        <Setter Property="StrokeThickness" Value="0"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 16"/>
+        <Setter Property="Padding" Value="24,20"/>
+        <Setter Property="Margin" Value="20,20,20,0"/>
+    </Style>
+
+    <!-- 头部横幅内标题文字（白色粗体） -->
+    <Style x:Key="ModuleHeroTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+    </Style>
+
+    <!-- 头部横幅内描述文字（白色半透明） -->
+    <Style x:Key="ModuleHeroSubtitle" TargetType="Label">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="TextColor" Value="#E6FFFFFF"/>
+    </Style>
+
+    <!-- 统计卡数值（白色大号粗体） -->
+    <Style x:Key="StatValueText" TargetType="Label">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+    </Style>
+
+    <!-- 统计卡标签（白色小字） -->
+    <Style x:Key="StatLabelText" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="#CCFFFFFF"/>
+    </Style>
+
+    <!-- 子功能卡片（白底圆角 + 悬停描边高亮；点击区域由 TapGesture 在使用处附加） -->
+    <Style x:Key="FeatureCard" TargetType="Border" BasedOn="{StaticResource CardBorder}">
+        <Setter Property="Padding" Value="18,16"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+                            <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                            <Setter Property="Stroke" Value="{StaticResource FocusRing}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- 子功能卡名称 -->
+    <Style x:Key="FeatureCardTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+    </Style>
+
+    <!-- 子功能卡说明 -->
+    <Style x:Key="FeatureCardDesc" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+        <Setter Property="LineBreakMode" Value="WordWrap"/>
+    </Style>
+
+</ResourceDictionary>

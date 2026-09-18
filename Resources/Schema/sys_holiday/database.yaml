@@ -1,0 +1,50 @@
+# 系统节假日数据库 Schema 定义
+# 法定节假日与调休补班日的权威数据源，支撑值班表与业务时间轴的日期类型判定
+database: 系统节假日数据库
+version: 1.0
+description: 系统节假日数据库 - 存储法定节假日（放假日）与调休补班日，支持 API 自动下载更新与手工维护兜底
+
+tables:
+  # ── 节假日表 ──
+  - name: nc_sys_holidays
+    comment: "[系统] 节假日表 - 法定节假日（放假日）与调休补班日，随国务院年度安排通过 API 或手工更新"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: holiday_date
+        type: date
+        nullable: false
+        comment: 日期（唯一）
+      - name: date_type
+        type: character varying(20)
+        nullable: false
+        defaultValue: "'HOLIDAY'"
+        comment: 日期类型：HOLIDAY=法定放假日、MAKEUP=调休补班日
+      - name: name
+        type: character varying(50)
+        nullable: true
+        defaultValue: "''"
+        comment: 节日名称，如元旦、春节、国庆节后补班
+      - name: year
+        type: integer
+        nullable: true
+        comment: 所属年份（冗余列，便于按年查询与批量更新）
+      - name: source
+        type: character varying(20)
+        nullable: true
+        defaultValue: "'MANUAL'"
+        comment: 数据来源：API=接口下载、MANUAL=手工维护、SEED=内置种子
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: NOW()
+        comment: 最后更新时间
+    indexes:
+      - name: idx_sys_holidays_date
+        columns: [holiday_date]
+        unique: true
+      - name: idx_sys_holidays_year
+        columns: [year]

@@ -1,0 +1,72 @@
+# 房产表 Schema 定义
+database: cosmos_app
+version: 2.0
+description: 家庭房产信息 - 记录家庭成员拥有的房产，用于资产核查
+
+tables:
+  - name: nc_biz_properties
+    comment: "[经济状况] 房产表 - 记录家庭成员拥有的房产信息（类型/面积/估值），用于资产核查"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: member_id
+        type: BIGINT
+        nullable: true
+        comment: 关联家庭成员ID
+      - name: property_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 房产类型：农村自建房/商品房/经济适用房等
+      - name: address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 房产地址
+      - name: housing_structure
+        type: VARCHAR(50)
+        nullable: true
+        comment: 房屋结构：砖混/砖木/钢筋混凝土等
+      - name: housing_nature
+        type: VARCHAR(50)
+        nullable: true
+        comment: 房屋性质：自有/租赁等
+      - name: area
+        type: NUMERIC
+        nullable: true
+        comment: 住房面积（平方米）
+      - name: room_count
+        type: INTEGER
+        nullable: true
+        comment: 房间数
+      - name: build_year
+        type: INTEGER
+        nullable: true
+        comment: 建造年份
+      - name: estimated_value
+        type: NUMERIC
+        nullable: true
+        comment: 估计价值（元）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_properties_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_properties_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

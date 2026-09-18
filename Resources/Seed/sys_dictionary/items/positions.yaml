@@ -1,0 +1,12 @@
+# 职位职务字典（固定 ID）
+# 分类 ID=90，字典项 ID 范围: 90001-90999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 90001, category: "Positions", item_key: "民政助理", item_value: "民政助理", sort_order: 1, is_active: true }
+      - { id: 90002, category: "Positions", item_key: "民政职员", item_value: "民政职员", sort_order: 2, is_active: true }
+      - { id: 90003, category: "Positions", item_key: "主管领导", item_value: "主管领导", sort_order: 3, is_active: true }
+      - { id: 90004, category: "Positions", item_key: "主要领导", item_value: "主要领导", sort_order: 4, is_active: true }

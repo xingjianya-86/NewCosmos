@@ -1,0 +1,207 @@
+# 家庭经济状况扩展表 Schema 定义
+# 来源：backup/cosmos_backup_20260618_073641.sql（pg_dump 权威 DDL）
+database: 家庭经济状况扩展
+version: 1.0
+description: 家庭经济状况补充表：赡养费收入、土地收入、补贴收入、就业成本、林地
+
+tables:
+  # ── 赡养费收入表 ──
+  - name: nc_biz_alimony_incomes
+    comment: 赡养费收入表，记录子女赡养费收入
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: supporter_id
+        type: bigint
+        nullable: true
+        comment: 关联赡养人ID，关联nc_biz_supporters.id
+      - name: annual_amount
+        type: numeric
+        nullable: true
+        comment: 年赡养费
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_biz_alimony_incomes_application_id
+        columns: [application_id]
+
+  # ── 土地收入表 ──
+  - name: nc_biz_land_incomes
+    comment: 土地收入表，记录土地流转、租赁等收入
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: land_usage
+        type: character varying(50)
+        nullable: true
+        comment: 土地用途
+      - name: area
+        type: numeric
+        nullable: true
+        comment: 面积
+      - name: price
+        type: numeric
+        nullable: true
+        comment: 单价
+      - name: subtotal
+        type: numeric
+        nullable: true
+        comment: 小计
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_biz_land_incomes_application_id
+        columns: [application_id]
+
+  # ── 补贴收入表 ──
+  - name: nc_biz_subsidy_incomes
+    comment: 补贴收入表，记录农业补贴等政策性补贴收入
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID，关联nc_biz_family_members.id
+      - name: subsidy_type
+        type: character varying(50)
+        nullable: true
+        comment: 补贴类型
+      - name: area
+        type: numeric
+        nullable: true
+        comment: 面积
+      - name: unit_price
+        type: numeric
+        nullable: true
+        comment: 单价
+      - name: amount
+        type: numeric
+        nullable: true
+        comment: 金额
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_biz_subsidy_incomes_application_id
+        columns: [application_id]
+
+  # ── 就业成本表 ──
+  - name: nc_biz_employment_costs
+    comment: 就业成本表，记录外出务工的交通、住宿等成本
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 关联家庭成员ID，关联nc_biz_family_members.id
+      - name: cost_type
+        type: character varying(50)
+        nullable: true
+        comment: 成本类型：交通/住宿/培训
+      - name: annual_amount
+        type: numeric
+        nullable: true
+        comment: 年金额
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_biz_employment_costs_application_id
+        columns: [application_id]
+
+  # ── 林地表 ──
+  - name: nc_biz_forest_lands
+    comment: 林地表，记录家庭拥有的林地信息
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: tree_species
+        type: character varying(100)
+        nullable: true
+        comment: 树木品种
+      - name: area
+        type: numeric
+        nullable: true
+        comment: 面积
+      - name: growth_cycle
+        type: character varying(50)
+        nullable: true
+        comment: 成材周期
+      - name: is_mature
+        type: boolean
+        nullable: true
+        comment: 是否成材林
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_biz_forest_lands_application_id
+        columns: [application_id]

@@ -1,0 +1,73 @@
+# 字典分类索引（固定 ID）
+# 定义系统中所有字典分类
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_categories
+    data:
+      # 基础分类 (ID: 1-9)
+      - { id: 1, category: "ClassificationCodes", display_name: "保障分类代码", description: "社会救助保障分类代码", sort_order: 1, is_active: true }
+      - { id: 2, category: "HukouTypes", display_name: "户籍类型", description: "城乡户籍类型", sort_order: 2, is_active: true }
+      - { id: 3, category: "SupportModes", display_name: "供养方式", description: "特困供养方式", sort_order: 3, is_active: true }
+      
+      # 家庭与人口 (ID: 10-19)
+      - { id: 10, category: "FamilyRelationships", display_name: "家庭关系", description: "家庭成员与户主关系", sort_order: 10, is_active: true }
+      - { id: 11, category: "Gender", display_name: "性别", description: "性别", sort_order: 11, is_active: true }
+      - { id: 12, category: "Ethnicities", display_name: "民族", description: "民族", sort_order: 12, is_active: true }
+      - { id: 13, category: "MaritalStatuses", display_name: "婚姻状况", description: "婚姻状况", sort_order: 13, is_active: true }
+      - { id: 14, category: "EducationLevels", display_name: "学历", description: "文化程度", sort_order: 14, is_active: true }
+      - { id: 15, category: "PoliticalStatuses", display_name: "政治面貌", description: "政治面貌", sort_order: 15, is_active: true }
+      
+      # 健康与能力 (ID: 20-29)
+      - { id: 20, category: "HealthStatuses", display_name: "健康状况", description: "健康状况", sort_order: 20, is_active: true }
+      - { id: 21, category: "LaborAbilities", display_name: "劳动能力", description: "劳动能力状态", sort_order: 21, is_active: true }
+      - { id: 22, category: "SelfCareAbilities", display_name: "自理能力", description: "生活自理能力", sort_order: 22, is_active: true }
+      - { id: 23, category: "DisabilityLevels", display_name: "残疾等级", description: "残疾等级", sort_order: 23, is_active: true }
+      - { id: 24, category: "DisabilityTypes", display_name: "残疾类型", description: "残疾类型", sort_order: 24, is_active: true }
+      
+      # 就业与收入 (ID: 30-39)
+      - { id: 30, category: "EmploymentStatuses", display_name: "就业状况", description: "就业状况", sort_order: 30, is_active: true }
+      - { id: 31, category: "IncomeSources", display_name: "收入来源", description: "收入来源类型", sort_order: 31, is_active: true }
+      
+      # 收入与资产扩展 (ID: 32-38)
+      # 依据：《中华人民共和国社会救助法》第40-41条、《刚性支出困难家庭认定办法》、国办发〔2023〕39号
+      - { id: 32, category: "IncomeTypes", display_name: "收入类别", description: "收入类别代码（工资/经营/财产/转移/赡养/其他）", sort_order: 32, is_active: true }
+      - { id: 33, category: "AssetTypes", display_name: "资产类别", description: "家庭资产类别（房产/车辆/存款/证券/保险）", sort_order: 33, is_active: true }
+      - { id: 34, category: "AssetExemptionTypes", display_name: "财产豁免类型", description: "财产认定豁免类型（疾病治疗车辆/康复车辆/谋生工具/救助存款）", sort_order: 34, is_active: true }
+      - { id: 35, category: "AssistanceCategories", display_name: "救助类别", description: "三大救助类别（基本生活/专项社会/急难社会）", sort_order: 35, is_active: true }
+      - { id: 36, category: "AssistanceTypes", display_name: "救助类型", description: "具体救助类型（特困供养/低保/医疗/教育/住房/就业/临时救助）", sort_order: 36, is_active: true }
+      - { id: 37, category: "LowIncomePopulationTypes", display_name: "低收入人口类型", description: "六类低收入人口分类（国办发〔2023〕39号）", sort_order: 37, is_active: true }
+      - { id: 38, category: "OwnershipStatus", display_name: "所有权状态", description: "资产所有权状态（自有/共有/租赁/其他）", sort_order: 38, is_active: true }
+      
+      # 疾病相关 (ID: 40-49)
+      - { id: 40, category: "DiseaseCategories", display_name: "疾病类别", description: "疾病分类", sort_order: 40, is_active: true }
+      
+      # 土地相关 (ID: 50-59)
+      - { id: 50, category: "LandUsage", display_name: "土地用途", description: "土地使用方式", sort_order: 50, is_active: true }
+      - { id: 51, category: "LandManagementTypes", display_name: "土地经营类型", description: "土地经营类型", sort_order: 51, is_active: true }
+      
+      # 支出与补贴 (ID: 60-69)
+      - { id: 60, category: "RigidExpenditureTypes", display_name: "刚性支出类型", description: "刚性支出分类", sort_order: 60, is_active: true }
+      - { id: 61, category: "SubsidyTypes", display_name: "补贴类型", description: "农业补贴类型", sort_order: 61, is_active: true }
+      
+      # 业务相关 (ID: 70-79)
+      - { id: 70, category: "ApplicationReasons", display_name: "申请原因", description: "救助申请原因", sort_order: 70, is_active: true }
+      - { id: 71, category: "ApplicationReasonTemplates", display_name: "申请原因模板", description: "申请原因预设话术", sort_order: 71, is_active: true }
+      - { id: 72, category: "DeregisterReasons", display_name: "注销原因", description: "停保注销原因", sort_order: 72, is_active: true }
+      - { id: 73, category: "ChangeReasons", display_name: "变更理由", description: "变更业务理由", sort_order: 73, is_active: true }
+      - { id: 74, category: "ArchiveStatuses", display_name: "档案状态", description: "档案状态", sort_order: 74, is_active: true }
+      - { id: 75, category: "ArchiveReasons", display_name: "归档原因", description: "归档原因", sort_order: 75, is_active: true }
+      
+      # 权限与角色 (ID: 80-89)
+      - { id: 80, category: "Permissions", display_name: "权限定义", description: "系统权限定义", sort_order: 80, is_active: true }
+      - { id: 81, category: "Roles", display_name: "角色定义", description: "系统角色定义", sort_order: 81, is_active: true }
+      
+      # 其他 (ID: 90-99)
+      - { id: 90, category: "Positions", display_name: "职位职务", description: "职位/职务", sort_order: 90, is_active: true }
+      - { id: 91, category: "InstitutionCategory", display_name: "机构类别", description: "组织机构类别分类", sort_order: 91, is_active: true }
+      - { id: 92, category: "InstitutionType", display_name: "机构类型", description: "组织机构具体类型", sort_order: 92, is_active: true }
+      - { id: 93, category: "IdTypes", display_name: "证件类型", description: "身份证件类型", sort_order: 93, is_active: true }
+
+      # 一事一议 (ID: 94)
+      - { id: 94, category: "SpecialApprovalTemplates", display_name: "一事一议预案模板", description: "一事一议申报情况说明预设话术", sort_order: 94, is_active: true }

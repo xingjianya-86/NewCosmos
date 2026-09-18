@@ -1,0 +1,135 @@
+# 农村低保家庭数据库Schema定义
+# 版本: 1.0
+# 说明: 农村低保家庭数据导入
+
+database: 农村低保家庭数据库
+version: 1.0
+description: 农村低保家庭数据管理
+
+tables:
+  - name: nc_biz_rural_subsistence_families
+    comment: 农村低保家庭数据表
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: applicant_name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 户主姓名
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 户主身份证号
+      - name: family_size
+        type: INTEGER
+        default: 1
+        comment: 家庭人口数
+      - name: guarantee_size
+        type: INTEGER
+        default: 0
+        comment: 保障人口数
+      - name: annual_income
+        type: NUMERIC(12,2)
+        comment: 家庭年总收入（元）
+      - name: per_capita_income
+        type: NUMERIC(12,2)
+        comment: 家庭年均收入（元）
+      - name: monthly_guarantee_amount
+        type: NUMERIC(12,2)
+        comment: 户月保障金额（元）
+      - name: family_classified_amount
+        type: NUMERIC(12,2)
+        comment: 家庭分类施保总额（元）
+      - name: person_classified_amount
+        type: NUMERIC(12,2)
+        comment: 人员分类施保总额（元）
+      - name: total_amount
+        type: NUMERIC(12,2)
+        comment: 合计（元）
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(500)
+        comment: 家庭住址
+      - name: province
+        type: VARCHAR(50)
+        comment: 所属省级
+      - name: city
+        type: VARCHAR(50)
+        comment: 所属市级
+      - name: district
+        type: VARCHAR(50)
+        comment: 所属区县
+      - name: street
+        type: VARCHAR(50)
+        comment: 所属街道
+      - name: community
+        type: VARCHAR(100)
+        comment: 所属社区
+      - name: certificate_number
+        type: VARCHAR(50)
+        comment: 低保（特困）证号
+      - name: first_receive_month
+        type: VARCHAR(10)
+        comment: 最初享受月份
+      - name: apply_reason
+        type: VARCHAR(100)
+        comment: 申请原因
+      - name: calculation_method
+        type: VARCHAR(20)
+        comment: 救助金计算方式
+      - name: grade_type
+        type: VARCHAR(50)
+        comment: 分档类型
+      - name: bank_name
+        type: VARCHAR(100)
+        comment: 开户银行
+      - name: bank_account_name
+        type: VARCHAR(50)
+        comment: 银行账户名称
+      - name: bank_account
+        type: VARCHAR(50)
+        comment: 银行帐号
+      - name: one_card_account
+        type: VARCHAR(50)
+        comment: 一卡通账号
+      - name: housing_count
+        type: INTEGER
+        comment: 拥有产权住房套数
+      - name: housing_area
+        type: NUMERIC(10,2)
+        comment: 住房总面积（平方米）
+      - name: financial_assets
+        type: NUMERIC(12,2)
+        comment: 金融资产总额（元）
+      - name: other_property
+        type: VARCHAR(200)
+        comment: 其他家庭财产情况
+      - name: member_names
+        type: TEXT
+        comment: 家庭成员姓名（分号分隔）
+      - name: member_id_cards
+        type: TEXT
+        comment: 家庭成员身份证号（分号分隔）
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_rural_subsistence_family_id_card
+        type: UNIQUE
+        columns: [applicant_id_card]
+    indexes:
+      - name: idx_rural_families_id_card
+        columns: [applicant_id_card]
+      - name: idx_rural_families_district
+        columns: [district]
+      - name: idx_rural_families_street
+        columns: [street]

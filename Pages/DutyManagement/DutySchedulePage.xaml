@@ -1,0 +1,267 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.DutyManagement"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.DutyManagement.DutySchedulePage"
+             x:DataType="vm:DutyScheduleViewModel"
+             Title="值班管理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 域色渐变头部横幅 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 返回行 -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 标题与职责 -->
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="值班管理" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="领导组 · 中层管理组 · 男生组 · 女生组 ｜ 工作日 / 休息日 / 法定节假日独立轮转" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 年月导航行 -->
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
+                            <Button Grid.Column="0" Text="&#xE76B;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                    BackgroundColor="#33FFFFFF" TextColor="White" WidthRequest="36" HeightRequest="32" CornerRadius="8"
+                                    Padding="0" Command="{Binding PreviousMonthCommand}"/>
+                            <Label Grid.Column="1" Text="{Binding MonthTitle}" FontSize="18" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" Margin="6,0"/>
+                            <Button Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                                    BackgroundColor="#33FFFFFF" TextColor="White" WidthRequest="36" HeightRequest="32" CornerRadius="8"
+                                    Padding="0" Command="{Binding NextMonthCommand}"/>
+
+                            <Label Grid.Column="3" Text="{Binding SummaryText}" FontSize="13" TextColor="#CCFFFFFF" VerticalOptions="Center" HorizontalOptions="Center"/>
+
+                            <Button Grid.Column="4" Text="生成值班表" FontSize="13" BackgroundColor="#FFFFFF" TextColor="#6D28D9"
+                                    HeightRequest="32" CornerRadius="8" Padding="14,4" Command="{Binding GenerateCommand}" Opacity="{Binding ManageOpacity}"/>
+                            <Button Grid.Column="5" Text="清空" FontSize="13" BackgroundColor="#33FFFFFF" TextColor="White"
+                                    HeightRequest="32" CornerRadius="8" Padding="14,4" Command="{Binding ClearMonthCommand}" Opacity="{Binding ManageOpacity}"/>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 工具栏：开关 + 导出打印 + 子页入口 -->
+                <Grid Margin="20,16,20,0" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                        <Switch IsToggled="{Binding RestdayLeaderSamePair}" OnColor="#6D28D9" Opacity="{Binding ManageOpacity}"/>
+                        <Label Text="周六周日同一带班领导" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <Button Grid.Column="2" Text="导出政务值班表" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonPrimary}"
+                            Command="{Binding OpenExportPanelCommand}"/>
+                    <Button Grid.Column="3" Text="导出 PDF" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding ExportPdfCommand}"/>
+                    <Button Grid.Column="4" Text="打印" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding PrintCommand}"/>
+                    <Button Grid.Column="5" Text="班务调整" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding OpenAdjustManagementCommand}"/>
+                    <Button Grid.Column="6" Text="成员管理" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding OpenMemberManagementCommand}"/>
+                    <Button Grid.Column="7" Text="节假日维护" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}"
+                            Command="{Binding OpenHolidayManagementCommand}"/>
+                </Grid>
+
+                <!-- 表头 -->
+                <Grid Margin="20,14,20,0" ColumnDefinitions="64,56,96,*,*,*,*" BackgroundColor="#EEF2F7" Padding="8,8" ColumnSpacing="4">
+                    <Label Grid.Column="0" Text="日期" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="1" Text="星期" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="2" Text="日期类型" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="3" Text="领导组" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="4" Text="中层管理组" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="5" Text="男生组" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="6" Text="女生组" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                </Grid>
+
+                <!-- 月度值班表 -->
+                <CollectionView Grid.Row="0" ItemsSource="{Binding Days}" Margin="20,6,20,0">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:DutyDayRow">
+                            <Grid ColumnDefinitions="64,56,96,*,*,*,*" ColumnSpacing="4" Padding="8,6">
+                                <Label Grid.Column="0" Text="{Binding DateDisplay}" FontSize="14" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding WeekLabel}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+
+                                <!-- 日期类型徽章（按类型着色） -->
+                                <Border Grid.Column="2" StrokeShape="RoundRectangle 10" Padding="8,2" HorizontalOptions="Center" VerticalOptions="Center">
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsHoliday}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="#FDE8E8"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsRestDay}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="#E3F0FC"/>
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Label Text="{Binding DateTypeName}" FontSize="12">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsHoliday}" Value="True">
+                                                <Setter Property="TextColor" Value="#C62828"/>
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsRestDay}" Value="True">
+                                                <Setter Property="TextColor" Value="#1565C0"/>
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                </Border>
+
+                                <!-- 领导组 -->
+                                <Border Grid.Column="3" StrokeShape="RoundRectangle 6" Padding="6,3" BackgroundColor="#F6F4FB" HorizontalOptions="Fill" VerticalOptions="Center">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyScheduleViewModel}}, Path=OpenShiftActionCommand}"
+                                                              CommandParameter="{Binding LeaderCell}"/>
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="1">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="{Binding LeaderCell.DisplayText}" FontSize="16"/>
+                                            <Border StrokeShape="RoundRectangle 4" Padding="3,0" BackgroundColor="#FEF3C7" IsVisible="{Binding LeaderCell.IsAdjusted}" VerticalOptions="Center">
+                                                <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                            </Border>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding LeaderCell.Phone}" FontSize="10" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" IsVisible="{Binding LeaderCell.HasPhone}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <!-- 中层管理组 -->
+                                <Border Grid.Column="4" StrokeShape="RoundRectangle 6" Padding="6,3" BackgroundColor="#FDF6EC" HorizontalOptions="Fill" VerticalOptions="Center">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyScheduleViewModel}}, Path=OpenShiftActionCommand}"
+                                                              CommandParameter="{Binding MiddleCell}"/>
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="1">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="{Binding MiddleCell.DisplayText}" FontSize="16"/>
+                                            <Border StrokeShape="RoundRectangle 4" Padding="3,0" BackgroundColor="#FEF3C7" IsVisible="{Binding MiddleCell.IsAdjusted}" VerticalOptions="Center">
+                                                <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                            </Border>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding MiddleCell.Phone}" FontSize="10" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" IsVisible="{Binding MiddleCell.HasPhone}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <!-- 男生组 -->
+                                <Border Grid.Column="5" StrokeShape="RoundRectangle 6" Padding="6,3" BackgroundColor="#EDF7F1" HorizontalOptions="Fill" VerticalOptions="Center">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyScheduleViewModel}}, Path=OpenShiftActionCommand}"
+                                                              CommandParameter="{Binding MaleCell}"/>
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="1">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="{Binding MaleCell.DisplayText}" FontSize="16"/>
+                                            <Border StrokeShape="RoundRectangle 4" Padding="3,0" BackgroundColor="#FEF3C7" IsVisible="{Binding MaleCell.IsAdjusted}" VerticalOptions="Center">
+                                                <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                            </Border>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding MaleCell.Phone}" FontSize="10" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" IsVisible="{Binding MaleCell.HasPhone}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <!-- 女生组 -->
+                                <Border Grid.Column="6" StrokeShape="RoundRectangle 6" Padding="6,3" BackgroundColor="#FDF0F5" HorizontalOptions="Fill" VerticalOptions="Center">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyScheduleViewModel}}, Path=OpenShiftActionCommand}"
+                                                              CommandParameter="{Binding FemaleCell}"/>
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="1">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="{Binding FemaleCell.DisplayText}" FontSize="16"/>
+                                            <Border StrokeShape="RoundRectangle 4" Padding="3,0" BackgroundColor="#FEF3C7" IsVisible="{Binding FemaleCell.IsAdjusted}" VerticalOptions="Center">
+                                                <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                            </Border>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding FemaleCell.Phone}" FontSize="10" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" IsVisible="{Binding FemaleCell.HasPhone}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 使用说明 -->
+                <Border Margin="20,14,20,0" Style="{StaticResource CardBorder}" Padding="14">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="轮转规则说明" FontAttributes="Bold" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="· 工作日/休息日：领导组 + 男生组 + 女生组各 1 人；法定节假日：另加中层管理组 1 人" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="· 每组在每种日期类型下独立轮转（领导组最多 3 条轮转线，中层仅节假日轮转）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="· 同一人同一天只值一个班：节假日若中层轮到的人同时也是男生/女生组当前轮到者，男生/女生组自动顺延下一位（被跳过者视为已消耗轮次）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="· 开启「周六周日同一带班领导」后，休息日领导以周末对轮转（周日复用周六人选）；男生/女生组仍每天轮转" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="· 点击表格中的姓名可手工换人（不影响轮转游标）；重新生成整月将按当前游标继续推演" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 导出范围面板（政务值班表：单月=起止同月；连续=选择范围；默认今日所在月） -->
+        <Grid Grid.Row="0" IsVisible="{Binding IsExportPanelVisible}" BackgroundColor="#66000000">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <Border Style="{StaticResource CardBorder}" Padding="20" WidthRequest="460">
+                    <VerticalStackLayout Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="导出政务值班表" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseExportPanelCommand}" Padding="4,0"/>
+                        </Grid>
+
+                        <Label Text="选择输出月份范围（每月一个文件；单月输出时起止相同即可）"
+                               FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="4" RowDefinitions="Auto,Auto" RowSpacing="10">
+                            <Label Grid.Row="0" Grid.Column="0" Text="起始" FontSize="13" VerticalOptions="Center" Margin="0,0,8,0"/>
+                            <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding ExportYearOptions}" SelectedItem="{Binding ExportStartYear}" WidthRequest="100" HeightRequest="34"/>
+                            <Label Grid.Row="0" Grid.Column="2" Text="年" FontSize="13" VerticalOptions="Center" Margin="4,0"/>
+                            <Picker Grid.Row="0" Grid.Column="3" ItemsSource="{Binding ExportMonthOptions}" SelectedItem="{Binding ExportStartMonth}" WidthRequest="80" HeightRequest="34"/>
+                            <Label Grid.Row="0" Grid.Column="4" Text="月" FontSize="13" VerticalOptions="Center" Margin="4,0"/>
+
+                            <Label Grid.Row="1" Grid.Column="0" Text="结束" FontSize="13" VerticalOptions="Center" Margin="0,0,8,0"/>
+                            <Picker Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ExportYearOptions}" SelectedItem="{Binding ExportEndYear}" WidthRequest="100" HeightRequest="34"/>
+                            <Label Grid.Row="1" Grid.Column="2" Text="年" FontSize="13" VerticalOptions="Center" Margin="4,0"/>
+                            <Picker Grid.Row="1" Grid.Column="3" ItemsSource="{Binding ExportMonthOptions}" SelectedItem="{Binding ExportEndMonth}" WidthRequest="80" HeightRequest="34"/>
+                            <Label Grid.Row="1" Grid.Column="4" Text="月" FontSize="13" VerticalOptions="Center" Margin="4,0"/>
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                            <Button Text="导出" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="18,4" Command="{Binding ExportGovRangeCommand}"/>
+                            <Button Text="取消" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="18,4" Command="{Binding CloseExportPanelCommand}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+        <!-- SnackBar -->
+        <Grid Grid.Row="0" VerticalOptions="End" HorizontalOptions="Center" Margin="0,0,0,24" InputTransparent="True">
+            <components:SnackBarView Message="{Binding SnackBarMessage}"
+                                     Type="{Binding SnackBarType}"
+                                     IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

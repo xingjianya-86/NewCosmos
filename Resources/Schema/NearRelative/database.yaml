@@ -1,0 +1,198 @@
+# 近亲属备案 Schema 定义
+# 业务：社会救助工作人员近亲属享受社会救助的备案制度（防优亲厚友）。
+# 一份备案 = 1 名工作人员（staff）+ 其 N 名救助对象（links 1..N，不设上限）。
+# 无年月维度——全量名册，月报表输出时忽略年月，任何月份均输出全部有效备案。
+database: near_relative
+version: 2.0
+description: 近亲属备案 - 社会救助工作人员近亲属享受救助的备案制度（防优亲厚友）
+
+tables:
+  # ── 近亲属备案·工作人员主表 ──
+  - name: nc_biz_near_relative_staffs
+    comment: "[审计] 近亲属备案工作人员主表 - 登记社会救助工作人员信息（身份证唯一）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: staff_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 工作人员姓名（近亲属姓名）
+      - name: staff_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 工作人员身份证号
+      - name: staff_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 工作人员联系方式
+      - name: work_unit
+        type: VARCHAR(200)
+        nullable: true
+        comment: 工作单位
+      - name: position
+        type: VARCHAR(100)
+        nullable: true
+        comment: 职务（职级）
+      - name: town
+        type: VARCHAR(100)
+        nullable: true
+        comment: 所在镇/街道（月报"全部/按镇"筛选口径）
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间（保存时校验，防并发覆盖）
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 更新人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    constraints: []
+    indexes:
+      - name: uk_near_relative_staff_idcard
+        columns: [staff_id_card]
+        unique: true
+        where: deleted_at IS NULL
+        comment: 同一身份证仅允许一条有效备案
+      - name: idx_near_relative_staff_town
+        columns: [town]
+
+  # ── 近亲属备案·救助对象明细表 ──
+  - name: nc_biz_near_relative_links
+    comment: "[审计] 近亲属备案救助对象明细表 - 记录工作人员近亲属享受救助的详细信息"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: staff_id
+        type: BIGINT
+        nullable: false
+        comment: 关联工作人员备案ID，关联nc_biz_near_relative_staffs.id
+      - name: application_id
+        type: BIGINT
+        nullable: true
+        comment: 关联救助申请ID（可选，nc_biz_applications.id；用于档案输出按申请检索）
+      - name: relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 救助对象与工作人员关系（批量备案{关系N}/汇总{对象关系N}/{户主与近亲属关系}）
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 救助对象姓名（{姓名N}/{救助姓名N}/{户主姓名}）
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 救助对象身份证号（{身份证号N}/{救助身份证号N}/{户主身份证号}）
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别（关联信息表{户主性别}）
+      - name: birth_date
+        type: VARCHAR(20)
+        nullable: true
+        comment: 出生年月（关联信息表{户主出生年月}）
+      - name: family_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 家庭住址（关联信息表{户主家庭住址}）
+      - name: hukou_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 户籍地址（{户籍地址N}/{救助户籍地址N}/{户主户籍地址}）
+      - name: residence_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 居住地址（{居住地址N}/{户主居住地}）
+      - name: family_size
+        type: INTEGER
+        nullable: true
+        comment: 家庭人口/共同生活家庭成员人数（{户主家庭人口}/{救助共同生活人数N}）
+      - name: help_type
+        type: VARCHAR(100)
+        nullable: true
+        comment: 社会救助种类/保障类别（{社会救助类型N}/{救助保障类别N}/{户主救助类型}）
+      - name: month_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 月保障金（{月保障金N}/{户主月保证金}）
+      - name: report_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 报账金额（{救助报账金额N}）
+      - name: start_time
+        type: VARCHAR(30)
+        nullable: true
+        comment: 救助起始时间（{户主享受起始时间}）
+      - name: family_relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 家庭关系（救助对象信息表{户主家庭关系}）
+      - name: apply_reason
+        type: TEXT
+        nullable: true
+        comment: 申请原因（关联信息表{户主申请原因}）
+      - name: apply_time
+        type: VARCHAR(30)
+        nullable: true
+        comment: 申请时间（关联信息表{户主申请时间}）
+      - name: family_difficulty
+        type: TEXT
+        nullable: true
+        comment: 家庭主要困难（救助对象信息表{家庭主要困难}）
+      - name: economy_investigate
+        type: TEXT
+        nullable: true
+        comment: 家庭经济情况调查情况（关联信息表{近亲属家庭经济情况调查情况}）
+      - name: town_opinion
+        type: TEXT
+        nullable: true
+        comment: 乡镇（街道）意见（{乡镇街道意见}）
+      - name: dynamic_record
+        type: TEXT
+        nullable: true
+        comment: 动态管理记录（救助对象信息表{动态管理记录}）
+      - name: sort_order
+        type: INTEGER
+        defaultValue: 0
+        nullable: false
+        comment: 排序号（同一备案内对象行顺序）
+      - name: created_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_near_relative_links_staff_id
+        columns: [staff_id]
+      - name: idx_near_relative_links_application_id
+        columns: [application_id]
+      - name: uk_near_relative_links_application
+        columns: [application_id]
+        unique: true
+        where: application_id IS NOT NULL AND deleted_at IS NULL
+        comment: 一个救助对象至多被一名工作人员备案（未关联或已软删不占名额）

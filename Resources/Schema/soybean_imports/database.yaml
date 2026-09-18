@@ -1,0 +1,200 @@
+# 大豆补贴数据库Schema定义
+# 版本: 3.0
+# 说明: 大豆补贴数据管理（双表结构：人员表+品种明细表）
+# 更新日期: 2026-08-27
+# 注意: cosmos_* 表保持不变，本文件仅定义 nc_biz_* 表
+
+database: 大豆补贴数据库
+version: 3.0
+description: 大豆补贴导入数据 - 高油/高蛋白大豆补贴人员和品种明细
+
+tables:
+  # ===== 高油大豆 =====
+  
+  # 高油大豆人员表
+  - name: nc_biz_high_oil_soybean_person
+    comment: "[导入台账] 高油大豆补贴人员表 - 导入高油大豆种植人员信息和面积"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 地址（村/屯）
+      - name: total_area
+        type: NUMERIC(18,2)
+        comment: 总种植面积（亩）
+      - name: self_area
+        type: NUMERIC(18,2)
+        comment: 自种面积（亩）
+      - name: rented_area
+        type: NUMERIC(18,2)
+        comment: 租种面积（亩）
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_high_oil_soybean_person_id_card
+        type: UNIQUE
+        columns: [id_card]
+    indexes:
+      - name: idx_high_oil_soybean_person_id_card
+        columns: [id_card]
+      - name: idx_high_oil_soybean_person_data_year
+        columns: [data_year]
+
+  # 高油大豆品种明细表
+  - name: nc_biz_high_oil_soybean_detail
+    comment: "[导入台账] 高油大豆品种明细表 - 记录每人种植的高油大豆品种/种子/面积"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: person_id
+        type: BIGINT
+        nullable: false
+        comment: 关联人员ID（外键）
+      - name: variety
+        type: VARCHAR(100)
+        comment: 品种名称
+      - name: seed_quantity
+        type: NUMERIC(18,2)
+        comment: 种子数量（斤）
+      - name: subsidy_area
+        type: NUMERIC(18,2)
+        comment: 补贴面积（亩）
+      - name: seed_source
+        type: VARCHAR(200)
+        comment: 种子来源
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+    indexes:
+      - name: idx_high_oil_soybean_detail_person_id
+        columns: [person_id]
+
+  # ===== 高蛋白大豆 =====
+
+  # 高蛋白大豆人员表
+  - name: nc_biz_high_protein_soybean_person
+    comment: "[导入台账] 高蛋白大豆补贴人员表 - 导入高蛋白大豆种植人员信息和面积"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 地址（村/屯）
+      - name: total_area
+        type: NUMERIC(18,2)
+        comment: 总种植面积（亩）
+      - name: self_area
+        type: NUMERIC(18,2)
+        comment: 自种面积（亩）
+      - name: rented_area
+        type: NUMERIC(18,2)
+        comment: 租种面积（亩）
+      - name: data_year
+        type: INTEGER
+        comment: 数据年份
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_high_protein_soybean_person_id_card
+        type: UNIQUE
+        columns: [id_card]
+    indexes:
+      - name: idx_high_protein_soybean_person_id_card
+        columns: [id_card]
+      - name: idx_high_protein_soybean_person_data_year
+        columns: [data_year]
+
+  # 高蛋白大豆品种明细表
+  - name: nc_biz_high_protein_soybean_detail
+    comment: "[导入台账] 高蛋白大豆品种明细表 - 记录每人种植的高蛋白大豆品种/种子/面积"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: person_id
+        type: BIGINT
+        nullable: false
+        comment: 关联人员ID（外键）
+      - name: variety
+        type: VARCHAR(100)
+        comment: 品种名称
+      - name: seed_quantity
+        type: NUMERIC(18,2)
+        comment: 种子数量（斤）
+      - name: subsidy_area
+        type: NUMERIC(18,2)
+        comment: 补贴面积（亩）
+      - name: seed_source
+        type: VARCHAR(200)
+        comment: 种子来源
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+    indexes:
+      - name: idx_high_protein_soybean_detail_person_id
+        columns: [person_id]
+
+views: []

@@ -1,0 +1,96 @@
+# 普惠高龄补贴历史Schema定义
+database: 普惠高龄补贴历史
+version: 2.0
+description: 普惠高龄补贴历史数据 - 导入高龄老人补贴发放历史
+
+tables:
+  # ── 普惠高龄补贴历史表 ──
+  - name: nc_biz_elderly_subsidy_history
+    comment: "[导入台账] 高龄补贴历史表 - 导入80岁以上高龄老人补贴发放记录"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: name
+        type: character varying(100)
+        nullable: false
+        comment: 老人姓名
+      - name: pinyin_name
+        type: character varying(200)
+        nullable: true
+        comment: 姓名拼音（辅助查询）
+      - name: id_card
+        type: character varying(20)
+        nullable: false
+        comment: 身份证号码
+      - name: gender
+        type: character varying(10)
+        nullable: true
+        comment: 性别（从身份证计算）
+      - name: birth_date
+        type: date
+        nullable: true
+        comment: 出生日期（从身份证计算）
+      - name: age
+        type: integer
+        nullable: true
+        comment: 年龄
+      - name: phone
+        type: character varying(20)
+        nullable: true
+        comment: 联系电话
+      - name: address
+        type: character varying(255)
+        nullable: true
+        comment: 户籍地址
+      - name: subsidy_amount
+        type: numeric
+        nullable: true
+        comment: 发放金额（元）
+      - name: bank_account
+        type: character varying(50)
+        nullable: true
+        comment: 银行卡号
+      - name: person_type
+        type: character varying(100)
+        nullable: true
+        comment: 人员类型（系统分类）
+      - name: original_type
+        type: character varying(50)
+        nullable: true
+        comment: 原始类型（Excel导入）
+      - name: data_year
+        type: integer
+        nullable: true
+        comment: 数据年份
+      - name: imported_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: status
+        type: character varying(20)
+        nullable: false
+        defaultValue: 'Active'
+        comment: 标记状态（Active=正常 / Stopped=已停发，停发时由高龄停发流程联动标记）
+      - name: stopped_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 停发标记时间
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: CURRENT_TIMESTAMP
+        comment: 更新时间
+    indexes:
+      - name: idx_elderly_subsidy_history_id_card
+        columns: [id_card]
+      - name: idx_elderly_subsidy_history_data_year
+        columns: [data_year]

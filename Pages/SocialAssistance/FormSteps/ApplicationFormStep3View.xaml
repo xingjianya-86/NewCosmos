@@ -1,0 +1,915 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.SocialAssistance.FormSteps.ApplicationFormStep3View"
+             x:Name="StepRoot"
+             x:DataType="ApplicationFormViewModel">
+
+    <!-- Step3: 经济状况 — 从 ApplicationFormPage.xaml 提取；可见性由宿主页面按 CurrentStep 懒加载控制 -->
+    <VerticalStackLayout Spacing="8">
+
+        <!-- 单人保经济状况锁定提示 -->
+        <Border Padding="16,12" Margin="0,4" StrokeShape="RoundRectangle 8"
+                BackgroundColor="{StaticResource WarningSoft}" Stroke="{StaticResource Warning}" StrokeThickness="1"
+                IsVisible="{Binding IsSingleRescueApplication}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <Label Text="⚠️" FontSize="20" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="单人保申请 - 经济状况已锁定，不可编辑" FontSize="15"
+                       FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- 💰 收入明细分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="&#x1F4B0; 收入明细" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 添加收入" Style="{StaticResource ButtonPrimary}"
+                                HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddIncomeCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12">
+
+                    <!-- 务工收入 -->
+                    <CollectionView ItemsSource="{Binding LaborIncomes}" SelectionMode="None"
+                                    ItemsLayout="VerticalGrid, 2">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无务工收入" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:LaborIncome">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="4" RowSpacing="4">
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedIncomeMember, Mode=TwoWay}"
+                                                ItemDisplayBinding="{Binding Name}"
+                                                FontSize="15" HeightRequest="38"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Picker Grid.Row="1" ItemsSource="{Binding BindingContext.LaborSubTypeOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding IncomeSubType}" FontSize="15" HeightRequest="36"
+                                                VerticalOptions="Center"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Entry Grid.Row="2" Text="{Binding WorkUnit}" FontSize="15"
+                                               Placeholder="{x:Static constants:UIConstants.WORK_UNIT_PLACEHOLDER}"
+                                               VerticalOptions="Center"
+                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Grid Grid.Row="3" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                            <Label Text="月收入" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding MonthlyIncome}" FontSize="15" Keyboard="Numeric"
+                                                   VerticalOptions="Center"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
+                                                   VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
+                                                TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
+                                                Padding="0" CornerRadius="14" VerticalOptions="Center"
+                                                Command="{Binding BindingContext.RemoveLaborIncomeCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 经营收入 -->
+                    <CollectionView ItemsSource="{Binding BusinessIncomes}" SelectionMode="None"
+                                    ItemsLayout="VerticalGrid, 2">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无经营收入" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:BusinessIncome">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="4" RowSpacing="4">
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedIncomeMember, Mode=TwoWay}"
+                                                ItemDisplayBinding="{Binding Name}"
+                                                FontSize="15" HeightRequest="38"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Picker Grid.Row="1" ItemsSource="{Binding BindingContext.BusinessSubTypeOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding VendorType}" FontSize="15" HeightRequest="36"
+                                                VerticalOptions="Center"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Entry Grid.Row="2" Text="{Binding CompanyName}" FontSize="15"
+                                               Placeholder="{x:Static constants:UIConstants.COMPANY_NAME_PLACEHOLDER}"
+                                               VerticalOptions="Center"
+                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Grid Grid.Row="3" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                            <Label Text="月收入" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding MonthlyIncome}" FontSize="15" Keyboard="Numeric"
+                                                   VerticalOptions="Center"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
+                                                   VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
+                                                TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
+                                                Padding="0" CornerRadius="14" VerticalOptions="Center"
+                                                Command="{Binding BindingContext.RemoveBusinessIncomeCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 财产收入 -->
+                    <CollectionView ItemsSource="{Binding PropertyIncomes}" SelectionMode="None"
+                                    ItemsLayout="VerticalGrid, 2">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无财产收入" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:PropertyIncome">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="4" RowSpacing="4">
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedIncomeMember, Mode=TwoWay}"
+                                                ItemDisplayBinding="{Binding Name}"
+                                                FontSize="15" HeightRequest="38"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Entry Grid.Row="1" Text="{Binding PropertyDescription}" FontSize="15"
+                                               Placeholder="财产描述"
+                                               VerticalOptions="Center"
+                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Grid Grid.Row="2" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                            <Label Text="月收入" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Amount}" FontSize="15" Keyboard="Numeric"
+                                                   VerticalOptions="Center"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
+                                                   VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
+                                                TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
+                                                Padding="0" CornerRadius="14" VerticalOptions="Center"
+                                                Command="{Binding BindingContext.RemovePropertyIncomeCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 转移收入 -->
+                    <CollectionView ItemsSource="{Binding TransferIncomes}" SelectionMode="None"
+                                    ItemsLayout="VerticalGrid, 2">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无转移收入" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:TransferIncome">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="4" RowSpacing="4">
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedIncomeMember, Mode=TwoWay}"
+                                                ItemDisplayBinding="{Binding Name}"
+                                                FontSize="15" HeightRequest="38"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Picker Grid.Row="1" ItemsSource="{Binding BindingContext.TransferSubTypeOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding IncomeType}" FontSize="15" HeightRequest="36"
+                                                VerticalOptions="Center"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Grid Grid.Row="2" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                            <Label Text="月收入" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding MonthlyAmount}" FontSize="15" Keyboard="Numeric"
+                                                   VerticalOptions="Center"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
+                                                   VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
+                                                TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
+                                                Padding="0" CornerRadius="14" VerticalOptions="Center"
+                                                Command="{Binding BindingContext.RemoveTransferIncomeCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 其他收入 -->
+                    <CollectionView ItemsSource="{Binding OtherIncomes}" SelectionMode="None"
+                                    ItemsLayout="VerticalGrid, 2">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无其他收入" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:OtherIncome">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="4" RowSpacing="4">
+                                        <Entry Text="{Binding IncomeType}" FontSize="15"
+                                               Placeholder="收入类型"
+                                               VerticalOptions="Center"
+                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <Grid Grid.Row="1" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                            <Label Text="月收入" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Amount}" FontSize="15" Keyboard="Numeric"
+                                                   VerticalOptions="Center"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
+                                                   VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <Button Grid.RowSpan="2" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                                FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
+                                                TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
+                                                Padding="0" CornerRadius="14" VerticalOptions="Center"
+                                                Command="{Binding BindingContext.RemoveOtherIncomeCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 🌾 土地信息分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="🌾 土地信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleLandExpandedCommand}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12" IsVisible="{Binding IsLandExpanded}">
+                    <!-- 操作按钮 -->
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <Label Text="📋 土地确权归户表" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 新增组" Style="{StaticResource ButtonSmall}" HeightRequest="32" Padding="8,0" FontSize="16"
+                                Command="{Binding AddLandConfirmationGroupCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                        <Button Grid.Column="2" Text="📥 导入" Style="{StaticResource ButtonPrimary}" HeightRequest="32" Padding="8,0" FontSize="16"
+                                Command="{Binding ImportLandConfirmationCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+
+                    <!-- 归户表分组列表 -->
+                    <CollectionView ItemsSource="{Binding LandConfirmationGroups}" SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无土地确权归户表，可点击“导入”或“新增组”" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:LandConfirmationGroup">
+                                <Border Padding="12" Margin="0,0,0,10" StrokeShape="RoundRectangle 8"
+                                        BackgroundColor="White" Stroke="{StaticResource Warning}" StrokeThickness="1">
+                                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                                        <!-- 组标题：户主 + 面积 + 删除 -->
+                                        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Label Grid.Column="0" Text="户主:" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                            <Entry Grid.Column="1" Text="{Binding ContractorName}" Placeholder="承包方姓名" FontSize="16" BackgroundColor="White"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="{Binding TotalArea, StringFormat='面积: {0:F2}亩'}" FontSize="15" TextColor="{StaticResource Warning}" FontAttributes="Bold" VerticalOptions="Center" Margin="8,0,4,0"/>
+                                            <Button Grid.Column="3" Text="×" Command="{Binding BindingContext.RemoveLandConfirmationGroupCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}" WidthRequest="28" HeightRequest="28" BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}" FontSize="16" FontAttributes="Bold" Padding="0" CornerRadius="4"
+                                                    IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+
+                                        <BoxView Grid.Row="1" HeightRequest="1" Color="{StaticResource WarningLight}"/>
+
+                                        <!-- 地块记录 4列 -->
+                                        <VerticalStackLayout Grid.Row="2" Spacing="4">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="地块记录" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Warning}"/>
+                                                <Button Grid.Column="1" Text="+" Command="{Binding BindingContext.AddLandConfirmationRecordCommand, Source={x:Reference StepRoot}}"
+                                                        CommandParameter="{Binding .}" WidthRequest="24" HeightRequest="22" BackgroundColor="{StaticResource WarningLight}" TextColor="{StaticResource WarningDark}" FontSize="15" FontAttributes="Bold" Padding="0" CornerRadius="4"
+                                                        IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                                                <Button Grid.Column="0" Text="全自种" FontSize="14" HeightRequest="32" Padding="12,4"
+                                                        BackgroundColor="{StaticResource Success}" TextColor="White"
+                                                        Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
+                                                        CommandParameter="自行种植"
+                                                        IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                <Button Grid.Column="1" Text="全转包" FontSize="14" HeightRequest="32" Padding="12,4"
+                                                        BackgroundColor="{StaticResource Info}" TextColor="White"
+                                                        Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
+                                                        CommandParameter="转包他人"
+                                                        IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                <Button Grid.Column="2" Text="全承包" FontSize="14" HeightRequest="32" Padding="12,4"
+                                                        BackgroundColor="{StaticResource WarningDark}" TextColor="White"
+                                                        Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
+                                                        CommandParameter="承包土地"
+                                                        IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            </Grid>
+                                            <FlexLayout Wrap="Wrap" JustifyContent="Start"
+                                                        BindableLayout.ItemsSource="{Binding Records}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate x:DataType="ent:LandConfirmationRecord">
+                                                        <Border Padding="6" Margin="2" StrokeShape="RoundRectangle 6"
+                                                                BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1"
+                                                                FlexLayout.Basis="31%">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <!-- 第1行：地块名 + 删除 -->
+                                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="2">
+                                                                    <Entry Text="{Binding LandPlotInfo}" Placeholder="地块" FontSize="15"
+                                                                           BackgroundColor="Transparent"
+                                                                           IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                    <Button Grid.Column="1" Text="×" FontSize="14" WidthRequest="18" HeightRequest="18"
+                                                                            Padding="0" CornerRadius="9"
+                                                                            BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                                            Command="{Binding BindingContext.RemoveLandConfirmationRecordCommand, Source={x:Reference StepRoot}}"
+                                                                            CommandParameter="{Binding .}"
+                                                                            IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                </Grid>
+                                                                <!-- 第2行：面积 + 种植类型 Picker -->
+                                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                                                    <StackLayout Orientation="Horizontal" Spacing="2">
+                                                                        <Entry Text="{Binding LandArea}" Placeholder="面积" Keyboard="Numeric" FontSize="15"
+                                                                               WidthRequest="45" BackgroundColor="Transparent"
+                                                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                        <Label Text="亩" FontSize="14" VerticalOptions="Center"
+                                                                               TextColor="{StaticResource TextSecondary}"/>
+                                                                    </StackLayout>
+                                                                    <Picker Grid.Column="1" ItemsSource="{Binding BindingContext.LandUsageOptions, Source={x:Reference StepRoot}}"
+                                                                            SelectedItem="{Binding LandUsage}" FontSize="14" BackgroundColor="White"
+                                                                            HeightRequest="30"
+                                                                            IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                </Grid>
+                                                                <!-- 第3行：单价 + 价值 -->
+                                                                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="2">
+                                                                    <Entry Text="{Binding UnitPrice}" Placeholder="单价" Keyboard="Numeric" FontSize="15"
+                                                                           WidthRequest="45" BackgroundColor="Transparent"
+                                                                           IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                    <Label Grid.Column="1" Text="元/亩" FontSize="14" VerticalOptions="Center"
+                                                                           TextColor="{StaticResource TextSecondary}"/>
+                                                                    <Label Grid.Column="2" Text="{Binding LandValue, StringFormat='= ¥{0:N0}'}" FontSize="15"
+                                                                           TextColor="{StaticResource Primary}" FontAttributes="Bold" VerticalOptions="Center"
+                                                                           Margin="4,0,0,0"/>
+                                                                </Grid>
+                                                            </VerticalStackLayout>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </FlexLayout>
+                                        </VerticalStackLayout>
+
+                                        <BoxView Grid.Row="3" HeightRequest="1" Color="{StaticResource WarningLight}"/>
+
+                                        <!-- 人员表 4列 -->
+                                        <VerticalStackLayout Grid.Row="4" Spacing="4">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="人员表" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Warning}"/>
+                                                <Button Grid.Column="1" Text="+" Command="{Binding BindingContext.AddLandConfirmationPersonCommand, Source={x:Reference StepRoot}}"
+                                                        CommandParameter="{Binding .}" WidthRequest="24" HeightRequest="22" BackgroundColor="{StaticResource WarningLight}" TextColor="{StaticResource WarningDark}" FontSize="15" FontAttributes="Bold" Padding="0" CornerRadius="4"
+                                                        IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            </Grid>
+                                            <FlexLayout Wrap="Wrap" JustifyContent="Start"
+                                                        BindableLayout.ItemsSource="{Binding Persons}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate x:DataType="ent:LandConfirmationPerson">
+                                                        <Border Padding="6" Margin="2" StrokeShape="RoundRectangle 6"
+                                                                BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1"
+                                                                FlexLayout.Basis="24%">
+                                                            <VerticalStackLayout Spacing="3">
+                                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="3">
+                                                                    <Entry Text="{Binding Name}" Placeholder="姓名" FontSize="16" BackgroundColor="Transparent"
+                                                                           IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                    <Button Grid.Column="1" Text="×" FontSize="15" WidthRequest="18" HeightRequest="18" Padding="0" CornerRadius="9"
+                                                                            BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                                            Command="{Binding BindingContext.RemoveLandConfirmationPersonCommand, Source={x:Reference StepRoot}}"
+                                                                            CommandParameter="{Binding .}"
+                                                                            IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                </Grid>
+                                                                <Entry Text="{Binding IdCard}" Placeholder="身份证号" FontSize="15" BackgroundColor="Transparent"
+                                                                       IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="3">
+                                                                    <Picker ItemsSource="{Binding BindingContext.LandStatusOptions, Source={x:Reference StepRoot}}"
+                                                                            SelectedItem="{Binding LandStatus}" FontSize="15" BackgroundColor="White"
+                                                                            IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                    <StackLayout Grid.Column="1" Orientation="Horizontal" Spacing="1">
+                                                                        <Entry Text="{Binding SharesCount}" Keyboard="Numeric" FontSize="16" WidthRequest="30" BackgroundColor="Transparent"
+                                                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                        <Label Text="份" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                                                    </StackLayout>
+                                                                </Grid>
+                                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="2">
+                                                                    <Entry Text="{Binding TotalLandArea}" Keyboard="Numeric" FontSize="15"
+                                                                           WidthRequest="60" BackgroundColor="Transparent"
+                                                                           IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                                                    <Label Grid.Column="1" Text="亩" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                                                </Grid>
+                                                                    <Grid IsVisible="{Binding IsDeceasedInheritance}" ColumnDefinitions="Auto,*" ColumnSpacing="3">
+                                                                        <Label Text="继承:" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                                                        <Picker Grid.Column="1" ItemsSource="{Binding InheritCandidates}"
+                                                                                SelectedItem="{Binding LandInheritTo}" FontSize="15" BackgroundColor="White"/>
+                                                                    </Grid>
+                                                            </VerticalStackLayout>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </FlexLayout>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- 总计汇总 -->
+                    <Border Stroke="{StaticResource Warning}" StrokeThickness="1" BackgroundColor="{StaticResource WarningLight}" Padding="12" StrokeShape="RoundRectangle 8">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="家庭土地面积汇总" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" FontSize="15" HorizontalOptions="Center"/>
+                            <Label Text="{Binding LandCalculationFormula}" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*" ColumnSpacing="8" RowSpacing="6" Margin="0,4,0,0">
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="0">
+                                    <Label Text="总面积" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalConfirmedLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="1">
+                                    <Label Text="总份数" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="2">
+                                    <Label Text="家庭土地" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Info}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="0">
+                                    <Label Text="家庭份数" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="1">
+                                    <Label Text="家庭人数" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="2">
+                                    <Label Text="总人数" TextColor="{StaticResource TextSecondary}" FontSize="16" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Gray400}" FontSize="15" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <!-- 土地收入汇总 -->
+                            <BoxView HeightRequest="1" Color="{StaticResource WarningLight}"/>
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" RowSpacing="4" Margin="0,4,0,0">
+                                <VerticalStackLayout Grid.Column="0">
+                                    <Label Text="自种收入" TextColor="{StaticResource TextSecondary}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding SelfFarmedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1">
+                                    <Label Text="转包收入" TextColor="{StaticResource TextSecondary}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding SubleasedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2">
+                                    <Label Text="承包收入" TextColor="{StaticResource TextSecondary}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding ContractedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="{Binding LandIncomeTotal, StringFormat='土地收入合计: ¥{0:N2}'}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 📑 农业补贴分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="📑 农业补贴" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleSubsidyExpandedCommand}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12" IsVisible="{Binding IsSubsidyExpanded}">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <Label Text="农业补贴明细" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="📥 导入" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding ImportSubsidyDataCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                        <Button Grid.Column="2" Text="+ 添加" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddSubsidyCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding Subsidies}" SelectionMode="None"
+                                    HeightRequest="{Binding SubsidyListHeight}">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" Span="1"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:Subsidy">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <VerticalStackLayout Spacing="3">
+                                        <!-- 第1行：类型 + 删除 -->
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                            <Picker ItemsSource="{Binding BindingContext.SubsidyTypeOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SubsidyType}" HeightRequest="32" FontSize="15"
+                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Button Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                    WidthRequest="28" HeightRequest="28" Padding="0" CornerRadius="14"
+                                                    Command="{Binding BindingContext.RemoveSubsidyCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                        <!-- 第2行：面积 × 单价 = 金额 -->
+                                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="2">
+                                            <Entry Text="{Binding Area}" Placeholder="面积" Keyboard="Numeric" FontSize="15"
+                                                   WidthRequest="45" HeightRequest="30" BackgroundColor="Transparent"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="1" Text="亩×" FontSize="14" VerticalOptions="Center"
+                                                   TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="2" Text="{Binding UnitPrice}" Placeholder="单价" Keyboard="Numeric"
+                                                   FontSize="15" WidthRequest="50" HeightRequest="30" BackgroundColor="Transparent"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="3" Text="元/亩" FontSize="14" VerticalOptions="Center"
+                                                   TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <!-- 第3行：金额合计 -->
+                                        <Label Text="{Binding Amount, StringFormat='= ¥{0:N2}'}" FontSize="15"
+                                               TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 💸 刚性支出分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="💸 刚性支出" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleRigidExpenditureExpandedCommand}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12" IsVisible="{Binding IsRigidExpenditureExpanded}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="刚性支出明细" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddRigidExpenditureCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding RigidExpenditures}" SelectionMode="None"
+                                    HeightRequest="{Binding RigidExpenditureListHeight}">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" Span="2"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:RigidExpenditure">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <VerticalStackLayout Spacing="3">
+                                        <!-- 支出类型 -->
+                                        <Picker ItemsSource="{Binding BindingContext.RigidExpenditureTypeOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding ExpenditureType}" FontSize="14" HeightRequest="32" BackgroundColor="White"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <!-- 金额 -->
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="2">
+                                            <Entry Text="{Binding Amount}" Placeholder="金额" Keyboard="Numeric" FontSize="15"
+                                                   HeightRequest="30" BackgroundColor="Transparent"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="1" Text="元" FontSize="14" VerticalOptions="Center"
+                                                   TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <!-- 备注 -->
+                                        <Entry Text="{Binding Remark}" Placeholder="备注" FontSize="14"
+                                               HeightRequest="28" BackgroundColor="Transparent"
+                                               IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        <!-- 删除按钮 -->
+                                        <Button Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                                BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                WidthRequest="24" HeightRequest="24" Padding="0" CornerRadius="12"
+                                                HorizontalOptions="End"
+                                                Command="{Binding BindingContext.RemoveRigidExpenditureCommand, Source={x:Reference StepRoot}}"
+                                                CommandParameter="{Binding .}"
+                                                IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 🏠 财产信息分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="🏠 财产信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding TogglePropertyExpandedCommand}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12" IsVisible="{Binding IsPropertyExpanded}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="🏡 房产" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddFamilyPropertyCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding FamilyProperties}" SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无房产信息" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:FamilyProperty">
+                                <Border Padding="10" Margin="0,2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                        <!-- 第一行：地址、面积、评估价值、删除 -->
+                                        <Grid ColumnDefinitions="Auto,3*,Auto,1*,Auto,1*,Auto" ColumnSpacing="6">
+                                            <Label Text="地址:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Address}" HeightRequest="38" FontSize="16"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="面积:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding Area}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                    WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
+                                                    Command="{Binding BindingContext.RemoveFamilyPropertyCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                        <!-- 第二行：房屋结构、房屋性质、房间数、建造年份 -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="Auto,1*,Auto,1*,Auto,1*,Auto,1*" ColumnSpacing="6">
+                                            <Label Text="结构:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding HousingStructure}" HeightRequest="32" FontSize="14" Placeholder="砖混/框架等"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="性质:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding HousingNature}" HeightRequest="32" FontSize="14" Placeholder="自有/租赁等"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="房间:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding RoomCount}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="6" Text="年份:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="7" Text="{Binding BuildYear}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                        <Label Text="🚗 车辆" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddVehicleCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding Vehicles}" SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无车辆信息" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:Vehicle">
+                                <Border Padding="10" Margin="0,2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                        <!-- 第一行：品牌、型号、评估价值、删除 -->
+                                        <Grid ColumnDefinitions="Auto,2*,Auto,1*,Auto,1*,Auto" ColumnSpacing="6">
+                                            <Label Text="品牌:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Brand}" HeightRequest="38" FontSize="16"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="型号:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding Model}" HeightRequest="38" FontSize="16"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                    WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
+                                                    Command="{Binding BindingContext.RemoveVehicleCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                        <!-- 第二行：车牌号、购买年份、购买价格 -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="Auto,1*,Auto,1*,Auto,1*" ColumnSpacing="6">
+                                            <Label Text="车牌:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding LicensePlate}" HeightRequest="32" FontSize="14" Placeholder="车牌号"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="年份:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding PurchaseYear}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="购价:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding PurchasePrice}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                        <Label Text="🚜 农机具" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding AddMachineryCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding Machineries}" SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无农机具信息" Style="{StaticResource EmptyStateLabel}" Margin="0,8"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:Machinery">
+                                <Border Padding="10" Margin="0,2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                        <!-- Row 0: 品牌、型号、评估价值、删除 -->
+                                        <Grid ColumnDefinitions="Auto,2*,Auto,1*,Auto,1*,Auto" ColumnSpacing="6">
+                                            <Label Text="品牌:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Brand}" HeightRequest="38" FontSize="16"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="型号:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding Model}" HeightRequest="38" FontSize="16"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                    WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
+                                                    Command="{Binding BindingContext.RemoveMachineryCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                        <!-- Row 1: 数量、马力、购买年份、购买价格 -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="Auto,1*,Auto,1*,Auto,1*" ColumnSpacing="6">
+                                            <Label Text="数量:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Quantity}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="2" Text="马力:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="3" Text="{Binding Horsepower}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                            <Label Grid.Column="4" Text="年份:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="5" Text="{Binding PurchaseYear}" HeightRequest="32" FontSize="14" Keyboard="Numeric"
+                                                   IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 👨‍👩‍👧 赡养抚养扶养分组 -->
+        <Border Style="{StaticResource CardBorder}" Padding="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="0">
+                <Border Padding="16,12" BackgroundColor="{StaticResource Gray50}"
+                        StrokeShape="RoundRectangle 12,12,0,0"
+                        Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="👨‍👩‍👧 赡养抚养扶养" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleSupportExpandedCommand}"/>
+                    </Grid>
+                </Border>
+                <VerticalStackLayout Padding="16,12" Spacing="12" IsVisible="{Binding IsSupportExpanded}">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Label Text="赡养抚养扶养明细" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="📥 导入家庭成员" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding ImportSupportMembersCommand}"/>
+                        <Button Grid.Column="2" Text="+ 赡养" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="10,0" FontSize="16"
+                                Command="{Binding AddSupporterCommand}" CommandParameter="赡养"/>
+                        <Button Grid.Column="3" Text="+ 抚养" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="10,0" FontSize="16"
+                                BackgroundColor="{StaticResource StatCardGreenStart}"
+                                Command="{Binding AddSupporterCommand}" CommandParameter="抚养"/>
+                        <Button Grid.Column="4" Text="+ 扶养" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="10,0" FontSize="16"
+                                BackgroundColor="{StaticResource StatCardPurpleStart}"
+                                Command="{Binding AddSupporterCommand}" CommandParameter="扶养"/>
+                    </Grid>
+                    <CollectionView ItemsSource="{Binding Supporters}" SelectionMode="None"
+                                    HeightRequest="{Binding SupporterListHeight}">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" Span="2"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:Supporter">
+                                <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
+                                        BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                    <VerticalStackLayout Spacing="2">
+                                        <!-- 姓名 -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                            <Label Text="姓名:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding Name}" HeightRequest="32" FontSize="15" BackgroundColor="Transparent"/>
+                                        </Grid>
+                                        <!-- 身份证 -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                            <Label Text="身份证:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding IdCard}" HeightRequest="32" FontSize="15" BackgroundColor="Transparent"/>
+                                        </Grid>
+                                        <!-- 人员类型 Picker -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                            <Label Text="类型:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Picker Grid.Column="1" ItemsSource="{Binding BindingContext.PersonTypeOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedPersonType}" ItemDisplayBinding="{Binding Display}" FontSize="15" HeightRequest="32" BackgroundColor="White"/>
+                                        </Grid>
+                                        <!-- 关系 Picker -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                                            <Label Text="关系:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Picker Grid.Column="1" ItemsSource="{Binding BindingContext.MemberRelationOptions, Source={x:Reference StepRoot}}"
+                                                    SelectedItem="{Binding SelectedRelationship}" ItemDisplayBinding="{Binding Display}" FontSize="15" HeightRequest="32" BackgroundColor="White"/>
+                                        </Grid>
+                                        <!-- 月赡养费 -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                                            <Label Text="月赡养费:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding MonthlySupportFee}" HeightRequest="32" FontSize="15" Keyboard="Numeric" BackgroundColor="Transparent"/>
+                                            <Label Grid.Column="2" Text="元" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <!-- 月数 + 家庭人数 -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,*,Auto" ColumnSpacing="4">
+                                            <Label Text="月数:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="1" Text="{Binding SupportMonths}" HeightRequest="32" FontSize="15" Keyboard="Numeric" BackgroundColor="Transparent"/>
+                                            <Label Grid.Column="3" Text="家庭人数:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="4" Text="{Binding SupporterFamilySize}" HeightRequest="32" FontSize="15" Keyboard="Numeric" BackgroundColor="Transparent"/>
+                                        </Grid>
+                                        <!-- 年赡养费（自动计算，只读） -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                                            <Label Text="年赡养费:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding AnnualSupportFee, StringFormat='{0:F2}'}" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="2" Text="元/年" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                        </Grid>
+                                        <!-- 有赡养能力 + 删除 -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+                                            <Label Text="有赡养能力" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Switch Grid.Column="1" IsToggled="{Binding IsSupportAbility}" VerticalOptions="Center"/>
+                                            <Button Grid.Column="2" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                    WidthRequest="24" HeightRequest="24" Padding="0" CornerRadius="12"
+                                                    Command="{Binding BindingContext.RemoveSupporterCommand, Source={x:Reference StepRoot}}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+    </VerticalStackLayout>
+
+</ContentView>

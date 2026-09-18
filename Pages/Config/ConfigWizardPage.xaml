@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Config.ConfigWizardPage"
+             x:DataType="ConfigWizardViewModel"
+             Title="系统配置向导"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="MissingConfigRow" x:DataType="x:String">
+            <Grid Padding="12,8" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                       TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding .}" FontSize="15"
+                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变头部 -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+            <VerticalStackLayout Spacing="16">
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="系统配置向导" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="完成配置与网络接入后即可启动系统" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="24" Spacing="16" HorizontalOptions="Center" MaximumWidthRequest="760">
+
+                <!-- 缺失配置 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                   TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
+                            <Label Text="缺失的配置文件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <CollectionView ItemsSource="{Binding MissingConfigFiles}" ItemTemplate="{StaticResource MissingConfigRow}"
+                                        MaximumHeightRequest="160"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 操作 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="配置操作" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start">
+                            <Button Text="生成默认配置" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding GenerateDefaultConfigCommand}" Margin="0,0,10,10" MinimumWidthRequest="150"/>
+                            <Button Text="网络接入" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenNetworkAccessCommand}" Margin="0,0,10,10" MinimumWidthRequest="120"/>
+                            <Button Text="打开配置目录" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenConfigDirectoryCommand}" Margin="0,0,10,10" MinimumWidthRequest="130"/>
+                            <Button Text="重新检查" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding RecheckConfigCommand}" Margin="0,0,10,10" MinimumWidthRequest="110"/>
+                        </FlexLayout>
+                        <Label Text="说明：一键生成默认配置（数据库为默认连接，密码首次连接后自动加密为 DPAPI 密文）；" 
+                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <Label Text="异地组网请先点「网络接入」安装/加入 ZeroTier，并在服务器网页端授权本机节点。"
+                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

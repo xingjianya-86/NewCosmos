@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.DutyManagement"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.DutyManagement.HolidayPage"
+             x:DataType="vm:HolidayViewModel"
+             Title="节假日维护"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 头部横幅 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+                    <VerticalStackLayout Spacing="14">
+
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回值班表" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE787;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="节假日维护" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="法定节假日与调休补班日 · 随国家安排更新 · 值班表与业务时间轴共用" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 年份与操作 -->
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                            <Label Grid.Column="0" Text="年份" TextColor="#B3FFFFFF" VerticalOptions="Center" FontSize="14"/>
+                            <Picker Grid.Column="1" ItemsSource="{Binding YearOptions}"
+                                    SelectedItem="{Binding SelectedYear}"
+                                    WidthRequest="110" HeightRequest="36" VerticalOptions="Center"/>
+                            <Button Grid.Column="3" HeightRequest="36" CornerRadius="8" Padding="14,4" Opacity="{Binding ManageOpacity}"
+                                    Command="{Binding DownloadCommand}">
+                                <Button.Text>
+                                    <Binding Path="SelectedYear" StringFormat="下载 {0} 年数据"/>
+                                </Button.Text>
+                            </Button>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 新增区 -->
+                <Border Margin="20,16,20,0" Style="{StaticResource CardBorder}" Padding="16" IsVisible="{Binding IsAdding}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="新增节假日记录（相同日期将覆盖已有记录）" FontAttributes="Bold" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                            <Label Grid.Column="0" Text="日期" FontSize="13" VerticalOptions="Center"/>
+                            <DatePicker Grid.Column="1" Date="{Binding NewDate}" WidthRequest="130" HeightRequest="36"/>
+                            <Label Grid.Column="2" Text="类型" FontSize="13" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <Picker Grid.Column="3" ItemsSource="{Binding HolidayTypeOptions}" SelectedItem="{Binding NewType}" WidthRequest="110" HeightRequest="36"/>
+                            <Label Grid.Column="4" Text="名称" FontSize="13" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <Entry Grid.Column="5" Text="{Binding NewName}" Placeholder="如：元旦 / 春节前补班" HeightRequest="36"/>
+                        </Grid>
+                        <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                            <Button Text="保存" Style="{StaticResource ButtonPrimary}" HeightRequest="34" Padding="18,4" Command="{Binding SaveCommand}"/>
+                            <Button Text="取消" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="18,4" Command="{Binding CancelAddCommand}"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 工具栏 -->
+                <Grid Margin="20,12,20,0" ColumnDefinitions="*,Auto">
+                    <Label Text="记录列表" Style="{StaticResource SectionTitleLabel}" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="+ 手工新增" FontSize="13" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                            Style="{StaticResource ButtonOutline}" Opacity="{Binding ManageOpacity}"
+                            Command="{Binding StartAddCommand}"/>
+                </Grid>
+
+                <!-- 节假日列表 -->
+                <CollectionView ItemsSource="{Binding Holidays}" Margin="20,8,20,0">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:SysHoliday">
+                            <Border Style="{StaticResource CardBorder}" Padding="14,10" Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="110,70,110,90,*,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                        <Label Text="{Binding DateDisplay}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="{Binding WeekDisplay}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                    </VerticalStackLayout>
+
+                                    <Label Grid.Column="1" Text="{Binding DateTypeName}" FontSize="12" VerticalOptions="Center">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsMakeup}" Value="True">
+                                                <Setter Property="TextColor" Value="#1565C0"/>
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Grid.Column="2" Text="{Binding Name}" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="3" Text="{Binding SourceName}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="4" Text="{Binding UpdatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                    <Button Grid.Column="5" Text="删除" FontSize="12" Style="{StaticResource ButtonSmall}"
+                                            Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:HolidayViewModel}}, Path=ManageOpacity}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HolidayViewModel}}, Path=DeleteCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource CardBorder}" Padding="24" Margin="0,8">
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
+                                <Label Text="该年份暂无节假日数据" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                                <Label Text="可点击「下载数据」从节假日接口获取，或手工新增" FontSize="12" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"/>
+                            </VerticalStackLayout>
+                        </Border>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+        <!-- SnackBar -->
+        <Grid Grid.Row="0" VerticalOptions="End" HorizontalOptions="Center" Margin="0,0,0,24" InputTransparent="True">
+            <components:SnackBarView Message="{Binding SnackBarMessage}"
+                                     Type="{Binding SnackBarType}"
+                                     IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

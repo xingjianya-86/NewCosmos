@@ -1,0 +1,91 @@
+# 死亡信息登记表 Schema 定义
+# 来源：backup/cosmos_backup_20260618_073641.sql（pg_dump 权威 DDL，
+# 旧表名 cosmos_death_records 按 nc_ 命名规范迁移）
+# 注：member_id、operator_name 两列为 ChangeService 代码实际写入但备份库缺失的列，
+# 以可空列补齐（见 Services/Domain/ChangeManagement/ChangeService.cs 的 INSERT）
+database: 死亡记录
+version: 2.0
+description: 死亡信息登记表 - 记录家庭成员死亡及户主变更信息
+
+tables:
+  - name: nc_biz_death_records
+    comment: "[流程] 死亡信息登记表 - 记录家庭成员死亡信息，触发户主变更和档案重建"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 死亡记录ID，主键
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID（历史档案）
+      - name: member_id
+        type: bigint
+        nullable: true
+        comment: 死亡成员ID，关联nc_biz_family_members.id（代码使用，备份库缺失，补齐列）
+      - name: member_name
+        type: character varying(100)
+        nullable: false
+        comment: 死亡成员姓名
+      - name: member_id_card
+        type: character varying(18)
+        nullable: false
+        comment: 死亡成员身份证号
+      - name: relationship_to_head
+        type: character varying(50)
+        nullable: true
+        comment: 与户主关系
+      - name: death_date
+        type: date
+        nullable: false
+        comment: 死亡日期
+      - name: death_reason
+        type: character varying(200)
+        nullable: true
+        comment: 死亡原因
+      - name: death_certificate_no
+        type: character varying(50)
+        nullable: true
+        comment: 死亡证明编号
+      - name: is_household_head
+        type: boolean
+        nullable: true
+        defaultValue: 'false'
+        comment: 是否户主
+      - name: new_head_id_card
+        type: character varying(18)
+        nullable: true
+        comment: 新户主身份证号（户主死亡时）
+      - name: new_head_name
+        type: character varying(100)
+        nullable: true
+        comment: 新户主姓名
+      - name: new_application_id
+        type: bigint
+        nullable: true
+        comment: 新申请ID（户主死亡后重建档案）
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: operator_name
+        type: character varying(100)
+        nullable: true
+        comment: 操作人姓名（代码使用，备份库缺失，补齐列）
+      - name: created_by
+        type: character varying(100)
+        nullable: true
+        comment: 创建人
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+    indexes:
+      - name: idx_biz_death_records_application_id
+        columns: [application_id]
+      - name: idx_biz_death_records_death_date
+        columns: [death_date]
+      - name: idx_biz_death_records_member_id_card
+        columns: [member_id_card]

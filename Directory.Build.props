@@ -1,0 +1,26 @@
+<Project>
+  <!-- 统一的警告屏蔽配置 -->
+  <PropertyGroup>
+    <!-- 代码分析警告（CA系列）-->
+    <NoWarn>$(NoWarn);CA1707;CA1859;CA1845;CA1822;CA1852;CA2201;CA1000;CA1001;CA1416;CA1716;CA1816</NoWarn>
+    
+    <!-- XAML编译警告（XC系列）；验证绑定时用 -p:ShowXamlCWarnings=true 显形 -->
+    <NoWarn Condition="'$(ShowXamlCWarnings)' != 'true'">$(NoWarn);XC0022;XC0023;XC0024;XC0025;XC0045;XC0009</NoWarn>
+    
+    <!-- 系统库警告 -->
+    <NoWarn>$(NoWarn);SYSLIB1045</NoWarn>
+    
+    <!-- 可空性警告（CS系列）-->
+    <NoWarn>$(NoWarn);CS8625</NoWarn>
+    
+    <!-- 警告不作为错误处理 -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- 构建期关闭代码分析器运行（保留 IDE 实时分析，仅省构建时间）：
+       MVVM/源生成器不受此影响，编译错误照常上报 -->
+  <PropertyGroup>
+    <RunAnalyzers>false</RunAnalyzers>
+    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.UserManagement.OrganizationImportPage"
+             x:DataType="OrganizationImportViewModel"
+             Title="组织数据导入"
+             NavigationPage.HasNavigationBar="False">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+        <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <Button Grid.Column="2"
+                            Text="&#xE72C; 清空"
+                            FontFamily="Segoe Fluent Icons"
+                            BackgroundColor="#33FFFFFF"
+                            TextColor="White"
+                            FontSize="14"
+                            Command="{Binding SelectFileCommand}"
+                            VerticalOptions="Center"
+                            Padding="16,10"
+                            CornerRadius="20"/>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="组织数据导入" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="从Excel文件批量导入组织数据" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1" BackgroundColor="{StaticResource Background}">
+            <VerticalStackLayout Padding="20" Spacing="20">
+
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Label Grid.Column="0" Text="选择文件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Button Grid.Column="2" Text="&#xE8B7; 选择文件" FontFamily="Segoe Fluent Icons"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding SelectFileCommand}"
+                                    IsEnabled="{Binding IsImporting, Converter={StaticResource BoolToInverseConverter}}"/>
+                        </Grid>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Label Text="支持 .xlsx / .xls / .csv 格式，需包含「名称」列"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+
+                        <Grid IsVisible="{Binding HasSelectedFile}" Margin="0,4,0,0">
+                            <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="12,8" StrokeShape="RoundRectangle 8">
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons"
+                                           FontSize="18" TextColor="{StaticResource Primary}"
+                                           VerticalOptions="Center"/>
+                                    <Label Text="{Binding SelectedFileName}" FontSize="16"
+                                           TextColor="{StaticResource TextPrimary}"
+                                           VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderElevated}"
+                        IsVisible="{Binding HasSelectedFile}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="数据预览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <Grid ColumnDefinitions="Auto,*,*,*,*" RowDefinitions="Auto,Auto" Padding="8"
+                              ColumnSpacing="8" RowSpacing="8">
+                            <Label Grid.Row="0" Grid.Column="0" Text="行号" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="1" Text="名称" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="2" Text="简称" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="3" Text="负责人" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="4" Text="电话" Style="{StaticResource TableHeaderLabel}"/>
+
+                            <CollectionView Grid.Row="1" Grid.ColumnSpan="5"
+                                            ItemsSource="{Binding PreviewRows}">
+                                <CollectionView.EmptyView>
+                                    <Label Text="暂无数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                                </CollectionView.EmptyView>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="domain:OrganizationPreviewRow">
+                                        <Grid ColumnDefinitions="Auto,*,*,*,*" ColumnSpacing="8"
+                                              Padding="8,6" Style="{StaticResource TableRowInteractive}">
+                                            <Label Grid.Column="0" Text="{Binding RowNumber}"
+                                                   FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding Name}"
+                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="2" Text="{Binding Abbreviation}"
+                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="3" Text="{Binding Principal}"
+                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="4" Text="{Binding Phone}"
+                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </Grid>
+
+                        <Label Text="{Binding TotalCount, StringFormat='共 {0} 条数据'}"
+                               FontSize="15" TextColor="{StaticResource TextTertiary}"
+                               HorizontalOptions="End"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderElevated}"
+                        IsVisible="{Binding HasImportResult}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="导入结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <Border Grid.Column="0" BackgroundColor="{StaticResource SuccessSoft}" Padding="12,8"
+                                    StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="成功" FontSize="14" TextColor="#166534"/>
+                                    <Label Text="{Binding SuccessCount}" FontSize="28"
+                                           FontAttributes="Bold" TextColor="#166534"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" BackgroundColor="{StaticResource DangerSoft}" Padding="12,8"
+                                    StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="失败" FontSize="14" TextColor="#991B1B"/>
+                                    <Label Text="{Binding FailureCount}" FontSize="28"
+                                           FontAttributes="Bold" TextColor="#991B1B"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" BackgroundColor="{StaticResource CardOptionBackground}" Padding="12,8"
+                                    StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="总计" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding TotalCount}" FontSize="28"
+                                           FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 导入进度 -->
+                <!-- 导入进度改为全屏遮罩（见页面顶层 LoadingOverlay） -->
+
+                <!-- 操作按钮 -->
+                <HorizontalStackLayout HorizontalOptions="End" Spacing="12"
+                                       IsVisible="{Binding HasSelectedFile}">
+                    <Button Text="&#xE74E; 开始导入" FontFamily="Segoe Fluent Icons"
+                            Style="{StaticResource ButtonPrimary}"
+                            Command="{Binding ImportCommand}"
+                            IsEnabled="{Binding IsImporting, Converter={StaticResource BoolToInverseConverter}}"
+                            WidthRequest="160"/>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              VerticalOptions="End" HorizontalOptions="Fill"
+              Padding="24,0,24,80" InputTransparent="True">
+            <components:SnackBarView
+                Message="{Binding SnackBarMessage}"
+                Type="{Binding SnackBarType}"
+                IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+        <!-- 导入进度全屏遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2"
+                                   IsLoading="{Binding IsImporting}"
+                                   LoadingText="正在导入..."
+                                   ShowProgress="True"
+                                   Progress="{Binding ImportProgress}"/>
+
+    </Grid>
+</ContentPage>

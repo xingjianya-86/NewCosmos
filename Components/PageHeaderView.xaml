@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.PageHeaderView"
+             x:Name="Root">
+
+    <!-- 全库统一页面页头：
+         <components:PageHeaderView Glyph="&#xE88E;" Title="数据中心"
+                                    BackCommand="{Binding GoBackCommand}">
+             <components:PageHeaderView.HeaderActions>
+                 <Button Text="清空" .../>
+             </components:PageHeaderView.HeaderActions>
+         </components:PageHeaderView>
+         深色页头：IsDark="True"；双行垂排：Subtitle 非空；单行附加小字：TrailingText。 -->
+    <Border x:Name="HostBorder" Padding="20,16" StrokeThickness="0">
+        <Border.Shadow>
+            <Shadow Brush="#000000" Offset="0,2" Radius="4" Opacity="0.05"/>
+        </Border.Shadow>
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+            <components:BackButton x:Name="BackBtn" VerticalOptions="Center"/>
+            <Label x:Name="GlyphLabel" Grid.Column="1" FontFamily="Segoe Fluent Icons" FontSize="24"
+                   VerticalOptions="Center" IsVisible="False"/>
+            <Grid x:Name="TitleHost" Grid.Column="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
+                <Label x:Name="TitleLabel" Style="{StaticResource PageTitleLabel}" VerticalOptions="Center"/>
+                <VerticalStackLayout x:Name="DualRowLayout" Grid.Column="0" Grid.ColumnSpan="3" Spacing="0"
+                                     IsVisible="False">
+                    <Label x:Name="DualTitleLabel" Style="{StaticResource PageTitleLabel}"/>
+                    <Label x:Name="SubTitleLabel" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                </VerticalStackLayout>
+                <Label x:Name="TrailingLabel" Grid.Column="1" FontSize="14"
+                       TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="False"/>
+            </Grid>
+            <ContentPresenter Grid.Column="3" Content="{Binding HeaderActions, Source={x:Reference Root}}"/>
+        </Grid>
+    </Border>
+</ContentView>

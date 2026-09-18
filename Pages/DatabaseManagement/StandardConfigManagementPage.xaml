@@ -1,0 +1,238 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.DatabaseManagement.StandardConfigManagementPage"
+             x:DataType="StandardConfigManagementViewModel"
+             Title="标准配置管理"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="&#xE774; 同步Schema"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="#33FFFFFF"
+                                TextColor="White"
+                                FontSize="14"
+                                Command="{Binding SyncSchemaCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                        <Button Text="&#xE9F9; 初始化"
+                                FontFamily="Segoe Fluent Icons"
+                                BackgroundColor="White"
+                                TextColor="{StaticResource Primary}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                Command="{Binding InitializeFromSeedCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                Opacity="{Binding ManageOpacity}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="标准配置管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="管理低保、特困等救助标准配置" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="280,*" BackgroundColor="{StaticResource Background}">
+
+            <!-- 左侧：分类列表 -->
+            <Border Grid.Column="0" Style="{StaticResource CardBorderElevated}" Padding="0" Margin="16">
+                <Grid RowDefinitions="Auto,*">
+                    <Label Grid.Row="0" Text="标准分类" Style="{StaticResource SectionTitleLabel}" Margin="16,16,16,8"/>
+                    <BoxView Grid.Row="0" HeightRequest="1" BackgroundColor="{StaticResource Gray200}" Margin="16,40,16,0" VerticalOptions="End"/>
+
+                    <ScrollView Grid.Row="1">
+                        <CollectionView ItemsSource="{Binding Categories}" SelectionMode="Single" SelectedItem="{Binding SelectedCategory}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无分类" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="StandardCategoryView">
+                                    <Grid Padding="16,12" Margin="8,0,8,4">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="Transparent"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <Label Text="{Binding DisplayName}" FontSize="16" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </ScrollView>
+                </Grid>
+            </Border>
+
+            <!-- 右侧：标准列表 + 编辑面板 -->
+            <Grid Grid.Column="1">
+                <Border Style="{StaticResource CardBorderElevated}" Padding="0" Margin="0,16,16,16">
+                    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+                        <!-- 标准列表标题 + 操作按钮 -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="16" Margin="0,0,0,8">
+                            <Label Grid.Column="0" Text="{Binding SelectedCategory.DisplayName, StringFormat='标准配置 - {0}'}" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                                <Button Text="&#xE710; 新增" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddStandardCommand}" Opacity="{Binding ManageOpacity}"/>
+                                <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditStandardCommand}" IsEnabled="{Binding SelectedStandard, Converter={StaticResource NullToBoolConverter}}" Opacity="{Binding ManageOpacity}"/>
+                                <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteStandardCommand}" IsEnabled="{Binding SelectedStandard, Converter={StaticResource NullToBoolConverter}}" Opacity="{Binding ManageOpacity}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 表头 -->
+                        <Grid Grid.Row="1" ColumnDefinitions="*,100,80,60" Padding="12,8" Margin="16,0" BackgroundColor="{StaticResource Gray100}">
+                            <Label Grid.Column="0" Text="标准名称" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="1" Text="标准值" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="End"/>
+                            <Label Grid.Column="2" Text="单位" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="End"/>
+                            <Label Grid.Column="3" Text="户籍" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="End"/>
+                        </Grid>
+
+                        <!-- 标准列表 -->
+                        <CollectionView Grid.Row="2" ItemsSource="{Binding ConfigStandards}" SelectionMode="Single" SelectedItem="{Binding SelectedStandard}" Margin="16,0">
+                            <CollectionView.EmptyView>
+                                <Label Text="请选择分类或点击初始化" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:ConfigStandard">
+                                    <Grid ColumnDefinitions="*,100,80,60" Padding="12" Margin="0,0,0,4">
+                                        <VisualStateManager.VisualStateGroups>
+                                            <VisualStateGroupList>
+                                                <VisualStateGroup x:Name="CommonStates">
+                                                    <VisualState x:Name="Normal">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="PointerOver">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                    <VisualState x:Name="Selected">
+                                                        <VisualState.Setters>
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryLight}"/>
+                                                        </VisualState.Setters>
+                                                    </VisualState>
+                                                </VisualStateGroup>
+                                            </VisualStateGroupList>
+                                        </VisualStateManager.VisualStateGroups>
+                                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                            <Label Text="{Binding StandardName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding Description}" FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1" Text="{Binding StandardValue}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="End"/>
+                                        <Label Grid.Column="2" Text="{Binding Unit}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                        <Label Grid.Column="3" Text="{Binding HukouType}" FontSize="14" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <!-- 编辑面板（完整字段） -->
+                        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Padding="16" IsVisible="{Binding IsEditing}" BackgroundColor="{StaticResource Gray100}">
+                            <VerticalStackLayout Grid.Column="0" Spacing="8">
+                                <Entry Text="{Binding EditStandardName}" Placeholder="标准名称" WidthRequest="200"/>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Entry Text="{Binding EditStandardValue}" Placeholder="标准值" WidthRequest="100" Keyboard="Numeric"/>
+                                    <Entry Text="{Binding EditUnit}" Placeholder="单位" WidthRequest="80"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Picker Title="户籍类型" ItemsSource="{Binding HukouTypeOptions}" SelectedItem="{Binding EditHukouType}" WidthRequest="120"/>
+                                    <Picker Title="供养方式" ItemsSource="{Binding SupportModeOptions}" SelectedItem="{Binding EditSupportMode}" WidthRequest="120"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Spacing="8">
+                                    <DatePicker Date="{Binding EditEffectiveStartDate}" WidthRequest="150"/>
+                                    <DatePicker Date="{Binding EditEffectiveEndDate}" WidthRequest="150"/>
+                                </HorizontalStackLayout>
+                                <Entry Text="{Binding EditDescription}" Placeholder="描述" WidthRequest="300"/>
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                <Button Text="保存" Style="{StaticResource ButtonPrimary}" Command="{Binding SaveStandardCommand}"/>
+                                <Button Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelEditCommand}"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                    </Grid>
+                </Border>
+
+            </Grid>
+
+        </Grid>
+
+        <!-- 进度弹窗覆盖层 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              BackgroundColor="#80000000"
+              IsVisible="{Binding Progress.IsProgressVisible}"
+              HorizontalOptions="Fill"
+              VerticalOptions="Fill">
+            <components:ProgressPopupView
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                Title="{Binding Progress.ProgressTitle}"
+                Progress="{Binding Progress.ProgressValue}"
+                ProgressText="{Binding Progress.ProgressText}"
+                Steps="{Binding Progress.ProgressSteps}"
+                CanClose="{Binding Progress.CanCloseProgress}"
+                CloseCommand="{Binding Progress.CloseProgressCommand}"/>
+        </Grid>
+
+        <!-- SnackBar 提示 -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              VerticalOptions="End"
+              HorizontalOptions="Fill"
+              Padding="24,0,24,80"
+              InputTransparent="True">
+            <components:SnackBarView
+                Message="{Binding SnackBarMessage}"
+                Type="{Binding SnackBarType}"
+                IsVisible="{Binding IsSnackBarVisible}"/>
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

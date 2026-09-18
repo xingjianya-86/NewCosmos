@@ -1,0 +1,51 @@
+﻿namespace NewCosmos.Models.NavigationData;
+
+/// <summary>
+/// 打印/档案输出流程的跨页面传参。
+/// ⚠️ FieldData/TableData 含公民 PII（姓名、身份证、收入）——
+/// 离开输出流程时必须调用 Clear()（ArchiveOutputPage.OnDisappearing 在页面弹出导航栈时负责），
+/// 严禁让这些数据驻留到进程退出。
+/// </summary>
+public static class PrintNavigationData
+{
+    public static string BusinessType { get; set; } = string.Empty;
+    public static long? BusinessId { get; set; }
+    public static Dictionary<string, string> FieldData { get; set; } = new();
+    public static List<Dictionary<string, string>> TableData { get; set; } = new();
+
+    /// <summary>
+    /// 赡养人表格数据（用于赡养费承诺书按人迭代生成PDF）
+    /// </summary>
+    public static List<Dictionary<string, string>>? SupporterTableData { get; set; }
+
+    /// <summary>
+    /// 近亲属备案对数据（用于档案近亲属两表按对迭代生成PDF，每对一页）
+    /// 每行 = 一名工作人员 + 一名关联救助对象的字段集
+    /// </summary>
+    public static List<Dictionary<string, string>>? NearRelativePairs { get; set; }
+
+    /// <summary>
+    /// 家庭分类代码（如 "RuralSubsistence", "UrbanSubsistence" 等）
+    /// 用于按分类查询模板配置的打印份数
+    /// </summary>
+    public static string Classification { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 申请状态（如 "Completed", "Stopped" 等）
+    /// 用于判断是否为停保档案，加载变更告知书模板
+    /// </summary>
+    public static string Status { get; set; } = string.Empty;
+
+    public static void Clear()
+    {
+        BusinessType = string.Empty;
+        BusinessId = null;
+        // 置空引用释放 PII；读方均有 null 检查（历史行为即置 null，保持一致）
+        FieldData = null;
+        TableData = null;
+        SupporterTableData = null;
+        NearRelativePairs = null;
+        Classification = string.Empty;
+        Status = string.Empty;
+    }
+}

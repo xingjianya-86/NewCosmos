@@ -1,0 +1,80 @@
+# 综合数据库配置文件（示例模板）
+# 复制此文件为 database.ini 并填入真实配置
+# 格式：标准INI格式，使用节(section)和键值对(key=value)
+
+[General]
+# 配置文件格式版本
+Version=1.0
+# 默认使用的数据库模块
+DefaultModule=primary
+
+# 模块 1: 主数据库配置
+[PrimaryConnection]
+# 数据库类型: PostgreSQL
+Type=PostgreSQL
+# 数据库服务器主机名或IP地址
+Host=127.0.0.1
+# 数据库服务器端口 (PostgreSQL: 5432)
+Port=5432
+# 数据库名称
+DatabaseName=cosmos_next
+# 连接超时时间（秒）
+ConnectionTimeout=5
+
+[PrimaryAuthentication]
+# 数据库用户名
+Username=your_username
+# 数据库密码
+Password=your_password
+
+[PrimaryPooling]
+# 连接池最大连接数
+MaxPoolSize=30
+# 连接池最小连接数
+MinPoolSize=10
+
+[PrimaryPostgreSQL]
+# PostgreSQL SSL模式
+SslMode=Disable
+# 是否信任服务器证书
+TrustServerCertificate=true
+
+[PrimaryEnvironment]
+# 是否为生产环境
+IsProduction=true
+# 数据库连接的应用程序名称
+ApplicationName=NewCosmos
+
+# 控制分类部分
+[Validation]
+EnableConnectionValidation=true
+ConnectionValidationTimeout=5
+EnableSchemaValidation=true
+
+[Operational]
+EnableConnectionPooling=true
+EnableTransactionSupport=true
+EnableQueryLogging=true
+QueryLogLevel=Error
+
+[Performance]
+EnableConnectionResiliency=true
+CommandTimeout=30
+BatchSize=1000
+KeepAliveInterval=60
+EnableKeepAlive=true
+
+# 备份配置部分
+[Backup]
+PgDumpPath=pg_dump
+BackupFilePrefix=cosmos_backup
+BackupFileExtension=.sql
+RetentionDays=30
+EnableCompression=false
+
+# Schema版本控制部分
+[Schema]
+CurrentVersion=1.0
+InitializedAt=
+InitializedBy=
+TablePrefixFilter=nc_

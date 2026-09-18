@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.SocialAssistance.SelectMembersPopup"
+             x:DataType="pages:SelectMembersPopup"
+             Title="选择家庭成员"
+             BackgroundColor="Transparent"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="*,Auto" RowSpacing="0">
+        <!-- 半透明背景遮罩 -->
+        <Grid Grid.Row="0" BackgroundColor="#80000000">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnCancelClicked"/>
+            </Grid.GestureRecognizers>
+        </Grid>
+
+        <!-- 弹窗内容 -->
+        <Border Grid.Row="1" BackgroundColor="White" Stroke="Transparent"
+                MaximumHeightRequest="500" VerticalOptions="End"
+                StrokeShape="RoundRectangle 20,20,0,0">
+        <VerticalStackLayout>
+
+            <!-- 拖拽指示条 -->
+            <HorizontalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Margin="0,8,0,0">
+                <BoxView WidthRequest="40" HeightRequest="4" CornerRadius="2"
+                         BackgroundColor="{StaticResource Gray300}"/>
+            </HorizontalStackLayout>
+
+            <!-- 标题栏 -->
+            <Grid ColumnDefinitions="*,Auto" Padding="20,12,16,8">
+                <Label Text="选择家庭成员" FontSize="17" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                <Button Grid.Column="1" Text="全选" FontSize="14"
+                        Clicked="OnSelectAllClicked" BackgroundColor="Transparent"
+                        TextColor="{StaticResource Primary}" Padding="0" HeightRequest="32"/>
+            </Grid>
+
+            <!-- 成员复选列表 -->
+            <ScrollView MaximumHeightRequest="350">
+                <VerticalStackLayout Padding="16,0" Spacing="8"
+                                     BindableLayout.ItemsSource="{Binding Members}">
+                    <BindableLayout.EmptyView>
+                        <Label Text="暂无可选的家庭成员" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                    </BindableLayout.EmptyView>
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="ent:FamilyMember">
+                            <Border Padding="16,12" StrokeShape="RoundRectangle 12"
+                                    BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                              Color="{StaticResource Primary}" VerticalOptions="Center"/>
+                                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                        <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                               TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="12"
+                                               TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Text="{Binding Age, StringFormat='{0}岁'}" FontSize="12"
+                                               TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Text="{Binding Gender}" FontSize="12"
+                                               TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- 底部按钮 1:1 -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Padding="16,10,16,20">
+                <Button Text="取消" Style="{StaticResource ButtonSecondary}" HeightRequest="42"
+                        Clicked="OnCancelClicked"/>
+                <Button Grid.Column="1" Text="确认添加" Style="{StaticResource ButtonPrimary}" HeightRequest="42"
+                        Clicked="OnConfirmClicked"/>
+            </Grid>
+
+        </VerticalStackLayout>
+        </Border>
+    </Grid>
+
+</ContentPage>

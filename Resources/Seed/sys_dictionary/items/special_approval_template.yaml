@@ -1,0 +1,15 @@
+# 一事一议预案模板字典（固定 ID）
+# 分类 ID=94，字典项 ID 范围: 94001-94999
+# item_value 为预案文案，含【占位符】由经办人替换；最终编辑文本保存到申报表 special_matters
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 94001, category: "SpecialApprovalTemplates", item_key: "收入超标-刚性支出沉重", item_value: "申请人家庭现有成员【X】人，人均月收入【金额】元，虽略高于本地【低保/低收入】认定标准，但因家庭成员【姓名】患【疾病】/遭遇【事故】，每月刚性支出【金额】元，实际可支配收入已低于基本生活保障水平，家庭基本生活仍存在严重困难，情况特殊，恳请通过“一事一议”程序研究给予救助。", sort_order: 1, is_active: true }
+      - { id: 94002, category: "SpecialApprovalTemplates", item_key: "有劳动力-实际难以就业", item_value: "申请人家庭虽成员【姓名】具备劳动能力，但因其需长期照护【重病/重残/失能老人或婴幼儿】/身患【慢性疾病】难以稳定就业，主要劳动力无法外出务工，收入来源单一、入不敷出，存在特殊困难，恳请通过“一事一议”程序研究给予救助。", sort_order: 2, is_active: true }
+      - { id: 94003, category: "SpecialApprovalTemplates", item_key: "重病重残-边缘情形", item_value: "申请人家庭成员【姓名】患【疾病】（残疾【等级】级，证号【证号】），长期医疗/康复费用负担沉重，虽未完全达到【低保/低收入】认定条件，但实际生活陷入困境，属边缘困难群体，情况特殊，恳请通过“一事一议”程序研究给予救助。", sort_order: 3, is_active: true }
+      - { id: 94004, category: "SpecialApprovalTemplates", item_key: "多重赡养抚养负担", item_value: "申请人家庭需承担【X】名【老人/未成年子女】的赡养抚养义务，其中【具体情况】，支出较大，家庭负担沉重，人均收入虽略超认定标准，但实际困难突出，恳请通过“一事一议”程序研究给予救助。", sort_order: 4, is_active: true }
+      - { id: 94005, category: "SpecialApprovalTemplates", item_key: "情况特殊存在争议", item_value: "申请人家庭【具体情况】与常规认定条件存在【差异/争议】，经入户走访核实其家庭经济状况确有困难，为精准回应救助需求、避免漏保，恳请通过“一事一议”程序集体研究决策。", sort_order: 5, is_active: true }
+      - { id: 94006, category: "SpecialApprovalTemplates", item_key: "通用兜底", item_value: "申请人家庭基本情况：【概述】。因【主要原因】导致家庭基本生活出现严重困难，虽不完全符合常规认定条件，但情况特殊、确有救助必要，恳请通过“一事一议”程序研究给予救助。", sort_order: 6, is_active: true }

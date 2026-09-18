@@ -1,0 +1,490 @@
+# 普惠高龄补贴业务 Schema 定义
+database: elderly_benefits
+version: 1.0
+description: 普惠高龄补贴登记与补发计算
+
+tables:
+  # ── 普惠高龄补贴登记表 ──
+  - name: nc_biz_elderly_applications
+    comment: 普惠高龄补贴登记表，记录高龄老人申请登记、享受类别与补发计算信息
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 申请编号（GA+受理日期+序号）
+      - name: name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 申请人姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 身份证号码
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别（从身份证自动计算）
+      - name: birth_date
+        type: DATE
+        nullable: true
+        comment: 出生日期（从身份证自动计算）
+      - name: phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 联系电话
+
+      # ── 户籍地址（地区 key，遵循低收入认定流程） ──
+      - name: hukou_city_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍城市ID（nc_regions_cities.id）
+      - name: hukou_county_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍区县ID（nc_regions_counties.id）
+      - name: hukou_town_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍乡镇ID（nc_regions_towns.id）
+      - name: hukou_village_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍村/社区ID（nc_regions_villages.id）
+      - name: hukou_detail_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 户籍详细地址（门牌号等）
+      - name: hukou_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 户籍地址（由级联区划拼接）
+      - name: hukou_village
+        type: VARCHAR(100)
+        nullable: true
+        comment: 户籍所属村（单独登记）
+
+      # ── 家庭地址（独立区划） ──
+      - name: family_city_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭城市ID（nc_regions_cities.id）
+      - name: family_county_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭区县ID（nc_regions_counties.id）
+      - name: family_town_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭乡镇ID（nc_regions_towns.id）
+      - name: family_village_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭村/社区ID（nc_regions_villages.id）
+      - name: detail_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 家庭详细地址（门牌号，如：99号）
+      - name: family_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 家庭住址（由级联区划+详细地址拼接）
+      - name: bank_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 社保卡开户行
+      - name: bank_account
+        type: VARCHAR(50)
+        nullable: true
+        comment: 社保卡账号
+      - name: agent_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代办人姓名
+      - name: agent_relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代办人与申请人关系
+
+      # ── 代领人（登记表） ──
+      - name: agent_receive_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代领人姓名
+      - name: agent_receive_relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代领人与申请人关系
+      - name: agent_receive_bank_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 代领人社保卡开户行
+      - name: agent_receive_bank_account
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代领人社保卡账号
+      - name: agent_receive_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 代领原因
+
+      # ── 计发（受理次月起正常发放） ──
+      - name: issue_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 计发年月（受理次月，YYYY-MM）
+      - name: issue_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 计发金额（元/月，=受理时月标准）
+
+      # ── 享受类别与身份比对 ──
+      - name: category
+        type: VARCHAR(20)
+        nullable: true
+        comment: 享受类别（CAT1=80-89低保/边缘/特困，CAT2=80-89其他，CAT3=90-99，CAT4=100+）
+      - name: identity_flag
+        type: VARCHAR(20)
+        nullable: true
+        comment: 身份比对结果（低保对象/低保边缘/特困/低收入/无）
+      - name: identity_source
+        type: VARCHAR(50)
+        nullable: true
+        comment: 命中导入库表名
+      - name: is_category_manual
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 享受类别是否人工修正
+
+      # ── 补发计算 ──
+      - name: payback_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 补发起算月（YYYY-MM，实际采用值）
+      - name: payback_end_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 补发止算月（YYYY-MM，实际采用值）
+      - name: auto_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 系统自动计算的起算月（特殊情况追溯用）
+      - name: auto_end_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 系统自动计算的止算月（特殊情况追溯用）
+      - name: payback_months
+        type: INTEGER
+        nullable: true
+        comment: 补发总月数
+      - name: payback_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 补发总金额（元）
+      - name: is_special_case
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否特殊情况处理（人工调整起止月）
+      - name: special_reason
+        type: VARCHAR(500)
+        nullable: true
+        comment: 特殊情况原因说明
+      - name: payback_reason
+        type: VARCHAR(100)
+        nullable: true
+        comment: 补发原因（未及时登记/查找不到本人/短暂失联/其他，可选）
+
+      # ── 状态与流程 ──
+      - name: status
+        type: VARCHAR(20)
+        nullable: true
+        defaultValue: 'Draft'
+        comment: 状态（Draft=草稿，Confirmed=已确认/在享，Stopped=已停发）
+      - name: apply_date
+        type: DATE
+        nullable: true
+        comment: 受理日期（默认当天）
+      - name: confirmed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 确认时间
+      - name: confirmed_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 确认人
+      - name: stopped_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 停发时间
+      - name: stopped_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 停发人
+      - name: stop_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 停发原因
+
+      # ── 停止/追缴（取消备案表） ──
+      - name: due_stop_date
+        type: DATE
+        nullable: true
+        comment: 应停发时间
+      - name: actual_stop_date
+        type: DATE
+        nullable: true
+        comment: 实际停发时间（默认=系统停发时间）
+      - name: is_recover
+        type: BOOLEAN
+        nullable: true
+        defaultValue: false
+        comment: 是否需要追缴
+      - name: recover_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 追缴起算月（YYYY-MM）
+      - name: recover_end_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 追缴止算月（YYYY-MM）
+      - name: recover_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        defaultValue: 0
+        comment: 追缴金额（元）
+      - name: death_date
+        type: DATE
+        nullable: true
+        comment: 死亡日期（停发原因为去世时填写）
+      - name: remark
+        type: VARCHAR(500)
+        nullable: true
+        comment: 备注
+
+      # ── 来源追踪 ──
+      - name: source_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 数据来源类型（如 ElderlySubsidyHistory）
+      - name: source_id
+        type: BIGINT
+        nullable: true
+        comment: 来源记录ID（如导入库记录ID）
+
+      # ── 审计字段 ──
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 更新人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_elderly_applications_id_card
+        columns: [id_card]
+      - name: idx_elderly_applications_application_no
+        columns: [application_no]
+        unique: true
+      - name: idx_elderly_applications_status
+        columns: [status]
+      - name: idx_elderly_applications_apply_date
+        columns: [apply_date]
+
+  # ── 普惠高龄补贴补发分段明细表 ──
+  - name: nc_biz_elderly_payback_segments
+    comment: 普惠高龄补贴补发分段明细表，按年龄档位切段记录补发金额（分段计算与审计用）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联登记表ID（nc_biz_elderly_applications.id）
+      - name: category_code
+        type: VARCHAR(20)
+        nullable: true
+        comment: 该段享受类别代码
+      - name: monthly_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 该段月标准金额（元/月）
+      - name: segment_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 该段起算月（YYYY-MM）
+      - name: segment_end_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 该段止算月（YYYY-MM）
+      - name: months
+        type: INTEGER
+        nullable: true
+        comment: 该段月数
+      - name: segment_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 该段金额（元）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: idx_elderly_segments_application_id
+        columns: [application_id]
+
+  # ── 高龄津贴复核记录表（待复核队列 + 复核留痕，一次复核一条） ──
+  - name: nc_biz_elderly_reviews
+    comment: 高龄津贴类别复核记录表（身份+年龄重评、停旧增新留痕；Pending=待复核队列，Completed=已办理）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: review_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 复核编号（FC+日期+序号）
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 身份证号
+      - name: name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 姓名
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Pending'
+        comment: 状态（Pending=待复核，Completed=已完成）
+      - name: trigger_source
+        type: VARCHAR(50)
+        nullable: true
+        comment: 触发来源（Manual=人工，ArchiveReview=归档联动，LowIncomeChange=低收入变更，Import=名册）
+      - name: trigger_ref
+        type: BIGINT
+        nullable: true
+        comment: 触发来源记录ID（低收入档案ID/变更记录ID）
+      - name: trigger_reason
+        type: VARCHAR(200)
+        nullable: true
+        comment: 触发说明
+      - name: source_history_id
+        type: BIGINT
+        nullable: true
+        comment: 名册记录ID（nc_biz_elderly_subsidy_history.id，名册未建档人员）
+      - name: old_application_id
+        type: BIGINT
+        nullable: true
+        comment: 旧档案ID（在享档案；名册未建档者为补建档案ID）
+      - name: old_application_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 旧档案编号
+      - name: old_category
+        type: VARCHAR(20)
+        nullable: true
+        comment: 旧享受类别（CAT1-CAT4）
+      - name: old_monthly_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 旧月标准（元/月）
+      - name: new_application_id
+        type: BIGINT
+        nullable: true
+        comment: 新档案ID
+      - name: new_application_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 新档案编号
+      - name: new_category
+        type: VARCHAR(20)
+        nullable: true
+        comment: 新享受类别（CAT1-CAT4）
+      - name: new_monthly_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 新月标准（元/月）
+      - name: identity_flag
+        type: VARCHAR(20)
+        nullable: true
+        comment: 重评身份比对结果（低保对象/低保边缘/特困/无）
+      - name: age_at_review
+        type: INTEGER
+        nullable: true
+        comment: 复核时年龄（周岁）
+      - name: effective_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 应生效月（满90/100周岁当月，YYYY-MM）
+      - name: issue_start_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 新档计发起始月（复核次月，YYYY-MM）
+      - name: review_result
+        type: VARCHAR(20)
+        nullable: true
+        comment: 复核结果（Changed=已变更，NoChange=无需调整）
+      - name: adjust_reason_code
+        type: VARCHAR(20)
+        nullable: true
+        comment: 调整原因（AGE=年龄档次，IDENTITY=身份变动，OTHER=其他政策）
+      - name: review_opinion
+        type: VARCHAR(500)
+        nullable: true
+        comment: 复核意见
+      - name: reviewed_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 复核人
+      - name: reviewed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 复核时间
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_elderly_reviews_id_card
+        columns: [id_card]
+      - name: idx_elderly_reviews_status
+        columns: [status]
+      - name: idx_elderly_reviews_old_application_id
+        columns: [old_application_id]
+      - name: idx_elderly_reviews_reviewed_at
+        columns: [reviewed_at]

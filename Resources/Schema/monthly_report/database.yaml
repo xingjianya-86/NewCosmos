@@ -1,0 +1,327 @@
+# 月报表模块 Schema 定义
+# 来源说明（2026-07-27）：
+#   nc_biz_monthly_reports 在生产库 pg_dump（backup/db/new_cosmos_20260727_054917.sql）中不存在，
+#   运行日志存在 42P01 relation does not exist 报错。本定义依据代码使用重建：
+#   - Services/Domain/Reporting/MonthlyReportService.cs（INSERT 列清单 / 查询条件）
+#   - Services/Domain/Reporting/IMonthlyReportService.cs（MonthlyReport / MonthlyReportSummary 实体）
+#   - Services/Domain/Reporting/PrintService.cs（SELECT * 按 year+month 单行查询）
+#   uk_monthly_reports_year_month 为代码逻辑推断（生成前按 year+month 查重，且按 year+month 单行读取）。
+database: 月报表模块
+version: 2.0
+description: 救助业务月报表 - 按年月统计在保档案数、新增/停保数、各类救助人数和金额
+
+tables:
+  - name: nc_biz_monthly_reports
+    comment: "[报表] 月度统计报表 - 按年月统计在保档案数、新增/停保数、各类救助人数和金额"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 报表年份
+      - name: month
+        type: INTEGER
+        nullable: false
+        comment: 报表月份
+      - name: town
+        type: VARCHAR(100)
+        nullable: false
+        defaultValue: "'全部'"
+        comment: 乡镇（全部=全县汇总）
+      - name: report_type
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: "'Monthly'"
+        comment: 报表类型（Monthly-月报）
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: "'Generated'"
+        comment: 报表状态（Generated-已生成）
+      - name: total_archives
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 月末在保档案总数
+      - name: new_archives
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 本月新增档案数
+      - name: stopped_archives
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 本月停保档案数
+      - name: total_amount
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 月末在保总金额（元）
+      - name: new_amount
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 本月新增金额（元）
+      - name: rural_subsistence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 农村低保人数
+      - name: urban_subsistence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 城市低保人数
+      - name: rural_low_income_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 农村低收入人数
+      - name: urban_low_income_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 城市低收入人数
+      - name: rural_destitute_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 农村特困人数（分散+集中）
+      - name: urban_destitute_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 城市特困人数（分散+集中）
+      - name: rigid_expenditure_count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 刚性支出困难家庭人数（农村+城市）
+      - name: generated_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 生成人（实体字段，当前代码未写入）
+      - name: generated_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 生成时间
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+    constraints:
+      - name: uk_monthly_reports_year_month
+        type: UNIQUE
+        columns: [year, month]
+
+  - name: nc_biz_monthly_meetings
+    comment: "[报表] 月度会议记录 - 低保审核/一事一议会议记录（时间/主持人/出席/缺席/议题）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 报表年份
+      - name: month
+        type: INTEGER
+        nullable: false
+        comment: 报表月份
+      - name: town
+        type: VARCHAR(100)
+        nullable: false
+        defaultValue: "'全部'"
+        comment: 乡镇（全部=全县汇总）
+      - name: meeting_time
+        type: VARCHAR(50)
+        nullable: true
+        comment: 会议时间（原样填模板）
+      - name: host
+        type: VARCHAR(100)
+        nullable: true
+        comment: 主持人
+      - name: recorder
+        type: VARCHAR(100)
+        nullable: true
+        comment: 记录人
+      - name: attendees
+        type: TEXT
+        nullable: true
+        comment: 出席人员（多行文本）
+      - name: absentees
+        type: TEXT
+        nullable: true
+        comment: 缺席人员（多行文本）
+      - name: member_info
+        type: TEXT
+        nullable: true
+        comment: 新增成员信息（周期内新增名名单，多行；生成会议记录时自动带出）
+      - name: apply_category
+        type: VARCHAR(100)
+        nullable: true
+        comment: 申请分类（低保/低收入/特困等）
+      - name: created_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 录入人
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 更新时间
+    constraints:
+      - name: uk_monthly_meetings_year_month_town
+        type: UNIQUE
+        columns: [year, month, town]
+
+  - name: nc_biz_meeting_attendance_history
+    comment: "[报表] 会议出席历史表 - 记录每次会议的出席/缺席人员快照，用于自动回填"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 报表年份
+      - name: month
+        type: INTEGER
+        nullable: false
+        comment: 报表月份
+      - name: town
+        type: VARCHAR(100)
+        nullable: false
+        defaultValue: "'全部'"
+        comment: 乡镇（全部=全县汇总）
+      - name: attendees
+        type: TEXT
+        nullable: true
+        comment: 出席人员（多行文本快照）
+      - name: absentees
+        type: TEXT
+        nullable: true
+        comment: 缺席人员（多行文本快照）
+      - name: created_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 录入人
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 快照时间
+    indexes:
+      - name: idx_meeting_attendance_history_latest
+        columns: [year, month, town, created_at]
+
+  - name: nc_biz_monthly_classified_adds
+    comment: "[报表] 分类施保增发月报快照 - 每月首次渲染分类施保增加表单时按户落库，确定本月新增并支持重复打印一致性与历史溯源"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 报表年份
+      - name: month
+        type: INTEGER
+        nullable: false
+        comment: 报表月份
+      - name: town
+        type: VARCHAR(100)
+        nullable: false
+        defaultValue: "'全部'"
+        comment: 乡镇（月报表单不分乡镇，统一存全部）
+      - name: category
+        type: VARCHAR(50)
+        nullable: false
+        comment: 救助类别（最低生活保障对象）
+      - name: is_rural
+        type: BOOLEAN
+        nullable: false
+        comment: 是否农村低保（农村=TRUE / 城市=FALSE）
+      - name: applicant_id_card
+        type: VARCHAR(32)
+        nullable: false
+        comment: 户主/申请人身份证号
+      - name: applicant_name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 户主姓名
+      - name: applicant_gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 户主性别
+      - name: applicant_birth_date
+        type: VARCHAR(20)
+        nullable: true
+        comment: 户主出生日期（yyyy年MM月dd日）
+      - name: nationality
+        type: VARCHAR(50)
+        nullable: true
+        comment: 民族（中文）
+      - name: health_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 身体状况（中文）
+      - name: family_size
+        type: INTEGER
+        nullable: true
+        comment: 家庭人口
+      - name: phone
+        type: VARCHAR(100)
+        nullable: true
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        nullable: true
+        comment: 家庭住址
+      - name: classified_type
+        type: VARCHAR(100)
+        nullable: true
+        comment: 分类施保类型（重病/重残/高龄/未成年，顿号连接）
+      - name: count
+        type: INTEGER
+        nullable: false
+        defaultValue: '0'
+        comment: 符合增发人数
+      - name: amount
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 分类施保标准加发额度（元）
+      - name: members_json
+        type: JSONB
+        nullable: true
+        comment: 户内非户主家庭成员明细快照（MonthlyClassifiedMember 数组，1~6 行；户主信息在表头上方单独填写）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: 'NOW()'
+        comment: 落库时间
+    constraints:
+      - name: uk_classified_adds_ym_applicant
+        type: UNIQUE
+        columns: [year, month, applicant_id_card]
+    indexes:
+      - name: idx_classified_adds_ym
+        columns: [year, month]

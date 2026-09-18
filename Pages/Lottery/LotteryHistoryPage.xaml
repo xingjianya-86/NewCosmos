@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:local="clr-namespace:NewCosmos.Models.Lottery"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.Lottery"
+             x:Class="NewCosmos.Pages.Lottery.LotteryHistoryPage"
+             x:DataType="vm:LotteryHistoryViewModel"
+             Title="历史开奖"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 渐变头部 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE81C;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="历史开奖" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="往期开奖记录查询与数据浏览" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 分页信息 -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Label Text="{Binding TotalCount, StringFormat='共 {0} 期数据'}" TextColor="#B3FFFFFF" VerticalOptions="Center"/>
+                            <Label Text="{Binding CurrentPage, StringFormat='第 {0} 页'}" Grid.Column="1" TextColor="#B3FFFFFF" VerticalOptions="Center"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 彩种选择 + 分页控制 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                        <Label Text="彩种" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                        <Picker ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}" Grid.Column="1" WidthRequest="120" HeightRequest="40" VerticalOptions="Center"/>
+                        <Button Text="上一页" Command="{Binding GoPreviousPageCommand}" Grid.Column="2" WidthRequest="80" IsEnabled="{Binding HasPreviousPage}" HeightRequest="36"/>
+                        <Button Text="下一页" Command="{Binding GoNextPageCommand}" Grid.Column="3" WidthRequest="80" IsEnabled="{Binding HasNextPage}" HeightRequest="36"/>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- 开奖记录列表 -->
+                <VerticalStackLayout Margin="20,10,20,0" Spacing="8">
+                    <CollectionView ItemsSource="{Binding DrawList}" SelectionMode="None">
+                        <CollectionView.Header>
+                            <Grid ColumnDefinitions="*,*,*,*,*,*" BackgroundColor="{StaticResource SurfaceVariant}" Padding="12,10" Margin="0,0,0,4">
+                                <Label Text="期号" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                                <Label Text="日期" Grid.Column="1" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                                <Label Text="红球" Grid.Column="2" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                                <Label Text="蓝球" Grid.Column="3" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                                <Label Text="销售额" Grid.Column="4" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                                <Label Text="奖池" Grid.Column="5" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" FontSize="12"/>
+                            </Grid>
+                        </CollectionView.Header>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:LotteryDraw">
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,6" Padding="12">
+                                    <Grid ColumnDefinitions="*,*,*,*,*,*" RowDefinitions="Auto">
+                                        <Label Text="{Binding DrawNumber}" TextColor="{StaticResource TextPrimary}" FontSize="13"/>
+                                        <Label Text="{Binding DrawDate, StringFormat='{0:MM-dd}'}" Grid.Column="1" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
+                                        <Label Text="{Binding RedNumbersJson}" Grid.Column="2" TextColor="#E53935" FontSize="13"/>
+                                        <Label Text="{Binding BlueNumbersJson}" Grid.Column="3" TextColor="#1E88E5" FontSize="13"/>
+                                        <Label Text="{Binding SalesAmount, StringFormat='{0:N0}'}" Grid.Column="4" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
+                                        <Label Text="{Binding PoolMoney, StringFormat='{0:N0}'}" Grid.Column="5" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.RowSpan="1" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+    </Grid>
+</ContentPage>

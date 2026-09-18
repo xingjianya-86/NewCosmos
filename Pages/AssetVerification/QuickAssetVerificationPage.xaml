@@ -1,0 +1,328 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.AssetVerification.QuickAssetVerificationPage"
+             x:DataType="QuickAssetVerificationViewModel"
+             x:Name="ThisPage"
+             Title="快速经济核对"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter" />
+
+        <DataTemplate x:Key="ApplicantEvenRow" x:DataType="AssetCheckItemDto">
+            <Grid ColumnDefinitions="*,140,1.5*,Auto,*,Auto" ColumnSpacing="8" Margin="0,8" BackgroundColor="White">
+
+                <!-- 姓名 -->
+                <Entry Text="{Binding ApplicantName}" Placeholder="姓名" HeightRequest="48"
+                       BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 证件类型 -->
+                <Picker Grid.Column="1"
+                        ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=IdTypes}"
+                        SelectedItem="{Binding ApplicantIdType}"
+                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 身份证号 -->
+                <Entry Grid.Column="2" Text="{Binding ApplicantIdCard}" Placeholder="身份证号"
+                       MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 查询按钮 -->
+                <Button Grid.Column="3" Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        WidthRequest="36" HeightRequest="36" CornerRadius="18" Padding="0"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=QueryHistoryCommand}"
+                        CommandParameter="{Binding .}"/>
+
+                <!-- 家庭关系 -->
+                <Picker Grid.Column="4"
+                        ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=Relationships}"
+                        SelectedItem="{Binding Relationship}"
+                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 删除按钮 -->
+                <Button Grid.Column="5" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0"
+                        IsEnabled="{Binding IsHead, Converter={StaticResource BoolToInverseConverter}}"
+                        Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=RemoveApplicantCommand}"
+                        CommandParameter="{Binding .}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
+                            <Setter Property="TextColor" Value="White"/>
+                            <Style.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding IsHead}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Gray200}"/>
+                                    <Setter Property="TextColor" Value="{StaticResource Gray500}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:Key="ApplicantOddRow" x:DataType="AssetCheckItemDto">
+            <Grid ColumnDefinitions="*,140,1.5*,Auto,*,Auto" ColumnSpacing="8" Margin="0,8" BackgroundColor="#F8F9FA">
+
+                <!-- 姓名 -->
+                <Entry Text="{Binding ApplicantName}" Placeholder="姓名" HeightRequest="48"
+                       BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 证件类型 -->
+                <Picker Grid.Column="1"
+                        ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=IdTypes}"
+                        SelectedItem="{Binding ApplicantIdType}"
+                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 身份证号 -->
+                <Entry Grid.Column="2" Text="{Binding ApplicantIdCard}" Placeholder="身份证号"
+                       MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 查询按钮 -->
+                <Button Grid.Column="3" Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        WidthRequest="36" HeightRequest="36" CornerRadius="18" Padding="0"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=QueryHistoryCommand}"
+                        CommandParameter="{Binding .}"/>
+
+                <!-- 家庭关系 -->
+                <Picker Grid.Column="4"
+                        ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=Relationships}"
+                        SelectedItem="{Binding Relationship}"
+                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+
+                <!-- 删除按钮 -->
+                <Button Grid.Column="5" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0"
+                        IsEnabled="{Binding IsHead, Converter={StaticResource BoolToInverseConverter}}"
+                        Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=RemoveApplicantCommand}"
+                        CommandParameter="{Binding .}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
+                            <Setter Property="TextColor" Value="White"/>
+                            <Style.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding IsHead}" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Gray200}"/>
+                                    <Setter Property="TextColor" Value="{StaticResource Gray500}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="ApplicantRowSelector"
+            EvenTemplate="{StaticResource ApplicantEvenRow}"
+            OddTemplate="{StaticResource ApplicantOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 渐变英雄头部（橙色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8F5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="低收入人口经济核对申请" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="快速申请 · 信息录入 · 提交核对" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 表单内容 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="16">
+
+                <!-- 卡片1：申请信息 -->
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 标题 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
+                                    BackgroundColor="{StaticResource PrimarySoft}" Padding="0" StrokeThickness="0">
+                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                       TextColor="{StaticResource Primary}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="申请信息" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                        <!-- 所属镇提示 -->
+                        <HorizontalStackLayout Spacing="8" IsVisible="{Binding IsTownConfigured}">
+                            <Label Text="所属镇：" FontSize="16" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Text="{Binding OperatorTownName}" FontSize="16" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label Text="提示：请先完善个人信息的镇归属" FontSize="15" TextColor="{StaticResource Error}"
+                               IsVisible="{Binding IsTownConfigured, Converter={StaticResource BoolToInverseConverter}}"/>
+
+                        <!-- 表单字段 -->
+                        <Grid ColumnDefinitions="Auto,*,*,*,*" ColumnSpacing="16" RowDefinitions="Auto" RowSpacing="12">
+
+                            <!-- 申请日期 -->
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="申请日期" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <DatePicker Date="{Binding ApplicationDate}" Format="yyyy-MM-dd" HeightRequest="48"/>
+                            </VerticalStackLayout>
+
+                            <!-- 村社区 -->
+                            <VerticalStackLayout Grid.Column="1" Spacing="8">
+                                <Label Text="村社区" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Picker ItemsSource="{Binding Villages}" SelectedItem="{Binding SelectedVillage}"
+                                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 详细地址 -->
+                            <VerticalStackLayout Grid.Column="2" Spacing="8">
+                                <Label Text="详细地址" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Entry Text="{Binding FamilyAddressDetail}" Placeholder="门牌号等" HeightRequest="48"
+                                        BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 联系方式 -->
+                            <VerticalStackLayout Grid.Column="3" Spacing="8">
+                                <Label Text="联系方式" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Entry Text="{Binding ContactPhone}" Placeholder="手机号码" Keyboard="Telephone"
+                                        MaxLength="11" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 申请原因 -->
+                            <VerticalStackLayout Grid.Column="4" Spacing="8">
+                                <Label Text="申请原因" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Picker ItemsSource="{Binding ApplicationReasons}" SelectedItem="{Binding SelectedApplicationReason}"
+                                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 卡片2：授权人信息(家庭成员) -->
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 标题 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
+                                    BackgroundColor="{StaticResource SuccessSoft}" Padding="0" StrokeThickness="0">
+                                <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                       TextColor="{StaticResource Success}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="授权人信息(家庭成员)" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                        <!-- 添加按钮 -->
+                        <Button Text="＋ 添加授权人" Command="{Binding AddApplicantCommand}"
+                                Style="{StaticResource ButtonOutline}" HorizontalOptions="Start"
+                                HeightRequest="40" Padding="16,0"/>
+
+                        <!-- 表头 -->
+                        <Grid ColumnDefinitions="*,140,1.5*,Auto,*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
+                            <Label Text="姓名" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="1" Text="证件类型" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="2" Text="身份证号" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="4" Text="家庭关系" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Column="5" Text="操作" Style="{StaticResource TableHeaderLabel}"/>
+                        </Grid>
+
+                        <!-- 授权人列表 -->
+                        <CollectionView ItemsSource="{Binding Applicants}" ItemTemplate="{StaticResource ApplicantRowSelector}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无授权人" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+
+                        <!-- 提示文字 -->
+                        <Label Text="注：第一行必须填写户主本人信息，后续行请填写姓名、身份证号并选择家庭关系。"
+                               FontSize="15" TextColor="{StaticResource TextTertiary}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 卡片3：委托代理人信息 -->
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 标题 + CheckBox -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <CheckBox IsChecked="{Binding IsAgent}" Color="{StaticResource Primary}"/>
+                            <Label Grid.Column="1" Text="委托代理人/法定代理人信息" Style="{StaticResource SectionTitleLabel}"
+                                   Margin="0" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <BoxView Style="{StaticResource Divider}" Margin="0" IsVisible="{Binding IsAgentVisible}"/>
+
+                        <!-- 代理人表单 -->
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12" RowDefinitions="Auto" RowSpacing="12"
+                              IsVisible="{Binding IsAgentVisible}">
+
+                            <!-- 代理人姓名 -->
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="代理人姓名" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Entry Text="{Binding AgentName}" Placeholder="输入代理人姓名" HeightRequest="48"
+                                        BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 代理人证件类型 -->
+                            <VerticalStackLayout Grid.Column="1" Spacing="8">
+                                <Label Text="代理人证件类型" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Picker ItemsSource="{Binding IdTypes}"
+                                        SelectedItem="{Binding AgentIdType}"
+                                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 代理人身份证号 -->
+                            <VerticalStackLayout Grid.Column="2" Spacing="8">
+                                <Label Text="代理人身份证号" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Entry Text="{Binding AgentIdCard}" Placeholder="输入代理人身份证号"
+                                       MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 代理人关系 -->
+                            <VerticalStackLayout Grid.Column="3" Spacing="8">
+                                <Label Text="代理人关系" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Entry Text="{Binding AgentRelationship}" Placeholder="如：村干部、亲属"
+                                       HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 操作按钮 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,8,0,24">
+                    <Button Grid.Column="0" Text="提交申请" Style="{StaticResource ButtonPrimary}"
+                            Command="{Binding SubmitCommand}" IsEnabled="{Binding IsSubmitting, Converter={StaticResource BoolToInverseConverter}}"/>
+                    <Button Grid.Column="1" Text="重置" Style="{StaticResource ButtonOutline}"
+                            Command="{Binding ResetCommand}" IsEnabled="{Binding IsSubmitting, Converter={StaticResource BoolToInverseConverter}}"/>
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载指示器（放在 Grid 层级，覆盖整个页面） -->
+<components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2" IsLoading="{Binding IsBusy}"
+    LoadingText="正在核查..."/>
+    </Grid>
+</ContentPage>

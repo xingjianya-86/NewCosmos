@@ -1,0 +1,17 @@
+# 申请原因字典（固定 ID）
+# 分类 ID=70，字典项 ID 范围: 70001-70999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 70001, category: "ApplicationReasons", item_key: "Illness", item_value: "因病", sort_order: 1, is_active: true }
+      - { id: 70002, category: "ApplicationReasons", item_key: "Disaster", item_value: "因灾", sort_order: 2, is_active: true }
+      - { id: 70003, category: "ApplicationReasons", item_key: "Disability", item_value: "因残", sort_order: 3, is_active: true }
+      - { id: 70004, category: "ApplicationReasons", item_key: "Education", item_value: "因学", sort_order: 4, is_active: true }
+      - { id: 70005, category: "ApplicationReasons", item_key: "LowIncome", item_value: "收入低", sort_order: 5, is_active: true }
+      - { id: 70006, category: "ApplicationReasons", item_key: "Unemployment", item_value: "失业", sort_order: 6, is_active: true }
+      - { id: 70007, category: "ApplicationReasons", item_key: "LandLoss", item_value: "失地", sort_order: 7, is_active: true }
+      - { id: 70008, category: "ApplicationReasons", item_key: "Accident", item_value: "因意外事故", sort_order: 8, is_active: true }
+      - { id: 70009, category: "ApplicationReasons", item_key: "Other", item_value: "其他", sort_order: 9, is_active: true }

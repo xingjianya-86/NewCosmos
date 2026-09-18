@@ -1,0 +1,20 @@
+# 机构类型字典（固定 ID）
+# 分类 ID=92，字典项 ID 范围: 92001-92099
+# description 字段存储所属类别代码（Functional / Elderly）
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      # 职能机构类型
+      - { id: 92001, category: "InstitutionType", item_key: "Functional_Admin", item_value: "行政管理", description: "Functional", sort_order: 1, is_active: true }
+      - { id: 92002, category: "InstitutionType", item_key: "Functional_Business", item_value: "业务办理", description: "Functional", sort_order: 2, is_active: true }
+      - { id: 92003, category: "InstitutionType", item_key: "Functional_Supervision", item_value: "监督执法", description: "Functional", sort_order: 3, is_active: true }
+      - { id: 92004, category: "InstitutionType", item_key: "Functional_Other", item_value: "其他职能", description: "Functional", sort_order: 4, is_active: true }
+
+      # 养老机构类型
+      - { id: 92005, category: "InstitutionType", item_key: "Elderly_NursingHome", item_value: "敬老院", description: "Elderly", sort_order: 5, is_active: true }
+      - { id: 92006, category: "InstitutionType", item_key: "Elderly_CareCenter", item_value: "养老服务中心", description: "Elderly", sort_order: 6, is_active: true }
+      - { id: 92007, category: "InstitutionType", item_key: "Elderly_Welfare", item_value: "福利院", description: "Elderly", sort_order: 7, is_active: true }
+      - { id: 92008, category: "InstitutionType", item_key: "Elderly_Other", item_value: "其他养老", description: "Elderly", sort_order: 8, is_active: true }

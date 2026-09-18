@@ -1,0 +1,27 @@
+# 民族字典（固定 ID）
+# 分类 ID=12，字典项 ID 范围: 12001-12999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 12001, category: "Ethnicities", item_key: "Han", item_value: "汉族", sort_order: 1, is_active: true }
+      - { id: 12002, category: "Ethnicities", item_key: "Mongol", item_value: "蒙古族", sort_order: 2, is_active: true }
+      - { id: 12003, category: "Ethnicities", item_key: "Hui", item_value: "回族", sort_order: 3, is_active: true }
+      - { id: 12004, category: "Ethnicities", item_key: "Tibetan", item_value: "藏族", sort_order: 4, is_active: true }
+      - { id: 12005, category: "Ethnicities", item_key: "Uyghur", item_value: "维吾尔族", sort_order: 5, is_active: true }
+      - { id: 12006, category: "Ethnicities", item_key: "Miao", item_value: "苗族", sort_order: 6, is_active: true }
+      - { id: 12007, category: "Ethnicities", item_key: "Yi", item_value: "彝族", sort_order: 7, is_active: true }
+      - { id: 12008, category: "Ethnicities", item_key: "Zhuang", item_value: "壮族", sort_order: 8, is_active: true }
+      - { id: 12009, category: "Ethnicities", item_key: "Bouyei", item_value: "布依族", sort_order: 9, is_active: true }
+      - { id: 12010, category: "Ethnicities", item_key: "Korean", item_value: "朝鲜族", sort_order: 10, is_active: true }
+      - { id: 12011, category: "Ethnicities", item_key: "Manchu", item_value: "满族", sort_order: 11, is_active: true }
+      - { id: 12012, category: "Ethnicities", item_key: "Dong", item_value: "侗族", sort_order: 12, is_active: true }
+      - { id: 12013, category: "Ethnicities", item_key: "Yao", item_value: "瑶族", sort_order: 13, is_active: true }
+      - { id: 12014, category: "Ethnicities", item_key: "Bai", item_value: "白族", sort_order: 14, is_active: true }
+      - { id: 12015, category: "Ethnicities", item_key: "Tujia", item_value: "土家族", sort_order: 15, is_active: true }
+      - { id: 12016, category: "Ethnicities", item_key: "Hani", item_value: "哈尼族", sort_order: 16, is_active: true }
+      - { id: 12017, category: "Ethnicities", item_key: "Dai", item_value: "傣族", sort_order: 17, is_active: true }
+      - { id: 12018, category: "Ethnicities", item_key: "Li", item_value: "黎族", sort_order: 18, is_active: true }
+      - { id: 12019, category: "Ethnicities", item_key: "Other", item_value: "其他", sort_order: 19, is_active: true }

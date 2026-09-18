@@ -1,0 +1,311 @@
+database: 新权限系统
+version: 1.0
+description: 精简权限代码定义（共33个）
+
+permission_groups:
+  # ==================== 用户管理模块 (6个) ====================
+  USER_MANAGEMENT:
+    name: 用户管理
+    description: 用户账户管理相关权限
+    permissions:
+      - code: USER_VIEW
+        name: 用户查看
+        description: 查看用户列表和详情，包含导出功能
+        ui_control:
+          - 左侧导航"用户管理"
+          - 首页卡片"用户管理"按钮
+          - 用户列表页面
+          - "导出"按钮
+
+      - code: USER_CREATE
+        name: 用户创建
+        description: 创建新用户账户
+        ui_control:
+          - "创建用户"按钮
+
+      - code: USER_EDIT
+        name: 用户编辑
+        description: 编辑用户基本信息、组织调整、角色分配
+        ui_control:
+          - "编辑"按钮
+          - 组织选择下拉框
+          - 角色多选复选框
+
+      - code: USER_DELETE
+        name: 用户删除
+        description: 删除用户账户
+        ui_control:
+          - "删除"按钮
+
+      - code: USER_RESET_PASSWORD
+        name: 重置密码
+        description: 重置用户密码为默认密码
+        ui_control:
+          - "重置密码"按钮
+
+      - code: USER_MANAGE_STATUS
+        name: 启停用户
+        description: 启用或停用用户账户
+        ui_control:
+          - "启用"按钮
+          - "停用"按钮
+
+  # ==================== 组织管理模块 (4个) ====================
+  ORG_MANAGEMENT:
+    name: 组织管理
+    description: 组织机构管理相关权限
+    permissions:
+      - code: ORG_VIEW
+        name: 组织查看
+        description: 查看组织树和详情，包含导出功能
+        ui_control:
+          - 首页卡片"组织机构"按钮
+          - 组织树结构
+          - 组织详情区域
+
+      - code: ORG_CREATE
+        name: 组织创建
+        description: 新建组织节点
+        ui_control:
+          - "新增"按钮
+
+      - code: ORG_EDIT
+        name: 组织编辑
+        description: 编辑组织基本信息和上级组织，包含移动功能
+        ui_control:
+          - "编辑"按钮
+          - 上级组织选择
+          - 拖拽移动功能
+
+      - code: ORG_DELETE
+        name: 组织删除
+        description: 删除无子节点的组织
+        ui_control:
+          - "删除"按钮
+
+  # ==================== 角色管理模块 (3个) ====================
+  ROLE_MANAGEMENT:
+    name: 角色管理
+    description: 角色权限管理相关权限
+    permissions:
+      - code: ROLE_VIEW
+        name: 角色查看
+        description: 查看角色列表和权限配置
+        ui_control:
+          - 角色管理页面入口
+          - 角色列表
+          - 角色详情
+
+      - code: ROLE_MANAGE
+        name: 角色管理
+        description: 创建角色、编辑角色、分配权限
+        ui_control:
+          - "创建角色"按钮
+          - "编辑角色"按钮
+          - 权限勾选区域
+
+      - code: ROLE_DELETE
+        name: 角色删除
+        description: 删除自定义角色
+        ui_control:
+          - "删除角色"按钮
+
+  # ==================== 系统运维模块 (4个) ====================
+  SYSTEM_MANAGEMENT:
+    name: 系统运维
+    description: 系统运维管理相关权限
+    permissions:
+      - code: SYSTEM_BACKUP
+        name: 数据备份
+        description: 执行数据库备份操作
+        ui_control:
+          - 数据库管理页面"备份"按钮
+
+      - code: SYSTEM_RESTORE
+        name: 数据恢复
+        description: 执行数据库恢复操作
+        ui_control:
+          - 数据库管理页面"恢复"按钮
+
+      - code: SYSTEM_IMPORT
+        name: 数据导入
+        description: 导入Excel数据
+        ui_control:
+          - 数据库管理页面"导入"按钮
+
+      - code: SYSTEM_EXPORT
+        name: 数据导出
+        description: 导出业务数据
+        ui_control:
+          - 数据库管理页面"导出"按钮
+
+  # ==================== 社会救助模块 (4个) ====================
+  INCOME_SUPPORT:
+    name: 社会救助
+    description: 低收入家庭认定业务权限
+    permissions:
+      - code: INCOME_VIEW
+        name: 救助查看
+        description: 查看救助申请列表和详情
+        ui_control:
+          - 左侧导航"社会救助"
+          - 申请列表页面
+          - 申请详情页面
+
+      - code: INCOME_CREATE
+        name: 救助创建
+        description: 新建救助申请
+        ui_control:
+          - "新建申请"按钮
+
+      - code: INCOME_EDIT
+        name: 救助编辑
+        description: 编辑申请、归档、信息变更
+        ui_control:
+          - "编辑"按钮
+          - "归档"按钮
+          - "信息变更"按钮
+
+      - code: INCOME_DELETE
+        name: 救助删除
+        description: 删除草稿状态的申请
+        ui_control:
+          - "删除"按钮
+
+  # ==================== 资产核查模块 (4个) ====================
+  ASSET_CHECK:
+    name: 资产核查
+    description: 家庭资产核查业务权限
+    permissions:
+      - code: ASSET_VIEW
+        name: 核查查看
+        description: 查看核查列表和详情
+        ui_control:
+          - 左侧导航"资产核查"
+          - 核查列表页面
+          - 核查详情页面
+
+      - code: ASSET_CREATE
+        name: 核查创建
+        description: 新建资产核查申请
+        ui_control:
+          - "新建核查"按钮
+
+      - code: ASSET_EDIT
+        name: 核查编辑
+        description: 编辑核查、月度审核
+        ui_control:
+          - "编辑"按钮
+          - "月度审核"按钮
+
+      - code: ASSET_DELETE
+        name: 核查删除
+        description: 删除核查记录
+        ui_control:
+          - "删除"按钮
+
+  # ==================== 临时救助模块 (4个) ====================
+  TEMP_ASSISTANCE:
+    name: 临时救助
+    description: 临时救助申请业务权限
+    permissions:
+      - code: TEMP_VIEW
+        name: 临时救助查看
+        description: 查看临时救助列表和详情
+        ui_control:
+          - 申请列表页面
+          - 申请详情页面
+
+      - code: TEMP_CREATE
+        name: 临时救助创建
+        description: 新建临时救助申请
+        ui_control:
+          - "新建申请"按钮
+
+      - code: TEMP_EDIT
+        name: 临时救助编辑
+        description: 编辑申请、归档
+        ui_control:
+          - "编辑"按钮
+          - "归档"按钮
+
+      - code: TEMP_DELETE
+        name: 临时救助删除
+        description: 删除申请记录
+        ui_control:
+          - "删除"按钮
+
+  # ==================== 普惠高龄模块 (4个) ====================
+  ELDERLY_WELFARE:
+    name: 普惠高龄
+    description: 高龄补贴业务权限
+    permissions:
+      - code: ELDERLY_VIEW
+        name: 高龄查看
+        description: 查看高龄补贴列表和详情
+        ui_control:
+          - 左侧导航"普惠高龄"
+          - 申请列表页面
+          - 申请详情页面
+
+      - code: ELDERLY_CREATE
+        name: 高龄创建
+        description: 新建高龄补贴申请
+        ui_control:
+          - "新建申请"按钮
+
+      - code: ELDERLY_EDIT
+        name: 高龄编辑
+        description: 编辑申请、津贴发放
+        ui_control:
+          - "编辑"按钮
+          - "发放"按钮
+
+      - code: ELDERLY_DELETE
+        name: 高龄删除
+        description: 删除申请记录
+        ui_control:
+          - "删除"按钮
+
+  # ==================== 基础访问模块 (4个) ====================
+  APP_ACCESS:
+    name: 基础访问
+    description: 系统基础功能访问权限
+    permissions:
+      - code: APP_ACCESS
+        name: 系统访问
+        description: 登录系统的基本权限
+        ui_control:
+          - 登录验证
+        is_required: true
+
+      - code: APP_FILE_UPLOAD
+        name: 文件上传
+        description: 上传附件功能
+        ui_control:
+          - 附件上传按钮
+
+      - code: APP_FILE_DOWNLOAD
+        name: 文件下载
+        description: 下载附件功能
+        ui_control:
+          - 附件下载按钮
+
+      - code: APP_SEARCH
+        name: 全局搜索
+        description: 全局搜索功能
+        ui_control:
+          - 顶部搜索框
+
+permission_count:
+  total: 33
+  breakdown:
+    user_management: 6
+    org_management: 4
+    role_management: 3
+    system_management: 4
+    income_support: 4
+    asset_check: 4
+    temp_assistance: 4
+    elderly_welfare: 4
+    app_access: 4

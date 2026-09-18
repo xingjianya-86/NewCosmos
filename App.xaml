@@ -1,0 +1,37 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<!-- 根元素 Application 与 Models.Entities.Application 在 global 命名空间重名，
+     本文件保留经典 MAUI 命名空间以消歧（GlobalXmlns 的例外文件） -->
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:NewCosmos.Converters"
+             x:Class="NewCosmos.App">
+    
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml"/>
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            
+            <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+            <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+            <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
+            <converters:NullToInverseBoolConverter x:Key="NullToInverseBoolConverter"/>
+            <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
+            <converters:TemplateTypeToColorConverter x:Key="TemplateTypeToColorConverter"/>
+
+            <converters:IntToBoolConverter x:Key="IntToBoolConverter"/>
+            <converters:CategoryDisplayConverter x:Key="CategoryDisplayConverter"/>
+            <converters:DepthToMarginConverter x:Key="DepthToMarginConverter"/>
+            <converters:DepthToBoldConverter x:Key="DepthToBoldConverter"/>
+            <converters:BoolToExpandIconConverter x:Key="BoolToExpandIconConverter"/>
+            <converters:ReportStatusColorConverter x:Key="ReportStatusColorConverter"/>
+            <converters:IndexToRowColorConverter x:Key="IndexToRowColorConverter"/>
+            <converters:DataScopeToDisplayConverter x:Key="DataScopeToDisplayConverter"/>
+            <converters:RelationshipDisplayConverter x:Key="RelationshipDisplayConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+    
+</Application>

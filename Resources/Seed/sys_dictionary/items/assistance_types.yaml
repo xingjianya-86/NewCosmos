@@ -1,0 +1,24 @@
+# 救助类型字典（固定 ID）
+# 分类 ID=36，字典项 ID 范围: 36001-36099
+# 依据：《中华人民共和国社会救助法》第15条
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      # 基本生活救助
+      - { id: 36001, category: "AssistanceTypes", item_key: "DestituteSupport", item_value: "特困人员供养", sort_order: 1, is_active: true }
+      - { id: 36002, category: "AssistanceTypes", item_key: "Subsistence", item_value: "最低生活保障", sort_order: 2, is_active: true }
+      
+      # 专项社会救助
+      - { id: 36010, category: "AssistanceTypes", item_key: "Medical", item_value: "医疗救助", sort_order: 10, is_active: true }
+      - { id: 36011, category: "AssistanceTypes", item_key: "Education", item_value: "教育救助", sort_order: 11, is_active: true }
+      - { id: 36012, category: "AssistanceTypes", item_key: "Housing", item_value: "住房救助", sort_order: 12, is_active: true }
+      - { id: 36013, category: "AssistanceTypes", item_key: "Employment", item_value: "就业救助", sort_order: 13, is_active: true }
+      - { id: 36014, category: "AssistanceTypes", item_key: "Disaster", item_value: "受灾人员救助", sort_order: 14, is_active: true }
+      
+      # 急难社会救助
+      - { id: 36020, category: "AssistanceTypes", item_key: "Temporary", item_value: "临时救助", sort_order: 20, is_active: true }
+      - { id: 36021, category: "AssistanceTypes", item_key: "EmergencyMedical", item_value: "疾病应急救助", sort_order: 21, is_active: true }
+      - { id: 36022, category: "AssistanceTypes", item_key: "Homeless", item_value: "流散人员救助", sort_order: 22, is_active: true }

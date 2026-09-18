@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ArchiveManagement.ArchiveOutputPage"
+             x:DataType="ArchiveOutputViewModel"
+             Title="档案输出"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE7B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="档案输出" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="{Binding StatusText}" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 工具栏 -->
+        <Border Grid.Row="1" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                <Label Text="预览模板:" VerticalOptions="Center" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                <Picker Grid.Column="1"
+                        ItemsSource="{Binding Templates}"
+                        SelectedItem="{Binding SelectedPreviewTemplate}"
+                        ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
+                        VerticalOptions="Center"/>
+                <Button Grid.Column="2"
+                        Text="&#xE8BD; 生成预览"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding PreviewCommand}"
+                        IsEnabled="{Binding IsNotBusy}"
+                        Style="{StaticResource ButtonPrimary}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="3"
+                        Text="&#xE7A7; 打印"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding PrintCommand}"
+                        IsEnabled="{Binding HasPdf}"
+                        Style="{StaticResource WarningButton}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Padding="16">
+                <Grid ColumnDefinitions="6.5*,3.5*" RowDefinitions="*,Auto,Auto" RowSpacing="16" ColumnSpacing="16">
+
+                    <Border Style="{StaticResource CardBorder}"
+                            Grid.Column="0" Grid.Row="0" Grid.RowSpan="3"
+                            VerticalOptions="Fill">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                            <Label Text="PDF 预览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid Grid.Row="1" VerticalOptions="Fill">
+                                <WebView x:Name="PdfWebView"
+                                         IsVisible="{Binding HasPdf}"
+                                         HorizontalOptions="Fill"
+                                         VerticalOptions="Fill"/>
+                                <VerticalStackLayout IsVisible="{Binding HasPdf, Converter={StaticResource BoolToInverseConverter}}"
+                                                     VerticalOptions="Center"
+                                                     HorizontalOptions="Center"
+                                                     Spacing="10">
+                                    <Label Text="&#xE894;" FontFamily="Segoe MDL2 Assets" FontSize="48"
+                                           TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                    <Label Text="点击「生成预览」查看PDF" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}"
+                            Grid.Column="1" Grid.Row="0">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                            <Label Grid.Row="0" Text="输出模板（批量）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <CollectionView Grid.Row="1" ItemsSource="{Binding Templates}" SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="TemplateSelectItem">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" Padding="8,6" ColumnSpacing="12" Style="{StaticResource TableRowInteractive}">
+                                            <Switch IsToggled="{Binding IsSelected}" OnColor="{StaticResource Primary}" IsEnabled="{Binding IsApplicable}"/>
+                                            <Label Grid.Column="1" Text="{Binding Name}" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
+                                            <!-- 核查报告：显示状态标签 + 查看按钮 -->
+                                            <Label Grid.Column="2" Text="{Binding ReportStatus}" VerticalOptions="Center"
+                                                   FontSize="12" IsVisible="{Binding IsVerificationReport}"
+                                                   TextColor="{Binding ReportStatus, Converter={StaticResource ReportStatusColorConverter}}"/>
+                                            <Button Grid.Column="3" Text="查看"
+                                                    FontSize="12" Padding="8,0" HeightRequest="30"
+                                                    IsVisible="{Binding IsVerificationReport}"
+                                                    IsEnabled="{Binding IsApplicable}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PreviewReportCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            <!-- 非核查报告：显示份数 -->
+                                            <Label Grid.Column="2" Grid.ColumnSpan="2" Text="{Binding BaseCopies, StringFormat='{}{0}份'}"
+                                                   VerticalOptions="Center" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                                                   IsVisible="{Binding IsVerificationReport, Converter={StaticResource BoolToInverseConverter}}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="暂无可用模板" Style="{StaticResource EmptyStateLabel}"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}"
+                            Grid.Column="1" Grid.Row="1">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="打印设置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                <Label Grid.Row="0" Grid.Column="0" Text="打印机" VerticalOptions="Center" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Picker Grid.Row="0" Grid.Column="1"
+                                        ItemsSource="{Binding PrinterNames}"
+                                        SelectedItem="{Binding SelectedPrinter}"
+                                        VerticalOptions="Center"
+                                        Title="选择打印机"/>
+                                <Label Grid.Row="1" Grid.Column="0" Text="倍数(份)" VerticalOptions="Center" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
+                                    <Button Text="−"
+                                            Command="{Binding DecreaseCopiesCommand}"
+                                            WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold"
+                                            Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}"
+                                            TextColor="{StaticResource TextPrimary}"
+                                            CornerRadius="4"/>
+                                    <Entry Text="{Binding Copies}" Keyboard="Numeric"
+                                           WidthRequest="60" HeightRequest="36"
+                                           HorizontalTextAlignment="Center"
+                                           VerticalOptions="Center"/>
+                                    <Button Text="+"
+                                            Command="{Binding IncreaseCopiesCommand}"
+                                            WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold"
+                                            Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}"
+                                            TextColor="{StaticResource TextPrimary}"
+                                            CornerRadius="4"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Spacing="8">
+                                    <Label Text="双面打印" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
+                                    <Label Text="生成PDF" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding GeneratePdf}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}"
+                            Grid.Column="1" Grid.Row="2"
+                            IsVisible="{Binding HasPdf}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="输出文件" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <CollectionView ItemsSource="{Binding OutputFiles}" SelectionMode="None" MaximumHeightRequest="150">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="OutputFileItem">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="4,6" Style="{StaticResource TableRowInteractive}">
+                                            <Label Text="✓" TextColor="{StaticResource Secondary}" FontSize="16" VerticalOptions="Center"/>
+                                            <Label Grid.Column="1" Text="{Binding FileName}" VerticalOptions="Center" FontSize="12" LineBreakMode="TailTruncation"/>
+                                            <Button Grid.Column="2" Text="&#xE741; 保存"
+                                                    FontFamily="Segoe MDL2 Assets"
+                                                    Style="{StaticResource ButtonSuccess}"
+                                                    FontSize="12" Padding="8,0" HeightRequest="30"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=SaveFileCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </Grid>
+        </Grid>
+
+        <Border Style="{StaticResource CardBorderElevated}"
+                IsVisible="{Binding IsGenerating}"
+                Grid.Row="0" Grid.RowSpan="4"
+                VerticalOptions="Center" HorizontalOptions="Center"
+                MinimumWidthRequest="320"
+                MaximumWidthRequest="400"
+                ZIndex="10">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="生成中..." FontSize="16" FontAttributes="Bold" HorizontalOptions="Center"/>
+                <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Primary}"/>
+                <Label Text="{Binding ProgressText}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <Border Grid.Row="3" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                <Button Text="&#xE72B; 返回"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding GoBackCommand}"
+                        Style="{StaticResource ButtonOutline}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="1"
+                        Text="&#xE792; 全部保存"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding SaveAllFilesCommand}"
+                        IsEnabled="{Binding HasPrinted}"
+                        Style="{StaticResource ButtonSuccess}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="3"
+                        Text="&#xE7A7; 一键打印"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding PrintAllCommand}"
+                        Style="{StaticResource ButtonPrimary}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="4"
+                        Text="&#xE73E; 完成归档"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding CompleteCommand}"
+                        Style="{StaticResource ButtonSecondary}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+            </Grid>
+        </Border>
+
+        <ActivityIndicator Grid.Row="0" Grid.RowSpan="4"
+                           IsRunning="{Binding IsBusy}"
+                           IsVisible="{Binding IsBusy}"
+                           VerticalOptions="Center"
+                           HorizontalOptions="Center"
+                           Color="{StaticResource Primary}"/>
+
+    </Grid>
+</ContentPage>

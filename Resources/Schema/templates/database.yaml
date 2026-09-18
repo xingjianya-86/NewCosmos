@@ -1,0 +1,47 @@
+# 模板管理Schema定义
+database: 模板管理
+version: 2.0
+description: 档案模板存储与管理 - Word/Excel模板文件和字段映射配置
+
+tables:
+  # ── 模板表 ──
+  - name: nc_biz_templates
+    comment: "[配置] 模板表 - 存储档案生成的Word/Excel模板文件和字段映射配置"
+    columns:
+      - name: id
+        type: bigserial
+        nullable: false
+        primaryKey: true
+        comment: 自增主键
+      - name: name
+        type: character varying(200)
+        nullable: false
+        comment: 模板名称
+      - name: file_type
+        type: character varying(20)
+        nullable: false
+        comment: 模板类型（docx / xlsx）
+      - name: file_data
+        type: bytea
+        nullable: false
+        comment: 模板文件二进制数据
+      - name: file_hash
+        type: character varying(64)
+        nullable: true
+        comment: SHA256哈希
+      - name: categories
+        type: text[]
+        nullable: true
+        comment: 分类标签数组（如 低保,特困,低保证明）
+      - name: config_json
+        type: jsonb
+        nullable: true
+        comment: 字段映射配置JSON
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间

@@ -1,0 +1,411 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.DatabaseManagement.DatabaseManagementPage"
+             x:DataType="DatabaseManagementViewModel"
+             Title="数据库管理"
+             NavigationPage.HasNavigationBar="False">
+
+    <ContentPage.Resources>
+        <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="数据中心" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="数据库状态监控、Schema管理、备份与导入" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1" BackgroundColor="{StaticResource Background}">
+            <VerticalStackLayout Padding="20" Spacing="20">
+
+                <Label Text="快捷入口" Style="{StaticResource SectionTitleLabel}"/>
+
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*,*" ColumnSpacing="16" RowSpacing="16">
+
+                    <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#FEF3C7" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="数据导入" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="导入Excel数据文件" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                            <Button Text="&#xE8B5; 进入导入" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDataImportCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="0" Grid.Row="1" Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource PrimarySoft}" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="数据字典管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="管理系统数据字典" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                            <Button Text="&#xE8F1; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDictionaryManagementCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource SuccessSoft}" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="标准配置管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="管理政策标准配置" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                            <Button Text="&#xE9D9; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToStandardConfigManagementCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="2" Grid.Row="1" Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#F3E8FF" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#9333EA" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="行政区划管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="管理黑龙江省行政区划" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                            <Button Text="&#xE80F; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToRegionManagementCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </Grid>
+
+                <Label Text="Schema状态" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                        <VerticalStackLayout Grid.Column="0" Spacing="6">
+                            <HorizontalStackLayout Spacing="12">
+                                <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{Binding SchemaStatusColor}" VerticalOptions="Center"/>
+                                <Label Text="{Binding SchemaStatusText}" FontSize="16" FontAttributes="Bold" TextColor="{Binding SchemaStatusColor}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="12" Margin="28,0,0,0">
+                                <Label Text="{Binding SchemaStatusSummary}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="12" Margin="28,0,0,0">
+                                <Label Text="初始化:" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Text="{Binding SchemaStatus.InitializedAt}" FontSize="14" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                <Label Text="{Binding SchemaStatus.InitializedBy}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="&#xE74E; 创建缺失表"
+                                    FontFamily="Segoe Fluent Icons"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding InitializeSchemaCommand}"
+                                    IsVisible="{Binding CanInitializeSchema}"/>
+                            <Button Text="&#xE943; 修复缺失列"
+                                    FontFamily="Segoe Fluent Icons"
+                                    Style="{StaticResource WarningButton}"
+                                    Command="{Binding FixSchemaCommand}"
+                                    IsVisible="{Binding HasMissingColumns}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- 缺失表警告 -->
+                <Border BackgroundColor="{StaticResource WarningLight}" StrokeShape="RoundRectangle 8" Padding="16"
+                        IsVisible="{Binding HasMissingTables}">
+                    <VerticalStackLayout Spacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="&#xE783;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                   TextColor="#856404" VerticalOptions="Center"/>
+                            <Label Text="缺少数据库表" FontSize="17" FontAttributes="Bold"
+                                   TextColor="#856404" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchemaMissingTablesSummary}" FontSize="15"
+                               TextColor="#856404" LineBreakMode="WordWrap"/>
+                        <Label Text="点击「创建缺失表」按钮自动创建缺少的表" FontSize="14"
+                               TextColor="#856404" Opacity="0.8"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 缺失列警告 -->
+                <Border BackgroundColor="{StaticResource WarningLight}" StrokeShape="RoundRectangle 8" Padding="16"
+                        IsVisible="{Binding HasMissingColumns}">
+                    <VerticalStackLayout Spacing="8">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="&#xE783;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                   TextColor="#856404" VerticalOptions="Center"/>
+                            <Label Text="检测到列结构不匹配" FontSize="17" FontAttributes="Bold"
+                                   TextColor="#856404" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding SchemaMissingColumnsSummary}" FontSize="15"
+                               TextColor="#856404" LineBreakMode="WordWrap"/>
+                        <Label Text="点击「修复缺失列」按钮自动添加缺少的列" FontSize="14"
+                               TextColor="#856404" Opacity="0.8"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="数据库状态" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+
+                    <Border Grid.Column="0" Style="{StaticResource StatCard}" Background="{StaticResource StatCardGreenGradient}">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="连接状态" FontSize="16" TextColor="White" Opacity="0.9"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding DatabaseStatus.IsConnected, Converter={StaticResource BoolToTextConverter}, ConverterParameter='已连接|未连接'}"
+                                   FontSize="24" FontAttributes="Bold" TextColor="White"/>
+                            <Label Text="{Binding DatabaseStatus.Version, StringFormat='版本: {0}'}" FontSize="14" TextColor="White" Opacity="0.8" LineBreakMode="TailTruncation"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource StatCard}" Background="{StaticResource StatCardBlueGradient}">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="数据库大小" FontSize="16" TextColor="White" Opacity="0.9"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding DatabaseStatus.DatabaseSizeFormatted}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
+                            <Label Text="{Binding DatabaseStatistics.TotalTables, StringFormat='{0} 张表'}" FontSize="14" TextColor="White" Opacity="0.8"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource StatCard}" Background="{StaticResource StatCardPurpleGradient}">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="总记录数" FontSize="16" TextColor="White" Opacity="0.9"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding DatabaseStatistics.TotalRecords}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
+                            <Label Text="历史数据" FontSize="14" TextColor="White" Opacity="0.8"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="3" Style="{StaticResource StatCard}" Background="{StaticResource StatCardOrangeGradient}">
+                        <VerticalStackLayout Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="活跃用户" FontSize="16" TextColor="White" Opacity="0.9"/>
+                            </HorizontalStackLayout>
+                            <Label Text="{Binding DatabaseStatistics.ActiveUsers}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
+                            <Label Text="当前在线用户" FontSize="14" TextColor="White" Opacity="0.8"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </Grid>
+
+                <Label Text="功能操作" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+
+                    <Border Grid.Column="0" Style="{StaticResource CardBorderElevated}" Opacity="{Binding BackupOpacity}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource PrimarySoft}" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="数据库备份" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="手动备份数据库" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+
+                            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                            <Button Text="&#xE88E; 执行备份" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding BackupDatabaseCommand}" HorizontalOptions="Fill"/>
+
+                            <Label Text="{Binding BackupPath, StringFormat='备份路径: {0}'}" FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource CardBorderElevated}" Opacity="{Binding CleanupOpacity}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#FEF3C7" StrokeShape="RoundRectangle 12">
+                                    <Label Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="清理本地日志" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="清理过期的本地日志文件" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+
+                            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                            <Button Text="&#xE74D; 清理本地日志" FontFamily="Segoe Fluent Icons" Style="{StaticResource WarningButton}" Command="{Binding CleanupLogsCommand}" HorizontalOptions="Fill"/>
+
+                            <Label Text="app/30天 biz/180天 err/90天" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </Grid>
+
+                <!-- 清理软删除档案 -->
+                <Border Style="{StaticResource CardBorderElevated}" Opacity="{Binding CleanupOpacity}">
+                    <VerticalStackLayout Spacing="16">
+                        <HorizontalStackLayout Spacing="12">
+                            <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource DangerSoft}" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Error}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="清理软删除档案" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="检测并物理删除全库软删除行（保留停保档案与其链接；执行前先本地备份）" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <Button Text="&#xE721; 检测软删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding DetectSoftDeleteCommand}" HorizontalOptions="Fill"/>
+                            <Button Grid.Column="1" Text="&#xE74D; 执行清理" FontFamily="Segoe Fluent Icons" Style="{StaticResource WarningButton}" Command="{Binding CleanupSoftDeletedCommand}" HorizontalOptions="Fill"/>
+                        </Grid>
+
+                        <Label Text="{Binding SoftDeleteResultText}" FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"
+                               IsVisible="{Binding SoftDeleteResultText, Converter={StaticResource StringNotEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorderElevated}">
+                    <VerticalStackLayout Spacing="16">
+                        <HorizontalStackLayout Spacing="12">
+                            <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource SuccessSoft}" StrokeShape="RoundRectangle 12">
+                                <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="备份文件列表" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding BackupFiles.Count, StringFormat='共 {0} 个备份文件'}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                        <CollectionView ItemsSource="{Binding BackupFiles}" HeightRequest="150">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无备份文件" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="sys:BackupFileInfo">
+                                    <Grid ColumnDefinitions="*,Auto" Padding="12" Margin="0,0,0,8" Style="{StaticResource TableRowInteractive}" HeightRequest="60">
+                                        <VerticalStackLayout Grid.Column="0" VerticalOptions="Center" Spacing="4">
+                                            <Label Text="{Binding FileName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding CreatedAt, StringFormat='创建时间: {0:yyyy-MM-dd HH:mm:ss}'}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1" Text="{Binding SizeFormatted}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="表大小统计" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+
+                <CollectionView ItemsSource="{Binding TableSizes}" ItemsLayout="VerticalGrid,2">
+                    <CollectionView.EmptyView>
+                        <Label Text="加载中..." Style="{StaticResource EmptyStateLabel}"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="sys:TableSizeInfo">
+                            <Border Style="{StaticResource CardBorder}" Margin="4">
+                                <Grid RowDefinitions="Auto,Auto,Auto">
+                                    <Label Grid.Row="0" Text="{Binding TableName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="MiddleTruncation"/>
+                                    <Label Grid.Row="1" Text="{Binding TableComment}" FontSize="14" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation" Margin="0,2,0,6"/>
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
+                                        <Border Grid.Column="0" BackgroundColor="{StaticResource PrimarySoft}" Padding="8,4" StrokeShape="RoundRectangle 4">
+                                            <Label Text="{Binding SizeFormatted}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                                        </Border>
+                                        <Border Grid.Column="1" BackgroundColor="{StaticResource SuccessSoft}" Padding="8,4" StrokeShape="RoundRectangle 4">
+                                            <Label Text="{Binding RowCount, StringFormat='{0:N0} 行'}" FontSize="14" TextColor="#10B981" HorizontalOptions="Center"/>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 客户端版本台账（登录后自动上报；县局据此查看未升级机器） -->
+                <Label Text="客户端版本" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                            <Label Text="{Binding ClientVersionSummary}" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                                <Label Text="仅看非最新" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Switch IsToggled="{Binding ShowOnlyOutdatedClients}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <Button Grid.Column="2" Text="刷新" Style="{StaticResource ButtonOutline}" FontSize="13"
+                                    HeightRequest="30" Padding="12,0" MinimumWidthRequest="0"
+                                    Command="{Binding LoadClientVersionsCommand}"/>
+                        </Grid>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <CollectionView ItemsSource="{Binding FilteredClientVersions}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无上报记录（客户端登录后自动上报）" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="sys:ClientVersionRow">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Padding="0,6">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{Binding MachineName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                                                <Label.FormattedText>
+                                                    <FormattedString>
+                                                        <Span Text="{Binding UserName}"/>
+                                                        <Span Text=" · 最后在线 "/>
+                                                        <Span Text="{Binding LastSeenAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"/>
+                                                    </FormattedString>
+                                                </Label.FormattedText>
+                                            </Label>
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                            <Label Text="{Binding AppVersion}" Style="{StaticResource ChipNeutralText}"/>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+
+</ContentPage>

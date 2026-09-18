@@ -1,0 +1,17 @@
+# 申请原因模板字典（固定 ID）
+# 分类 ID=71，字典项 ID 范围: 71001-71999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 71001, category: "ApplicationReasonTemplates", item_key: "因病", item_value: "因患【疾病名称】，需长期治疗，医疗费用较大，经济负担重。", sort_order: 1, is_active: true }
+      - { id: 71002, category: "ApplicationReasonTemplates", item_key: "因灾", item_value: "因【灾害类型】灾害，财产损失严重，经济损失约【金额】元。", sort_order: 2, is_active: true }
+      - { id: 71003, category: "ApplicationReasonTemplates", item_key: "因残", item_value: "持有【残疾类型】残疾【等级】证，证号【证号】，丧失劳动能力。", sort_order: 3, is_active: true }
+      - { id: 71004, category: "ApplicationReasonTemplates", item_key: "因学", item_value: "有子女【子女人数】人在校就读，学费生活费支出较大。", sort_order: 4, is_active: true }
+      - { id: 71005, category: "ApplicationReasonTemplates", item_key: "收入低", item_value: "主要收入来源为【收入来源】，人均月收入【金额】元。", sort_order: 5, is_active: true }
+      - { id: 71006, category: "ApplicationReasonTemplates", item_key: "失业", item_value: "原从事【职业】，于【时间】失业，无固定收入。", sort_order: 6, is_active: true }
+      - { id: 71007, category: "ApplicationReasonTemplates", item_key: "失地", item_value: "原承包土地【面积】亩，因【原因】被征用/流转。", sort_order: 7, is_active: true }
+      - { id: 71008, category: "ApplicationReasonTemplates", item_key: "因意外事故", item_value: "因【事故类型】意外事故，造成【伤害情况】，医疗费用大。", sort_order: 8, is_active: true }
+      - { id: 71009, category: "ApplicationReasonTemplates", item_key: "其他", item_value: "因【具体情况】，经济困难。", sort_order: 9, is_active: true }

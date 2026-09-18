@@ -1,0 +1,39 @@
+# 打印与COM配置
+# 参考设计方案：第九章 9.4 COM崩溃预防机制
+
+# ── 默认打印参数 ──
+defaults:
+  copies: 1                         # 默认打印份数
+  duplex: false                     # 是否默认双面打印
+  collate: true                     # 是否逐份打印
+
+# ── 打印队列配置 ──
+queue:
+  max_concurrent: 1                 # 最大并发打印任务数
+  retry_count: 3                    # 打印失败重试次数
+  task_timeout_ms: 300000           # 单个任务超时时间（毫秒）= 5分钟
+  retry_delay_ms: 2000              # 重试间隔时间（毫秒）= 2秒
+  cooldown_ms: 500                  # 任务间冷却时间（毫秒）= 0.5秒
+
+# ── COM组件配置 ──
+com:
+  # Word COM配置
+  word:
+    reset_after_tasks: 4            # 执行N个任务后重启Word进程
+    startup_timeout_ms: 90000       # Word启动超时时间（毫秒）= 90秒
+    operation_timeout_ms: 300000    # 单次操作超时时间（毫秒）= 5分钟
+    process_kill_timeout_ms: 15000  # 强制结束进程超时时间（毫秒）= 15秒
+    retry_delay_ms: 3000            # 重试间隔时间（毫秒）= 3秒
+  # Excel COM配置
+  excel:
+    reset_after_tasks: 5            # 执行N个任务后重启Excel进程
+    startup_timeout_ms: 60000       # Excel启动超时时间（毫秒）= 60秒
+    operation_timeout_ms: 300000    # 单次操作超时时间（毫秒）= 5分钟
+    process_kill_timeout_ms: 10000  # 强制结束进程超时时间（毫秒）= 10秒
+    retry_delay_ms: 2000            # 重试间隔时间（毫秒）= 2秒
+
+# ── 备用方案配置 ──
+fallback:
+  wps_pdf_enabled: true             # 是否启用WPS PDF导出（备用方案）
+  edge_print_enabled: true          # 是否启用Edge浏览器打印（备用方案）
+  save_to_documents: true           # 是否将文件保存到文档目录

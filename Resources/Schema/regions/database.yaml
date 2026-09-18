@@ -1,0 +1,146 @@
+# 地区数据库Schema定义
+# 黑龙江省行政区划：地级市、县区、乡镇、村/社区四级结构
+database: regions
+version: 2.0
+description: 黑龙江省行政区划数据库，含地级市、县区、乡镇、村/社区四级结构
+
+tables:
+  - name: nc_regions_cities
+    comment: 地级市表（黑龙江省13个地级行政单位）
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: city_name
+        type: character varying(100)
+        nullable: false
+        comment: 地级市名称，如"哈尔滨市"
+      - name: city_code
+        type: character varying(12)
+        nullable: true
+        comment: 行政区划代码（4位）
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+
+  - name: nc_regions_counties
+    comment: 县区表（黑龙江省125个县级行政单位）
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID（1001-9999）
+      - name: county_name
+        type: character varying(100)
+        nullable: false
+        comment: 县区名称，如"哈尔滨市道里区"
+      - name: county_code
+        type: character varying(12)
+        nullable: true
+        comment: 行政区划代码（6位），如"230102"
+      - name: city_name
+        type: character varying(100)
+        nullable: true
+        comment: 所属地级市名称，如"哈尔滨市"
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+    # 2026-07-27 已实际建入生产库（RegionService 按 city_name 查县区的热路径）
+    indexes:
+      - name: idx_counties_city_name
+        columns: [city_name]
+
+  - name: nc_regions_towns
+    comment: 乡镇/街道表（黑龙江省约908个乡镇级行政单位）
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID（10001-99999）
+      - name: county_id
+        type: integer
+        nullable: false
+        comment: 外键，关联nc_regions_counties.id
+      - name: town_name
+        type: character varying(100)
+        nullable: false
+        comment: 乡镇/街道名称
+      - name: town_code
+        type: character varying(12)
+        nullable: true
+        comment: 行政区划代码（9位）
+      - name: town_type
+        type: character varying(20)
+        nullable: true
+        comment: 类型：镇/乡/街道
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+    # 2026-07-27 已实际建入生产库（按 county_id 查乡镇的热路径）
+    indexes:
+      - name: idx_towns_county_id
+        columns: [county_id]
+
+  - name: nc_regions_villages
+    comment: 村/社区表（黑龙江省约10000个村级单位）
+    columns:
+      - name: id
+        type: integer
+        nullable: false
+        primaryKey: true
+        comment: 主键ID（100001-999999）
+      - name: town_id
+        type: integer
+        nullable: false
+        comment: 外键，关联nc_regions_towns.id
+      - name: village_name
+        type: character varying(100)
+        nullable: false
+        comment: 村/社区名称
+      - name: village_code
+        type: character varying(15)
+        nullable: true
+        comment: 行政区划代码（12位）
+      - name: village_type
+        type: character varying(20)
+        nullable: true
+        comment: 类型：村委会/居委会
+      - name: sort_order
+        type: integer
+        nullable: true
+        defaultValue: 0
+        comment: 排序号
+      - name: is_active
+        type: boolean
+        nullable: true
+        defaultValue: true
+        comment: 是否启用
+    # 2026-07-27 已实际建入生产库（按 town_id 查村/社区的热路径，村表数万行）
+    indexes:
+      - name: idx_villages_town_id
+        columns: [town_id]

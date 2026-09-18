@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:local="clr-namespace:NewCosmos.ViewModels.Lottery"
+             x:Class="NewCosmos.Pages.Lottery.LotteryHomePage"
+             x:DataType="local:LotteryHomeViewModel"
+             Title="彩票助手"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 域色渐变头部横幅 -->
+                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+                    <VerticalStackLayout Spacing="16">
+
+                        <!-- 返回行 -->
+                        <Grid ColumnDefinitions="Auto,*">
+                            <HorizontalStackLayout Spacing="6">
+                                <HorizontalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                                </HorizontalStackLayout.GestureRecognizers>
+                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <!-- 标题与职责 -->
+                        <HorizontalStackLayout Spacing="14">
+                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                                <Label Text="&#xE834;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                <Label Text="彩票助手" Style="{StaticResource ModuleHeroTitle}"/>
+                                <Label Text="双色球 · 大乐透 · 历史数据 · 智能预测" Style="{StaticResource ModuleHeroSubtitle}"/>
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 彩种选择器 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label Text="当前彩种" TextColor="#B3FFFFFF" VerticalOptions="Center" FontSize="14"/>
+                            <Picker ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}" Grid.Column="1" WidthRequest="150" HorizontalOptions="End" HeightRequest="40" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <!-- 模块统计栏 -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <components:StatCapsule Grid.Column="0" Value="{Binding LatestDrawNumber}" Caption="最新开奖期号"/>
+                            <components:StatCapsule Grid.Column="1" Value="{Binding TotalDrawCount, StringFormat='{0}'}" Caption="历史数据（期）"/>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 最新开奖信息卡片区 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="{Binding LatestDrawTitle}" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+
+                    <Border Style="{StaticResource CardBorder}" Padding="16">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                            <Label Text="期号" Grid.Row="0" Grid.Column="0" TextColor="{StaticResource TextTertiary}" WidthRequest="60"/>
+                            <Label Text="{Binding LatestDrawNumber}" Grid.Row="0" Grid.Column="1" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+
+                            <Label Text="日期" Grid.Row="1" Grid.Column="0" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding LatestDrawDate}" Grid.Row="1" Grid.Column="1" TextColor="{StaticResource TextPrimary}"/>
+
+                            <Label Text="红球" Grid.Row="2" Grid.Column="0" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding LatestRedNumbers}" Grid.Row="2" Grid.Column="1" TextColor="#E53935" FontAttributes="Bold"/>
+
+                            <Label Text="蓝球" Grid.Row="3" Grid.Column="0" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding LatestBlueNumbers}" Grid.Row="3" Grid.Column="1" TextColor="#1E88E5" FontAttributes="Bold"/>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- 功能入口卡片区 -->
+                <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
+                    <Label Text="功能入口" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+
+                        <!-- 同步历史数据 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE8B7;"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="同步历史数据" Description="从官方接口下载双色球/大乐透开奖数据"
+                                                Command="{Binding SyncHistoryDataCommand}"/>
+
+                        <!-- 快速机选 -->
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE834;"
+                                                IconBackgroundColor="#ECFDF5" IconColor="{StaticResource ModuleArchive}"
+                                                Title="快速机选" Description="随机生成一组推荐号码"
+                                                Command="{Binding QuickPickCommand}"/>
+
+                        <!-- 智能预测 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE9D9;"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="智能预测" Description="融合算法（机器学习 + LotteryML）"
+                                                Command="{Binding OpenPredictionCommand}"/>
+
+                        <!-- 历史记录 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="&#xE81C;"
+                                                IconBackgroundColor="#FFF7ED" IconColor="#EA580C"
+                                                Title="历史记录" Description="查看往期开奖结果与统计"
+                                                Command="{Binding OpenHistoryCommand}"/>
+
+                        <!-- 训练模型 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE9D5;"
+                                                IconBackgroundColor="#FEF3C7" IconColor="#D97706"
+                                                Title="训练预测模型" Description="训练 机器学习(LSTM) 与 LotteryML 模型（约5-10分钟）"
+                                                Command="{Binding TrainModelCommand}"/>
+
+                        <!-- 中奖结果 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="&#xE8D4;"
+                                                IconBackgroundColor="#FCE7F3" IconColor="#DB2777"
+                                                Title="中奖结果" Description="查看购彩命中、奖级与奖金明细"
+                                                Command="{Binding OpenResultCommand}"/>
+
+                    </Grid>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.RowSpan="1" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+
+    </Grid>
+</ContentPage>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ChangeManagement.MemberChangeReasonPopup"
+             x:DataType="MemberChangeReasonPopupViewModel"
+             Title="{Binding Title}"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 渐变英雄头部（绿色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding CancelCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
+                        <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="{Binding Title}" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="{Binding Subtitle}" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 内容区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 成员信息（减员时只读展示） -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsRemoveMode}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="成员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="{Binding MemberName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding MemberIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="2" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRelationship}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="年龄" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberAge, StringFormat='{0}岁'}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="性别" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberGender}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                <Label Text="健康状况" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberHealthStatus}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 变更原因 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="{Binding ReasonPrompt}" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <CollectionView ItemsSource="{Binding Reasons}" SelectionMode="Single" SelectedItem="{Binding SelectedReason}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="MemberChangeReasonOption">
+                                    <Border StrokeShape="RoundRectangle 8" StrokeThickness="1"
+                                            Stroke="{StaticResource Gray200}"
+                                            BackgroundColor="{StaticResource Gray50}"
+                                            Padding="12" Margin="0,4">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                            <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 事由日期 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="事由日期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <DatePicker Date="{Binding EventDate}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 备注 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="备注" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Editor Text="{Binding Remark}" Placeholder="补充说明（选填）..." HeightRequest="80"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 提示 -->
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}" Stroke="Transparent">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="{Binding HintText}" FontSize="12" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="确认" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmCommand}" MinimumWidthRequest="100"/>
+                <Button Grid.Column="2" Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelCommand}" MinimumWidthRequest="100"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,25 @@
+# 疾病类别字典（固定 ID）
+# 分类 ID=40，字典项 ID 范围: 40001-40999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 40000, category: "DiseaseCategories", item_key: "无任何疾病", item_value: "无任何疾病", sort_order: 0, is_active: true }
+      - { id: 40001, category: "DiseaseCategories", item_key: "恶性肿瘤", item_value: "恶性肿瘤", sort_order: 1, is_active: true }
+      - { id: 40002, category: "DiseaseCategories", item_key: "慢性肾功能不全", item_value: "慢性肾功能不全", sort_order: 2, is_active: true }
+      - { id: 40003, category: "DiseaseCategories", item_key: "心脏病", item_value: "心脏病", sort_order: 3, is_active: true }
+      - { id: 40004, category: "DiseaseCategories", item_key: "脑血管疾病", item_value: "脑血管疾病", sort_order: 4, is_active: true }
+      - { id: 40005, category: "DiseaseCategories", item_key: "糖尿病", item_value: "糖尿病", sort_order: 5, is_active: true }
+      - { id: 40006, category: "DiseaseCategories", item_key: "慢性呼吸系统疾病", item_value: "慢性呼吸系统疾病", sort_order: 6, is_active: true }
+      - { id: 40007, category: "DiseaseCategories", item_key: "其他", item_value: "其他", sort_order: 7, is_active: true }
+      - { id: 40008, category: "DiseaseCategories", item_key: "泌尿系统疾病", item_value: "泌尿系统疾病", sort_order: 8, is_active: true }
+      - { id: 40009, category: "DiseaseCategories", item_key: "儿科先天性疾病", item_value: "儿科先天性疾病", sort_order: 9, is_active: true }
+      - { id: 40010, category: "DiseaseCategories", item_key: "感染性疾病", item_value: "感染性疾病", sort_order: 10, is_active: true }
+      - { id: 40011, category: "DiseaseCategories", item_key: "骨科及结缔组织疾病", item_value: "骨科及结缔组织疾病", sort_order: 11, is_active: true }
+      - { id: 40012, category: "DiseaseCategories", item_key: "精神神经系统疾病", item_value: "精神神经系统疾病", sort_order: 12, is_active: true }
+      - { id: 40013, category: "DiseaseCategories", item_key: "免疫系统疾病", item_value: "免疫系统疾病", sort_order: 13, is_active: true }
+      - { id: 40014, category: "DiseaseCategories", item_key: "消化系统疾病", item_value: "消化系统疾病", sort_order: 14, is_active: true }
+      - { id: 40015, category: "DiseaseCategories", item_key: "血液系统疾病", item_value: "血液系统疾病", sort_order: 15, is_active: true }
+      - { id: 40016, category: "DiseaseCategories", item_key: "严重创伤及并发症", item_value: "严重创伤及并发症", sort_order: 16, is_active: true }

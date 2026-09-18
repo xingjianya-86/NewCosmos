@@ -1,0 +1,90 @@
+# 监护人表 Schema 定义
+# 列定义与实际数据库结构对齐（对齐日期 2026-08-17）；索引/外键与 DB 现状一致
+database: cosmos_app
+version: 2.0
+description: 法定监护人信息 - 记录未成年人或无民事行为能力人的监护人
+
+tables:
+  - name: nc_biz_guardians
+    comment: "[经济状况] 监护人表 - 记录未成年人或无民事行为能力人的法定监护人信息"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID
+      - name: name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 监护人姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(11)
+        nullable: true
+        comment: 联系电话
+      - name: relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与被监护人关系
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别
+      - name: age
+        type: INTEGER
+        nullable: true
+        comment: 年龄
+      - name: ethnicity
+        type: VARCHAR(20)
+        nullable: true
+        comment: 民族
+      - name: marital_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 婚姻状况
+      - name: employment_status
+        type: VARCHAR(50)
+        nullable: true
+        comment: 就业状况
+      - name: work_unit
+        type: VARCHAR(100)
+        nullable: true
+        comment: 工作单位
+      - name: position
+        type: VARCHAR(100)
+        nullable: true
+        comment: 职务
+      - name: address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 地址
+      - name: main_income_source
+        type: VARCHAR(100)
+        nullable: true
+        comment: 主要收入来源
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: 'NOW()'
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_guardians_application_id
+        columns: [application_id]
+    foreignKeys:
+      - name: fk_guardians_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

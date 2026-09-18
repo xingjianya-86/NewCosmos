@@ -1,0 +1,11 @@
+# 补贴类型字典（固定 ID）
+# 分类 ID=61，字典项 ID 范围: 61001-61999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 61001, category: "SubsidyTypes", item_key: "地力补贴", item_value: "地力补贴", sort_order: 1, is_active: true }
+      - { id: 61002, category: "SubsidyTypes", item_key: "种植补贴", item_value: "种植补贴", sort_order: 2, is_active: true }
+      - { id: 61003, category: "SubsidyTypes", item_key: "轮作补贴", item_value: "轮作补贴", sort_order: 3, is_active: true }

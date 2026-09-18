@@ -1,0 +1,58 @@
+# 入户调查Schema定义
+database: 入户调查
+version: 2.0
+description: 入户调查记录 - 记录入户调查的详细信息，作为审批依据
+
+tables:
+  # ── 入户调查记录表 ──
+  - name: nc_biz_household_surveys
+    comment: "[流程] 入户调查记录表 - 记录入户调查详情（调查人/被调查人/调查内容），作为审批依据"
+    columns:
+      - name: id
+        type: bigint
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: bigint
+        nullable: false
+        comment: 关联申请ID，关联nc_biz_applications.id
+      - name: survey_date
+        type: date
+        nullable: true
+        comment: 调查日期
+      - name: surveyor_name
+        type: character varying(100)
+        nullable: true
+        comment: 调查人签字姓名
+      - name: surveyor_organization
+        type: character varying(200)
+        nullable: true
+        comment: 调查人所属单位
+      - name: respondent_name
+        type: character varying(100)
+        nullable: true
+        comment: 被调查人签字姓名
+      - name: respondent_relation
+        type: character varying(50)
+        nullable: true
+        comment: 被调查人与申请人关系
+      - name: survey_notes
+        type: text
+        nullable: true
+        comment: 调查记录内容
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 最后更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_household_surveys_application_id
+        columns: [application_id]

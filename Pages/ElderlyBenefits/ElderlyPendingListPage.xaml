@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyPendingListPage"
+             x:DataType="ElderlyPendingListViewModel"
+             Title="高龄津贴下月待办"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToFontAttributeConverter x:Key="BoolToFontAttributeConverter"/>
+        <converters:IntToVisibilityConverter x:Key="IntToVisibilityConverter"/>
+
+        <!-- 待新增列表交替行色 -->
+        <DataTemplate x:Key="PendingNewEvenRow" x:DataType="ent:ElderlyPendingItem">
+            <Border Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.Text>
+                                <MultiBinding StringFormat="{}{0} 周岁 · {1}">
+                                    <Binding Path="Age"/>
+                                    <Binding Path="StatusLabel"/>
+                                </MultiBinding>
+                            </Label.Text>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="办理" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="PendingNewOddRow" x:DataType="ent:ElderlyPendingItem">
+            <Border Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.Text>
+                                <MultiBinding StringFormat="{}{0} 周岁 · {1}">
+                                    <Binding Path="Age"/>
+                                    <Binding Path="StatusLabel"/>
+                                </MultiBinding>
+                            </Label.Text>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="办理" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="PendingNewSelector"
+            EvenTemplate="{StaticResource PendingNewEvenRow}"
+            OddTemplate="{StaticResource PendingNewOddRow}"/>
+
+        <!-- 需停旧增新列表交替行色 -->
+        <DataTemplate x:Key="PendingTransferEvenRow" x:DataType="ent:ElderlyPendingItem">
+            <Border Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.Text>
+                                <MultiBinding StringFormat="{}{0} 周岁 · {1}">
+                                    <Binding Path="Age"/>
+                                    <Binding Path="StatusLabel"/>
+                                </MultiBinding>
+                            </Label.Text>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="停发/建档" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="PendingTransferOddRow" x:DataType="ent:ElderlyPendingItem">
+            <Border Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="#F8F9FA">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" Style="{StaticResource ChipNeutralText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.Text>
+                                <MultiBinding StringFormat="{}{0} 周岁 · {1}">
+                                    <Binding Path="Age"/>
+                                    <Binding Path="StatusLabel"/>
+                                </MultiBinding>
+                            </Label.Text>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="停发/建档" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                            CommandParameter="{Binding .}"
+                            VerticalOptions="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="PendingTransferSelector"
+            EvenTemplate="{StaticResource PendingTransferEvenRow}"
+            OddTemplate="{StaticResource PendingTransferOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
+
+        <!-- 渐变英雄头部（紫色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="高龄津贴下月待办" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="已完结档案中年满80周岁的待办老人名单，请及时办理" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <!-- 统计栏 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding PendingNewCountText}" Caption="待新增（人）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding PendingTransferCountText}" Caption="需停旧增新（人）"/>
+                </Grid>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Tab 栏：待新增 / 需停旧增新 -->
+        <Grid Grid.Row="2"
+              ColumnDefinitions="*,*"
+              Padding="16,12"
+              BackgroundColor="{StaticResource White}"
+              ColumnSpacing="8">
+
+            <Border Grid.Column="0"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE74F;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="待新增"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Primary}"
+                            IsVisible="{Binding PendingNewItems.Count, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding PendingNewItems.Count}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/>
+                </Border.GestureRecognizers>
+            </Border>
+
+            <Border Grid.Column="1"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="12,10"
+                    BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}}">
+                <Border.Stroke>
+                    <SolidColorBrush Color="{StaticResource Primary}" />
+                </Border.Stroke>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                    <Label Text="&#xE73E;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource Primary}"/>
+                    <Label Grid.Column="1"
+                           Text="需停旧增新"
+                           FontSize="13"
+                           FontAttributes="{Binding IsTab1Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
+                           VerticalOptions="Center"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Border Grid.Column="2"
+                            Padding="8,2"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 999"
+                            BackgroundColor="{StaticResource Warning}"
+                            IsVisible="{Binding PendingTransferItems.Count, Converter={StaticResource IntToVisibilityConverter}}">
+                        <Label Text="{Binding PendingTransferItems.Count}"
+                               FontSize="12"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource White}"
+                               HorizontalOptions="Center"/>
+                    </Border>
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/>
+                </Border.GestureRecognizers>
+            </Border>
+        </Grid>
+
+        <!-- 数据列表区 -->
+        <Grid Grid.Row="3" Padding="24,16">
+
+            <!-- Tab 0: 待新增 -->
+            <CollectionView x:Name="PendingNewList" ItemsSource="{Binding PendingNewItems}"
+                            SelectionMode="None"
+                            IsVisible="{Binding IsTab0Selected}"
+                            ItemTemplate="{StaticResource PendingNewSelector}">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无待新增老人" Style="{StaticResource EmptyStateLabel}"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+            </CollectionView>
+
+            <!-- Tab 1: 需停旧增新 -->
+            <CollectionView x:Name="PendingTransferList" ItemsSource="{Binding PendingTransferItems}"
+                            SelectionMode="None"
+                            IsVisible="{Binding IsTab1Selected}"
+                            ItemTemplate="{StaticResource PendingTransferSelector}">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无需停旧增新的老人" Style="{StaticResource EmptyStateLabel}"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+            </CollectionView>
+        </Grid>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载待办..."/>
+    </Grid>
+</ContentPage>

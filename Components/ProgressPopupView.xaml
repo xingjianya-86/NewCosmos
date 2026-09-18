@@ -1,0 +1,133 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.ProgressPopupView"
+             x:Name="ThisView">
+    
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- 进度弹窗样式（Frame 已于 .NET 9 废弃，改用 Border） -->
+            <Style x:Key="ProgressPopupFrameStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="#FFFFFF"/>
+                <Setter Property="Stroke" Value="#E5E7EB"/>
+                <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="MinimumWidthRequest" Value="400"/>
+                <Setter Property="MaximumWidthRequest" Value="500"/>
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="Black" Offset="0,4" Radius="16" Opacity="0.15"/>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            
+            <Style x:Key="ProgressPopupTitleStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="18"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="#1F2937"/>
+                <Setter Property="HorizontalTextAlignment" Value="Center"/>
+            </Style>
+            
+            <Style x:Key="ProgressStepLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="TextColor" Value="#374151"/>
+                <Setter Property="VerticalTextAlignment" Value="Center"/>
+            </Style>
+            
+            <Style x:Key="ProgressIconLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="VerticalTextAlignment" Value="Center"/>
+                <Setter Property="HorizontalTextAlignment" Value="Center"/>
+                <Setter Property="WidthRequest" Value="30"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+    
+    <Border Style="{StaticResource ProgressPopupFrameStyle}">
+        <VerticalStackLayout Spacing="0">
+            <!-- 标题栏 -->
+            <Grid Padding="20,16" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0"
+                       Text="{Binding Title, Source={x:Reference ThisView}}"
+                       Style="{StaticResource ProgressPopupTitleStyle}"/>
+                
+                <Button Grid.Column="1"
+                        Text="✕"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        TextColor="#9CA3AF"
+                        BackgroundColor="Transparent"
+                        WidthRequest="32"
+                        HeightRequest="32"
+                        CornerRadius="16"
+                        Command="{Binding CloseCommand, Source={x:Reference ThisView}}"
+                        IsVisible="{Binding CanClose, Source={x:Reference ThisView}}"/>
+            </Grid>
+            
+            <BoxView HeightRequest="1" Color="#E5E7EB"/>
+            
+            <!-- 进度条 -->
+            <Grid Padding="20,16" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*">
+                <Label Grid.Row="0"
+                       Grid.Column="0"
+                       Text="{Binding ProgressText, Source={x:Reference ThisView}}"
+                       FontSize="15"
+                       TextColor="#6B7280"
+                       VerticalTextAlignment="Center"/>
+                
+                <Label Grid.Row="0"
+                       Grid.Column="1"
+                       Text="{Binding PercentageText, Source={x:Reference ThisView}}"
+                       FontSize="15"
+                       TextColor="#6B7280"
+                       HorizontalTextAlignment="End"
+                       VerticalTextAlignment="Center"/>
+                
+                <ProgressBar Grid.Row="1"
+                             Grid.Column="0"
+                             Grid.ColumnSpan="2"
+                             Progress="{Binding Progress, Source={x:Reference ThisView}}"
+                             ProgressColor="#3B82F6"
+                             HeightRequest="6"
+                             Margin="0,8,0,0"/>
+            </Grid>
+            
+            <BoxView HeightRequest="1" Color="#E5E7EB"/>
+            
+            <!-- 步骤列表 -->
+            <ScrollView Padding="20,12" MaximumHeightRequest="300">
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Steps, Source={x:Reference ThisView}}"
+                                     Spacing="8">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="30,*" RowDefinitions="Auto">
+                                <Label Grid.Column="0"
+                                       Grid.Row="0"
+                                       Text="{Binding StatusIcon}"
+                                       TextColor="{Binding StatusColor}"
+                                       FontAttributes="{Binding IsBold}"
+                                       Style="{StaticResource ProgressIconLabelStyle}"/>
+                                
+                                <Label Grid.Column="1"
+                                       Grid.Row="0"
+                                       Text="{Binding StepName}"
+                                       FontAttributes="{Binding IsBold}"
+                                       Style="{StaticResource ProgressStepLabelStyle}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </ScrollView>
+            
+            <!-- 底部按钮 -->
+            <Grid Padding="20,16" ColumnDefinitions="*" 
+                  IsVisible="{Binding CanClose, Source={x:Reference ThisView}}">
+                <Button Grid.Column="0"
+                        Text="关闭"
+                        Style="{StaticResource ButtonPrimary}"
+                        Command="{Binding CloseCommand, Source={x:Reference ThisView}}"/>
+            </Grid>
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

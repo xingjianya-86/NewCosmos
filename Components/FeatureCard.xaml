@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.FeatureCard"
+             x:Name="Root">
+
+    <!-- 模块首页子功能导航卡：图标座 + 标题 + 说明 + 右箭头 + 整卡点击。
+         用法：<components:FeatureCard Glyph="&#xE7C1;" IconBackgroundColor="#EBF5FF"
+                                       IconColor="{StaticResource ModuleSocialAssistance}"
+                                       Title="业务申请" Description="五步工作流录入救助申请"
+                                       Command="{Binding OpenApplicationWorkflowCommand}"
+                                       Opacity="{Binding SocialAssistanceOpacity}"/> -->
+    <Border Style="{StaticResource FeatureCard}">
+        <Border.GestureRecognizers>
+            <TapGestureRecognizer Command="{Binding Command, Source={x:Reference Root}}"/>
+        </Border.GestureRecognizers>
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Border x:Name="IconHost" WidthRequest="46" HeightRequest="46"
+                    StrokeShape="RoundRectangle 12" StrokeThickness="0">
+                <Label x:Name="GlyphLabel" FontFamily="Segoe Fluent Icons" FontSize="22"
+                       HorizontalOptions="Center" VerticalOptions="Center"/>
+            </Border>
+            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                <Label x:Name="TitleLabel" Style="{StaticResource FeatureCardTitle}"/>
+                <Label x:Name="DescLabel" Style="{StaticResource FeatureCardDesc}"/>
+            </VerticalStackLayout>
+            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                   TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+        </Grid>
+    </Border>
+</ContentView>

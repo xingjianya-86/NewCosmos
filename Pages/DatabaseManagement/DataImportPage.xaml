@@ -1,0 +1,249 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.DatabaseManagement.DataImportPage"
+             x:DataType="DataImportViewModel"
+             Title="数据导入"
+             NavigationPage.HasNavigationBar="False">
+
+    <ContentPage.Resources>
+        <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+        <converters:IntToBoolConverter x:Key="IntToBoolConverter"/>
+
+        <DataTemplate x:Key="ImportLogEvenRow" x:DataType="x:String">
+            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="Consolas" Margin="0,2" BackgroundColor="White"/>
+        </DataTemplate>
+        <DataTemplate x:Key="ImportLogOddRow" x:DataType="x:String">
+            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="Consolas" Margin="0,2" BackgroundColor="#F8F9FA"/>
+        </DataTemplate>
+        <converters:AlternatingRowTemplateSelector x:Key="ImportLogRowSelector"
+            EvenTemplate="{StaticResource ImportLogEvenRow}"
+            OddTemplate="{StaticResource ImportLogOddRow}"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 渐变英雄头部（蓝色） -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 操作按钮 -->
+                    <Button Grid.Column="2"
+                            Text="&#xE72C; 清空"
+                            FontFamily="Segoe Fluent Icons"
+                            BackgroundColor="#33FFFFFF"
+                            TextColor="White"
+                            FontSize="14"
+                            Command="{Binding ClearFilesCommand}"
+                            VerticalOptions="Center"
+                            Padding="16,10"
+                            CornerRadius="20"
+                            IsEnabled="{Binding HasSelectedFiles}"/>
+                </Grid>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="数据导入" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="导入Excel数据文件到系统" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1" BackgroundColor="{StaticResource Background}">
+            <VerticalStackLayout Padding="20" Spacing="20">
+                
+                <Border Style="{StaticResource CardBorderElevated}" InputTransparent="False">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="导入类型选择" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Label Grid.Column="0" Text="导入类型:" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            <Picker Grid.Column="1" 
+                                    ItemsSource="{Binding ImportTypeNames}" 
+                                    SelectedItem="{Binding SelectedImportTypeName}"
+                                    Title="选择导入类型"
+                                    FontSize="16"
+                                    BackgroundColor="{StaticResource Gray50}"
+                                    HorizontalOptions="Fill"/>
+                        </Grid>
+                        
+                        <Label Text="{Binding ImportModeHint}"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}"
+                               LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Border Style="{StaticResource CardBorderElevated}" InputTransparent="False">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Label Grid.Column="0" Text="文件夹选择" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Button Grid.Column="2" Text="&#xE8B7; 选择文件夹" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding SelectFolderCommand}"/>
+                        </Grid>
+                        
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        
+                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasSelectedFolder}" Margin="0,8,0,0">
+                            <Label Grid.Column="0" Text="&#xE8B7;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center" Margin="0,0,8,0"/>
+                            <Label Grid.Column="1" Text="{Binding SelectedFolderPath}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" LineBreakMode="MiddleTruncation"/>
+                        </Grid>
+                        
+<Label Text="{Binding SelectedFiles.Count, StringFormat='已扫描 {0} 个文件'}" 
+                               FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"
+                               IsVisible="{Binding HasSelectedFiles}"/>
+                         
+                         <Border BackgroundColor="{StaticResource SuccessSoft}" Padding="12" StrokeShape="RoundRectangle 8" IsVisible="{Binding ShowMatchedFiles}">
+                             <VerticalStackLayout Spacing="8">
+                                 <Label Text="已匹配文件" FontSize="16" FontAttributes="Bold" TextColor="#10B981"/>
+                                 <Grid ColumnDefinitions="Auto,*">
+                                     <Label Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
+                                     <Label Grid.Column="1" Text="{Binding FamilyFileName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                 </Grid>
+                                 <Grid ColumnDefinitions="Auto,*">
+                                     <Label Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
+                                     <Label Grid.Column="1" Text="{Binding PersonFileName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                 </Grid>
+                             </VerticalStackLayout>
+                         </Border>
+                         
+                         <Border BackgroundColor="{StaticResource DangerSoft}" Padding="12" StrokeShape="RoundRectangle 8" IsVisible="{Binding ShowMatchError}">
+                             <Label Text="未找到匹配的家庭和人员文件，请确保文件命名符合要求" FontSize="15" TextColor="#EF4444"/>
+                         </Border>
+                        
+                        <Label Text="支持的文件格式：Excel (.xlsx, .xls)"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}"
+                               IsVisible="{Binding HasSelectedFiles, Converter={StaticResource BoolToInverseConverter}}"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Border Style="{StaticResource CardBorderElevated}" InputTransparent="False">
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="导入操作" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                            <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                                <CheckBox IsChecked="{Binding ClearBeforeImport}" Color="{StaticResource Primary}"/>
+                                <Label Text="导入前清空表数据" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                        
+<Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                             <Button Grid.Column="0" Text="&#xE873; 预览" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" 
+                                     Command="{Binding PreviewCommand}" 
+                                     IsEnabled="{Binding ShowMatchedFiles}"
+                                     HeightRequest="44"/>
+                             <Button Grid.Column="1" Text="&#xE8B5; 开始导入" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" 
+                                     Command="{Binding StartImportCommand}" 
+                                     IsEnabled="{Binding CanStartImport}"
+                                     HeightRequest="44"/>
+                         </Grid>
+                        
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsImporting}">
+                            <Label Grid.Column="0" Text="{Binding ImportStatusMessage}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center" LineBreakMode="TailTruncation"/>
+                        </Grid>
+                        
+                        <ProgressBar Progress="{Binding ImportProgress}" 
+                                     ProgressColor="{StaticResource Primary}"
+                                     HeightRequest="8"
+                                     IsVisible="{Binding IsImporting}"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding HasPreview}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <Label Grid.Column="0" Text="预览结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Grid.Column="1" Text="{Binding FamilyPreviewRows, StringFormat='家庭 {0:N0} 行'}" FontSize="15" TextColor="{StaticResource Primary}" VerticalOptions="Center" Margin="0,0,16,0"/>
+                            <Label Grid.Column="2" Text="{Binding PersonPreviewRows, StringFormat='人员 {0:N0} 行'}" FontSize="15" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        </Grid>
+                        
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding HasImportResult}">
+                    <VerticalStackLayout Spacing="16">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="导入结果" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Button Grid.Column="1" Text="清空结果" Style="{StaticResource ButtonOutline}" Command="{Binding ClearResultsCommand}" FontSize="14" Padding="12,6"/>
+                        </Grid>
+                        
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        
+                        <Label Text="{Binding ImportResultMessage}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                        
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <Border Grid.Column="0" BackgroundColor="{StaticResource SuccessSoft}" Padding="10" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="家庭" FontSize="14" TextColor="#10B981" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyImportedCount}" FontSize="16" FontAttributes="Bold" TextColor="#10B981" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" BackgroundColor="{StaticResource PrimarySoft}" Padding="10" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="人员" FontSize="14" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding PersonImportedCount}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" BackgroundColor="{StaticResource SuccessSoft}" Padding="10" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="关联" FontSize="14" TextColor="#10B981" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding LinkedCount}" FontSize="16" FontAttributes="Bold" TextColor="#10B981" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="3" BackgroundColor="{StaticResource DangerSoft}" Padding="10" StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout>
+                                    <Label Text="未关联" FontSize="14" TextColor="#EF4444" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding UnlinkedCount}" FontSize="16" FontAttributes="Bold" TextColor="#EF4444" HorizontalOptions="Center"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                        
+                        <Button Text="查看未关联详情" Style="{StaticResource ButtonOutline}" 
+                                Command="{Binding ShowUnlinkedDetailCommand}"
+                                IsVisible="{Binding HasUnlinkedPersons}"
+                                FontSize="14" Padding="12,6" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Border>
+                
+                <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding ImportLogLines.Count, Converter={StaticResource IntToBoolConverter}}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="导入日志" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Button Grid.Column="1" Text="导出日志" Style="{StaticResource ButtonOutline}" Command="{Binding ExportErrorLogCommand}" FontSize="14" Padding="12,6"/>
+                        </Grid>
+                        
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        
+                        <CollectionView ItemsSource="{Binding ImportLogLines}" HeightRequest="200" ItemTemplate="{StaticResource ImportLogRowSelector}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无日志" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+                
+            </VerticalStackLayout>
+        </ScrollView>
+        
+    </Grid>
+    
+</ContentPage>

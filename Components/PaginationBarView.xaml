@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.PaginationBarView">
+
+    <!-- 标准分页栏：直接继承页面 BindingContext（PagedSearchViewModelBase 家族），
+         零配置使用：<components:PaginationBarView />
+         迷你版（无统计文案）：<components:PaginationBarView ShowStatusText="False"/> -->
+    <!-- 标准分页栏：直接继承页面 BindingContext（PagedSearchViewModelBase 家族），
+         零配置使用：<components:PaginationBarView />
+         迷你版（无统计文案）：<components:PaginationBarView ShowStatusText="False"/>
+         背景色经 ContentView 本体设置：BackgroundColor="{StaticResource Gray50}" -->
+    <Grid Padding="16" ColumnDefinitions="*, Auto">
+        <Label Text="{Binding PageStatusText}"
+               Style="{StaticResource LabelSmall}"
+               VerticalOptions="Center"
+               IsVisible="{Binding ShowStatusText, Source={RelativeSource AncestorType={x:Type components:PaginationBarView}}}"/>
+        <HorizontalStackLayout Grid.Column="1" Spacing="8">
+            <Button Text="&#xE76B;"
+                    FontFamily="Segoe MDL2 Assets"
+                    Style="{StaticResource ButtonSmall}"
+                    Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding CanGoPrevious}"/>
+            <Label Text="{Binding PageIndex}" FontSize="16" VerticalOptions="Center" Margin="8,0"/>
+            <Label Text="/" FontSize="16" VerticalOptions="Center"/>
+            <Label Text="{Binding TotalPages}" FontSize="16" VerticalOptions="Center" Margin="0,0,8,0"/>
+            <Button Text="&#xE76C;"
+                    FontFamily="Segoe MDL2 Assets"
+                    Style="{StaticResource ButtonSmall}"
+                    Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding CanGoNext}"/>
+        </HorizontalStackLayout>
+    </Grid>
+</ContentView>
