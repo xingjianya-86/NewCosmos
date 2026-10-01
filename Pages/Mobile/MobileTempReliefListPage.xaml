@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileTempReliefListPage"
+             x:DataType="TempReliefListViewModel"
+             Title="临时救助"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="TempCardTemplate" x:DataType="ent:TempReliefApplication">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <HorizontalStackLayout Grid.Column="0" Spacing="8">
+                            <Label Text="{Binding ApplicantName}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center"
+                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab0Selected}">
+                                <Label Text="草稿" Style="{StaticResource ChipDangerText}"/>
+                            </Border>
+                            <Border Style="{StaticResource ChipSuccess}" VerticalOptions="Center"
+                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab1Selected}">
+                                <Label Text="已确认" Style="{StaticResource ChipSuccessText}"/>
+                            </Border>
+                            <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center"
+                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab2Selected}">
+                                <Label Text="已终止" Style="{StaticResource ChipDangerText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Grid.Column="1" Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="12"
+                               TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                    </Grid>
+                    <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+
+                    <!-- 草稿明细 -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab0Selected}">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="救助类型" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ReliefTypeName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="申请日期" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ApplyDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 已确认明细 -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab1Selected}">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="救助类型" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ReliefTypeName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="确定金额" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ConfirmAmountDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 已终止明细 -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"
+                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab2Selected}">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="终止时间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding StoppedAt, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="终止原因" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding StopReason}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 草稿操作 -->
+                    <HorizontalStackLayout Spacing="8" HorizontalOptions="End"
+                                           IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab0Selected}">
+                        <Button Text="确认" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource Success}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ConfirmCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="编辑" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=EditCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="删除" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=DeleteCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 已确认操作 -->
+                    <HorizontalStackLayout Spacing="8" HorizontalOptions="End"
+                                           IsVisible="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=IsTab1Selected}">
+                        <Button Text="推送打印" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource Info}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=PushPrintCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="终止" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=StopCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 橙色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardOrangeGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <Button Grid.Column="2" Text="+ 新增申请" FontSize="13" FontAttributes="Bold"
+                            BackgroundColor="White" TextColor="{StaticResource Primary}"
+                            Padding="14,0" HeightRequest="38" CornerRadius="19"
+                            Command="{Binding CreateNewCommand}"/>
+                </Grid>
+                <Label Text="临时救助" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="急难型 / 支出型临时救助申请办理" FontSize="13" TextColor="#E6FFFFFF"/>
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding DraftCount}" Caption="草稿（件）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding ConfirmedCount}" Caption="已确认（件）"/>
+                    <components:StatCapsule Grid.Column="2" Value="{Binding YearConfirmedText}" Caption="本年确认（人次）"/>
+                    <components:StatCapsule Grid.Column="3" Value="{Binding YearAmountText}" Caption="本年金额（元）"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Tab 胶囊 -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
+            <Border Grid.Column="0" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="草稿" FontSize="13" VerticalOptions="Center"
+                           TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding DraftCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#EA580C'}"/>
+                </HorizontalStackLayout>
+            </Border>
+            <Border Grid.Column="1" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="已确认" FontSize="13" VerticalOptions="Center"
+                           TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding ConfirmedCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#EA580C'}"/>
+                </HorizontalStackLayout>
+            </Border>
+            <Border Grid.Column="2" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="2"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="已终止" FontSize="13" VerticalOptions="Center"
+                           TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding StoppedCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#EA580C'}"/>
+                </HorizontalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 搜索栏 -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,6" BackgroundColor="White">
+            <Entry Grid.Column="0" Placeholder="搜索姓名、身份证号..." Text="{Binding SearchText}"
+                   HeightRequest="40" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
+            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="40"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                    Command="{Binding SearchCommand}"/>
+        </Grid>
+
+        <!-- 列表 -->
+        <Grid Grid.Row="3">
+            <CollectionView ItemsSource="{Binding DraftApps}" ItemTemplate="{StaticResource TempCardTemplate}"
+                            IsVisible="{Binding IsTab0Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无草稿记录" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+            <CollectionView ItemsSource="{Binding ConfirmedApps}" ItemTemplate="{StaticResource TempCardTemplate}"
+                            IsVisible="{Binding IsTab1Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无已确认记录" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+            <CollectionView ItemsSource="{Binding StoppedApps}" ItemTemplate="{StaticResource TempCardTemplate}"
+                            IsVisible="{Binding IsTab2Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无已终止记录" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </Grid>
+
+        <!-- 分页 -->
+        <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
+                <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="5" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

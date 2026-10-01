@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileElderlyReviewPage"
+             x:DataType="ElderlyReviewViewModel"
+             Title="高龄津贴复核"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 紫色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="高龄津贴复核办理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="重评身份与年龄档次，变更后停旧增新" FontSize="13" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 人员信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="👤 人员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantName}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding Gender}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding AgeDisplay}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="档案" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicationNo}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="身份证号码" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="身份比对结果" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding IdentityFlag}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <Border IsVisible="{Binding IsHistoryOnly}" BackgroundColor="{StaticResource InfoSoft}"
+                                Stroke="Transparent" Padding="12" StrokeShape="RoundRectangle 8">
+                            <Label Text="该人员仅在高龄导入名册中发放（当前库未建档）。复核确认变更时，将先补建原类别档案再停旧增新。"
+                                   FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 类别评估 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="📊 类别评估" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="10">
+                            <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="当前（旧）类别" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding OldCategoryName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="{Binding OldAmountText}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                </VerticalStackLayout>
+                            </Border>
+                            <Label Grid.Column="1" Text="→" FontSize="20" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                            <Border Grid.Column="2" BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="重评（新）类别" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding NewCategoryName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                    <Label Text="{Binding NewAmountText}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="变化类型" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding ChangeTypeText}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="调整原因" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding AdjustReasonName}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="应生效月" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding EffectiveMonthText}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="新档计发起始月（次月）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding IssueStartMonthText}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 复核意见 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="📝 复核意见" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Editor Text="{Binding ReviewOpinion}" Placeholder="复核意见/说明（可选）..." HeightRequest="80"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 复核历史 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="🕘 复核历史" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <CollectionView ItemsSource="{Binding HistoryRecords}">
+                            <CollectionView.EmptyView>
+                                <Label Text="暂无复核记录" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:ElderlyReview">
+                                    <Border Padding="10" Margin="0,3" StrokeShape="RoundRectangle 8"
+                                            BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding ReviewedAt, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Grid.Column="1" Text="{Binding ReviewResultName}" FontSize="12" TextColor="{StaticResource Success}"/>
+                                            </Grid>
+                                            <Label Text="{Binding CategoryChangeDisplay}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding ReviewedBy}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="取消" HeightRequest="46" CornerRadius="10" FontSize="15"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding CancelCommand}"/>
+                <Button Grid.Column="1" Text="确认复核" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding ConfirmReviewCommand}" IsEnabled="{Binding CanConfirm}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="3" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

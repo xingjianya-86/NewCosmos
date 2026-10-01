@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileApplicationFormPage"
+             x:DataType="ApplicationFormViewModel"
+             Title="低收入人口认定申请"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 蓝色英雄头部：返回 + 标题 + 模式 + 家庭概况 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding AbandonCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <Label Text="低收入人口认定申请" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="{Binding ModeDescription}" FontSize="13" TextColor="#E6FFFFFF"/>
+
+                <HorizontalStackLayout Spacing="18">
+                    <Label FontSize="13" TextColor="#E6FFFFFF">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="人口 "/><Span Text="{Binding FamilySize}"/><Span Text=" 人"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Label FontSize="13" TextColor="#E6FFFFFF">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="人均年收入 "/>
+                                <Span Text="{Binding PerCapitaIncomeAnnual, StringFormat='{0:N2}'}"/>
+                                <Span Text=" 元"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 步骤条 -->
+        <components:MobileStepperBar Grid.Row="1"
+                                     BackgroundColor="White"
+                                     CurrentStep="{Binding CurrentStep}"
+                                     StepCount="{Binding TotalSteps}"
+                                     StepTappedCommand="{Binding NavigateToStepCommand}"/>
+
+        <!-- 步骤内容宿主：Step1~Step5 由代码隐藏按 CurrentStep 懒加载，复用 PC 步骤视图 -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="12" Spacing="8">
+                <Grid x:Name="StepHost"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部操作栏 -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,10,12,16">
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="存草稿" HeightRequest="46" CornerRadius="10" FontSize="13"
+                        BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
+                        Command="{Binding SaveDraftCommand}" IsVisible="{Binding IsSaveDraftVisible}"/>
+                <Button Grid.Column="1" Text="上一步" HeightRequest="46" CornerRadius="10" FontSize="13"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding PreviousStepCommand}" IsVisible="{Binding IsNotFirstStep}"/>
+                <Button Grid.Column="2" Text="下一步" HeightRequest="46" CornerRadius="10" FontSize="13"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding NextStepCommand}" IsVisible="{Binding IsNotLastStep}"/>
+                <Button Grid.Column="3" Text="提交" HeightRequest="46" CornerRadius="10" FontSize="14" FontAttributes="Bold"
+                        BackgroundColor="{StaticResource Success}" TextColor="White"
+                        Command="{Binding SaveCommand}" IsVisible="{Binding IsSubmitVisible}"
+                        IsEnabled="{Binding IsClassificationDone}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

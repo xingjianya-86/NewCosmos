@@ -204,6 +204,9 @@ public static class DictionaryConstants
 
         /// <summary>跨大类变更：新类别新增（新分类开始享受，供月报"新增救助明细"体现）</summary>
         public const string CATEGORY_ADD = "CategoryAdd";
+
+        /// <summary>户主死亡进入渐退期时的分类施保减法记录（原分类施保不再享受，挂旧档）</summary>
+        public const string CLASSIFIED_SUBSIDY_REDUCE = "ClassifiedSubsidyReduce";
     }
 
     /// <summary>

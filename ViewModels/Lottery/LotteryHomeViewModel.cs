@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Models.Lottery;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Lottery;
 using NewCosmos.ViewModels.Base;
 

@@ -28,6 +28,7 @@ public class SocialAssistanceReprintProvider : IReprintDomainProvider
     public string DomainKey => DomainKeyConst;
     public string DisplayName => "低收入人口";
     public ReprintDomainMode Mode => ReprintDomainMode.ArchiveSet;
+    public ReprintMonthWindow MonthWindow => ReprintMonthWindow.BusinessProcess;
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByPersonAsync(string keyword, int limit = 20, CancellationToken ct = default)
     {

@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Media;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
@@ -9,6 +11,7 @@ using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.AssetVerification;
 using NewCosmos.Models.NavigationData;
 using NewCosmos.Services.Domain.UserManagement;
+using NewCosmos.Services.Platform;
 using NewCosmos.Services.System;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ArchiveManagement;
@@ -29,6 +32,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly ITemplateService _templateService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IIdentityReader _identityReader;
 
     private string _batchId = string.Empty;
     private int? _operatorTownId;
@@ -111,7 +115,8 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         IDialogService dialogService,
         ILoggerService logger,
         ITemplateService templateService,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IIdentityReader identityReader)
     {
         _verificationService = verificationService;
         _userService = userService;
@@ -123,6 +128,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         _logger = logger;
         _templateService = templateService;
         _serviceProvider = serviceProvider;
+        _identityReader = identityReader;
 
         Title = "快速资产核查";
     }
@@ -573,6 +579,68 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         if (item != null && !item.IsHead)
         {
             Applicants.Remove(item);
+        }
+    }
+
+    /// <summary>
+    /// 扫描身份证（移动端专用）：跳转原生 Camera2 取景页（带实时对齐框）拍照 → 端侧离线 OCR
+    /// → 回填户主姓名/身份证号。相机页通过 <see cref="IdCardScanParameter.OnCompleted"/> 回传结果。
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanIdCardAsync()
+    {
+        if (!_identityReader.IsSupported)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请在手机端使用", "确定");
+            return;
+        }
+
+        try
+        {
+            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
+            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
+                new IdCardScanParameter(result => completion.TrySetResult(result)));
+
+            var scanResult = await completion.Task;
+            if (scanResult is null)
+                return; // 用户取消
+
+            if (scanResult.IsFailure || scanResult.Value is null)
+            {
+                await _dialogService.DisplayAlertAsync("识别失败", scanResult.Message ?? "未能识别身份证信息", "确定");
+                return;
+            }
+
+            var info = scanResult.Value;
+            var target = Applicants.FirstOrDefault(a => a.IsHead) ?? Applicants.FirstOrDefault();
+            if (target is null)
+            {
+                await _dialogService.DisplayAlertAsync("提示", "请先添加授权人信息行后再扫描", "确定");
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(info.Name)) target.ApplicantName = info.Name;
+            if (!string.IsNullOrWhiteSpace(info.IdCard)) target.ApplicantIdCard = info.IdCard;
+
+            var rawText = info.RawLines.Count > 0 ? string.Join("\n", info.RawLines) : "（无）";
+            var checksumHint = !string.IsNullOrWhiteSpace(info.IdCard) && !info.IdCardChecksumValid
+                ? "\n（校验位不符，请人工核对身份证号）"
+                : string.Empty;
+            await _dialogService.DisplayAlertAsync("识别结果",
+                $"姓名：{(string.IsNullOrWhiteSpace(info.Name) ? "未识别" : info.Name)}\n" +
+                $"身份证号：{(string.IsNullOrWhiteSpace(info.IdCard) ? "未识别" : info.IdCard)}{checksumHint}\n\n" +
+                $"原始识别行：\n{rawText}",
+                "确定");
+
+            _logger.LogBusiness("身份证 OCR 识别完成",
+                ("Name", DataMasker.MaskName(info.Name)),
+                ("IdCard", DataMasker.MaskIdCard(info.IdCard)),
+                ("ChecksumValid", info.IdCardChecksumValid));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "身份证扫描失败");
+            await _dialogService.DisplayAlertAsync("错误", $"扫描失败：{ex.Message}", "确定");
         }
     }
 

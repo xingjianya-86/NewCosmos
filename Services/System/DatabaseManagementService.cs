@@ -13,6 +13,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
     protected override string ServiceName => "DatabaseManagementService";
     private readonly IDatabaseService _dbService;
     private readonly IConfigService _configService;
+    private readonly IDatabaseBackupService _backupService;
     private readonly ISchemaService _schemaService;
     private readonly ILoggerService _logger;
 
@@ -20,11 +21,13 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         IDatabaseService dbService,
         IConfigService configService,
         ISchemaService schemaService,
+        IDatabaseBackupService backupService,
         ILoggerService logger) : base(logger)
     {
         _dbService = dbService;
         _configService = configService;
         _schemaService = schemaService;
+        _backupService = backupService;
         _logger = logger;
     }
 
@@ -202,91 +205,10 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         }
     }
 
-    private string ResolvePgDumpPath()
+    /// <summary>pg_dump 备份（委托共享实现 IDatabaseBackupService，与导入清表前备份同源）。</summary>
+    public Task<Result<string>> BackupDatabaseAsync(string backupPath, CancellationToken ct = default)
     {
-        var dbOptions = _configService.GetDatabaseOptions();
-
-        // 1. 配置文件指定路径
-        if (!string.IsNullOrWhiteSpace(dbOptions.PgDumpPath) && File.Exists(dbOptions.PgDumpPath))
-            return dbOptions.PgDumpPath;
-
-        // 2. 应用内置 pg_dump（Resources/PostgreSQL/pg_dump.exe）
-        var bundledPath = Path.Combine(AppContext.BaseDirectory, "Resources", "PostgreSQL", "pg_dump.exe");
-        if (File.Exists(bundledPath))
-            return bundledPath;
-
-        // 3. 兜底：走系统 PATH
-        return "pg_dump";
-    }
-
-    public async Task<Result<string>> BackupDatabaseAsync(string backupPath, CancellationToken ct = default)
-    {
-        LogInfo("备份数据库");
-
-        try
-        {
-            var dbOptions = _configService.GetDatabaseOptions();
-            var appOptions = _configService.GetAppOptions();
-
-            var backupFileName = $"{appOptions.ApplicationName}_backup_{DateTime.Now:yyyyMMdd_HHmmss}.sql";
-            var fullPath = Path.Combine(backupPath, backupFileName);
-
-            if (!Directory.Exists(backupPath))
-            {
-                Directory.CreateDirectory(backupPath);
-            }
-
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = ResolvePgDumpPath(),
-                Arguments = $"-h {dbOptions.Host} -p {dbOptions.Port} -U {dbOptions.Username} -d {dbOptions.DatabaseName} -F p -f \"{fullPath}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            var pgpassPath = Path.Combine(Path.GetTempPath(), $".pgpass_{Guid.NewGuid():N}");
-            try
-            {
-                var pgpassContent = $"{dbOptions.Host}:{dbOptions.Port}:{dbOptions.DatabaseName}:{dbOptions.Username}:{dbOptions.Password}";
-                await File.WriteAllTextAsync(pgpassPath, pgpassContent, ct);
-                File.SetAttributes(pgpassPath, FileAttributes.Hidden);
-                processStartInfo.Environment["PGPASSFILE"] = pgpassPath;
-
-                using var process = new Process { StartInfo = processStartInfo };
-                process.Start();
-
-                var stderr = await process.StandardError.ReadToEndAsync(ct);
-                await process.WaitForExitAsync(ct);
-
-                if (process.ExitCode != 0)
-                {
-                    LogError($"备份数据库失败: {stderr}");
-                    return Result.Failure<string>(ErrorCodes.DB_QUERY_ERROR, $"pg_dump执行失败: {stderr}");
-                }
-            }
-            finally
-            {
-                if (File.Exists(pgpassPath))
-                    File.Delete(pgpassPath);
-            }
-
-            if (!File.Exists(fullPath))
-            {
-                return Result.Failure<string>(ErrorCodes.FILE_NOT_FOUND, "备份文件未生成");
-            }
-
-            LogInfo("备份数据库完成");
-            Logger.LogBusiness("数据库备份完成", ("BackupFile", backupFileName), ("Size", FormatSize(new FileInfo(fullPath).Length)));
-
-            return Result.Success(fullPath);
-        }
-        catch (Exception ex)
-        {
-            LogError($"操作失败: {ex.Message}");
-            return Result.FromException<string>(ex);
-        }
+        return _backupService.BackupDatabaseAsync(backupPath, ct);
     }
 
     public Task<Result<List<BackupFileInfo>>> GetBackupFilesAsync(CancellationToken ct = default)
@@ -428,6 +350,11 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         "nc_biz_temp_relief_applications","nc_biz_change_records"
     };
 
+    /// <summary>
+    /// 动态表名形状守卫（information_schema 发现的表名先过形状再进参数化 SQL）。
+    /// 注意与 Helpers.TableNameValidator 白名单用途不同：软删扫描/清理需覆盖全部 nc_ 业务表，
+    /// 无法用固定白名单枚举，故保留前缀形状校验（白名单场景一律走 TableNameValidator）。
+    /// </summary>
     private static bool IsSafeTableName(string name) =>
         !string.IsNullOrEmpty(name) && name.Length <= 64 &&
         global::System.Text.RegularExpressions.Regex.IsMatch(name, "^nc_[a-z0-9_]+$");
@@ -458,13 +385,13 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
                 {
                     "nc_biz_applications" => (await _dbService.ExecuteScalarAsync<int?>(@"
                         SELECT count(*) FROM nc_biz_applications a
-                        WHERE a.deleted_at IS NOT NULL AND a.status <> 'Stopped'
+                        WHERE a.deleted_at IS NOT NULL AND a.status <> $1
                           AND NOT EXISTS (SELECT 1 FROM nc_biz_change_records cr WHERE cr.application_id=a.id OR cr.original_application_id=a.id OR cr.new_application_id=a.id)
-                          AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct)).Value ?? 0,
+                          AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
                     "nc_biz_elderly_applications" or "nc_biz_temp_relief_applications" =>
-                        (await _dbService.ExecuteScalarAsync<int?>($"SELECT count(*) FROM {t} WHERE deleted_at IS NOT NULL AND status <> 'Stopped'", ct)).Value ?? 0,
+                        (await _dbService.ExecuteScalarAsync<int?>($"SELECT count(*) FROM {t} WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
                     "nc_biz_family_members" => (await _dbService.ExecuteScalarAsync<int?>(
-                        "SELECT count(*) FROM nc_biz_family_members fm JOIN nc_biz_applications a ON a.id=fm.application_id WHERE fm.deleted_at IS NOT NULL AND NOT(a.deleted_at IS NULL AND a.status='Stopped')", ct)).Value ?? 0,
+                        "SELECT count(*) FROM nc_biz_family_members fm JOIN nc_biz_applications a ON a.id=fm.application_id WHERE fm.deleted_at IS NOT NULL AND NOT(a.deleted_at IS NULL AND a.status=$1)", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
                     _ => softDeleted
                 };
 
@@ -486,9 +413,9 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
                        c.chain_type AS chain_type
                 FROM nc_biz_applications p
                 JOIN nc_biz_applications c ON c.original_application_id = p.id AND c.deleted_at IS NULL
-                WHERE p.deleted_at IS NULL AND p.status <> 'Stopped'
+                WHERE p.deleted_at IS NULL AND p.status <> $1
                   AND c.chain_type IN ('CategoryRebuild', 'HeadChange', 'HouseholdDeath')
-                ORDER BY p.id", ct);
+                ORDER BY p.id", ct, ApplicationStatusCodes.STOPPED);
             if (chainRows.IsSuccess && chainRows.Value != null)
             {
                 census.ChainIssues = chainRows.Value.Select(r => new ChainInconsistency
@@ -546,19 +473,19 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             result.RestoredRows += (await _dbService.ExecuteNonQueryAsync(
                 @"UPDATE nc_biz_family_members fm SET deleted_at=NULL
                   FROM nc_biz_applications a
-                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status='Stopped'", ct)).Value;
+                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status=$1", ct, ApplicationStatusCodes.STOPPED)).Value;
 
             // 2.2 删除活档案(非停保)下冗余软删成员
             result.DeletedRows += (await _dbService.ExecuteNonQueryAsync(
                 @"DELETE FROM nc_biz_family_members fm USING nc_biz_applications a
-                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status<>'Stopped'", ct)).Value;
+                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status<>$1", ct, ApplicationStatusCodes.STOPPED)).Value;
 
             // 2.3 待删救助档案（非停保、无变更链接、非存活档案之父）+ 从表
             var appIds = (await _dbService.QueryAsync<long>(@"
                 SELECT a.id FROM nc_biz_applications a
-                WHERE a.deleted_at IS NOT NULL AND a.status <> 'Stopped'
+                WHERE a.deleted_at IS NOT NULL AND a.status <> $1
                   AND NOT EXISTS (SELECT 1 FROM nc_biz_change_records cr WHERE cr.application_id=a.id OR cr.original_application_id=a.id OR cr.new_application_id=a.id)
-                  AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct)).Value ?? new List<long>();
+                  AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
             if (appIds.Count > 0)
             {
                 var arr = appIds.ToArray();
@@ -571,7 +498,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
 
             // 2.4 高龄（非停止）
             var elderlyIds = (await _dbService.QueryAsync<long>(
-                "SELECT id FROM nc_biz_elderly_applications WHERE deleted_at IS NOT NULL AND status <> 'Stopped'", ct)).Value ?? new List<long>();
+                "SELECT id FROM nc_biz_elderly_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
             if (elderlyIds.Count > 0)
             {
                 var arr = elderlyIds.ToArray();
@@ -584,7 +511,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
 
             // 2.5 临时救助（非停止）
             var tempIds = (await _dbService.QueryAsync<long>(
-                "SELECT id FROM nc_biz_temp_relief_applications WHERE deleted_at IS NOT NULL AND status <> 'Stopped'", ct)).Value ?? new List<long>();
+                "SELECT id FROM nc_biz_temp_relief_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
             if (tempIds.Count > 0)
             {
                 var arr = tempIds.ToArray();

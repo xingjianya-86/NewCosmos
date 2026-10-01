@@ -1,9 +1,10 @@
 using NewCosmos.Models.Entities;
+using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Recovery;
 
 namespace NewCosmos.Pages.Recovery;
 
-public partial class RecoveryManualPage : ContentPage
+public partial class RecoveryManualPage : ContentPage, IParameterizedPage<RecoveryRecord>
 {
     private readonly RecoveryManualViewModel _viewModel;
 
@@ -14,12 +15,11 @@ public partial class RecoveryManualPage : ContentPage
         BindingContext = _viewModel;
     }
 
-    /// <summary>
-    /// 编辑草稿：回填记录数据
-    /// </summary>
-    public void SetEditRecord(RecoveryRecord record)
+    /// <summary>编辑草稿：参数化入口（仅经 NavigateToPageAsync 单一通道调用）</summary>
+    Task IParameterizedPage<RecoveryRecord>.SetParameterAsync(RecoveryRecord record)
     {
         _viewModel.LoadRecord(record);
+        return Task.CompletedTask;
     }
 
     protected override async void OnAppearing()

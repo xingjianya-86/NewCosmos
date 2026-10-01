@@ -42,9 +42,7 @@ public class SupporterService : BaseService, ISupporterService
 
         LogInfo($"保存赡养人信息: ApplicationId={applicationId}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -53,95 +51,133 @@ public class SupporterService : BaseService, ISupporterService
             var delResult = await _db.ExecuteNonQueryAsync(delSql, ct, applicationId);
             if (delResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return delResult;
             }
 
             foreach (var supporter in supporters)
-            {
                 supporter.ApplicationId = applicationId;
 
-                if (supporter.Id > 0)
+            // 新增/更新分流：新增走多行 VALUES 批插，更新走 unnest 数组批改（原逐行 SQL 为 N+1）
+            var inserts = supporters.Where(s => s.Id <= 0).ToList();
+            var updates = supporters.Where(s => s.Id > 0).ToList();
+
+            if (updates.Count > 0)
+            {
+                var updSql = @"UPDATE nc_biz_family_members SET
+                    name = v.name, id_card = v.id_card, person_type = v.person_type, relationship_to_head = v.relationship_to_head,
+                    annual_support_fee = v.annual_support_fee, is_support_ability = v.is_support_ability,
+                    monthly_support_fee = v.monthly_support_fee, support_months = v.support_months, family_size = v.family_size,
+                    gender = v.gender, age = v.age, ethnicity = v.ethnicity, phone = v.phone,
+                    marital_status = v.marital_status, hukou_type = v.hukou_type, education_level = v.education_level, political_status = v.political_status,
+                    health_status = v.health_status, work_unit = v.work_unit,
+                    employment_status = v.employment_status, main_income_source = v.main_income_source, work_capacity = v.work_capacity, annual_income = v.annual_income,
+                    home_province = v.home_province, home_city = v.home_city, home_district = v.home_district, home_town = v.home_town,
+                    home_village = v.home_village, home_address = v.home_address,
+                    hukou_province = v.hukou_province, hukou_city = v.hukou_city, hukou_district = v.hukou_district, hukou_town = v.hukou_town,
+                    deleted_at = NULL, updated_at = NOW()
+                FROM (
+                    SELECT * FROM unnest(
+                        $1::bigint[], $2::text[], $3::text[], $4::text[], $5::text[], $6::numeric[], $7::boolean[],
+                        $8::numeric[], $9::integer[], $10::integer[], $11::text[], $12::integer[], $13::text[],
+                        $14::text[], $15::text[], $16::text[], $17::text[], $18::text[],
+                        $19::text[], $20::text[], $21::text[], $22::text[], $23::text[], $24::numeric[], $25::text[],
+                        $26::text[], $27::text[], $28::text[], $29::text[], $30::text[],
+                        $31::text[], $32::text[], $33::text[], $34::text[]
+                    ) AS t(id, name, id_card, person_type, relationship_to_head, annual_support_fee, is_support_ability,
+                           monthly_support_fee, support_months, family_size, gender, age, ethnicity, phone,
+                           marital_status, hukou_type, education_level, political_status,
+                           health_status, work_unit, employment_status, main_income_source, work_capacity, annual_income,
+                           home_province, home_city, home_district, home_town, home_village, home_address,
+                           hukou_province, hukou_city, hukou_district, hukou_town)
+                ) v
+                WHERE nc_biz_family_members.id = v.id AND nc_biz_family_members.application_id = $35";
+                // 数组实参传 List<T>（勿传 T[]——单数组协变会退化 params 形参，见 NewPermissionService 教训）
+                var updResult = await _db.ExecuteNonQueryAsync(updSql, ct,
+                    updates.Select(s => s.Id).ToList(),
+                    updates.Select(s => s.Name).ToList(),
+                    updates.Select(s => s.IdCard).ToList(),
+                    updates.Select(s => s.PersonType).ToList(),
+                    updates.Select(s => s.Relationship).ToList(),
+                    updates.Select(s => s.AnnualSupportFee).ToList(),
+                    updates.Select(s => s.IsSupportAbility).ToList(),
+                    updates.Select(s => s.MonthlySupportFee).ToList(),
+                    updates.Select(s => s.SupportMonths).ToList(),
+                    updates.Select(s => s.SupporterFamilySize).ToList(),
+                    updates.Select(s => s.Gender).ToList(),
+                    updates.Select(s => s.Age).ToList(),
+                    updates.Select(s => s.Ethnicity).ToList(),
+                    updates.Select(s => s.Phone).ToList(),
+                    updates.Select(s => s.MaritalStatus).ToList(),
+                    updates.Select(s => s.HukouType).ToList(),
+                    updates.Select(s => s.EducationLevel).ToList(),
+                    updates.Select(s => s.PoliticalStatus).ToList(),
+                    updates.Select(s => s.HealthStatus).ToList(),
+                    updates.Select(s => s.WorkUnit).ToList(),
+                    updates.Select(s => s.EmploymentStatus).ToList(),
+                    updates.Select(s => s.MainIncomeSource).ToList(),
+                    updates.Select(s => s.WorkCapacity).ToList(),
+                    updates.Select(s => s.AnnualIncome).ToList(),
+                    updates.Select(s => s.HomeProvince).ToList(),
+                    updates.Select(s => s.HomeCity).ToList(),
+                    updates.Select(s => s.HomeDistrict).ToList(),
+                    updates.Select(s => s.HomeTown).ToList(),
+                    updates.Select(s => s.HomeVillage).ToList(),
+                    updates.Select(s => s.HomeAddress).ToList(),
+                    updates.Select(s => s.HukouProvince).ToList(),
+                    updates.Select(s => s.HukouCity).ToList(),
+                    updates.Select(s => s.HukouDistrict).ToList(),
+                    updates.Select(s => s.HukouTown).ToList(),
+                    applicationId);
+                if (updResult.IsFailure)
                 {
-                    // 更新已有记录：写入赡养人字段（不覆盖 member_category，保留原有分类）
-                    var updSql = @"UPDATE nc_biz_family_members SET
-                        name = $2, id_card = $3, person_type = $4, relationship_to_head = $5,
-                        annual_support_fee = $6, is_support_ability = $7,
-                        monthly_support_fee = $8, support_months = $9, family_size = $10,
-                        gender = $11, age = $12, ethnicity = $13, phone = $14,
-                        marital_status = $15, hukou_type = $16, education_level = $17, political_status = $18,
-                        health_status = $19, work_unit = $20,
-                        employment_status = $21, main_income_source = $22, work_capacity = $23, annual_income = $24,
-                        home_province = $25, home_city = $26, home_district = $27, home_town = $28,
-                        home_village = $29, home_address = $30,
-                        hukou_province = $31, hukou_city = $32, hukou_district = $33, hukou_town = $34,
-                        deleted_at = NULL, updated_at = NOW()
-                        WHERE id = $1 AND application_id = $35";
-                    var updResult = await _db.ExecuteNonQueryAsync(updSql, ct,
-                        supporter.Id, supporter.Name, supporter.IdCard, supporter.PersonType,
-                        supporter.Relationship, supporter.AnnualSupportFee, supporter.IsSupportAbility,
-                        supporter.MonthlySupportFee, supporter.SupportMonths, supporter.SupporterFamilySize,
-                        supporter.Gender, supporter.Age, supporter.Ethnicity, supporter.Phone,
-                        supporter.MaritalStatus, supporter.HukouType, supporter.EducationLevel,
-                        supporter.PoliticalStatus, supporter.HealthStatus, supporter.WorkUnit,
-                        supporter.EmploymentStatus, supporter.MainIncomeSource, supporter.WorkCapacity, supporter.AnnualIncome,
-                        supporter.HomeProvince, supporter.HomeCity, supporter.HomeDistrict, supporter.HomeTown,
-                        supporter.HomeVillage, supporter.HomeAddress,
-                        supporter.HukouProvince, supporter.HukouCity, supporter.HukouDistrict, supporter.HukouTown,
-                        applicationId);
-                    if (updResult.IsFailure)
-                    {
-                        if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                        return updResult;
-                    }
-                }
-                else
-                {
-                    // 新增记录：插入 nc_biz_family_members 并设置 member_category
-                    var insSql = @"INSERT INTO nc_biz_family_members
-                        (application_id, name, id_card, person_type, relationship_to_head,
-                         annual_support_fee, is_support_ability,
-                         monthly_support_fee, support_months, family_size,
-                         gender, age, ethnicity, phone, marital_status, hukou_type, education_level,
-                         political_status, health_status, work_unit,
-                         employment_status, main_income_source, work_capacity, annual_income,
-                         home_province, home_city, home_district, home_town, home_village, home_address,
-                         hukou_province, hukou_city, hukou_district, hukou_town,
-                         member_category, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                                $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
-                                $31, $32, $33, $34,
-                                'Support', NOW())";
-                    var insResult = await _db.ExecuteNonQueryAsync(insSql, ct,
-                        applicationId, supporter.Name, supporter.IdCard, supporter.PersonType,
-                        supporter.Relationship, supporter.AnnualSupportFee, supporter.IsSupportAbility,
-                        supporter.MonthlySupportFee, supporter.SupportMonths, supporter.SupporterFamilySize,
-                        supporter.Gender, supporter.Age, supporter.Ethnicity, supporter.Phone,
-                        supporter.MaritalStatus, supporter.HukouType, supporter.EducationLevel,
-                        supporter.PoliticalStatus, supporter.HealthStatus, supporter.WorkUnit,
-                        supporter.EmploymentStatus, supporter.MainIncomeSource, supporter.WorkCapacity, supporter.AnnualIncome,
-                        supporter.HomeProvince, supporter.HomeCity, supporter.HomeDistrict, supporter.HomeTown,
-                        supporter.HomeVillage, supporter.HomeAddress,
-                        supporter.HukouProvince, supporter.HukouCity, supporter.HukouDistrict, supporter.HukouTown);
-                    if (insResult.IsFailure)
-                    {
-                        if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                        return insResult;
-                    }
+                    await tx.RollbackAsync(ct);
+                    return updResult;
                 }
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            const int chunkSize = 500;
+            for (var chunkStart = 0; chunkStart < inserts.Count; chunkStart += chunkSize)
+            {
+                var chunk = inserts.Skip(chunkStart).Take(chunkSize).ToList();
+                var (valuesClause, insertArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(chunk.Count, 34, i =>
+                {
+                    var s = chunk[i];
+                    return new object?[] { s.ApplicationId, s.Name, s.IdCard, s.PersonType, s.Relationship,
+                        s.AnnualSupportFee, s.IsSupportAbility, s.MonthlySupportFee, s.SupportMonths, s.SupporterFamilySize,
+                        s.Gender, s.Age, s.Ethnicity, s.Phone, s.MaritalStatus, s.HukouType, s.EducationLevel,
+                        s.PoliticalStatus, s.HealthStatus, s.WorkUnit, s.EmploymentStatus, s.MainIncomeSource,
+                        s.WorkCapacity, s.AnnualIncome, s.HomeProvince, s.HomeCity, s.HomeDistrict, s.HomeTown,
+                        s.HomeVillage, s.HomeAddress, s.HukouProvince, s.HukouCity, s.HukouDistrict, s.HukouTown };
+                }, start => $"({string.Join(",", Enumerable.Range(0, 34).Select(k => $"${start + k}"))},'Support',NOW())");
+
+                var insSql = $@"INSERT INTO nc_biz_family_members
+                    (application_id, name, id_card, person_type, relationship_to_head,
+                     annual_support_fee, is_support_ability,
+                     monthly_support_fee, support_months, family_size,
+                     gender, age, ethnicity, phone, marital_status, hukou_type, education_level,
+                     political_status, health_status, work_unit,
+                     employment_status, main_income_source, work_capacity, annual_income,
+                     home_province, home_city, home_district, home_town, home_village, home_address,
+                     hukou_province, hukou_city, hukou_district, hukou_town,
+                     member_category, created_at)
+                    VALUES {valuesClause}";
+                var insResult = await _db.ExecuteNonQueryAsync(insSql, ct, insertArgs);
+                if (insResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return insResult;
+                }
+            }
+
+            await tx.CommitAsync(ct);
 
             LogInfo("保存赡养人信息成功");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError("保存赡养人信息失败");
             return Result.Failure(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }

@@ -86,16 +86,19 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
         IElderlyApplicationService applicationService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        Services.Domain.Reporting.IStatisticsService statisticsService)
+        Services.Domain.Reporting.IStatisticsService statisticsService,
+        Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _applicationService = applicationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _statisticsService = statisticsService;
+        _printJobFactory = printJobFactory;
         Title = "高龄津贴申请登记";
     }
 
     private readonly Services.Domain.Reporting.IStatisticsService _statisticsService = null!;
+    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
 
     #region 页头统计栏（跨状态全局视角；草稿/确认/停发分项已在 Tab 徽章展示）
 
@@ -318,6 +321,38 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
             target.Remove(app);
             _logger.LogBusiness("高龄津贴登记删除成功", ("ApplicationId", deletedId));
         }
+    }
+
+    /// <summary>手机端推送打印：在享登记表（classification=新增）。</summary>
+    [RelayCommand]
+    private Task PushPrintAsync(ElderlyApplication? app) => PushPrintCoreAsync(app, "新增");
+
+    /// <summary>手机端推送打印：取消备案表（classification=Stop）。</summary>
+    [RelayCommand]
+    private Task PushPrintStopAsync(ElderlyApplication? app) => PushPrintCoreAsync(app, "Stop");
+
+    private async Task PushPrintCoreAsync(ElderlyApplication? app, string classification)
+    {
+        if (app == null) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _printJobFactory.EnqueueElderlyAsync(app.Id, classification, ct: CancellationToken);
+            var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+            if (result.IsFailure)
+            {
+                await dialogService.DisplayAlertAsync("推送失败", result.Message ?? "推送打印失败", "确定");
+                return result;
+            }
+
+            _logger.LogBusiness("高龄推送打印入队",
+                ("ApplicationId", (object)app.Id),
+                ("Classification", classification),
+                ("JobNo", result.Value?.JobNo ?? string.Empty));
+            await dialogService.DisplayAlertAsync("已推送打印",
+                $"打印任务 {result.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+            return Result.Success();
+        }, "推送打印...");
     }
 
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）

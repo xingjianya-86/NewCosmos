@@ -357,20 +357,20 @@ public class UserService : BaseService, IUserService
 
     public async Task<Result<PagedResult<User>>> SearchPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"搜索用户: keyword={keyword}, 第{pageIndex}页");
+        LogInfo($"搜索用户: keywordLength={keyword.Length}, 第{pageIndex}页");
         return await GetPagedAsync(pageIndex, pageSize, keyword, null, null, ct);
     }
 
     public async Task<Result<PagedResult<User>>> SearchPagedAsync(string keyword, string? role, bool? isActive, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"搜索用户: keyword={keyword}, role={role}, isActive={isActive}, 第{pageIndex}页");
+        LogInfo($"搜索用户: keywordLength={keyword.Length}, role={role}, isActive={isActive}, 第{pageIndex}页");
         return await SearchPagedAsync(keyword, role, isActive, null, pageIndex, pageSize, ct);
     }
 
     /// <summary>带组织边界过滤的分页搜索：organizationIds 为空则不过滤（超管全量）</summary>
     public async Task<Result<PagedResult<User>>> SearchPagedAsync(string keyword, string? role, bool? isActive, IReadOnlyCollection<int>? organizationIds, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"搜索用户: keyword={keyword}, role={role}, isActive={isActive}, orgFilter={organizationIds?.Count ?? 0}, 第{pageIndex}页");
+        LogInfo($"搜索用户: keywordLength={keyword.Length}, role={role}, isActive={isActive}, orgFilter={organizationIds?.Count ?? 0}, 第{pageIndex}页");
         return await GetPagedAsync(pageIndex, pageSize, keyword, isActive, role, organizationIds, ct);
     }
 

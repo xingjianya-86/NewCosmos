@@ -24,6 +24,7 @@ public class TempReliefReprintProvider : IReprintDomainProvider
     public string DomainKey => TempReliefConstants.BusinessType;
     public string DisplayName => "临时救助";
     public ReprintDomainMode Mode => ReprintDomainMode.ArchiveSet;
+    public ReprintMonthWindow MonthWindow => ReprintMonthWindow.TempReliefFull;
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByPersonAsync(string keyword, int limit = 20, CancellationToken ct = default)
     {

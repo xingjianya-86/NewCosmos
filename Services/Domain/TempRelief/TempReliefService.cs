@@ -85,17 +85,15 @@ public class TempReliefService : BaseService, ITempReliefService
     {
         try
         {
-            var sql = "SELECT " + BuildCandidateSelect(table) +
-                $" FROM {table} WHERE (applicant_name ILIKE $1 OR applicant_id_card ILIKE $1)";
             var parameters = new List<object> { $"%{keyword}%" };
+            var hasExclude = !string.IsNullOrWhiteSpace(excludeIdCard);
+            if (hasExclude) parameters.Add(excludeIdCard!);
 
-            if (!string.IsNullOrWhiteSpace(excludeIdCard))
-            {
-                sql += " AND applicant_id_card != $2";
-                parameters.Add(excludeIdCard);
-            }
-
-            sql += " LIMIT 20";
+            var directSql = BuildDirectMatchSql(table, hasExclude);
+            var memberSql = BuildMemberMatchSql(table, hasExclude);
+            var sql = memberSql == null
+                ? directSql + " LIMIT 20"
+                : $"({directSql}) UNION ALL ({memberSql}) LIMIT 20";
 
             var result = await _db.QueryAsync<TempReliefCandidateRow>(sql, ct, parameters.ToArray());
             if (result.IsFailure)
@@ -110,97 +108,149 @@ public class TempReliefService : BaseService, ITempReliefService
         }
     }
 
-    /// <summary>
-    /// 生成候选人查询 SELECT 列（各来源表列名统一）
-    /// </summary>
-    private static string BuildCandidateSelect(string table) => table switch
+    /// <summary>直查臂：户主/申请人姓名或身份证命中（申请库过滤软删）。</summary>
+    private static string BuildDirectMatchSql(string table, bool hasExclude)
     {
-        // 农村/城市低保台账无 hukou_address 列，户籍地址缺省（户籍由表单从当前用户组织机构获取）
-        "nc_biz_rural_subsistence_families" or
-        "nc_biz_urban_subsistence_families" => string.Join(", ",
-            "id AS source_family_id",
-            "applicant_name AS name",
-            "applicant_id_card AS id_card",
-            "COALESCE(phone,'') AS phone",
-            "COALESCE(province,'') AS province",
-            "COALESCE(city,'') AS city",
-            "COALESCE(district,'') AS district",
-            "COALESCE(address,'') AS detail_address",
-            "COALESCE(address,'') AS family_address",
-            "'' AS hukou_address",
-            "COALESCE(street,'') AS town",
-            "COALESCE(community,'') AS village",
-            "family_size",
-            "COALESCE(bank_name,'') AS bank_name",
-            "COALESCE(bank_account,'') AS bank_account",
-            "COALESCE(one_card_account,'') AS one_card_account"),
-        // 特困人员台账无 address 列，家庭住址存于 hukou_address，无详细地址分列
-        "nc_biz_destitute_families" => string.Join(", ",
-            "id AS source_family_id",
-            "applicant_name AS name",
-            "applicant_id_card AS id_card",
-            "COALESCE(phone,'') AS phone",
-            "COALESCE(province,'') AS province",
-            "COALESCE(city,'') AS city",
-            "COALESCE(district,'') AS district",
-            "'' AS detail_address",
-            "COALESCE(hukou_address,'') AS family_address",
-            "COALESCE(hukou_address,'') AS hukou_address",
-            "COALESCE(street,'') AS town",
-            "COALESCE(community,'') AS village",
-            "family_size",
-            "COALESCE(bank_name,'') AS bank_name",
-            "COALESCE(bank_account,'') AS bank_account",
-            "COALESCE(one_card_account,'') AS one_card_account"),
-        // 低保边缘/刚性支出台账无 family_size 列，只有 guarantee_size；无 hukou_address 列
-        "nc_biz_low_income_edge_families" or
-        "nc_biz_rigid_expenditure_families" => string.Join(", ",
-            "id AS source_family_id",
-            "applicant_name AS name",
-            "applicant_id_card AS id_card",
-            "COALESCE(phone,'') AS phone",
-            "COALESCE(province,'') AS province",
-            "COALESCE(city,'') AS city",
-            "COALESCE(district,'') AS district",
-            "COALESCE(address,'') AS detail_address",
-            "COALESCE(address,'') AS family_address",
-            "'' AS hukou_address",
-            "COALESCE(street,'') AS town",
-            "COALESCE(community,'') AS village",
-            "guarantee_size AS family_size",
-            "'' AS bank_name",
-            "'' AS bank_account",
-            "'' AS one_card_account"),
-        "nc_biz_applications" => string.Join(", ",
-            "id AS source_family_id",
-            "applicant_name AS name",
-            "applicant_id_card AS id_card",
-            "COALESCE(gender,'') AS gender",
-            "COALESCE(applicant_phone,'') AS phone",
-            "COALESCE(province,'') AS province",
-            "COALESCE(city,'') AS city",
-            "COALESCE(district,'') AS district",
-            "COALESCE(address,'') AS detail_address",
-            "COALESCE(province||city||district||town||community,'') AS family_address",
-            "COALESCE(hukou_address,'') AS hukou_address",
-            "COALESCE(town,'') AS town",
-            "COALESCE(community,'') AS village",
-            "NULL AS family_size",
-            "COALESCE(bank_name,'') AS bank_name",
-            "COALESCE(bank_account,'') AS bank_account",
-            "'' AS one_card_account"),
-        _ => throw new ArgumentException($"来源表不在白名单内: {table}")
-    } + ", " + BuildHukouTypeSelect(table);
+        var sql = "SELECT " + BuildCandidateSelect(table) +
+            ", '' AS matched_member_name, '' AS matched_member_relation, '' AS matched_member_id_card" +
+            " FROM " + table + " WHERE ";
+        if (table == "nc_biz_applications") sql += "deleted_at IS NULL AND ";
+        sql += "(applicant_name ILIKE $1 OR applicant_id_card ILIKE $1)";
+        if (hasExclude) sql += " AND applicant_id_card != $2";
+        return sql;
+    }
+
+    /// <summary>
+    /// 成员命中回查户主臂：五台账 persons JOIN families（按 head_id_card）；
+    /// 申请库 LATERAL 查 nc_biz_family_members。排除户主本人行，避免与直查臂重复。
+    /// 无成员关联时返回 null。
+    /// </summary>
+    private static string? BuildMemberMatchSql(string table, bool hasExclude)
+    {
+        if (table == "nc_biz_applications")
+        {
+            var appSql = "SELECT " + BuildCandidateSelect(table, "a.") +
+                ", m.name AS matched_member_name, COALESCE(m.relationship_to_head,'') AS matched_member_relation, COALESCE(m.id_card,'') AS matched_member_id_card" +
+                " FROM nc_biz_applications a" +
+                " JOIN LATERAL (SELECT name, relationship_to_head, id_card FROM nc_biz_family_members fm" +
+                " WHERE fm.application_id = a.id AND (fm.name ILIKE $1 OR fm.id_card ILIKE $1)" +
+                " AND fm.deleted_at IS NULL AND COALESCE(fm.is_applicant,false) = false" +
+                " ORDER BY fm.id LIMIT 1) m ON true" +
+                " WHERE a.deleted_at IS NULL" +
+                " AND NOT (a.applicant_name ILIKE $1 OR a.applicant_id_card ILIKE $1)";
+            if (hasExclude) appSql += " AND a.applicant_id_card != $2";
+            return appSql;
+        }
+
+        var persons = TempReliefConstants.GetPersonsTable(table);
+        if (string.IsNullOrEmpty(persons)) return null;
+
+        var sql = "SELECT DISTINCT ON (f.id) " + BuildCandidateSelect(table, "f.") +
+            ", p.name AS matched_member_name, COALESCE(p.relationship,'') AS matched_member_relation, COALESCE(p.id_card,'') AS matched_member_id_card" +
+            $" FROM {persons} p JOIN {table} f ON f.applicant_id_card = p.head_id_card" +
+            " WHERE (p.name ILIKE $1 OR p.id_card ILIKE $1)" +
+            " AND COALESCE(p.relationship,'') <> 'Head'" +
+            " AND NOT (f.applicant_name ILIKE $1 OR f.applicant_id_card ILIKE $1)";
+        if (hasExclude) sql += " AND f.applicant_id_card != $2";
+        sql += " ORDER BY f.id, p.id";
+        return sql;
+    }
+
+    /// <summary>
+    /// 生成候选人查询 SELECT 列（各来源表列名统一；prefix 用于 JOIN 臂表别名 f./a.）
+    /// </summary>
+    private static string BuildCandidateSelect(string table, string prefix = "")
+    {
+        var p = prefix;
+        return table switch
+        {
+            // 农村/城市低保台账无 hukou_address 列，户籍地址缺省（户籍由表单从当前用户组织机构获取）
+            "nc_biz_rural_subsistence_families" or
+            "nc_biz_urban_subsistence_families" => string.Join(", ",
+                p + "id AS source_family_id",
+                p + "applicant_name AS name",
+                p + "applicant_id_card AS id_card",
+                $"COALESCE({p}phone,'') AS phone",
+                $"COALESCE({p}province,'') AS province",
+                $"COALESCE({p}city,'') AS city",
+                $"COALESCE({p}district,'') AS district",
+                $"COALESCE({p}address,'') AS detail_address",
+                $"COALESCE({p}address,'') AS family_address",
+                "'' AS hukou_address",
+                $"COALESCE({p}street,'') AS town",
+                $"COALESCE({p}community,'') AS village",
+                p + "family_size",
+                $"COALESCE({p}bank_name,'') AS bank_name",
+                $"COALESCE({p}bank_account,'') AS bank_account",
+                $"COALESCE({p}one_card_account,'') AS one_card_account"),
+            // 特困人员台账无 address 列，家庭住址存于 hukou_address，无详细地址分列
+            "nc_biz_destitute_families" => string.Join(", ",
+                p + "id AS source_family_id",
+                p + "applicant_name AS name",
+                p + "applicant_id_card AS id_card",
+                $"COALESCE({p}phone,'') AS phone",
+                $"COALESCE({p}province,'') AS province",
+                $"COALESCE({p}city,'') AS city",
+                $"COALESCE({p}district,'') AS district",
+                "'' AS detail_address",
+                $"COALESCE({p}hukou_address,'') AS family_address",
+                $"COALESCE({p}hukou_address,'') AS hukou_address",
+                $"COALESCE({p}street,'') AS town",
+                $"COALESCE({p}community,'') AS village",
+                p + "family_size",
+                $"COALESCE({p}bank_name,'') AS bank_name",
+                $"COALESCE({p}bank_account,'') AS bank_account",
+                $"COALESCE({p}one_card_account,'') AS one_card_account"),
+            // 低保边缘/刚性支出台账无 family_size 列，只有 guarantee_size；无 hukou_address 列
+            "nc_biz_low_income_edge_families" or
+            "nc_biz_rigid_expenditure_families" => string.Join(", ",
+                p + "id AS source_family_id",
+                p + "applicant_name AS name",
+                p + "applicant_id_card AS id_card",
+                $"COALESCE({p}phone,'') AS phone",
+                $"COALESCE({p}province,'') AS province",
+                $"COALESCE({p}city,'') AS city",
+                $"COALESCE({p}district,'') AS district",
+                $"COALESCE({p}address,'') AS detail_address",
+                $"COALESCE({p}address,'') AS family_address",
+                "'' AS hukou_address",
+                $"COALESCE({p}street,'') AS town",
+                $"COALESCE({p}community,'') AS village",
+                p + "guarantee_size AS family_size",
+                "'' AS bank_name",
+                "'' AS bank_account",
+                "'' AS one_card_account"),
+            "nc_biz_applications" => string.Join(", ",
+                p + "id AS source_family_id",
+                p + "applicant_name AS name",
+                p + "applicant_id_card AS id_card",
+                $"COALESCE({p}gender,'') AS gender",
+                $"COALESCE({p}applicant_phone,'') AS phone",
+                $"COALESCE({p}province,'') AS province",
+                $"COALESCE({p}city,'') AS city",
+                $"COALESCE({p}district,'') AS district",
+                $"COALESCE({p}address,'') AS detail_address",
+                $"COALESCE({p}province||{p}city||{p}district||{p}town||{p}community,'') AS family_address",
+                $"COALESCE({p}hukou_address,'') AS hukou_address",
+                $"COALESCE({p}town,'') AS town",
+                $"COALESCE({p}community,'') AS village",
+                "NULL AS family_size",
+                $"COALESCE({p}bank_name,'') AS bank_name",
+                $"COALESCE({p}bank_account,'') AS bank_account",
+                "'' AS one_card_account"),
+            _ => throw new ArgumentException($"来源表不在白名单内: {table}")
+        } + ", " + BuildHukouTypeSelect(table, prefix);
+    }
 
     /// <summary>
     /// 户籍类型快照取值（指定字段固定映射）：城乡低保台账无该列，按表名固定；
     /// 其余白名单表直接读 hukou_type 列（农村/城镇，兼容申请库 Rural/Urban）
     /// </summary>
-    private static string BuildHukouTypeSelect(string table) => table switch
+    private static string BuildHukouTypeSelect(string table, string prefix = "") => table switch
     {
         "nc_biz_rural_subsistence_families" => "'农村' AS hukou_type",
         "nc_biz_urban_subsistence_families" => "'城镇' AS hukou_type",
-        _ => "COALESCE(hukou_type,'') AS hukou_type"
+        _ => $"COALESCE({prefix}hukou_type,'') AS hukou_type"
     };
 
     public async Task<Result<TempReliefCandidate>> GetCandidateDetailAsync(string sourceTable, long sourceFamilyId, string? excludeIdCard = null, CancellationToken ct = default)
@@ -724,7 +774,7 @@ public class TempReliefService : BaseService, ITempReliefService
 
     public async Task<Result<PagedResult<TempReliefApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"分页查询: keyword={keyword}, status={status}, 第{pageIndex}页, 每页{pageSize}条");
+        LogInfo($"分页查询: keywordLength={keyword.Length}, status={status}, 第{pageIndex}页, 每页{pageSize}条");
 
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
@@ -751,11 +801,11 @@ public class TempReliefService : BaseService, ITempReliefService
 
     public async Task<Result<PagedResult<TempReliefApplication>>> GetArchivedPagedAsync(string? keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"已完结分页查询: keyword={keyword}, 第{pageIndex}页, 每页{pageSize}条");
+        LogInfo($"已完结分页查询: keywordLength={keyword?.Length ?? 0}, 第{pageIndex}页, 每页{pageSize}条");
 
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
-            .Add("status IN ('Confirmed', 'Stopped')")
+            .Add($"status IN ('{TempReliefConstants.StatusConfirmed}', '{TempReliefConstants.StatusStopped}')")
             .AddIf(!string.IsNullOrWhiteSpace(keyword), "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", $"%{keyword}%");
 
         var where = conditions.ToWhereClause();
@@ -786,7 +836,7 @@ public class TempReliefService : BaseService, ITempReliefService
         // 业务时间口径 COALESCE(apply_date, report_time, created_at)，与名单业务时间一致；范围比较
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
-            .Add("status IN ('Confirmed', 'Stopped')")
+            .Add($"status IN ('{TempReliefConstants.StatusConfirmed}', '{TempReliefConstants.StatusStopped}')")
             .Add("COALESCE(apply_date, report_time, created_at) >= {0}", monthStart)
             .Add("COALESCE(apply_date, report_time, created_at) < {0}", monthEnd);
 
@@ -1030,8 +1080,8 @@ public class TempReliefService : BaseService, ITempReliefService
 
         var sql = @"UPDATE nc_biz_temp_relief_applications SET
                     status = $1, confirmed_at = NOW(), confirmed_by = $2, updated_at = NOW()
-                    WHERE id = $3 AND deleted_at IS NULL AND status = 'Draft'";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, TempReliefConstants.StatusConfirmed, operatorName ?? "System", id);
+                    WHERE id = $3 AND deleted_at IS NULL AND status = $4";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, TempReliefConstants.StatusConfirmed, operatorName ?? "System", id, TempReliefConstants.StatusDraft);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
         if (result.Value == 0)
@@ -1047,8 +1097,8 @@ public class TempReliefService : BaseService, ITempReliefService
 
         var sql = @"UPDATE nc_biz_temp_relief_applications SET
                     status = $1, stopped_at = NOW(), stopped_by = $2, stop_reason = $3, updated_at = NOW()
-                    WHERE id = $4 AND deleted_at IS NULL AND status = 'Confirmed'";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, TempReliefConstants.StatusStopped, operatorName ?? "System", reason ?? string.Empty, id);
+                    WHERE id = $4 AND deleted_at IS NULL AND status = $5";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, TempReliefConstants.StatusStopped, operatorName ?? "System", reason ?? string.Empty, id, TempReliefConstants.StatusConfirmed);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
         if (result.Value == 0)
@@ -1064,8 +1114,8 @@ public class TempReliefService : BaseService, ITempReliefService
 
         var sql = @"UPDATE nc_biz_temp_relief_applications SET
                     deleted_at = NOW(), updated_at = NOW()
-                    WHERE id = $1 AND deleted_at IS NULL AND status = 'Draft'";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, id);
+                    WHERE id = $1 AND deleted_at IS NULL AND status = $2";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, id, TempReliefConstants.StatusDraft);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
         if (result.Value == 0)
@@ -1139,26 +1189,28 @@ public class TempReliefService : BaseService, ITempReliefService
         if (members == null || members.Count == 0)
             return Result.Success();
 
-        const string sql = @"
-            INSERT INTO nc_biz_temp_relief_members
-            (application_id, member_name, gender, relation, id_card, work_unit, annual_income, sort_order, created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())";
-
         var sorted = members
             .Select((m, idx) => new { Member = m, Index = idx })
             .OrderByDescending(x => string.Equals(x.Member.MemberName, string.Empty, StringComparison.Ordinal) ? 0 : 1)
             .ThenBy(x => x.Index)
             .ToList();
 
-        foreach (var item in sorted)
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(sorted.Count, 8, i =>
         {
-            var m = item.Member;
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            var m = sorted[i].Member;
+            return new object?[]
+            {
                 applicationId, m.MemberName, m.Gender ?? "", m.Relation ?? "", m.IdCard ?? "",
-                m.WorkUnit ?? "", (object?)m.AnnualIncome, item.Index);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-        }
+                m.WorkUnit ?? "", m.AnnualIncome, sorted[i].Index
+            };
+        }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, NOW(), NOW())");
+
+        var result = await _db.ExecuteNonQueryAsync(@"
+            INSERT INTO nc_biz_temp_relief_members
+            (application_id, member_name, gender, relation, id_card, work_unit, annual_income, sort_order, created_at, updated_at)
+            VALUES " + valuesClause, ct, args);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode!, result.Message!);
 
         return Result.Success();
     }
@@ -1175,28 +1227,30 @@ public class TempReliefService : BaseService, ITempReliefService
         if (diseases == null || diseases.Count == 0)
             return Result.Success();
 
-        const string sql = @"
-            INSERT INTO nc_biz_temp_relief_diseases
-            (application_id, disease_name, disease_code, member_name, hospital, treat_start_date, treat_end_date,
-             medical_total, insurance_paid, self_paid, sort_order, created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())";
-
         var sorted = diseases
             .Select((d, idx) => new { Item = d, Index = idx })
             .OrderByDescending(x => string.IsNullOrWhiteSpace(x.Item.DiseaseName) ? 0 : 1)
             .ThenBy(x => x.Index)
             .ToList();
 
-        foreach (var item in sorted)
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(sorted.Count, 11, i =>
         {
-            var d = item.Item;
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            var d = sorted[i].Item;
+            return new object?[]
+            {
                 applicationId, d.DiseaseName ?? "", d.DiseaseCode ?? "", d.MemberName ?? "", d.Hospital ?? "",
                 OrNull(d.TreatStartDate), OrNull(d.TreatEndDate),
-                (object?)d.MedicalTotal, (object?)d.InsurancePaid, (object?)d.SelfPaid, item.Index);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-        }
+                d.MedicalTotal, d.InsurancePaid, d.SelfPaid, sorted[i].Index
+            };
+        }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, ${o + 8}, ${o + 9}, ${o + 10}, NOW(), NOW())");
+
+        var result = await _db.ExecuteNonQueryAsync(@"
+            INSERT INTO nc_biz_temp_relief_diseases
+            (application_id, disease_name, disease_code, member_name, hospital, treat_start_date, treat_end_date,
+             medical_total, insurance_paid, self_paid, sort_order, created_at, updated_at)
+            VALUES " + valuesClause, ct, args);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode!, result.Message!);
 
         return Result.Success();
     }
@@ -1211,28 +1265,30 @@ public class TempReliefService : BaseService, ITempReliefService
         if (accidents == null || accidents.Count == 0)
             return Result.Success();
 
-        const string sql = @"
-            INSERT INTO nc_biz_temp_relief_accidents
-            (application_id, accident_type, member_name, happen_date, happen_place, injury_situation,
-             property_loss, compensation_paid, responsibility_desc, material_desc, sort_order, created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())";
-
         var sorted = accidents
             .Select((a, idx) => new { Item = a, Index = idx })
             .OrderByDescending(x => string.IsNullOrWhiteSpace(x.Item.AccidentType) ? 0 : 1)
             .ThenBy(x => x.Index)
             .ToList();
 
-        foreach (var item in sorted)
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(sorted.Count, 11, i =>
         {
-            var a = item.Item;
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            var a = sorted[i].Item;
+            return new object?[]
+            {
                 applicationId, a.AccidentType ?? "", a.MemberName ?? "", OrNull(a.HappenDate), a.HappenPlace ?? "", a.InjurySituation ?? "",
-                (object?)a.PropertyLoss, (object?)a.CompensationPaid,
-                a.ResponsibilityDesc ?? "", a.MaterialDesc ?? "", item.Index);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-        }
+                a.PropertyLoss, a.CompensationPaid,
+                a.ResponsibilityDesc ?? "", a.MaterialDesc ?? "", sorted[i].Index
+            };
+        }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, ${o + 8}, ${o + 9}, ${o + 10}, NOW(), NOW())");
+
+        var result = await _db.ExecuteNonQueryAsync(@"
+            INSERT INTO nc_biz_temp_relief_accidents
+            (application_id, accident_type, member_name, happen_date, happen_place, injury_situation,
+             property_loss, compensation_paid, responsibility_desc, material_desc, sort_order, created_at, updated_at)
+            VALUES " + valuesClause, ct, args);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode!, result.Message!);
 
         return Result.Success();
     }
@@ -1247,27 +1303,29 @@ public class TempReliefService : BaseService, ITempReliefService
         if (educations == null || educations.Count == 0)
             return Result.Success();
 
-        const string sql = @"
-            INSERT INTO nc_biz_temp_relief_educations
-            (application_id, student_name, education_stage, school_name,
-             tuition_fee, fee_date, school_duration, sort_order, created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())";
-
         var sorted = educations
             .Select((e, idx) => new { Item = e, Index = idx })
             .OrderByDescending(x => string.IsNullOrWhiteSpace(x.Item.StudentName) ? 0 : 1)
             .ThenBy(x => x.Index)
             .ToList();
 
-        foreach (var item in sorted)
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(sorted.Count, 8, i =>
         {
-            var e = item.Item;
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            var e = sorted[i].Item;
+            return new object?[]
+            {
                 applicationId, e.StudentName ?? "", e.EducationStage ?? "", e.SchoolName ?? "",
-                (object?)e.TuitionFee, OrNull(e.FeeDate), (object?)e.SchoolDuration, item.Index);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-        }
+                e.TuitionFee, OrNull(e.FeeDate), e.SchoolDuration, sorted[i].Index
+            };
+        }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, NOW(), NOW())");
+
+        var result = await _db.ExecuteNonQueryAsync(@"
+            INSERT INTO nc_biz_temp_relief_educations
+            (application_id, student_name, education_stage, school_name,
+             tuition_fee, fee_date, school_duration, sort_order, created_at, updated_at)
+            VALUES " + valuesClause, ct, args);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode!, result.Message!);
 
         return Result.Success();
     }
@@ -1298,6 +1356,9 @@ public class TempReliefCandidateRow
     public string BankName { get; set; } = string.Empty;
     public string BankAccount { get; set; } = string.Empty;
     public string OneCardAccount { get; set; } = string.Empty;
+    public string MatchedMemberName { get; set; } = string.Empty;
+    public string MatchedMemberRelation { get; set; } = string.Empty;
+    public string MatchedMemberIdCard { get; set; } = string.Empty;
 
     public TempReliefCandidate ToCandidate(string sourceTable) => new()
     {
@@ -1319,8 +1380,18 @@ public class TempReliefCandidateRow
         FamilySize = FamilySize,
         BankName = BankName,
         BankAccount = BankAccount,
-        OneCardAccount = OneCardAccount
+        OneCardAccount = OneCardAccount,
+        MatchedMemberIdCard = MatchedMemberIdCard,
+        MatchedPersonInfo = BuildMatchedPersonInfo(MatchedMemberName, MatchedMemberRelation)
     };
+
+    /// <summary>命中成员展示串：命中成员：张三（儿子）；关系为空时省略括号。</summary>
+    private static string BuildMatchedPersonInfo(string name, string relation)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        var rel = TempReliefConstants.GetRelationshipDisplayName(relation);
+        return string.IsNullOrWhiteSpace(rel) ? $"命中成员：{name}" : $"命中成员：{name}（{rel}）";
+    }
 }
 
 /// <summary>

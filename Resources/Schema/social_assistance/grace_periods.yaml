@@ -42,6 +42,10 @@ tables:
         type: DECIMAL(12,2)
         nullable: true
         comment: 渐退前原保障金额
+      - name: grace_grant_amount
+        type: DECIMAL(12,2)
+        nullable: true
+        comment: 渐退期内实际应发月保障金（原额超户口类型上限时已封顶，不含分类施保）
       - name: started_at
         type: TIMESTAMP
         nullable: true

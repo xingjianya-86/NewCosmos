@@ -120,22 +120,22 @@ public class InitializationService : BaseService, IInitializationService
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(generatedPassword);
 
             // 角色 / 权限 / 映射 / 管理员账户：单事务集合化写入，任一步失败整体回滚
-            await _dbService.BeginTransactionAsync(cancellationToken);
+            await using var tx = await _dbService.BeginTransactionScopeAsync(cancellationToken);
             try
             {
                 var seedResult = await SeedPermissionSystemAsync(adminPasswordHash, cancellationToken);
                 if (seedResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync();
+                    await tx.RollbackAsync(cancellationToken);
                     return Result<string>.Failure(
                         seedResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         seedResult.Message ?? "系统初始化失败");
                 }
-                await _dbService.CommitTransactionAsync(cancellationToken);
+                await tx.CommitAsync(cancellationToken);
             }
             catch
             {
-                await _dbService.RollbackTransactionAsync();
+                await tx.RollbackAsync(cancellationToken);
                 throw;
             }
 

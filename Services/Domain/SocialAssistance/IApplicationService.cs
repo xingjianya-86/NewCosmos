@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 
@@ -20,6 +20,11 @@ public interface IApplicationService
     /// 根据身份证号获取申请列表
     /// </summary>
     Task<Result<List<ApplicationEntity>>> GetByIdCardAsync(string idCard, CancellationToken ct = default);
+
+    /// <summary>
+    /// 批量查询身份证关联的档案分类结果（一次查询替代 N+1；同身份证多档案取先命中行）
+    /// </summary>
+    Task<Result<Dictionary<string, string>>> GetClassificationsByIdCardsAsync(IReadOnlyCollection<string> idCards, CancellationToken ct = default);
 
     /// <summary>
     /// 分页查询申请列表
@@ -102,7 +107,7 @@ public interface IApplicationService
 
     /// <summary>
     /// 获取已完成档案建设但未提交的申请（分页，支持关键词搜索）
-    /// CurrentStep 已完成且 status='Draft'
+    /// CurrentStep 已完成且 status=ApplicationStatusCodes.DRAFT
     /// </summary>
     Task<Result<PagedResult<ApplicationEntity>>> GetArchiveBuiltNotSubmittedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default);
 
@@ -113,7 +118,7 @@ public interface IApplicationService
 
     /// <summary>
     /// 获取草稿申请（分页，支持关键词搜索）
-    /// status='Draft' AND current_step < 5
+    /// status=ApplicationStatusCodes.DRAFT AND current_step &lt; 5
     /// </summary>
     Task<Result<PagedResult<ApplicationEntity>>> GetDraftPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default);
 
@@ -124,7 +129,7 @@ public interface IApplicationService
 
     /// <summary>
     /// 获取已完结档案（分页，支持关键词搜索）
-    /// current_step = 6
+    /// current_step = WorkflowSteps.ARCHIVED
     /// </summary>
     Task<Result<PagedResult<ApplicationEntity>>> GetArchivedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default);
 
@@ -135,7 +140,7 @@ public interface IApplicationService
 
     /// <summary>
     /// 获取已停保档案（分页，支持关键词搜索）
-    /// status = 'Stopped'
+    /// status = ApplicationStatusCodes.STOPPED
     /// </summary>
     Task<Result<PagedResult<ApplicationEntity>>> GetStoppedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default);
 
@@ -143,11 +148,6 @@ public interface IApplicationService
     /// 获取已停保档案总数
     /// </summary>
     Task<Result<int>> GetStoppedCountAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// 更新申请的当前步骤
-    /// </summary>
-    Task<Result> UpdateCurrentStepAsync(long applicationId, int step, CancellationToken ct = default);
 
     /// <summary>
     /// 完成归档：current_step 推进到 6 并将 status 置为 Approved（已审批/在保）。
@@ -159,4 +159,15 @@ public interface IApplicationService
     /// 为单人保成员创建草稿申请
     /// </summary>
     Task<Result<long>> CreateSingleRescueDraftAsync(long sourceApplicationId, FamilyMember member, CancellationToken ct = default);
+
+    /// <summary>
+    /// 在数据库事务中执行工作单元：正常完成提交，异常自动回滚。
+    /// 供 ViewModel 编排多服务保存流程使用（子服务经 HasTransaction 自动加入本事务）。
+    /// </summary>
+    Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken ct = default);
+
+    /// <summary>
+    /// 在数据库事务中执行返回 Result 的工作单元：Result 成功才提交，失败回滚并原样返回。
+    /// </summary>
+    Task<Result> ExecuteInTransactionForResultAsync(Func<CancellationToken, Task<Result>> work, CancellationToken ct = default);
 }

@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
@@ -70,9 +70,7 @@ public class SchemaSyncService : BaseService, ISchemaSyncService
 
         // DROP + CREATE 在同一事务内执行：任一步失败整体回滚，避免"旧表已删、新表未建"的半毁状态。
         // 若调用方已开启环境事务则直接加入，不重复开启。
-        var ownsTransaction = !_db.HasTransaction;
-        if (ownsTransaction)
-            await _db.BeginTransactionAsync(ct);
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -83,8 +81,7 @@ public class SchemaSyncService : BaseService, ISchemaSyncService
                 if (dropResult.IsFailure)
                 {
                     LogError("删除旧表失败");
-                    if (ownsTransaction)
-                        await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return dropResult;
                 }
             }
@@ -96,21 +93,18 @@ public class SchemaSyncService : BaseService, ISchemaSyncService
             if (createResult.IsFailure)
             {
                 LogError($"创建新表失败: {tableName}");
-                if (ownsTransaction)
-                    await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return createResult;
             }
 
-            if (ownsTransaction)
-                await _db.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
 
             LogInfo("结构同步完成");
             return Result.Success();
         }
         catch
         {
-            if (ownsTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             throw;
         }
     }

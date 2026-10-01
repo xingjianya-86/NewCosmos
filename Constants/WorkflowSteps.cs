@@ -7,6 +7,9 @@ namespace NewCosmos.Constants;
 /// </summary>
 public static class WorkflowSteps
 {
+    /// <summary>录入起点：新建/变更复制档案的初始录入步骤（1~4 为录入阶段）</summary>
+    public const int ENTRY_START = 1;
+
     /// <summary>审批中草稿：五个录入步骤全部完成，等待月度审核归档</summary>
     public const int PENDING_ARCHIVE = 5;
 

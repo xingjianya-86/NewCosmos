@@ -36,6 +36,29 @@ public static class PrintNavigationData
     /// </summary>
     public static string Status { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 仅出文书模式：允许展示的模板名白名单（null/空=不按名单收窄）。
+    /// 由 ApplicationFormViewModel.OpenDocumentOutputAsync 强白名单直出时写入；Output 分类模式一般不设。
+    /// </summary>
+    public static string[]? TemplateFilter { get; set; }
+
+    /// <summary>
+    /// 输出文书模式：模板分类集（null=按 BusinessType 默认分类）。
+    /// 文档直出/变动场景传 ArchiveCategoryResolver.DocumentOperationCategories。
+    /// </summary>
+    public static string[]? OutputCategories { get; set; }
+
+    /// <summary>
+    /// 输出文书模式：操作位覆盖（传入 GetRecordCategories 的 operationOverride）。
+    /// </summary>
+    public static string? OperationOverride { get; set; }
+
+    /// <summary>
+    /// 输出文书模式：预勾选模板名（列表仍展示分类内全部，仅控制 IsSelected）。
+    /// 告知书必选由调用方始终写入；人员变动/渐退/减发按业务事实追加。
+    /// </summary>
+    public static string[]? PrefilterTemplateNames { get; set; }
+
     public static void Clear()
     {
         BusinessType = string.Empty;
@@ -47,5 +70,9 @@ public static class PrintNavigationData
         NearRelativePairs = null;
         Classification = string.Empty;
         Status = string.Empty;
+        TemplateFilter = null;
+        OutputCategories = null;
+        OperationOverride = null;
+        PrefilterTemplateNames = null;
     }
 }

@@ -16,16 +16,46 @@ public class NetworkAccessService : BaseService, INetworkAccessService
 {
     protected override string ServiceName => "NetworkAccessService";
 
-    private static readonly string[] CliCandidates =
+    private readonly IConfigService _config;
+    private string[]? _cliCandidates;
+    private string? _tokenPath;
+
+    public NetworkAccessService(ILoggerService logger, IConfigService config) : base(logger)
     {
-        @"C:\Program Files (x86)\ZeroTier\One\zerotier-cli.bat",
-        @"C:\Program Files\ZeroTier\One\zerotier-cli.bat",
-    };
+        _config = config;
+    }
 
-    /// <summary>ZeroTier 本地管理令牌（默认 ACL 仅 Administrators/SYSTEM 可读）</summary>
-    private const string TokenPath = @"C:\ProgramData\ZeroTier\One\authtoken.secret";
+    /// <summary>ZeroTier CLI 搜索路径（config\app.ini [Network] ZeroTierCliPaths 覆盖，空则内置默认）</summary>
+    private string[] CliCandidates
+    {
+        get
+        {
+            if (_cliCandidates != null) return _cliCandidates;
+            var configured = _config.GetNetworkOptions().ZeroTierCliPaths;
+            _cliCandidates = string.IsNullOrWhiteSpace(configured)
+                ? new[]
+                {
+                    @"C:\Program Files (x86)\ZeroTier\One\zerotier-cli.bat",
+                    @"C:\Program Files\ZeroTier\One\zerotier-cli.bat",
+                }
+                : configured.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return _cliCandidates;
+        }
+    }
 
-    public NetworkAccessService(ILoggerService logger) : base(logger) { }
+    /// <summary>ZeroTier 本地管理令牌路径（config\app.ini [Network] ZeroTierTokenPath 覆盖，空则内置默认）</summary>
+    private string TokenPath
+    {
+        get
+        {
+            if (_tokenPath != null) return _tokenPath;
+            var configured = _config.GetNetworkOptions().ZeroTierTokenPath;
+            _tokenPath = string.IsNullOrWhiteSpace(configured)
+                ? @"C:\ProgramData\ZeroTier\One\authtoken.secret"
+                : configured;
+            return _tokenPath;
+        }
+    }
 
     public async Task<Result<ZeroTierStatus>> GetStatusAsync(CancellationToken ct = default)
     {
@@ -263,7 +293,7 @@ public class NetworkAccessService : BaseService, INetworkAccessService
 
     // ── 内部工具 ──
 
-    private static string? FindCli()
+    private string? FindCli()
     {
         foreach (var path in CliCandidates)
             if (File.Exists(path)) return path;
@@ -278,7 +308,7 @@ public class NetworkAccessService : BaseService, INetworkAccessService
     }
 
     /// <summary>当前用户是否可读取管理令牌</summary>
-    private static bool IsTokenReadable()
+    private bool IsTokenReadable()
     {
         try
         {

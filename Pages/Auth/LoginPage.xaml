@@ -20,10 +20,11 @@
                 </Image.GestureRecognizers>
             </Image>
 
-            <!-- 黑客帝国 0/1 数据流（全屏覆盖，背景图上、内容层下；点击穿透保留背景切换） -->
+            <!-- 黑客帝国 0/1 数据流（全屏覆盖，背景图上、内容层下；点击穿透保留背景切换）——仅 Windows，Android 屏蔽 -->
             <controls:MatrixRainView HorizontalOptions="Fill"
                                      VerticalOptions="Fill"
-                                     InputTransparent="True"/>
+                                     InputTransparent="True"
+                                     IsVisible="{OnPlatform WinUI=true, Android=false}"/>
 
             <!-- 渐变覆盖层 -->
             <BoxView BackgroundColor="White"
@@ -64,8 +65,8 @@
                                     Radius="8"
                                     Opacity="0.3" />
                         </Border.Shadow>
-                        <Label Text="&#xE80F;"
-                               FontFamily="Segoe MDL2 Assets"
+                        <Label Text="{OnPlatform WinUI=&#xE80F;, Android=⚖️}"
+                               FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                FontSize="36"
                                TextColor="White"
                                HorizontalOptions="Center"
@@ -141,8 +142,8 @@
                                                 Radius="12"
                                                 Opacity="0.3" />
                                     </Border.Shadow>
-                                    <Label Text="&#xE80F;"
-                                           FontFamily="Segoe MDL2 Assets"
+                                    <Label Text="{OnPlatform WinUI=&#xE80F;, Android=⚖️}"
+                                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                            FontSize="48"
                                            TextColor="White"
                                            HorizontalOptions="Center"
@@ -187,8 +188,8 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="8,0,0,8" />
                                             </Border.StrokeShape>
-                                            <Label Text="&#xE77B;"
-                                                   FontFamily="Segoe MDL2 Assets"
+                                            <Label Text="{OnPlatform WinUI=&#xE77B;, Android=👤}"
+                                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                    FontSize="14"
                                                    TextColor="{StaticResource Primary}"
                                                    HorizontalOptions="Center"
@@ -224,8 +225,8 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="8,0,0,8" />
                                             </Border.StrokeShape>
-                                            <Label Text="&#xE72E;"
-                                                   FontFamily="Segoe MDL2 Assets"
+                                            <Label Text="{OnPlatform WinUI=&#xE72E;, Android=🔒}"
+                                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                    FontSize="14"
                                                    TextColor="{StaticResource Primary}"
                                                    HorizontalOptions="Center"
@@ -479,11 +480,12 @@
             </Grid>
         </ScrollView>
 
-        <!-- 翁法罗斯 · 永劫回归 · 数据删除特效（全屏半透明背景层，点击穿透保留背景图切换） -->
+        <!-- 翁法罗斯 · 永劫回归 · 数据删除特效（全屏半透明背景层，点击穿透保留背景图切换）——仅 Windows，Android 屏蔽 -->
         <controls:EternalRegressionView x:Name="EternalRegressionEffect"
                                         HorizontalOptions="Fill"
                                         VerticalOptions="Fill"
-                                        InputTransparent="True"/>
+                                        InputTransparent="True"
+                                        IsVisible="{OnPlatform WinUI=true, Android=false}"/>
 
         <!-- 加载指示器 - 放在最顶层 -->
 <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3" IsLoading="{Binding IsBusy}"

@@ -22,7 +22,7 @@ public class ArchiveService : BaseService, IArchiveService
 
     public async Task<Archive> CreateAsync(Archive archive, CancellationToken ct = default)
     {
-        archive.ArchivedAt = DateTime.UtcNow;
+        archive.ArchivedAt = DateTime.Now;
 
         var sql = @"INSERT INTO nc_biz_archives (application_id, archive_no, archive_type, classification_result, archived_by, output_files)
                      VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id";

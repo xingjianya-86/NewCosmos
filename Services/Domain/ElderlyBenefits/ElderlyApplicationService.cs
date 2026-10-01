@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
@@ -146,7 +146,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
 
     public async Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"分页查询: keyword={keyword}, status={status}, 第{pageIndex}页, 每页{pageSize}条");
+        LogInfo($"分页查询: keywordLength={keyword.Length}, status={status}, 第{pageIndex}页, 每页{pageSize}条");
 
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
@@ -196,7 +196,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 ORDER BY actual_stop_date, id"
             : $@"SELECT * FROM nc_biz_elderly_applications
                 WHERE deleted_at IS NULL
-                  AND status IN ('Confirmed','Stopped')
+                  AND status IN ('{ElderlyBenefitConstants.StatusConfirmed}','{ElderlyBenefitConstants.StatusStopped}')
                   AND apply_date >= $1 AND apply_date < $2
                   {categoryClause}
                   {excludeImportClause}
@@ -501,16 +501,16 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 && src.SourceId.HasValue)
             {
                 var byId = await _db.ExecuteNonQueryAsync(
-                    "UPDATE nc_biz_elderly_subsidy_history SET status = 'Stopped', stopped_at = NOW(), updated_at = NOW() WHERE id = $1",
-                    ct, src.SourceId.Value);
+                    "UPDATE nc_biz_elderly_subsidy_history SET status = $2, stopped_at = NOW(), updated_at = NOW() WHERE id = $1",
+                    ct, src.SourceId.Value, ElderlyBenefitConstants.StatusStopped);
                 if (byId.IsSuccess) marked += byId.Value;
             }
 
             if (!string.IsNullOrWhiteSpace(src.IdCard))
             {
                 var byCard = await _db.ExecuteNonQueryAsync(
-                    "UPDATE nc_biz_elderly_subsidy_history SET status = 'Stopped', stopped_at = NOW(), updated_at = NOW() WHERE id_card = $1 AND status = 'Active'",
-                    ct, src.IdCard);
+                    "UPDATE nc_biz_elderly_subsidy_history SET status = $2, stopped_at = NOW(), updated_at = NOW() WHERE id_card = $1 AND status = $3",
+                    ct, src.IdCard, ElderlyBenefitConstants.StatusStopped, ElderlyBenefitConstants.StatusActive);
                 if (byCard.IsSuccess) marked += byCard.Value;
             }
 
@@ -579,20 +579,26 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
     /// </summary>
     private async Task<Result> InsertSegmentsAsync(long applicationId, List<ElderlyPaybackSegment> segments, CancellationToken ct)
     {
-        const string sql = @"
-            INSERT INTO nc_biz_elderly_payback_segments
-            (application_id, category_code, monthly_amount, segment_start_month, segment_end_month, months, segment_amount, created_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())";
+        if (segments == null || segments.Count == 0)
+            return Result.Success();
 
-        foreach (var segment in segments)
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(segments.Count, 7, i =>
         {
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            var segment = segments[i];
+            return new object?[]
+            {
                 applicationId, segment.CategoryCode, segment.MonthlyAmount,
                 segment.SegmentStartMonth, segment.SegmentEndMonth,
-                segment.Months, segment.SegmentAmount);
-            if (result.IsFailure)
-                return result;
-        }
+                segment.Months, segment.SegmentAmount
+            };
+        }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, NOW())");
+
+        var result = await _db.ExecuteNonQueryAsync(@"
+            INSERT INTO nc_biz_elderly_payback_segments
+            (application_id, category_code, monthly_amount, segment_start_month, segment_end_month, months, segment_amount, created_at)
+            VALUES " + valuesClause, ct, args);
+        if (result.IsFailure)
+            return result;
 
         return Result.Success();
     }
@@ -660,8 +666,8 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "身份证不能为空");
 
         // 已有草稿 → 复用，避免重复（已在享/已停发记录不阻塞新建，属"停旧增新"）
-        const string draftSql = "SELECT id FROM nc_biz_elderly_applications WHERE id_card = $1 AND status = 'Draft' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1";
-        var draftResult = await _db.QuerySingleAsync<long?>(draftSql, ct, idCard);
+        const string draftSql = "SELECT id FROM nc_biz_elderly_applications WHERE id_card = $1 AND status = $2 AND deleted_at IS NULL ORDER BY id DESC LIMIT 1";
+        var draftResult = await _db.QuerySingleAsync<long?>(draftSql, ct, idCard, ElderlyBenefitConstants.StatusDraft);
         if (draftResult.IsFailure)
             return Result.Failure<long>(draftResult.ErrorCode!, draftResult.Message!);
         if (draftResult.Value.HasValue)
@@ -858,8 +864,8 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             const string appSql = @"
                 SELECT applicant_name, applicant_id_card, classification_result, address
                 FROM nc_biz_applications
-                WHERE id = $1 AND deleted_at IS NULL AND current_step = 6";
-            var appResult = await _db.QuerySingleAsync<ArchivedApplicationRow>(appSql, ct, applicationId);
+                WHERE id = $1 AND deleted_at IS NULL AND current_step = $2";
+            var appResult = await _db.QuerySingleAsync<ArchivedApplicationRow>(appSql, ct, applicationId, WorkflowSteps.ARCHIVED);
             if (appResult.IsFailure || appResult.Value == null)
                 return Result.Success(0);
 
@@ -984,7 +990,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 WITH target_apps AS (
                     SELECT a.id, a.applicant_id_card
                     FROM nc_biz_applications a
-                    WHERE a.current_step = 6 AND a.deleted_at IS NULL
+                    WHERE a.current_step = $3 AND a.deleted_at IS NULL
                       AND a.classification_result IS NOT NULL
                       AND a.classification_result <> ALL($1)
                 ),
@@ -1011,11 +1017,11 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 SELECT
                     COUNT(*) FILTER (WHERE
                         NOT EXISTS (SELECT 1 FROM nc_biz_elderly_applications e
-                                    WHERE e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = 'Confirmed')
+                                    WHERE e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = $4)
                         AND NOT EXISTS (SELECT 1 FROM nc_biz_elderly_subsidy_history h WHERE h.id_card = q.id_card)) AS pending_new,
                     COUNT(*) FILTER (WHERE
                         EXISTS (SELECT 1 FROM nc_biz_elderly_applications e
-                                WHERE e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = 'Confirmed')
+                                WHERE e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = $4)
                         OR EXISTS (SELECT 1 FROM nc_biz_elderly_subsidy_history h WHERE h.id_card = q.id_card)) AS pending_transfer
                 FROM qualified q";
 
@@ -1026,7 +1032,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             };
             // 满80周岁门槛（月数）：与 C# 侧 Threshold80 常量同源，禁止在 SQL 内写死 960
             var thresholdMonths = ElderlyBenefitConstants.Threshold80 * 12;
-            var result = await _db.QuerySingleAsync<ElderlyPendingCounts>(sql, ct, excludeCodes, thresholdMonths);
+            var result = await _db.QuerySingleAsync<ElderlyPendingCounts>(sql, ct, excludeCodes, thresholdMonths, WorkflowSteps.ARCHIVED, ElderlyBenefitConstants.StatusConfirmed);
             if (result.IsFailure)
                 return Result.Failure<ElderlyPendingCounts>(result.ErrorCode!, result.Message!);
 
@@ -1054,7 +1060,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 WITH target_apps AS (
                     SELECT a.id, a.application_no, a.applicant_id_card, a.applicant_name
                     FROM nc_biz_applications a
-                    WHERE a.current_step = 6 AND a.deleted_at IS NULL
+                    WHERE a.current_step = $3 AND a.deleted_at IS NULL
                       AND a.classification_result IS NOT NULL
                       AND a.classification_result <> ALL($1)
                 ),
@@ -1092,13 +1098,13 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                            h.id AS history_id
                     FROM qualified q
                     LEFT JOIN nc_biz_elderly_applications e
-                           ON e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = 'Confirmed'
-                    LEFT JOIN nc_biz_elderly_subsidy_history h ON h.id_card = q.id_card AND h.status = 'Active'
+                           ON e.id_card = q.id_card AND e.deleted_at IS NULL AND e.status = $4
+                    LEFT JOIN nc_biz_elderly_subsidy_history h ON h.id_card = q.id_card AND h.status = $5
                 )
                 SELECT application_id, application_no, id_card, name, member_role,
                        elderly_application_id, elderly_application_no, history_id,
                        CASE WHEN elderly_application_id IS NULL AND history_id IS NULL
-                            THEN 'New' ELSE 'Transfer' END AS pending_type
+                            THEN $6 ELSE $7 END AS pending_type
                 FROM with_status
                 ORDER BY pending_type, name, id_card";
 
@@ -1108,19 +1114,16 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 ClassificationConstants.UrbanLowIncomeSingle
             };
             var thresholdMonths = ElderlyBenefitConstants.Threshold80 * 12;
-            var result = await _db.QueryAsync<ElderlyPendingRow>(sql, ct, excludeCodes, thresholdMonths);
+            var result = await _db.QueryAsync<ElderlyPendingRow>(sql, ct, excludeCodes, thresholdMonths, WorkflowSteps.ARCHIVED,
+            ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusActive,
+            ElderlyBenefitConstants.PendingTypeNew, ElderlyBenefitConstants.PendingTypeTransfer);
             if (result.IsFailure)
                 return Result.Failure<List<ElderlyPendingItem>>(result.ErrorCode!, result.Message!);
 
-            // 调试日志：SQL 原始返回行数
+            // 调试日志：SQL 原始返回行数（按分流聚合计数，避免逐行 dump 淹没日志）
             var rawRows = result.Value ?? new List<ElderlyPendingRow>();
-            LogInfo($"下月待办-SQL原始返回: {rawRows.Count} 行");
-            foreach (var r in rawRows.Take(50))
-            {
-                LogInfo($"  SQL行: {r.Name} {r.IdCard?.Substring(Math.Max(0, (r.IdCard?.Length ?? 0) - 4))} " +
-                    $"Type={r.PendingType} Role={r.MemberRole} AppId={r.ApplicationId} " +
-                    $"ElderlyAppId={r.ElderlyApplicationId} HistoryId={r.HistoryId}");
-            }
+            var rawNew = rawRows.Count(r => r.PendingType == ElderlyBenefitConstants.PendingTypeNew);
+            LogInfo($"下月待办-SQL原始返回: {rawRows.Count} 行（待新增={rawNew}，停旧增新={rawRows.Count - rawNew}）");
 
             var items = new List<ElderlyPendingItem>();
             foreach (var r in result.Value ?? new List<ElderlyPendingRow>())
@@ -1150,14 +1153,6 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 }
 
                 items.Add(item);
-            }
-
-            // 调试日志：逐条记录分流结果，便于排查"下月待办缺人"问题
-            foreach (var item in items)
-            {
-                LogInfo($"下月待办-分流: {item.Name} {DataMasker.MaskIdCard(item.IdCard)} " +
-                    $"Type={item.PendingType} SrcAppId={item.SourceApplicationId} " +
-                    $"ElderlyAppId={item.ElderlyApplicationId} HistoryId={item.HistoryId}");
             }
 
             LogInfo($"下月待办明细加载完成: 共 {items.Count} 人（待新增={items.Count(i => !i.IsTransfer)}，停旧增新={items.Count(i => i.IsTransfer)}）");
@@ -1372,9 +1367,9 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             const string appSql = @"
                 SELECT id FROM nc_biz_elderly_applications
                 WHERE id_card = $1 AND deleted_at IS NULL
-                ORDER BY CASE WHEN status = 'Confirmed' THEN 0 ELSE 1 END, id DESC
+                ORDER BY CASE WHEN status = $2 THEN 0 ELSE 1 END, id DESC
                 LIMIT 1";
-            var appIdResult = await _db.QuerySingleAsync<long?>(appSql, ct, idCard.Trim());
+            var appIdResult = await _db.QuerySingleAsync<long?>(appSql, ct, idCard.Trim(), ElderlyBenefitConstants.StatusConfirmed);
             if (appIdResult.IsFailure)
                 return Result.Failure<ElderlyReviewEvaluation>(appIdResult.ErrorCode!, appIdResult.Message!);
             if (appIdResult.Value is > 0)
@@ -1395,9 +1390,10 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
     /// <inheritdoc />
     public async Task<Result<List<ElderlyReview>>> GetPendingReviewsAsync(CancellationToken ct = default)
     {
+        // 上限保护：待复核队列超千条属异常积压，防无界列表（调用方为全量绑定列表，无分页）
         var sql = $@"SELECT * FROM nc_biz_elderly_reviews
                      WHERE status = '{ElderlyBenefitConstants.ReviewStatusPending}' AND deleted_at IS NULL
-                     ORDER BY created_at, id";
+                     ORDER BY created_at, id LIMIT 1000";
         var result = await _db.QueryAsync<ElderlyReview>(sql, ct);
         if (result.IsFailure)
             return Result.Failure<List<ElderlyReview>>(result.ErrorCode!, result.Message!);
@@ -1678,12 +1674,12 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
         const string byCardSql = @"
             SELECT id, name, id_card, gender, birth_date, phone, address, bank_account,
                    person_type, subsidy_amount, data_year
-            FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND status = 'Active'
+            FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND status = $2
             ORDER BY data_year DESC NULLS LAST, id DESC LIMIT 1";
         // 名册检索仅命中在册发放（Active）；byId 不限制（队列记录可能随后被标记，仍需可评估）
         var result = historyId is > 0
             ? await _db.QuerySingleAsync<ElderlyHistoryReviewRow>(byIdSql, ct, historyId.Value)
-            : await _db.QuerySingleAsync<ElderlyHistoryReviewRow>(byCardSql, ct, idCard);
+            : await _db.QuerySingleAsync<ElderlyHistoryReviewRow>(byCardSql, ct, idCard, ElderlyBenefitConstants.StatusActive);
         if (result.IsFailure || result.Value == null) return null;
         return result.Value;
     }
@@ -1803,7 +1799,7 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
              status, apply_date, confirmed_at, confirmed_by, remark, source_type, source_id,
              created_by, created_at, updated_at)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-                    'Confirmed',$15,NOW(),$16,$17,$18,$19,$20,NOW(),NOW())
+                    $21,$15,NOW(),$16,$17,$18,$19,$20,NOW(),NOW())
             RETURNING id";
         var result = await _db.ExecuteScalarAsync<long>(sql, ct,
             appNoResult.Value, eval.Name, eval.IdCard, eval.Gender, eval.BirthDate,
@@ -1812,7 +1808,8 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             currentMonth, eval.OldMonthlyAmount, eval.OldCategory, eval.OldIdentityFlag, "nc_biz_elderly_subsidy_history",
             DateTime.Today, operatorName ?? "System",
             $"复核补建（原类别 {ElderlyBenefitConstants.GetCategoryName(eval.OldCategory)}）",
-            ElderlyBenefitConstants.SourceTypeElderlyReview, eval.HistoryId, operatorName ?? "System");
+            ElderlyBenefitConstants.SourceTypeElderlyReview, eval.HistoryId, operatorName ?? "System",
+            ElderlyBenefitConstants.StatusConfirmed);
         if (result.IsFailure)
             return Result.Failure<long>(result.ErrorCode!, result.Message!);
         return Result.Success(result.Value);
@@ -1860,14 +1857,15 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
              bank_name, bank_account, agent_name, agent_relation,
              agent_receive_name, agent_receive_relation, agent_receive_bank_name, agent_receive_bank_account, agent_receive_reason,
              $2, $3, $4, $5, $6, false,
-             'Confirmed', $7::date, NOW(), $8, $9, $10, $11, $8, NOW(), NOW()
+             $13, $7::date, NOW(), $8, $9, $10, $11, $8, NOW(), NOW()
             FROM nc_biz_elderly_applications WHERE id = $12 AND deleted_at IS NULL
             RETURNING id";
         var result = await _db.ExecuteScalarAsync<long>(sql, ct,
             appNoResult.Value, eval.IssueStartMonth, eval.NewMonthlyAmount,
             eval.NewCategory, eval.IdentityFlag, eval.IdentitySource ?? string.Empty,
             DateTime.Today, operatorName ?? "System", remark,
-            ElderlyBenefitConstants.SourceTypeElderlyReview, oldAppId, oldAppId);
+            ElderlyBenefitConstants.SourceTypeElderlyReview, oldAppId, oldAppId,
+            ElderlyBenefitConstants.StatusConfirmed);
         if (result.IsFailure)
             return Result.Failure<long>(result.ErrorCode!, result.Message!);
         return Result.Success(result.Value);
@@ -1900,13 +1898,14 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
                 SELECT id, name, id_card, gender, birth_date, category, identity_flag,
                        issue_amount, hukou_address, family_address, detail_address
                 FROM nc_biz_elderly_applications
-                WHERE deleted_at IS NULL AND status = 'Confirmed'
-                  AND category IN ('CAT1','CAT2')
+                WHERE deleted_at IS NULL AND status = $3
+                  AND category IN ($4,$5)
                   AND birth_date IS NOT NULL
                   AND (birth_date + INTERVAL '90 years') >= $1
                   AND (birth_date + INTERVAL '90 years') < $2
                 ORDER BY birth_date, id";
-            var appResult = await _db.QueryAsync<Age90AppRow>(appSql, ct, monthStart, monthEnd);
+            var appResult = await _db.QueryAsync<Age90AppRow>(appSql, ct, monthStart, monthEnd,
+                ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.CatLowSubsidy, ElderlyBenefitConstants.CatOtherElderly);
             if (appResult.IsFailure)
                 return Result.Failure<List<ElderlyAge90Row>>(appResult.ErrorCode!, appResult.Message!);
             foreach (var a in appResult.Value ?? new List<Age90AppRow>())
@@ -1934,14 +1933,14 @@ public class ElderlyApplicationService : BaseService, IElderlyApplicationService
             const string histSql = @"
                 SELECT h.id, h.name, h.id_card, h.gender, h.birth_date, h.person_type, h.address, h.subsidy_amount
                 FROM nc_biz_elderly_subsidy_history h
-                WHERE h.status = 'Active'
+                WHERE h.status = $3
                   AND h.birth_date IS NOT NULL
                   AND (h.birth_date + INTERVAL '90 years') >= $1
                   AND (h.birth_date + INTERVAL '90 years') < $2
                   AND NOT EXISTS (SELECT 1 FROM nc_biz_elderly_applications e
                                   WHERE e.id_card = h.id_card AND e.deleted_at IS NULL)
                 ORDER BY h.birth_date, h.id";
-            var histResult = await _db.QueryAsync<Age90HistRow>(histSql, ct, monthStart, monthEnd);
+            var histResult = await _db.QueryAsync<Age90HistRow>(histSql, ct, monthStart, monthEnd, ElderlyBenefitConstants.StatusActive);
             if (histResult.IsFailure)
                 return Result.Failure<List<ElderlyAge90Row>>(histResult.ErrorCode!, histResult.Message!);
             foreach (var h in histResult.Value ?? new List<Age90HistRow>())

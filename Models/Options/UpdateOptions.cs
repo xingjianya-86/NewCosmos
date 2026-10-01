@@ -12,6 +12,13 @@ public class UpdateOptions
     /// <summary>更新清单地址（分号分隔，按顺序回退尝试）</summary>
     public List<string> ManifestUrls { get; set; } = new();
 
+    /// <summary>
+    /// Android 专用更新清单地址（分号分隔）。
+    /// 留空时由 ManifestUrls 推导（把 "/stable/" 替换为 "/android/"）。
+    /// Android 清单与 Windows 清单同 schema、同签名，仅 package.url 指向 .apk。
+    /// </summary>
+    public List<string> AndroidManifestUrls { get; set; } = new();
+
     /// <summary>启动时（登录窗前）是否静默检查更新</summary>
     public bool CheckOnStartup { get; set; } = true;
 
@@ -30,6 +37,11 @@ public class UpdateOptions
         if (HttpTimeoutSeconds < 5) HttpTimeoutSeconds = 5;
         if (DownloadTimeoutSeconds < 60) DownloadTimeoutSeconds = 60;
         ManifestUrls = ManifestUrls
+            .Where(u => !string.IsNullOrWhiteSpace(u))
+            .Select(u => u.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        AndroidManifestUrls = AndroidManifestUrls
             .Where(u => !string.IsNullOrWhiteSpace(u))
             .Select(u => u.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)

@@ -205,9 +205,13 @@
                         </Grid>
                     </Border>
 
-                    <!-- ArchiveSet 域：模板选择（组合 Output） -->
-                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsArchiveSetMode}" BackgroundColor="White">
+                    <!-- ArchiveSet 域 / 动态域文书清单：模板选择（组合 Output） -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding ShowDocsPanel}" BackgroundColor="White">
                         <VerticalStackLayout Spacing="10">
+                            <Label Text="输出分类" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Picker ItemsSource="{Binding OutputCategoryOptions}"
+                                    SelectedIndex="{Binding OutputCategoryIndex}"
+                                    HeightRequest="40"/>
                             <Label Text="选择打印模板" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Picker ItemsSource="{Binding Output.Templates}"
                                     SelectedItem="{Binding Output.SelectedPreviewTemplate}"
@@ -238,7 +242,64 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <!-- 动态管理域：留痕原样补打 / 重新生成 -->
+                    <!-- 打印设置 + 操作按钮（ArchiveSet 域 / 动态域文书清单，组合 Output） -->
+                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding ShowDocsPanel}" BackgroundColor="White">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="打印设置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+                                <Label Grid.Row="0" Text="打印机" FontSize="14" VerticalOptions="Center"/>
+                                <Picker Grid.Row="0" Grid.Column="1"
+                                        ItemsSource="{Binding Output.PrinterNames}"
+                                        SelectedItem="{Binding Output.SelectedPrinter}"/>
+                                <Label Grid.Row="1" Text="倍数(份)" FontSize="14" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
+                                    <Button Text="−" Command="{Binding Output.DecreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                    <Entry Text="{Binding Output.Copies}" Keyboard="Numeric" WidthRequest="60" HeightRequest="36"
+                                           HorizontalTextAlignment="Center" VerticalOptions="Center"/>
+                                    <Button Text="+" Command="{Binding Output.IncreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
+                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Spacing="8">
+                                    <Label Text="双面打印" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
+                                    <Label Text="生成PDF" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding Output.GeneratePdf}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding Output.PreviewCommand}"
+                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                                <Button Grid.Column="1" Text="打印" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding Output.PrintCommand}"
+                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                            </Grid>
+                            <VerticalStackLayout Spacing="4" IsVisible="{Binding Output.IsGenerating}">
+                                <Label Text="{Binding Output.ProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                <ProgressBar Progress="{Binding Output.Progress}" ProgressColor="{StaticResource Primary}" HeightRequest="6"/>
+                            </VerticalStackLayout>
+                            <Button Text="一键打印全部模板" Style="{StaticResource ButtonPrimary}"
+                                    BackgroundColor="{StaticResource WarningDark}"
+                                    Command="{Binding Output.PrintAllCommand}"
+                                    IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                            <Button Text="完成工单" Style="{StaticResource ButtonSecondary}"
+                                    Command="{Binding Output.CompleteWorkOrderCommand}">
+                                <Button.Triggers>
+                                    <DataTrigger TargetType="Button" Binding="{Binding Output.IsWorkOrderCompleted}" Value="True">
+                                        <Setter Property="Text" Value="✓ 工单已完成"/>
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Button.Triggers>
+                            </Button>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 动态管理域：留痕原样补打 / 重新生成（置于文书清单之后，不抢补打入口） -->
                     <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsDynamicMode}" BackgroundColor="White">
                         <VerticalStackLayout Spacing="10">
                             <Grid ColumnDefinitions="*,Auto">
@@ -287,54 +348,6 @@
                             <Button Text="打印当前档案（选中打印机）" Style="{StaticResource ButtonPrimary}"
                                     BackgroundColor="{StaticResource WarningDark}"
                                     Command="{Binding PrintDynamicCommand}"/>
-                        </VerticalStackLayout>
-                    </Border>
-
-                    <!-- 打印设置 + 操作按钮（ArchiveSet 域，组合 Output） -->
-                    <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding IsArchiveSetMode}" BackgroundColor="White">
-                        <VerticalStackLayout Spacing="10">
-                            <Label Text="打印设置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
-                                <Label Grid.Row="0" Text="打印机" FontSize="14" VerticalOptions="Center"/>
-                                <Picker Grid.Row="0" Grid.Column="1"
-                                        ItemsSource="{Binding Output.PrinterNames}"
-                                        SelectedItem="{Binding Output.SelectedPrinter}"/>
-                                <Label Grid.Row="1" Text="倍数(份)" FontSize="14" VerticalOptions="Center"/>
-                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
-                                    <Button Text="−" Command="{Binding Output.DecreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
-                                            FontSize="18" FontAttributes="Bold" Padding="0"
-                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
-                                    <Entry Text="{Binding Output.Copies}" Keyboard="Numeric" WidthRequest="60" HeightRequest="36"
-                                           HorizontalTextAlignment="Center" VerticalOptions="Center"/>
-                                    <Button Text="+" Command="{Binding Output.IncreaseCopiesCommand}" WidthRequest="36" HeightRequest="36"
-                                            FontSize="18" FontAttributes="Bold" Padding="0"
-                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
-                                </HorizontalStackLayout>
-                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Spacing="8">
-                                    <Label Text="双面打印" VerticalOptions="Center"/>
-                                    <Switch IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}"/>
-                                </HorizontalStackLayout>
-                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
-                                    <Label Text="生成PDF" VerticalOptions="Center"/>
-                                    <Switch IsToggled="{Binding Output.GeneratePdf}" OnColor="{StaticResource Primary}"/>
-                                </HorizontalStackLayout>
-                            </Grid>
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                                <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"
-                                        Command="{Binding Output.PreviewCommand}"
-                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
-                                <Button Grid.Column="1" Text="打印" Style="{StaticResource ButtonPrimary}"
-                                        Command="{Binding Output.PrintCommand}"
-                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
-                            </Grid>
-                            <VerticalStackLayout Spacing="4" IsVisible="{Binding Output.IsGenerating}">
-                                <Label Text="{Binding Output.ProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                <ProgressBar Progress="{Binding Output.Progress}" ProgressColor="{StaticResource Primary}" HeightRequest="6"/>
-                            </VerticalStackLayout>
-                            <Button Text="一键打印全部模板" Style="{StaticResource ButtonPrimary}"
-                                    BackgroundColor="{StaticResource WarningDark}"
-                                    Command="{Binding Output.PrintAllCommand}"
-                                    IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
                         </VerticalStackLayout>
                     </Border>
 

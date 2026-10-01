@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
@@ -36,9 +36,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         ValidateNotNull(request, nameof(request));
         LogInfo("创建资产核查: ArchiveId=" + request.ArchiveId);
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -47,32 +45,32 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             var existsResult = await _db.ExecuteScalarAsync(existsSql, ct, request.ArchiveId, request.VerificationYear, request.VerificationMonth);
             if (existsResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(existsResult.ErrorCode!, existsResult.Message!);
             }
 
             if (existsResult.Value > 0)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(ErrorCodes.APPLICATION_ALREADY_EXISTS, "该档案本月已有核查记录");
             }
 
             var sql = @"INSERT INTO nc_biz_asset_verifications 
                 (archive_id, verification_year, verification_month, verification_type, status, created_by, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, 'Pending', $5, NOW(), NOW())
+                VALUES ($1, $2, $3, $4, $6, $5, NOW(), NOW())
                 RETURNING id";
 
             var insertResult = await _db.ExecuteScalarAsync(sql, ct,
-                request.ArchiveId, request.VerificationYear, request.VerificationMonth, request.VerificationType, request.CreatedBy);
+                request.ArchiveId, request.VerificationYear, request.VerificationMonth, request.VerificationType, request.CreatedBy,
+                ApplicationStatusCodes.PENDING);
 
             if (insertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo("资产核查创建成功: Id=" + insertResult.Value);
             Logger.LogBusiness("创建资产核查", ("VerificationId", insertResult.Value), ("ArchiveId", request.ArchiveId));
@@ -80,7 +78,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "创建资产核查失败");
             return Result.FromException<long>(ex);
         }
@@ -127,10 +125,10 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             return Result.Failure(ErrorCodes.INVALID_TRANSITION, "核查已完成");
 
         var sql = @"UPDATE nc_biz_asset_verifications SET 
-            status = 'Completed', completed_at = NOW(), completed_by = $1, updated_at = NOW()
+            status = $3, completed_at = NOW(), completed_by = $1, updated_at = NOW()
             WHERE id = $2";
 
-        var completeResult = await _db.ExecuteNonQueryAsync(sql, ct, completedBy, id);
+        var completeResult = await _db.ExecuteNonQueryAsync(sql, ct, completedBy, id, ApplicationStatusCodes.COMPLETED);
 
         if (completeResult.IsFailure)
             return Result.Failure(completeResult.ErrorCode!, completeResult.Message!);
@@ -144,19 +142,19 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
     {
         LogInfo("获取待核查列表: 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_asset_verifications WHERE status = '{ApplicationStatusCodes.PENDING}'";
-        var countResult = await _db.ExecuteScalarAsync(countSql, ct);
+        var countSql = "SELECT COUNT(*) FROM nc_biz_asset_verifications WHERE status = $1";
+        var countResult = await _db.ExecuteScalarAsync(countSql, ct, ApplicationStatusCodes.PENDING);
         if (countResult.IsFailure)
             return Result.Failure<PagedResult<AssetVerification>>(countResult.ErrorCode!, countResult.Message!);
 
         var totalCount = countResult.Value;
         var offset = (pageIndex - 1) * pageSize;
-        var querySql = $@"SELECT * FROM nc_biz_asset_verifications 
-                         WHERE status = '{ApplicationStatusCodes.PENDING}' 
+        var querySql = @"SELECT * FROM nc_biz_asset_verifications 
+                         WHERE status = $1 
                          ORDER BY created_at DESC 
-                         LIMIT $1 OFFSET $2";
+                         LIMIT $2 OFFSET $3";
 
-        var listResult = await _db.QueryAsync<AssetVerification>(querySql, ct, pageSize, offset);
+        var listResult = await _db.QueryAsync<AssetVerification>(querySql, ct, ApplicationStatusCodes.PENDING, pageSize, offset);
         if (listResult.IsFailure)
             return Result.Failure<PagedResult<AssetVerification>>(listResult.ErrorCode!, listResult.Message!);
 
@@ -422,7 +420,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
     {
         LogInfo("删除当月核查记录: HeadIdCard=" + DataMasker.MaskIdCard(headIdCard));
 
-        await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
         try
         {
             var batchSql = @"SELECT DISTINCT batch_id FROM nc_biz_asset_checks 
@@ -446,7 +444,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                 AND deleted_at IS NULL";
 
             await ExecOrThrowAsync(_db, deleteSql, ct, headIdCard, monthStart, monthEnd);
-            await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo("已删除当月核查记录");
             Logger.LogBusiness("删除当月核查记录（事务提交）",
@@ -456,7 +454,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         }
         catch (Exception ex)
         {
-            await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "删除核查记录失败");
             return Result.Failure(ErrorCodes.UNKNOWN_ERROR, "删除核查记录失败: " + ex.Message);
         }
@@ -467,35 +465,43 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         ValidateNotNull(request, nameof(request));
         LogInfo("提交快速核查: BatchId=" + request.BatchId);
 
-        await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
         try
         {
-            foreach (var applicant in request.Applicants)
+            if (request.Applicants.Count > 0)
             {
-                var sql = @"INSERT INTO nc_biz_asset_checks 
+                var headIdCard = request.Applicants.FirstOrDefault(a => a.IsHead)?.ApplicantIdCard
+                    ?? request.Applicants.First().ApplicantIdCard;
+
+                var (valuesClause, insertArgs) = MultiRowValuesBuilder.Build(request.Applicants.Count, 12, i =>
+                {
+                    var applicant = request.Applicants[i];
+                    return new object?[]
+                    {
+                        request.BatchId,
+                        applicant.ApplicantName,
+                        applicant.ApplicantIdType,
+                        applicant.ApplicantIdCard,
+                        applicant.Relationship,
+                        applicant.IsHead,
+                        headIdCard,
+                        request.FamilyAddress,
+                        request.Community,
+                        request.ApplicationReason,
+                        request.ApplicationDate,
+                        request.ContactPhone
+                    };
+                }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, ${o + 8}, ${o + 9}, ${o + 10}, ${o + 11}, '0', NOW(), NOW())");
+
+                var insertResult = await _db.ExecuteNonQueryAsync(@"INSERT INTO nc_biz_asset_checks 
                     (batch_id, applicant_name, applicant_id_type, applicant_id_card, relationship, is_head,
                      head_id_card, family_address, community, application_reason, application_date,
                      contact_phone, status, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, '0', NOW(), NOW())
-                    RETURNING id";
-
-                var insertResult = await _db.ExecuteScalarAsync(sql, ct,
-                    request.BatchId,
-                    applicant.ApplicantName,
-                    applicant.ApplicantIdType,
-                    applicant.ApplicantIdCard,
-                    applicant.Relationship,
-                    applicant.IsHead,
-                    request.Applicants.FirstOrDefault(a => a.IsHead)?.ApplicantIdCard ?? request.Applicants.First().ApplicantIdCard,
-                    request.FamilyAddress,
-                    request.Community,
-                    request.ApplicationReason,
-                    request.ApplicationDate,
-                    request.ContactPhone);
+                    VALUES " + valuesClause, ct, insertArgs);
 
                 if (insertResult.IsFailure)
                 {
-                    await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     LogError("快速核查提交失败");
                     return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
                 }
@@ -516,7 +522,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
                 if (agentResult.IsFailure)
                 {
-                    await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     LogError("代理人信息写入失败");
                     return Result.Failure<long>(agentResult.ErrorCode!, agentResult.Message!);
                 }
@@ -535,12 +541,12 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
             if (operatorResult.IsFailure)
             {
-                await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 LogError("操作员信息写入失败");
                 return Result.Failure<long>(operatorResult.ErrorCode!, operatorResult.Message!);
             }
 
-            await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             Logger.LogBusiness("快速核查提交成功",
                 ("BatchId", request.BatchId),
@@ -552,7 +558,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         }
         catch (Exception ex)
         {
-            await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "快速核查提交失败");
             return Result.Failure<long>(ErrorCodes.UNKNOWN_ERROR, "快速核查提交失败: " + ex.Message);
         }
@@ -563,10 +569,10 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         LogInfo("获取日期范围统计");
 
         var sql = $@"SELECT
-                        COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.SUBMITTED}'), 0) as submitted_count,
-                        COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.VERIFIED}'), 0) as has_report_count,
-                        COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.INCLUDED}'), 0) as archived_count,
-                        COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.REFUSED}'), 0) as rejected_count,
+                        COALESCE(COUNT(*) FILTER (WHERE status = $3), 0) as submitted_count,
+                        COALESCE(COUNT(*) FILTER (WHERE status = $4), 0) as has_report_count,
+                        COALESCE(COUNT(*) FILTER (WHERE status = $5), 0) as archived_count,
+                        COALESCE(COUNT(*) FILTER (WHERE status = $6), 0) as rejected_count,
                         COALESCE(COUNT(*), 0) as total_count,
                         0 as total_asset_value
                     FROM nc_biz_asset_checks
@@ -575,7 +581,9 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
         try
         {
-            var result = await _db.QueryAsync<MonthlyStatsDto>(sql, ct, startDate, endDate);
+            var result = await _db.QueryAsync<MonthlyStatsDto>(sql, ct, startDate, endDate,
+                AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED,
+                AssetCheckStatusConstants.INCLUDED, AssetCheckStatusConstants.REFUSED);
             if (result.IsFailure)
                 return Result.Failure<MonthlyVerificationStats>(result.ErrorCode!, result.Message!);
 
@@ -650,12 +658,16 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                    EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                    EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                    'Quick' AS verification_type,
-                                   CASE WHEN status = '{AssetCheckStatusConstants.SUBMITTED}' THEN '已提交' WHEN status = '{AssetCheckStatusConstants.VERIFIED}' THEN '已核查' WHEN status = '{AssetCheckStatusConstants.INCLUDED}' THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
+                                   CASE WHEN status = ${conditions.ParamCount + 1} THEN '已提交' WHEN status = ${conditions.ParamCount + 2} THEN '已核查' WHEN status = ${conditions.ParamCount + 3} THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
                                    NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                                    created_at, NULL::timestamp AS completed_at
                             FROM nc_biz_asset_checks " + whereClause +
-                   $" ORDER BY created_at DESC LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
-        var pageParams = new List<object?>(conditions.GetParameters()) { pageSize, offset };
+                   $" ORDER BY created_at DESC LIMIT ${conditions.ParamCount + 4} OFFSET ${conditions.ParamCount + 5}";
+        var pageParams = new List<object?>(conditions.GetParameters())
+        {
+            AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED, AssetCheckStatusConstants.INCLUDED,
+            pageSize, offset
+        };
 
         var listResult = await _db.QueryAsync<AssetVerificationTask>(querySql, ct, pageParams.ToArray());
         if (listResult.IsFailure)
@@ -682,15 +694,19 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                        EXTRACT(YEAR FROM application_date)::int AS verification_year,
                        EXTRACT(MONTH FROM application_date)::int AS verification_month,
                        'Quick' AS verification_type,
-                       CASE WHEN status = '{AssetCheckStatusConstants.SUBMITTED}' THEN '已提交' WHEN status = '{AssetCheckStatusConstants.VERIFIED}' THEN '已核查' WHEN status = '{AssetCheckStatusConstants.INCLUDED}' THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
+                       CASE WHEN status = $2 THEN '已提交' WHEN status = $3 THEN '已核查' WHEN status = $4 THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
                        NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                        created_at, NULL::timestamp AS completed_at
-                 FROM nc_biz_asset_checks
-                 WHERE head_id_card = ANY($1::text[]) AND deleted_at IS NULL
-                 ORDER BY created_at DESC;
+                FROM nc_biz_asset_checks
+                WHERE head_id_card = ANY($1::text[]) AND deleted_at IS NULL
+                ORDER BY created_at DESC;
 ";
 
-            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, new object[] { headIdCards.ToArray() });
+            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, new object[]
+            {
+                headIdCards.ToArray(),
+                AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED, AssetCheckStatusConstants.INCLUDED
+            });
             if (result.IsFailure)
                 return Result.Failure<List<AssetVerificationTask>>(result.ErrorCode!, result.Message!);
 
@@ -702,6 +718,19 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             LogException(ex, "GetByHeadIdsAsync");
             return Result.FromException<List<AssetVerificationTask>>(ex);
         }
+    }
+
+    public async Task<Result<long?>> GetLatestIdByIdCardAsync(string idCard, CancellationToken ct = default)
+    {
+        ValidateNotNullOrEmpty(idCard, nameof(idCard));
+        LogInfo("按身份证查询最新核查记录: IdCard=" + DataMasker.MaskIdCard(idCard));
+        var sql = @"SELECT ac.id FROM nc_biz_asset_checks ac
+                  WHERE ac.applicant_id_card = $1 AND ac.deleted_at IS NULL
+                  ORDER BY ac.created_at DESC LIMIT 1";
+        var result = await _db.ExecuteScalarAsync<long?>(sql, ct, idCard);
+        return result.IsSuccess
+            ? Result.Success<long?>(result.Value)
+            : Result.Failure<long?>(result.ErrorCode!, result.Message!);
     }
 
     public async Task<AssetCheckHistoryResult?> GetHistoryByIdCardAsync(string idCard, CancellationToken ct = default)
@@ -855,18 +884,18 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                'Quick' AS verification_type,
-                               CASE WHEN status = '{AssetCheckStatusConstants.SUBMITTED}' THEN '已提交' WHEN status = '{AssetCheckStatusConstants.VERIFIED}' THEN '已核查' WHEN status = '{AssetCheckStatusConstants.INCLUDED}' THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
+                               CASE WHEN status = $3 THEN '已提交' WHEN status = $4 THEN '已核查' WHEN status = $5 THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
                                NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                                created_at, NULL::timestamp AS completed_at
-                         FROM nc_biz_asset_checks
-                         WHERE application_date >= $1 AND application_date < $2
-                           AND deleted_at IS NULL
+                        FROM nc_biz_asset_checks
+                        WHERE application_date >= $1 AND application_date < $2
+                          AND deleted_at IS NULL
                          ORDER BY created_at DESC;
 ";
-
             var monthStart = new DateTime(year, month, 1);
             var monthEnd = monthStart.AddMonths(1);
-            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, monthStart, monthEnd);
+            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, monthStart, monthEnd,
+                AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED, AssetCheckStatusConstants.INCLUDED);
             if (result.IsFailure)
                 return Result.Failure<List<AssetVerificationTask>>(result.ErrorCode!, result.Message!);
 
@@ -990,12 +1019,12 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             var memberSql = $@"SELECT applicant_name AS name, applicant_id_card AS id_card,
                                      applicant_id_type AS id_type, relationship, is_head
                               FROM nc_biz_asset_checks
-                              WHERE head_id_card = $1 AND status = '{AssetCheckStatusConstants.VERIFIED}'
+                              WHERE head_id_card = $1 AND status = $2
                                 AND applicant_id_card != $1 AND deleted_at IS NULL
                               GROUP BY applicant_id_card, applicant_name, applicant_id_type, relationship, is_head
                               ORDER BY applicant_name;
 ";
-            var memberResult = await _db.QueryAsync<AssetVerificationFamilyMember>(memberSql, ct, detail.HeadIdCard);
+            var memberResult = await _db.QueryAsync<AssetVerificationFamilyMember>(memberSql, ct, detail.HeadIdCard, AssetCheckStatusConstants.VERIFIED);
             if (memberResult.IsSuccess && memberResult.Value != null)
             {
                 detail.FamilyMembers = memberResult.Value;
@@ -1121,10 +1150,12 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
             var whereClause = conditions.Count > 0 ? " WHERE " + string.Join(" AND ", conditions) : "";
 
+            // [索引豁免] GROUP BY EXTRACT(...) 为月度聚合计算列；WHERE 已按年份范围收敛，
+            // 表规模有限，不为此加冗余列。
             var sql = $@"SELECT EXTRACT(YEAR FROM application_date)::int AS year,
                                EXTRACT(MONTH FROM application_date)::int AS month,
-                               COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.SUBMITTED}'), 0) AS pending_count,
-                               COALESCE(COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.VERIFIED}'), 0) AS completed_count,
+                               COALESCE(COUNT(*) FILTER (WHERE status = ${paramIndex}), 0) AS pending_count,
+                               COALESCE(COUNT(*) FILTER (WHERE status = ${paramIndex + 1}), 0) AS completed_count,
                                0 AS error_count,
                                COUNT(*)::int AS total_count,
                                0 AS total_asset_value
@@ -1132,6 +1163,9 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                       " + whereClause +
                       " GROUP BY EXTRACT(YEAR FROM application_date), EXTRACT(MONTH FROM application_date)"
                       + " ORDER BY year DESC, month DESC";
+
+            parameters.Add(AssetCheckStatusConstants.SUBMITTED);
+            parameters.Add(AssetCheckStatusConstants.VERIFIED);
 
             var result = await _db.QueryAsync<MonthlyVerificationStats>(sql, ct, parameters.ToArray());
             if (result.IsFailure)
@@ -1158,9 +1192,9 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
         try
         {
-            var conditions = new List<string> { $"status = '{AssetCheckStatusConstants.SUBMITTED}'" };
-            var parameters = new List<object>();
-            var paramIndex = 1;
+            var conditions = new List<string> { "status = $1" };
+            var parameters = new List<object> { AssetCheckStatusConstants.SUBMITTED };
+            var paramIndex = 2;
 
             var rangeStart = month.HasValue ? new DateTime(year, month.Value, 1) : new DateTime(year, 1, 1);
             var rangeEnd = month.HasValue ? rangeStart.AddMonths(1) : rangeStart.AddYears(1);
@@ -1171,12 +1205,12 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
             var whereClause = " WHERE " + string.Join(" AND ", conditions);
 
-            var sql = @"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
+            var sql = $@"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
                                batch_id, relationship,
                                EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                'Quick' AS verification_type,
-                               'Pending' AS status,
+                               '{ApplicationStatusCodes.PENDING}' AS status,
                                NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                                created_at, NULL::timestamp AS completed_at
                         FROM nc_biz_asset_checks"
@@ -1208,15 +1242,15 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                'Quick' AS verification_type,
-                               'Pending' AS status,
+                               '{ApplicationStatusCodes.PENDING}' AS status,
                                NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                                created_at, NULL::timestamp AS completed_at
                         FROM nc_biz_asset_checks
-                        WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND application_date >= $1 AND application_date < $2
+                        WHERE status = $1 AND application_date >= $2 AND application_date < $3
                         ORDER BY created_at DESC;
 ";
 
-            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, startDate, endDate);
+            var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, AssetCheckStatusConstants.SUBMITTED, startDate, endDate);
             if (result.IsFailure)
                 return Result.Failure<List<AssetVerificationTask>>(result.ErrorCode!, result.Message!);
 
@@ -1272,16 +1306,16 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
     {
         LogInfo("获取已完成资产核查记录（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.VERIFIED}' AND deleted_at IS NULL";
-        var querySql = $@"SELECT id, batch_id, 
+        var countSql = "SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
+        var querySql = @"SELECT id, batch_id, 
                 applicant_name AS archive_name, 
                 applicant_id_card AS archive_id_card,
                 relationship, head_id_card, family_address, community, 
                 applicant_id_type, status, created_at, updated_at
-            FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.VERIFIED}' AND deleted_at IS NULL";
+            FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
         var conditions = new List<string>();
-        var parameters = new List<object>();
-        var paramIndex = 1;
+        var parameters = new List<object> { AssetCheckStatusConstants.VERIFIED };
+        var paramIndex = 2;
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -1318,16 +1352,16 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
     {
         LogInfo("获取待处理资产核查记录（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND deleted_at IS NULL";
-        var querySql = $@"SELECT id, batch_id, 
+        var countSql = "SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
+        var querySql = @"SELECT id, batch_id, 
                 applicant_name AS archive_name, 
                 applicant_id_card AS archive_id_card,
                 relationship, head_id_card, family_address, community, 
                 applicant_id_type, status, created_at, updated_at
-            FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND deleted_at IS NULL";
+            FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
         var conditions = new List<string>();
-        var parameters = new List<object>();
-        var paramIndex = 1;
+        var parameters = new List<object> { AssetCheckStatusConstants.SUBMITTED };
+        var paramIndex = 2;
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -1362,8 +1396,8 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
     public async Task<Result<int>> GetCompletedCountAsync(CancellationToken ct = default)
     {
-        var sql = $"SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.VERIFIED}' AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct);
+        var sql = "SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
+        var result = await _db.ExecuteScalarAsync(sql, ct, AssetCheckStatusConstants.VERIFIED);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));
@@ -1371,8 +1405,8 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
     public async Task<Result<int>> GetPendingCountAsync(CancellationToken ct = default)
     {
-        var sql = $"SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct);
+        var sql = "SELECT COUNT(*) FROM nc_biz_asset_checks WHERE status = $1 AND deleted_at IS NULL";
+        var result = await _db.ExecuteScalarAsync(sql, ct, AssetCheckStatusConstants.SUBMITTED);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));

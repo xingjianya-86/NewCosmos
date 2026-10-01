@@ -141,11 +141,13 @@ public partial class RecoveryManualViewModel : ViewModelBase
     public RecoveryManualViewModel(
         IServiceProvider serviceProvider,
         ILoggerService logger,
-        IRecoveryService recoveryService)
+        IRecoveryService recoveryService,
+        Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
+        _printJobFactory = printJobFactory;
 
         // 初始化追缴分类列表
         SourceTypeList = RecoveryConstants.GetAllSourceTypes();
@@ -165,6 +167,8 @@ public partial class RecoveryManualViewModel : ViewModelBase
         StartMonth = $"{now.Year:D4}-{now.Month:D2}";
         EndMonth = $"{now.Year:D4}-{now.Month:D2}";
     }
+
+    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
 
     /// <summary>
     /// 起始年份变化
@@ -317,6 +321,44 @@ public partial class RecoveryManualViewModel : ViewModelBase
         && !string.IsNullOrWhiteSpace(PersonName)
         && SelectedSourceType.HasValue
         && MonthlyAmount > 0;
+
+    /// <summary>
+    /// 保存并推送打印：保存后写入推送打印队列（PC 端打印代理生成《追缴资金办理单》）。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task SaveAndPushPrintAsync()
+    {
+        var result = await SaveInternalAsync();
+        if (result.IsFailure)
+        {
+            await ShowFailureAsync(result, "保存并推送打印");
+            return;
+        }
+
+        var fields = await BuildPrintFieldsAsync();
+        var request = new PrintJobRequest
+        {
+            BusinessType = "Recovery",
+            BusinessId = result.Value,
+            Classification = RecoveryConstants.INPUT_MODE_MANUAL,
+            ApplicantName = PersonName,
+            ApplicantIdCard = IdCard,
+            Fields = fields,
+            TableRows = new()
+        };
+
+        var push = await _printJobFactory.EnqueueAsync(request);
+        if (push.IsFailure)
+        {
+            ErrorMessage = push.Message ?? "推送打印失败";
+            return;
+        }
+
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+        await dialog.DisplayAlertAsync("已推送打印",
+            $"打印任务 {push.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+        await GoBackAsync();
+    }
 
     /// <summary>
     /// 保存草稿（宽松校验：字段缺失时保存为空值，不阻断）

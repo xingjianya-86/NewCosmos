@@ -62,9 +62,21 @@
                                     IsVisible="{Binding ShowSingleRescue}">
                                 <Label Text="单人保" Style="{StaticResource ChipInfoText}"/>
                             </Border>
+                            <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center"
+                                    IsVisible="{Binding HasGraceNote}">
+                                <Label Text="{Binding GraceNote}" Style="{StaticResource ChipWarningText}"/>
+                            </Border>
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowViewArchiveButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
                                     FontSize="13"
                                     Padding="16,8"
@@ -168,9 +180,21 @@
                                     IsVisible="{Binding ShowSingleRescue}">
                                 <Label Text="单人保" Style="{StaticResource ChipInfoText}"/>
                             </Border>
+                            <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center"
+                                    IsVisible="{Binding HasGraceNote}">
+                                <Label Text="{Binding GraceNote}" Style="{StaticResource ChipWarningText}"/>
+                            </Border>
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowViewArchiveButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
                                     FontSize="13"
                                     Padding="16,8"

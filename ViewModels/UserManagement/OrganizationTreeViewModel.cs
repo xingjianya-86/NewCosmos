@@ -352,23 +352,16 @@ public partial class OrganizationTreeViewModel : ViewModelBase
 
         _logger.LogBusiness("打开新建组织编辑器");
 
-        var regionService = _serviceProvider.GetRequiredService<IRegionService>();
-        OrganizationEditorViewModel = new OrganizationEditorViewModel(_organizationService,
-            _dictionaryService,
-            regionService,
-            _logger,
-            _dialogService,
-            _serviceProvider,
-            null,
-            parentId,
-            async () =>
-            {
-                IsOrganizationEditorVisible = false;
-                await LoadTreeAsync();
-                await ShowSnackBarAsync("组织创建成功");
-            });
+        var editor = _serviceProvider.GetRequiredService<OrganizationEditorViewModel>();
+        editor.Initialize(null, parentId, async () =>
+        {
+            IsOrganizationEditorVisible = false;
+            await LoadTreeAsync();
+            await ShowSnackBarAsync("组织创建成功");
+        });
+        OrganizationEditorViewModel = editor;
 
-        await OrganizationEditorViewModel.LoadInitialRegionAsync();
+        await editor.LoadInitialRegionAsync();
         IsOrganizationEditorVisible = true;
     }
 
@@ -386,23 +379,16 @@ public partial class OrganizationTreeViewModel : ViewModelBase
 
         _logger.LogBusiness($"编辑组织机构, OrganizationId={SelectedOrganization.Id}");
 
-        var regionService = _serviceProvider.GetRequiredService<IRegionService>();
-        OrganizationEditorViewModel = new OrganizationEditorViewModel(_organizationService,
-            _dictionaryService,
-            regionService,
-            _logger,
-            _dialogService,
-            _serviceProvider,
-            SelectedOrganizationDetails,
-            null,
-            async () =>
-            {
-                IsOrganizationEditorVisible = false;
-                await LoadTreeAsync();
-                await ShowSnackBarAsync("组织保存成功");
-            });
+        var editor = _serviceProvider.GetRequiredService<OrganizationEditorViewModel>();
+        editor.Initialize(SelectedOrganizationDetails, null, async () =>
+        {
+            IsOrganizationEditorVisible = false;
+            await LoadTreeAsync();
+            await ShowSnackBarAsync("组织保存成功");
+        });
+        OrganizationEditorViewModel = editor;
 
-        await OrganizationEditorViewModel.LoadInitialRegionAsync();
+        await editor.LoadInitialRegionAsync();
         IsOrganizationEditorVisible = true;
     }
 
@@ -464,8 +450,8 @@ public partial class OrganizationEditorViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly Func<Task> _onSaved;
-    private readonly Organization _originalOrganization;
+    private Func<Task>? _onSaved;
+    private Organization? _originalOrganization;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -554,10 +540,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
         IRegionService regionService,
         ILoggerService logger,
         IDialogService dialogService,
-        IServiceProvider serviceProvider,
-        Organization organization,
-        int? parentId,
-        Func<Task> onSaved)
+        IServiceProvider serviceProvider)
     {
         _organizationService = organizationService;
         _dictionaryService = dictionaryService;
@@ -565,8 +548,13 @@ public partial class OrganizationEditorViewModel : ViewModelBase
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
-        _onSaved = onSaved;
+    }
+
+    /// <summary>从 DI 解析后、绑定前调用：传入本次编辑目标、上级组织与保存回调（new 的运行期参数改由此承载）</summary>
+    public void Initialize(Organization? organization, int? parentId, Func<Task> onSaved)
+    {
         _originalOrganization = organization;
+        _onSaved = onSaved;
 
         IsEditMode = organization != null;
 
@@ -585,6 +573,8 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             IsSpecialCareInstitution = organization.IsSpecialCareInstitution;
             ParentId = organization.ParentId ?? 0;
         }
+
+        OnPropertyChanged(nameof(EditorTitle));
     }
 
     private async Task LoadDictionaryOptionsAsync()
@@ -959,7 +949,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
 
             var request = new OrganizationSaveRequest
             {
-                Id = _originalOrganization.Id,
+                Id = _originalOrganization?.Id,
                 Name = Name,
                 Abbreviation = Abbreviation,
                 Principal = Principal,
@@ -993,7 +983,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
 
             if (result.IsSuccess)
             {
-                await _onSaved();
+                if (_onSaved != null) await _onSaved();
                 _logger.LogBusiness("组织机构保存成功");
             }
             else
@@ -1007,7 +997,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task CancelAsync()
     {
-        await _onSaved();
+        if (_onSaved != null) await _onSaved();
     }
 
     #region 辅助方法

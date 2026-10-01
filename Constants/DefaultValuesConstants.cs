@@ -33,6 +33,9 @@ public static class DefaultValuesConstants
     
     /// <summary>疾病类别默认值 ItemKey（疾病类别的 ItemKey 本身是中文）</summary>
     public const string DISEASE_CATEGORY_KEY = "无任何疾病";
+
+    /// <summary>默认省份（家庭住址/户籍省份初值）</summary>
+    public const string HOME_PROVINCE = "黑龙江省";
     
     // ===== 旧常量（标记为过时，保留兼容） =====
     

@@ -1,3 +1,4 @@
+#if WINDOWS
 using Microsoft.Win32;
 using System.Diagnostics;
 
@@ -263,3 +264,4 @@ public static class OfficeProviderDetector
         }
     }
 }
+#endif

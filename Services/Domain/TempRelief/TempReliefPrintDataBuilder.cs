@@ -95,7 +95,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.APPLICANT_ID_CARD] = app.ApplicantIdCard,
             [FieldKeys.APPLICATION_REASON] = string.IsNullOrWhiteSpace(app.DifficultyType)
                 ? TempReliefConstants.DifficultyTypeOther : app.DifficultyType,
-            [FieldKeys.APPLICATION_DATE] = app.ApplyDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            [FieldKeys.APPLICATION_DATE] = (investigationDate ?? app.ApplyDate)?.ToString("yyyy-MM-dd") ?? string.Empty,
 
             // ── 通用承诺书键：通用_申请人承诺书(174) / 通用_经办人承诺书(178) 复用临时救助打印流 ──
             [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress,
@@ -248,10 +248,11 @@ public static class TempReliefPrintDataBuilder
         if (!string.IsNullOrWhiteSpace(app.FamilyMemberStatus))
             parts.Add($"家庭成员身体状况：{app.FamilyMemberStatus}");
 
-        var diseaseText = BuildDiseaseBrief(app.Diseases);
-        if (!string.IsNullOrWhiteSpace(diseaseText)) parts.Add($"申请人患病情况：{diseaseText}");
+        var diseaseOwners = ResolveDetailOwners(app, TempReliefConstants.DifficultyTypeDisease);
+        var diseaseText = BuildDiseaseBrief(app.Diseases, diseaseOwners);
+        if (!string.IsNullOrWhiteSpace(diseaseText)) parts.Add($"患病情况：{diseaseText}");
 
-        var accidentText = BuildAccidentBrief(app.Accidents);
+        var accidentText = BuildAccidentBrief(app.Accidents, ResolveDetailOwners(app, TempReliefConstants.DifficultyTypeAccident));
         if (!string.IsNullOrWhiteSpace(accidentText)) parts.Add($"意外灾害：{accidentText}");
 
         var educationText = BuildEducationBrief(app.Educations);
@@ -271,30 +272,59 @@ public static class TempReliefPrintDataBuilder
         return $"{app.DifficultyReason}\n{memberStatus}";
     }
 
-    private static string BuildDiseaseBrief(List<TempReliefDisease>? diseases)
+    private static string BuildDiseaseBrief(List<TempReliefDisease>? diseases, IReadOnlyList<string>? owners = null)
     {
         if (diseases == null || diseases.Count == 0) return string.Empty;
-        var idx = 1;
         var parts = new List<string>();
-        foreach (var d in diseases)
+        for (var i = 0; i < diseases.Count; i++)
         {
-            var owner = string.IsNullOrWhiteSpace(d.MemberName) ? "" : d.MemberName.Trim() + " ";
-            var seg = $"【疾病{idx}】{owner}{d.DiseaseName}".Trim();
+            var d = diseases[i];
+            // 归属成员空时回退对应顺序的解析名（明细归属优先，空则申请人），保证打印点名患病人
+            var ownerName = !string.IsNullOrWhiteSpace(d.MemberName)
+                ? d.MemberName.Trim()
+                : owners != null && i < owners.Count && !string.IsNullOrWhiteSpace(owners[i])
+                    ? owners[i].Trim()
+                    : "";
+            var owner = string.IsNullOrEmpty(ownerName) ? "" : ownerName + " ";
+            var seg = $"{owner}{d.DiseaseName}".Trim();
             if (!string.IsNullOrWhiteSpace(d.DiseaseCode)) seg += $"（编码 {d.DiseaseCode}）";
             parts.Add(seg);
-            idx++;
         }
         return string.Join("、", parts);
     }
 
-    private static string BuildAccidentBrief(List<TempReliefAccident>? accidents)
+    /// <summary>
+    /// 明细归属人解析列表（与明细行一一对应）：明细 MemberName 优先，空则回退申请人；
+    /// 用于打印 brief/摘要在归属字段为空时仍能点名患病人/受灾人。
+    /// </summary>
+    private static List<string> ResolveDetailOwners(TempReliefApplication app, string difficultyType)
+    {
+        IEnumerable<string?>? detailNames = difficultyType switch
+        {
+            TempReliefConstants.DifficultyTypeDisease => app.Diseases?.Select(d => d.MemberName),
+            TempReliefConstants.DifficultyTypeAccident => app.Accidents?.Select(a => a.MemberName),
+            TempReliefConstants.DifficultyTypeEducation => app.Educations?.Select(e => e.StudentName),
+            _ => null
+        };
+        if (detailNames == null) return new List<string>();
+        var fallback = app.ApplicantName ?? string.Empty;
+        return detailNames.Select(n => string.IsNullOrWhiteSpace(n) ? fallback : n!.Trim()).ToList();
+    }
+
+    private static string BuildAccidentBrief(List<TempReliefAccident>? accidents, IReadOnlyList<string>? owners = null)
     {
         if (accidents == null || accidents.Count == 0) return string.Empty;
         var idx = 1;
         var parts = new List<string>();
-        foreach (var a in accidents)
+        for (var i = 0; i < accidents.Count; i++)
         {
-            var owner = string.IsNullOrWhiteSpace(a.MemberName) ? "" : a.MemberName.Trim() + " ";
+            var a = accidents[i];
+            var ownerName = !string.IsNullOrWhiteSpace(a.MemberName)
+                ? a.MemberName.Trim()
+                : owners != null && i < owners.Count && !string.IsNullOrWhiteSpace(owners[i])
+                    ? owners[i].Trim()
+                    : "";
+            var owner = string.IsNullOrEmpty(ownerName) ? "" : ownerName + " ";
             var seg = $"【意外灾害{idx}】{owner}{a.AccidentType}".Trim();
             if (!string.IsNullOrWhiteSpace(a.InjurySituation)) seg += $"：{a.InjurySituation}";
             parts.Add(seg);
@@ -355,23 +385,35 @@ public static class TempReliefPrintDataBuilder
         var parts = new List<string>();
         if (app.Diseases != null && app.Diseases.Count > 0)
         {
-            var idx = 1;
-            foreach (var d in app.Diseases)
+            var diseaseOwners = ResolveDetailOwners(app, TempReliefConstants.DifficultyTypeDisease);
+            for (var i = 0; i < app.Diseases.Count; i++)
             {
-                var owner = string.IsNullOrWhiteSpace(d.MemberName) ? "" : d.MemberName.Trim() + " ";
-                var seg = $"【疾病{idx}】{owner}{d.DiseaseName}".Trim();
+                var d = app.Diseases[i];
+                var ownerName = !string.IsNullOrWhiteSpace(d.MemberName)
+                    ? d.MemberName.Trim()
+                    : i < diseaseOwners.Count && !string.IsNullOrWhiteSpace(diseaseOwners[i])
+                        ? diseaseOwners[i].Trim()
+                        : "";
+                var owner = string.IsNullOrEmpty(ownerName) ? "" : ownerName + " ";
+                var seg = $"{owner}{d.DiseaseName}".Trim();
                 if (!string.IsNullOrWhiteSpace(d.DiseaseCode)) seg += $"（编码 {d.DiseaseCode}）";
                 parts.Add(seg);
-                idx++;
             }
         }
 
         if (app.Accidents != null && app.Accidents.Count > 0)
         {
+            var accidentOwners = ResolveDetailOwners(app, TempReliefConstants.DifficultyTypeAccident);
             var idx = 1;
-            foreach (var a in app.Accidents)
+            for (var i = 0; i < app.Accidents.Count; i++)
             {
-                var owner = string.IsNullOrWhiteSpace(a.MemberName) ? "" : a.MemberName.Trim() + " ";
+                var a = app.Accidents[i];
+                var ownerName = !string.IsNullOrWhiteSpace(a.MemberName)
+                    ? a.MemberName.Trim()
+                    : i < accidentOwners.Count && !string.IsNullOrWhiteSpace(accidentOwners[i])
+                        ? accidentOwners[i].Trim()
+                        : "";
+                var owner = string.IsNullOrEmpty(ownerName) ? "" : ownerName + " ";
                 var seg = $"【意外灾害{idx}】{owner}{a.AccidentType}".Trim();
                 if (a.HappenDate != default) seg += $"（{a.HappenDate:yyyy-MM-dd}）";
                 if (!string.IsNullOrWhiteSpace(a.HappenPlace)) seg += $"；地点：{a.HappenPlace}";
@@ -479,16 +521,27 @@ public static class TempReliefPrintDataBuilder
     }
 
     /// <summary>
-    /// 困难情况摘要（概括句，不含疾病名称/编码/费用明细）：用于入户调查表{申请救助情况说明}和信息公示{困难情况}
+    /// 困难情况摘要（概括句，不含疾病名称/编码/费用明细；点名患病人/受灾人/就学生）：
+    /// 用于入户调查表{申请救助情况说明}和信息公示{困难情况}
     /// </summary>
     private static string BuildDifficultySummary(TempReliefApplication app)
     {
         var type = (app.DifficultyType ?? string.Empty).Trim();
+        var owners = ResolveDetailOwners(app, type);
+        var distinctOwners = owners
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        // 主语：单一对象点名，多对象或无明细回退"申请人家庭成员"
+        var subject = distinctOwners.Count == 1
+            ? $"申请人家庭成员{distinctOwners[0]}"
+            : "申请人家庭成员";
+
         return type switch
         {
-            "疾病" => "申请人家庭成员因患疾病，医疗费用支出较高，造成家庭基本生活暂时陷入困境，特申请临时救助。",
-            "意外灾害" => "申请人家庭成员因遭遇意外灾害，造成家庭基本生活暂时陷入困境，特申请临时救助。",
-            "教育支出" => "申请人家庭成员因教育支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。",
+            "疾病" => $"{subject}因患疾病，医疗费用支出较高，造成家庭基本生活暂时陷入困境，特申请临时救助。",
+            "意外灾害" => $"{subject}因遭遇意外灾害，造成家庭基本生活暂时陷入困境，特申请临时救助。",
+            "教育支出" => $"{subject}因教育支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。",
             _ => "申请人家庭因突发困难导致基本生活暂时陷入困境，特申请临时救助。"
         };
     }

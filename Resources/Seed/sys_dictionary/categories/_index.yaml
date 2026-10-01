@@ -71,3 +71,6 @@ tables:
 
       # 一事一议 (ID: 94)
       - { id: 94, category: "SpecialApprovalTemplates", display_name: "一事一议预案模板", description: "一事一议申报情况说明预设话术", sort_order: 94, is_active: true }
+
+      # 死亡原因 (ID: 95)
+      - { id: 95, category: "DeathReasons", display_name: "死亡原因", description: "户主死亡变更死亡原因预设", sort_order: 95, is_active: true }

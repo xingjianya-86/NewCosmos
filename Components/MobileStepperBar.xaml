@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.MobileStepperBar">
+
+    <!-- 手机端步骤条：圆点 + 连接线，当前步高亮、已完成步填充。
+         用法：<components:MobileStepperBar CurrentStep="{Binding CurrentStep}" StepCount="{Binding TotalSteps}"
+                                            StepTappedCommand="{Binding NavigateToStepCommand}"/> -->
+    <Grid x:Name="Host" Padding="8,10" ColumnSpacing="0" />
+</ContentView>

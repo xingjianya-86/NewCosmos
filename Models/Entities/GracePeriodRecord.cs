@@ -44,4 +44,9 @@ public class GracePeriodRecord
     /// 渐退前原保障金额
     /// </summary>
     public decimal? OriginalGuaranteeAmount { get; set; }
+
+    /// <summary>
+    /// 渐退期内实际应发月保障金（原额超户口类型上限时已封顶）
+    /// </summary>
+    public decimal? GraceGrantAmount { get; set; }
 }

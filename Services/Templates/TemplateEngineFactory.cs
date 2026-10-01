@@ -41,7 +41,9 @@ public class TemplateEngineFactory : ITemplateEngineFactory
 
         return fileType.ToLowerInvariant() switch
         {
+#if WINDOWS
             "docx" or "word" => new WordEngine(_logger, _perfOptions, _storageOptions),
+#endif
             "xlsx" or "excel" => new ExcelEngine(_logger, _perfOptions, _storageOptions),
             _ => throw new NotSupportedException($"不支持的模板类型: {fileType}")
         };

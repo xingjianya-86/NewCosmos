@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
@@ -10,10 +11,6 @@ public partial class PlantingSubsidyImportService : BaseImportService
 {
     protected override string ServiceName => ImportTypeName;
     public override string ImportTypeName => ImportTypeCodes.PLANTING_SUBSIDY;
-
-    private int _dataYear;
-    private string _addressFromFile = "";
-    private string _originalFileName = "";
 
     public PlantingSubsidyImportService(IDatabaseService databaseService, ILoggerService logger) : base(databaseService, logger)
     {
@@ -34,18 +31,12 @@ public partial class PlantingSubsidyImportService : BaseImportService
         }
     }
 
-    protected override async Task<ImportResult> ImportSingleFileAsync(string filePath, IProgress<string> progress = null, CancellationToken ct = default)
-    {
-        var fileName = Path.GetFileNameWithoutExtension(filePath);
-        _originalFileName = Path.GetFileName(filePath);
-        _dataYear = ExtractYearFromFileName(fileName);
-        _addressFromFile = ExtractAddressFromFileName(fileName);
-
-        return await base.ImportSingleFileAsync(filePath, progress, ct);
-    }
-
     protected override async Task ProcessWorksheetAsync(IExcelSheetReader reader, ImportResult result, IProgress<string>? progress, CancellationToken ct)
     {
+        // 每文件上下文由文件名派生（原 Singleton 实例字段存在并发导入交错写错风险）
+        var originalFileName = Path.GetFileName(result.FilePath);
+        var dataYear = ExtractYearFromFileName(Path.GetFileNameWithoutExtension(result.FilePath));
+        var addressFromFile = ExtractAddressFromFileName(Path.GetFileNameWithoutExtension(result.FilePath));
         var rowCount = reader.RowCount;
         var headerRow = FindHeaderRow(reader);
 
@@ -75,7 +66,7 @@ public partial class PlantingSubsidyImportService : BaseImportService
         LogColumnMapping(reader, headerRow, mapping);
 
         var personDataMap = new Dictionary<string, PlantingSubsidyRecord>();
-        var fileName = _originalFileName;
+        var fileName = originalFileName;
 
         for (var row = dataStartRow; row <= rowCount; row++)
         {
@@ -91,7 +82,7 @@ public partial class PlantingSubsidyImportService : BaseImportService
                 continue;
 
             var phone = ReadCellString(reader, row, mapping, "phone");
-            var address = _addressFromFile;
+            var address = addressFromFile;
 
             var totalAcreage = ReadDecimal(reader, row, mapping, "total_acreage");
             var cornAcreage = ReadDecimal(reader, row, mapping, "corn_acreage");
@@ -129,7 +120,7 @@ public partial class PlantingSubsidyImportService : BaseImportService
                     RiceTotalAcreage = riceTotalAcreage,
                     RiceSurfaceWaterAcreage = riceSurfaceWaterAcreage,
                     RiceGroundwaterAcreage = riceGroundwaterAcreage,
-                    DataYear = _dataYear,
+                    DataYear = dataYear,
                     OriginalFile = fileName
                 };
             }
@@ -145,38 +136,59 @@ public partial class PlantingSubsidyImportService : BaseImportService
 
         var successCount = 0;
         var errorCount = 0;
+        var records = personDataMap.Values.ToList();
 
-        foreach (var record in personDataMap.Values)
+        // 批量清理：本次导入年度内同证件旧记录（data_year 统一，一次 DELETE + = ANY）
+        ct.ThrowIfCancellationRequested();
+        var deleteResult = await DatabaseService.ExecuteNonQueryAsync(
+            "DELETE FROM nc_biz_planting_subsidy WHERE data_year = $1 AND id_card = ANY($2::text[])",
+            ct, records[0].DataYear, records.Select(r => r.IdCard).Distinct().ToArray());
+        if (deleteResult.IsFailure)
+        {
+            result.Errors.Add($"清理旧数据失败: {deleteResult.Message}");
+            result.ImportedCount = 0;
+            result.ErrorCount = records.Count;
+            progress?.Report("导入失败：清理旧数据失败");
+            LogError($"种植补贴导入失败: 清理旧数据失败 {deleteResult.Message}");
+            return;
+        }
+
+        // 多行 VALUES 分块插入（12 参数/行，400 行/块 ≈ 4800 参数，低于 PG 单语句 65535 参数上限）
+        const int chunkSize = 400;
+        for (var start = 0; start < records.Count; start += chunkSize)
         {
             ct.ThrowIfCancellationRequested();
+            var chunk = records.Skip(start).Take(chunkSize).ToList();
+            var (valuesClause, args) = MultiRowValuesBuilder.Build(chunk.Count, 12, i =>
+            {
+                var record = chunk[i];
+                return new object?[]
+                {
+                    record.Name, record.IdCard, record.Phone, record.Address,
+                    record.TotalAcreage, record.CornAcreage, record.SoybeanAcreage,
+                    record.RiceTotalAcreage, record.RiceSurfaceWaterAcreage, record.RiceGroundwaterAcreage,
+                    record.DataYear, record.OriginalFile
+                };
+            });
 
-            var sql = @"
+            var execResult = await DatabaseService.ExecuteNonQueryAsync(@"
                 INSERT INTO nc_biz_planting_subsidy 
                 (name, id_card, phone, address, total_acreage, corn_acreage, soybean_acreage, 
                  rice_total_acreage, rice_surface_water_acreage, rice_groundwater_acreage, 
                  data_year, original_file, imported_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP);";
-
-            await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_planting_subsidy WHERE id_card = $1 AND data_year = $2", ct, record.IdCard, record.DataYear);
-            var execResult = await DatabaseService.ExecuteNonQueryAsync(sql, ct,
-                record.Name, record.IdCard, record.Phone, record.Address,
-                record.TotalAcreage, record.CornAcreage, record.SoybeanAcreage,
-                record.RiceTotalAcreage, record.RiceSurfaceWaterAcreage, record.RiceGroundwaterAcreage,
-                record.DataYear, record.OriginalFile);
+                VALUES " + valuesClause + ", CURRENT_TIMESTAMP", ct, args);
 
             if (execResult.IsSuccess)
             {
-                successCount++;
+                successCount += chunk.Count;
+                progress?.Report($"已导入 {successCount} 条...");
             }
             else
             {
-                errorCount++;
-                result.Errors.Add($"保存失败: {record.Name}");
-            }
-
-            if (successCount % ProgressReportInterval == 0)
-            {
-                progress?.Report($"已导入 {successCount} 条...");
+                errorCount = records.Count - successCount;
+                result.Errors.Add($"保存失败: {execResult.Message}");
+                LogError($"种植补贴分块插入失败: {execResult.Message}");
+                break;
             }
         }
 

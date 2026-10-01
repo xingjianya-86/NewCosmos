@@ -276,6 +276,14 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
             return;
         }
 
+        // 二次确认：服务内部会 TRUNCATE nc_config_standards 后重灌 YAML 种子，属破坏性操作
+        var confirm = await _dialogService.DisplayAlertAsync(
+            "确认初始化",
+            "将从 YAML 种子重新导入标准配置：现有标准配置数据会被清空并覆盖，此操作不可撤销。是否继续？",
+            "继续初始化",
+            "取消");
+        if (!confirm) return;
+
         var stepNames = new List<string>
         {
             "同步表结构",

@@ -49,12 +49,28 @@ public class NewPermissionService : BaseService, INewPermissionService
         }
 
         LogInfo($"从数据库加载权限: UserId={userId}");
-        var permissions = await LoadUserPermissionsAsync(userId, ct);
-        _cache[userId] = permissions;
-        _cacheTime[userId] = DateTime.UtcNow;
+        try
+        {
+            var permissions = await LoadUserPermissionsAsync(userId, ct);
+            _cache[userId] = permissions;
+            _cacheTime[userId] = DateTime.UtcNow;
 
-        LogInfo($"权限加载完成: UserId={userId}, Count={permissions.Count}");
-        return permissions;
+            LogInfo($"权限加载完成: UserId={userId}, Count={permissions.Count}");
+            return permissions;
+        }
+        catch (Exception ex)
+        {
+            // 失败不归零：有旧缓存则 stale 返回并刷新时间戳（短暂降级，下次到期再试）
+            if (_cache.TryGetValue(userId, out var stale))
+            {
+                _cacheTime[userId] = DateTime.UtcNow;
+                _logger.Warn($"权限加载失败，使用过期缓存: UserId={userId}, Count={stale.Count}, {ex.Message}");
+                return stale;
+            }
+
+            _logger.Error($"权限加载失败且无缓存: UserId={userId}, {ex.Message}");
+            throw;
+        }
     }
 
     public async Task<IReadOnlyDictionary<string, bool>> CheckPermissionsAsync(int userId, IReadOnlyCollection<string> permissionCodes, CancellationToken ct = default)
@@ -122,6 +138,8 @@ public class NewPermissionService : BaseService, INewPermissionService
                 throw new BusinessException(ErrorCodes.DB_QUERY_ERROR, $"补齐 nc_sys_roles.data_scope 列失败: {ensureColumn.Message}");
 
             // 1) 默认角色：更新名称/等级/描述/数据范围；不存在则按固定 id 插入
+            // [N+1 豁免] 仅 6 个种子角色的一次性初始化，收益极低；nc_sys_roles.code 无唯一约束
+            // （new_permission_system/database.yaml 未定义 unique），改 ON CONFLICT (code) 需先加唯一索引属 Schema 变更，不在本批范围
             foreach (var role in PermissionSeedCatalog.Roles)
             {
                 var updateSql = @"
@@ -269,7 +287,15 @@ public class NewPermissionService : BaseService, INewPermissionService
         {
             var result = await _dbService.QueryAsync<string>(sql, ct, userId);
 
-            if (result.IsSuccess && result.Value is not null)
+            if (result.IsFailure)
+            {
+                // 违反 AGENTS §6：禁止吞异常/失败返回空集合（空集会被当作"无权限"缓存并清空 UI）
+                LogWarn($"用户权限查询失败: UserId={userId}, {result.Message}");
+                throw new BusinessException(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    result.Message ?? "加载用户权限失败");
+            }
+
+            if (result.Value is not null)
             {
                 var permissions = new HashSet<string>(result.Value, StringComparer.OrdinalIgnoreCase);
                 LogInfo($"用户权限加载完成: UserId={userId}, Count={permissions.Count}");
@@ -315,9 +341,10 @@ public class NewPermissionService : BaseService, INewPermissionService
 
                 if (_currentVersion.HasValue && _currentVersion != newVersion)
                 {
-                    _cache.Clear();
-                    _cacheTime.Clear();
-                    _logger.Info($"缓存版本已更新，已清除所有权限缓存");
+                    // 标记过期而非直接清空：重载失败时仍可 stale 返回，避免清缓存后失败=空集
+                    foreach (var key in _cache.Keys)
+                        _cacheTime[key] = DateTime.MinValue;
+                    _logger.Info($"缓存版本已更新，权限缓存已标记过期（保留旧值待重载）");
                 }
 
                 _currentVersion = newVersion;

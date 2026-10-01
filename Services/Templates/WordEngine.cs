@@ -1,3 +1,4 @@
+#if WINDOWS
 using System.Runtime.InteropServices;
 using NewCosmos.Constants;
 using NewCosmos.Models.Options;
@@ -621,3 +622,4 @@ public class WordEngine : ITemplateEngine
         GC.SuppressFinalize(this);
     }
 }
+#endif

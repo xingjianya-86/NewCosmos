@@ -11,8 +11,9 @@ public partial class LoginPage : ContentPage
         InitializeComponent();
         _viewModel = viewModel;
         BindingContext = viewModel;
-        // 永劫回归特效每删除一个人员 → 顺序切换一张背景图
-        EternalRegressionEffect.PersonDeleted += OnEternalPersonDeleted;
+        // 永劫回归特效每删除一个人员 → 顺序切换一张背景图（仅 Windows）
+        if (DeviceInfo.Platform == DevicePlatform.WinUI)
+            EternalRegressionEffect.PersonDeleted += OnEternalPersonDeleted;
     }
 
     private void OnEternalPersonDeleted(object? sender, EventArgs e)

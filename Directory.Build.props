@@ -17,10 +17,7 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
-  <!-- 构建期关闭代码分析器运行（保留 IDE 实时分析，仅省构建时间）：
-       MVVM/源生成器不受此影响，编译错误照常上报 -->
-  <PropertyGroup>
-    <RunAnalyzers>false</RunAnalyzers>
-    <RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
-  </PropertyGroup>
+  <!-- 批 7（2026-09-22）：恢复构建期代码分析器（此前 RunAnalyzers=false 关闭省时）。
+       AnalysisLevel/EnableNETAnalyzers 走 .NET 10 SDK 默认（latest）；TreatWarningsAsErrors 维持 false；
+       存量已知误报在上方 NoWarn 白名单逐条屏蔽并注明分类，新警告按"真问题修 / 误报入白名单+注释"处理。 -->
 </Project>

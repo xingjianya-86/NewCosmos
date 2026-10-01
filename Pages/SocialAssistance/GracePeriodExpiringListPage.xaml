@@ -4,7 +4,7 @@
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.SocialAssistance.GracePeriodExpiringListPage"
              x:DataType="GracePeriodExpiringListViewModel"
-             Title="渐退期到期处理"
+             Title="渐退期管理"
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="{StaticResource Background}">
 
@@ -29,8 +29,8 @@
                         <Label Text="&#xE898;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="渐退期到期处理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="渐退期已到期未处理的救助户请及时处理" Style="{StaticResource ModuleHeroSubtitle}"/>
+                        <Label Text="渐退期管理" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="进行中与已到期的渐退户统一管理，期满请及时复核处置" Style="{StaticResource ModuleHeroSubtitle}"/>
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
 
@@ -40,7 +40,7 @@
         <!-- 统计栏 -->
         <Grid Grid.Row="1" Padding="20,10" ColumnDefinitions="*,*,*,*" ColumnSpacing="12"
               BackgroundColor="{StaticResource White}">
-            <components:StatCapsule Grid.Column="0" IsLight="True" Value="{Binding ExpiringCountText}" Caption="临期/已到期未处理（户）"/>
+            <components:StatCapsule Grid.Column="0" IsLight="True" Value="{Binding ExpiringCountText}" Caption="进行中/已到期（户）"/>
             <components:StatCapsule Grid.Column="1" IsLight="True" Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
             <Grid Grid.Column="2" Grid.ColumnSpan="2"/>
         </Grid>
@@ -88,38 +88,40 @@
                 Margin="24,16"
                 MinimumWidthRequest="900">
 
-            <Grid RowDefinitions="Auto, *, Auto">
+            <Grid RowDefinitions="Auto, *, Auto, Auto">
 
                 <!-- 表头 -->
                 <Grid Grid.Row="0"
                      Style="{StaticResource TableHeader}"
                      Padding="16"
-                     ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, Auto">
+                     ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, 1*, Auto">
                     <Label Text="序号" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="1" Text="申请编号" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="2" Text="申请人" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="3" Text="身份证号" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="4" Text="渐退期" Style="{StaticResource TableHeaderLabel}"/>
-                    <Label Grid.Column="5" Text="过期天数" Style="{StaticResource TableHeaderLabel}"/>
-                    <Label Grid.Column="6" Text="原分类" Style="{StaticResource TableHeaderLabel}"/>
-                    <Label Grid.Column="7" Text="操作" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="Center"/>
+                    <Label Grid.Column="5" Text="状态" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="6" Text="时间长度" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="7" Text="原分类" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="8" Text="操作" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="Center"/>
                 </Grid>
 
-                <BoxView Grid.Row="0" Grid.ColumnSpan="8" HeightRequest="1"
+                <BoxView Grid.Row="0" Grid.ColumnSpan="9" HeightRequest="1"
                          BackgroundColor="{StaticResource Gray300}" VerticalOptions="End"/>
 
-                <!-- 数据列表 -->
+                <!-- 数据列表（选中行联动下方成员明细） -->
                 <CollectionView Grid.Row="1"
                                ItemsSource="{Binding ExpiringItems}"
-                               SelectionMode="None">
+                               SelectedItem="{Binding SelectedGraceItem, Mode=TwoWay}"
+                               SelectionMode="Single">
                     <CollectionView.EmptyView>
-                        <Label Text="暂无到期未处理的渐退期档案" Style="{StaticResource EmptyStateLabel}"/>
+                            <Label Text="暂无进行中或已到期的渐退期档案" Style="{StaticResource EmptyStateLabel}"/>
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="ent:GracePeriodExpiringItem">
                             <Grid Padding="16"
                                   Style="{StaticResource TableRowInteractive}"
-                                  ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, Auto">
+                                  ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, 1*, Auto">
 
                                 <Label Text="{Binding ApplicationId}" FontSize="15" VerticalOptions="Center"/>
                                 <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="15" VerticalOptions="Center"/>
@@ -129,12 +131,32 @@
                                        Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}"
                                        FontSize="15" VerticalOptions="Center"/>
                                 <Label Grid.Column="5"
-                                       Text="{Binding ExpiredDays, StringFormat='{0} 天'}"
-                                       FontSize="15" VerticalOptions="Center"
-                                       TextColor="{StaticResource Danger}"/>
-                                <Label Grid.Column="6" Text="{Binding OriginalClassification}" FontSize="15" VerticalOptions="Center"/>
+                                       Text="{Binding StatusText}"
+                                       FontSize="15" VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="True">
+                                            <Setter Property="TextColor" Value="#16A34A"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="False">
+                                            <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <Label Grid.Column="6"
+                                       Text="{Binding DurationText}"
+                                       FontSize="15" VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="True">
+                                            <Setter Property="TextColor" Value="#16A34A"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="False">
+                                            <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <Label Grid.Column="7" Text="{Binding OriginalClassification}" FontSize="15" VerticalOptions="Center"/>
 
-                                <Button Grid.Column="7"
+                                <Button Grid.Column="8"
                                         Text="重新核算"
                                         Style="{StaticResource ButtonSmall}"
                                         BackgroundColor="{StaticResource Primary}"
@@ -147,6 +169,59 @@
 
                 <!-- 分页控件 -->
                 <components:PaginationBarView Grid.Row="2" BackgroundColor="{StaticResource Gray50}"/>
+
+                <!-- 家庭成员明细（选中行联动） -->
+                <Border Grid.Row="3"
+                        IsVisible="{Binding HasSelectedItem}"
+                        BackgroundColor="{StaticResource White}"
+                        StrokeThickness="0"
+                        Padding="16,12">
+                    <Border.Shadow>
+                        <Shadow Brush="{StaticResource Black}" Offset="0,-2" Radius="4" Opacity="0.06"/>
+                    </Border.Shadow>
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="家庭成员名单"
+                               FontSize="15"
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding MemberLoadError}"
+                               IsVisible="{Binding MemberLoadError, Converter={StaticResource StringNotEmptyConverter}}"
+                               FontSize="12"
+                               TextColor="{StaticResource Error}"/>
+                        <CollectionView ItemsSource="{Binding MemberItems}" MaximumHeightRequest="240">
+                            <CollectionView.Header>
+                                <Grid Padding="12,8" ColumnDefinitions="1.2*,1*,0.6*,1.8*,1.2*"
+                                      BackgroundColor="{StaticResource Gray100}">
+                                    <Label Text="姓名" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="1" Text="关系" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="2" Text="年龄" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="3" Text="身份证号" Style="{StaticResource TableHeaderLabel}"/>
+                                    <Label Grid.Column="4" Text="年收入（元）" Style="{StaticResource TableHeaderLabel}"/>
+                                </Grid>
+                            </CollectionView.Header>
+                            <CollectionView.EmptyView>
+                                <Label Text="该户无成员明细" Style="{StaticResource EmptyStateLabel}"/>
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="ent:FamilyMember">
+                                    <Grid Padding="12,8" ColumnDefinitions="1.2*,1*,0.6*,1.8*,1.2*">
+                                        <Label Text="{Binding Name}" FontSize="14" VerticalOptions="Center"/>
+                                        <Label Grid.Column="1"
+                                               Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"
+                                               FontSize="14" VerticalOptions="Center"/>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding Age, StringFormat='{0} 岁'}"
+                                               FontSize="14" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="14" VerticalOptions="Center"/>
+                                        <Label Grid.Column="4"
+                                               Text="{Binding AnnualIncome, StringFormat='{0:N2}'}"
+                                               FontSize="14" VerticalOptions="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
             </Grid>
         </Border>
 

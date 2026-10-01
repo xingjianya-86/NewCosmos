@@ -105,13 +105,13 @@ Task<Result<List<T>>>  QueryAsync<T>(...同上);
 Task<Result<int>>      ExecuteNonQueryAsync(...同上);
 Task<Result<long>>     ExecuteScalarAsync(...同上);        // 历史 API：无行返回 Success(0)，勿用于 RETURNING id
 Task<Result<T?>>       ExecuteScalarAsync<T>(...同上);      // 新代码用这个：无行/NULL → Success(default)
-Task<ITransactionScope> BeginTransactionScopeAsync(CancellationToken ct = default);
-Task BeginTransactionAsync(ct); Task CommitTransactionAsync(ct); Task RollbackTransactionAsync(ct);
+Task<ITransactionScope> BeginTransactionScopeAsync(CancellationToken ct = default);   // 唯一事务入口
+Task BeginTransactionAsync(ct); Task CommitTransactionAsync(ct); Task RollbackTransactionAsync(ct);   // 已迁移废弃：0 调用方，新代码禁止使用
 bool HasTransaction;   // 当前异步流是否有活动事务
 ```
 
-- **SQL 只用 `$1,$2...` 位置参数**，值绝不插值进 SQL 字符串。表名如需动态必须过白名单（`Helpers\TableNameValidator.cs` 或服务内 AllowedTables）。
-- **事务是环境事务（AsyncLocal，按异步流隔离）**：Begin 之后同一异步流的查询自动入事务；并发操作互不影响。推荐新写法：
+- **SQL 只用 `$1,$2...` 位置参数**，值绝不插值进 SQL 字符串。表名如需动态必须过白名单（`Helpers\TableNameValidator.cs` 单点维护）。
+- **事务是环境事务（AsyncLocal，按异步流隔离）**：Begin 之后同一异步流的查询自动入事务；并发操作互不影响。**全库统一写法（2026-10 已完成 219+ 处存量迁移）**：
 
 ```csharp
 await using var tx = await _db.BeginTransactionScopeAsync(ct);
@@ -119,7 +119,7 @@ await using var tx = await _db.BeginTransactionScopeAsync(ct);
 await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 ```
 
-- 旧惯用法继续有效（存量代码大量使用，不必改写）：`var mine = !_db.HasTransaction; if (mine) await _db.BeginTransactionAsync(); ... if (mine) await _db.CommitTransactionAsync();`——嵌套服务调用靠 `HasTransaction` 加入外层事务。
+- **嵌套语义**：外层已有活动事务时，`BeginTransactionScopeAsync` 加入外层事务（不再抛"已有活动事务"），嵌套作用域的 Commit/Rollback/Dispose 均为 no-op，事务所有权归最外层作用域；嵌套参与者的失败经返回值上抛，由外层决定回滚（等价旧 `HasTransaction` 惯用法）。
 - ⚠️ `PostgreSqlDatabaseService` 中 Begin/Commit/Rollback/BeginScope **必须保持非 async 方法**（AsyncLocal 写入只在同步帧对调用方可见）——文件内有注释，勿"顺手"加 async。
 - 查询规范：明确列名代替 `SELECT *`（`nc_biz_applications` 有 380+ 列）；列表查询必须 LIMIT；批量条件用 `= ANY($1)` 传数组而非展开 IN 列表；时间过滤用范围比较（`col >= $1 AND col < $2`），**禁止 `EXTRACT(YEAR FROM col)=$1`**（索引失效）；批量写入用多行 VALUES。
 

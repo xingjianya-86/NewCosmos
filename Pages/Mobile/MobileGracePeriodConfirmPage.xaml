@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileGracePeriodConfirmPage"
+             x:DataType="GracePeriodConfirmViewModel"
+             Title="{Binding Title}"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 绿色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding CancelCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="{Binding Title}" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="{Binding Subtitle}" FontSize="13" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 分类变化 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="分类变化" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="渐退前原分类" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding OriginalClassification}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1" Text="→" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                <Label Text="本次判定分类" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding NewClassification}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 收入与标准 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="收入与标准" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="低保标准（元/人·月）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding SubsistenceStandardText}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="月人均收入（元）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding PerCapitaMonthlyText}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Spacing="2">
+                                <Label Text="年家庭总收入（元）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding TotalAnnualIncomeText}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                                <Label Text="家庭人数（人）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding FamilySizeText}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 保障金与渐退期 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="保障金与渐退期" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="保障金额（元/月）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding GuaranteeAmountText}" FontSize="14" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="渐退期区间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding PeriodText}" FontSize="13" FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="渐退期月数（1–12）" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Picker ItemsSource="{Binding MonthOptions}"
+                                    SelectedItem="{Binding SelectedMonth}"
+                                    Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 提示 -->
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}" Stroke="Transparent">
+                    <Label Text="{Binding HintText}" FontSize="12" TextColor="{StaticResource WarningDark}"/>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="2" BackgroundColor="White" Padding="12,10" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <Button Grid.Column="1" Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelCommand}" MinimumWidthRequest="88"/>
+                <Button Text="确认进入渐退期" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmCommand}" MinimumWidthRequest="120"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</ContentPage>

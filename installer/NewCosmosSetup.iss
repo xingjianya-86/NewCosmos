@@ -3,7 +3,7 @@
 ; 安全要点：config\database.ini 绝不随包分发，部署机首次启动由配置向导生成
 
 #define MyAppName "帝皇权杖δ-me13"
-#define MyAppVersion "1.1.20260919"
+#define MyAppVersion "1.1.20261002"
 #define MyAppPublisher "NewCosmos"
 #define MyAppExeName "NewCosmos.exe"
 #define SrcDir "..\publish\win-x64"
@@ -28,7 +28,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; 文件属性版本须为 4 段式且每段 ≤65535，20260915 超限故拆为 2026.915；安装向导显示版本见 MyAppVersion
-VersionInfoVersion=1.1.2026.919
+VersionInfoVersion=1.1.2026.1002
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} 民政社会救助管理系统
 CloseApplications=yes
@@ -40,8 +40,9 @@ Name: "chinesesimp"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标："; Flags: unchecked
 
 [Files]
-; 全量文件（database.ini 凭据绝不入包；update.ini 保留本机修改；彩票模型单独处理，见下一条）
-Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "config\database.ini,config\update.ini,Scripts\Lottery\models\*"
+; 全量文件（database.ini 凭据绝不入包；update.ini 保留本机修改；彩票模型单独处理，见下一条；
+; 输出\ 为本机运行产生的文书目录，含公民身份信息（PII），绝不入包；Logs/Temp 为运行时残留）
+Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "config\database.ini,config\update.ini,Scripts\Lottery\models\*,输出\*,Logs\*,Temp\*,*.log"
 ; 在线更新配置：仅首次安装写入，升级不覆盖本机修改
 Source: "{#SrcDir}\config\update.ini"; DestDir: "{app}\config"; Flags: onlyifdoesntexist
 ; 彩票预训练模型：新装机随包分发（免重新训练）；升级时 onlyifdoesntexist 保留用户已重训的模型

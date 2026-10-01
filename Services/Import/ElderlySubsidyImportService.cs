@@ -1,15 +1,15 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
-using NewCosmos.Helpers;
+using System.Globalization;
 
 namespace NewCosmos.Services.Import;
 
 public partial class ElderlySubsidyImportService : BaseImportService
 {
     private readonly IPinyinConverter _pinyinConverter;
-    private int _dataYear;
 
     public override string ImportTypeName => ImportTypeCodes.ELDERLY_SUBSIDY;
 
@@ -57,13 +57,13 @@ public partial class ElderlySubsidyImportService : BaseImportService
             return ImportResult.Failed($"文件名必须为'津贴对象.xlsx'，当前文件名: {fileName}");
         }
 
-        _dataYear = DateTime.Now.Year;
-
         return await base.ImportSingleFileAsync(filePath, progress, ct);
     }
 
     protected override async Task ProcessWorksheetAsync(IExcelSheetReader reader, ImportResult result, IProgress<string>? progress, CancellationToken ct)
     {
+        // 数据年度为导入当年（原 Singleton 实例字段存在并发导入交错写错风险）
+        var dataYear = DateTime.Now.Year;
         var rowCount = reader.RowCount;
         var colCount = reader.ColumnCount;
         LogInfo($"诊断: RowCount={rowCount}, ColumnCount={colCount}");
@@ -100,7 +100,14 @@ public partial class ElderlySubsidyImportService : BaseImportService
 
         // 加载查重集：当前库已登记（未删除）身份证 + 死亡记录身份证
         // 已登记/已死亡的人员拒绝再次导入（含原户主死亡等场景）
-        var existingIds = await LoadExistingIdCardSetAsync(ct);
+        // §6：查重集加载失败中止导入（空查重集会导致全部数据重复导入）
+        var existingIdsResult = await LoadExistingIdCardSetAsync(ct);
+        if (existingIdsResult.IsFailure)
+        {
+            result.Errors.Add(existingIdsResult.Message ?? "加载查重集失败，已中止导入");
+            return;
+        }
+        var existingIds = existingIdsResult.Value!;
 
         for (var row = 3; row <= rowCount; row++)
         {
@@ -144,10 +151,10 @@ public partial class ElderlySubsidyImportService : BaseImportService
                      subsidy_amount, bank_account, person_type, original_type, data_year, imported_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP);";
 
-                await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND data_year = $2", ct, idCard, _dataYear);
+                await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND data_year = $2", ct, idCard, dataYear);
                 var execResult = await DatabaseService.ExecuteNonQueryAsync(sql, ct,
                     name!, pinyinName!, idCard!, gender!, (object)birthDate!, (object)age!, phone, address,
-                    subsidyAmount, bankAccount, personType, originalType, _dataYear);
+                    subsidyAmount, bankAccount, personType, originalType, dataYear);
 
                 if (execResult.IsSuccess)
                 {
@@ -185,15 +192,20 @@ public partial class ElderlySubsidyImportService : BaseImportService
 
     /// <summary>
     /// 加载查重集：当前库已登记（未删除）身份证 + 死亡记录身份证（nc_biz_death_records.member_id_card）。
+    /// §6：加载失败显式失败——查重集为空会导致全部数据按"新数据"重复导入。
     /// </summary>
-    private async Task<HashSet<string>> LoadExistingIdCardSetAsync(CancellationToken ct)
+    private async Task<Result<HashSet<string>>> LoadExistingIdCardSetAsync(CancellationToken ct)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var apps = await DatabaseService.QueryAsync<string>(
                 "SELECT id_card FROM nc_biz_elderly_applications WHERE deleted_at IS NULL AND id_card IS NOT NULL", ct);
-            if (apps.IsSuccess && apps.Value != null)
+            if (apps.IsFailure)
+                return Result.Failure<HashSet<string>>(
+                    apps.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"加载高龄导入查重集失败: {apps.Message}");
+            if (apps.Value != null)
             {
                 foreach (var id in apps.Value)
                 {
@@ -203,7 +215,11 @@ public partial class ElderlySubsidyImportService : BaseImportService
 
             var deaths = await DatabaseService.QueryAsync<string>(
                 "SELECT member_id_card FROM nc_biz_death_records WHERE member_id_card IS NOT NULL", ct);
-            if (deaths.IsSuccess && deaths.Value != null)
+            if (deaths.IsFailure)
+                return Result.Failure<HashSet<string>>(
+                    deaths.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"加载高龄导入查重集失败: {deaths.Message}");
+            if (deaths.Value != null)
             {
                 foreach (var id in deaths.Value)
                 {
@@ -216,8 +232,9 @@ public partial class ElderlySubsidyImportService : BaseImportService
         catch (Exception ex)
         {
             LogError($"加载高龄导入查重集失败: {ex.Message}");
+            return Result.FromException<HashSet<string>>(ex);
         }
-        return set;
+        return Result.Success(set);
     }
 
     private static string? GetGenderFromIdCard(string idCard)
@@ -225,27 +242,22 @@ public partial class ElderlySubsidyImportService : BaseImportService
         if (idCard.Length != 18)
             return null;
 
-        var genderCode = int.Parse(idCard[16].ToString());
-        return genderCode % 2 == 1 ? "男" : "女";
+        var ch = idCard[16];
+        if (!char.IsDigit(ch))
+            return null;
+        return (ch - '0') % 2 == 1 ? "男" : "女";
     }
 
     private static DateTime? GetBirthDateFromIdCard(string idCard)
     {
+        // 结构化解析（TryParseExact）：非数字/非法日期返回 null，不走异常路径
         if (idCard.Length != 18)
             return null;
 
-        var year = int.Parse(idCard.Substring(6, 4));
-        var month = int.Parse(idCard.Substring(10, 2));
-        var day = int.Parse(idCard.Substring(12, 2));
-
-        try
-        {
-            return new DateTime(year, month, day);
-        }
-        catch
-        {
-            return null;
-        }
+        return DateTime.TryParseExact(
+            idCard.Substring(6, 8), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d
+            : null;
     }
 
     private static int CalculateAge(DateTime birthDate)

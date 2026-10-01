@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Text;
+using System.Text.Json;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
@@ -152,12 +153,12 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
         object[] parameters;
         if (year.HasValue)
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC";
+            sql = "SELECT * FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC LIMIT 1000";
             parameters = new object[] { year.Value };
         }
         else
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC";
+            sql = "SELECT * FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC LIMIT 1000";
             parameters = Array.Empty<object>();
         }
         return await _db.QueryAsync<MonthlyReportSummary>(sql, ct, parameters);
@@ -171,7 +172,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
             .AddIf(!string.IsNullOrEmpty(town), "town = {0}", town)
             .AddIf(!string.IsNullOrEmpty(status), "status = {0}", status);
 
-        var sql = $"SELECT * FROM nc_biz_monthly_reports{conditions.ToWhereClause()} ORDER BY year DESC, month DESC";
+        var sql = $"SELECT * FROM nc_biz_monthly_reports{conditions.ToWhereClause()} ORDER BY year DESC, month DESC LIMIT 1000";
         return await _db.QueryAsync<MonthlyReportSummary>(sql, ct, conditions.GetParameters());
     }
 
@@ -216,10 +217,10 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
         var end = cycleResult.Value.End;
 
         // 口径（2026-08 与用户确认，基准=nc_biz_applications 状态流转）：
-        // - 新增 = status='Approved' 且 original_application_id IS NULL（排除停旧建新接续档案）且 first_approved_at∈周期
+        // - 新增 = status=ApplicationStatusCodes.APPROVED 且 original_application_id IS NULL（排除停旧建新接续档案）且 first_approved_at∈周期
         //   （用不可变的首次审批时间，避免编辑/变更把老档案重算成"新增"）
-        // - 停保 = status='Stopped' 且 stop_date∈周期
-        // - 在保 = status<>'Stopped' 且 (stop_date IS NULL OR stop_date>=月末)
+        // - 停保 = status=ApplicationStatusCodes.STOPPED 且 stop_date∈周期
+        // - 在保 = status<>ApplicationStatusCodes.STOPPED 且 (stop_date IS NULL OR stop_date>=月末)
         var aggregateSql = $@"SELECT
                 COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.APPROVED}' AND (stop_date IS NULL OR stop_date >= $3::date)) AS total_archives,
                 COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.APPROVED}' AND original_application_id IS NULL AND first_approved_at >= $1::timestamp AND first_approved_at < $2::timestamp) AS new_archives,
@@ -494,7 +495,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                             a.land_income_total, a.subsidy_total,
                             a.id AS application_id
                      FROM nc_biz_applications a
-                     WHERE a.status = 'Approved' AND a.first_approved_at >= $1 AND a.first_approved_at < $2 AND a.deleted_at IS NULL
+                     WHERE a.status = '{ApplicationStatusCodes.APPROVED}' AND a.first_approved_at >= $1 AND a.first_approved_at < $2 AND a.deleted_at IS NULL
                        AND a.original_application_id IS NULL
                        AND ($3 = '' OR a.town = $3)
                        {categorySql}
@@ -833,7 +834,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                             COALESCE(a.stop_reason, '') AS stop_reason, a.stop_date, a.first_approved_at,
                             a.district, a.town, a.community
                      FROM nc_biz_applications a
-                     WHERE a.status = 'Stopped' AND a.stop_date >= $1 AND a.stop_date < $2 AND a.deleted_at IS NULL
+                     WHERE a.status = '{ApplicationStatusCodes.STOPPED}' AND a.stop_date >= $1 AND a.stop_date < $2 AND a.deleted_at IS NULL
                        AND ($3 = '' OR a.town = $3)
                        {categorySql}
                        -- 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算停保
@@ -867,7 +868,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                        AND cr.deleted_at IS NULL
                        -- 停保状态（Stopped）的档案由普通停保行显示（含户月保障金/分类施保），
                        -- 排除跨类 CategoryStop 行，避免停旧建新户重复（解维平 44）
-                       AND a.status <> 'Stopped'
+                       AND a.status <> '{ApplicationStatusCodes.STOPPED}'
                        AND ($3 = '' OR a.town = $3)
                        {crossCategorySql}";
         var crossResult = await _db.QueryAsync<StoppedRowData>(crossSql, ct, crossParams.ToArray());
@@ -1441,39 +1442,61 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
         if (rows == null || rows.Count == 0)
             return Result.Success(false);
 
-        var sql = @"INSERT INTO nc_biz_monthly_classified_adds
-            (year, month, town, category, is_rural, applicant_id_card, applicant_name, applicant_gender,
-             applicant_birth_date, nationality, health_status, family_size, phone, address,
-             classified_type, count, amount, members_json, created_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb, NOW())
-            ON CONFLICT (year, month, applicant_id_card) DO NOTHING";
-
         var inserted = 0;
-        foreach (var r in rows)
+        const int chunkSize = 400; // 18 参数/行 × 400 ≈ 7200，低于 PG 单语句 65535 参数上限
+
+        for (var start = 0; start < rows.Count; start += chunkSize)
         {
-            var membersJson = JsonSerializer.Serialize(r.Members ?? new List<MonthlyClassifiedMember>());
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
-                year, month, town,
-                r.Classification ?? "最低生活保障对象",
-                r.IsRural,
-                r.ApplicantIdCard ?? "",
-                r.ApplicantName ?? "",
-                r.ApplicantGender ?? "",
-                r.ApplicantBirthDate ?? "",
-                r.Nationality ?? "",
-                r.HealthStatus ?? "",
-                int.TryParse(r.FamilySize, out var fs) ? fs : 0,
-                r.Phone ?? "",
-                r.Address ?? "",
-                r.ClassifiedType ?? "",
-                r.Count,
-                r.Amount,
-                membersJson);
+            var chunk = rows.Skip(start).Take(chunkSize).ToList();
+            var (valuesClause, args) = MultiRowValuesBuilder.Build(chunk.Count, 18, i =>
+            {
+                var r = chunk[i];
+                var membersJson = JsonSerializer.Serialize(r.Members ?? new List<MonthlyClassifiedMember>());
+                return new object?[]
+                {
+                    year, month, town,
+                    r.Classification ?? "最低生活保障对象",
+                    r.IsRural,
+                    r.ApplicantIdCard ?? "",
+                    r.ApplicantName ?? "",
+                    r.ApplicantGender ?? "",
+                    r.ApplicantBirthDate ?? "",
+                    r.Nationality ?? "",
+                    r.HealthStatus ?? "",
+                    int.TryParse(r.FamilySize, out var fs) ? fs : 0,
+                    r.Phone ?? "",
+                    r.Address ?? "",
+                    r.ClassifiedType ?? "",
+                    r.Count,
+                    r.Amount,
+                    membersJson
+                };
+            }, o =>
+            {
+                var p = o;
+                var sb = new StringBuilder("(");
+                for (var k = 0; k < 18; k++)
+                {
+                    if (k > 0) sb.Append(", ");
+                    sb.Append('$').Append(p + k);
+                }
+                sb.Append("::jsonb, NOW())");
+                return sb.ToString();
+            });
+
+            var chunkSql = @"INSERT INTO nc_biz_monthly_classified_adds
+                (year, month, town, category, is_rural, applicant_id_card, applicant_name, applicant_gender,
+                 applicant_birth_date, nationality, health_status, family_size, phone, address,
+                 classified_type, count, amount, members_json, created_at)
+                VALUES " + valuesClause + @"
+                ON CONFLICT (year, month, applicant_id_card) DO NOTHING
+                RETURNING id";
+            var result = await _db.QueryAsync<long>(chunkSql, ct, args);
             if (result.IsFailure)
                 return Result.Failure<bool>(result.ErrorCode!, result.Message!);
-            if (result.Value > 0)
-                inserted++;
+            inserted += result.Value?.Count ?? 0;
         }
+
         return Result.Success(inserted > 0);
     }
 
@@ -1505,7 +1528,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                 }
                 catch (JsonException)
                 {
-                    LogWarn($"分类施保增发快照 members_json 解析失败: Year={year} Month={month} Applicant={s.ApplicantIdCard}");
+                    LogWarn($"分类施保增发快照 members_json 解析失败: Year={year} Month={month} Applicant={DataMasker.MaskIdCard(s.ApplicantIdCard ?? string.Empty)}");
                 }
             }
             rows.Add(new MonthlyClassifiedAddRow
@@ -1537,6 +1560,8 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
         var monthStart = new DateTime(year, month, 1);               // 本月1日
         var monthEnd = monthStart.AddMonths(1);                      // 下月1日（满 60 周岁生日不在此区间）
 
+        // [索引豁免] EXTRACT(MONTH FROM birth_date)=$1 是"生日月份匹配"（任意年份的该月）语义，
+        // 不存在等价的时间范围改写；CTE 粗筛 + 内存精确判定满 60，低频且数据规模有限。
         var sql = @"WITH matched AS (
                          SELECT DISTINCT p.family_id
                          FROM nc_biz_rural_subsistence_persons p
@@ -1812,7 +1837,7 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
 
     /// <summary>
     /// 退出对象兜底纠治表（表 7）。
-    /// 退出对象识别（本月周期）：停保(status='Stopped') + 渐退期满(grace_periods.end_date) + 经济复核降档(change_records.triggered_grace_period)。
+    /// 退出对象识别（本月周期）：停保(status=ApplicationStatusCodes.STOPPED) + 渐退期满(grace_periods.end_date，仅已生效档案) + 经济复核降档(change_records.triggered_grace_period，排除户主死亡/分类施保减除)。
     /// 核查列：给予渐退期(事件日期落在渐退期内)；纳入低保/特困/低保边缘/刚性支出(本户原档案当前生效分类)；直接退出(均否)。
     /// </summary>
     public async Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, CancellationToken ct = default)
@@ -1847,6 +1872,8 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                 FROM nc_biz_change_records c
                 WHERE c.triggered_grace_period = TRUE AND c.change_date >= $1 AND c.change_date < $2
                   AND c.deleted_at IS NULL
+                  -- 排除户主死亡/分类施保减除（死亡已有停保事件行，避免误标经济复核降档）
+                  AND c.change_type NOT IN ('{DictionaryConstants.ChangeType.HOUSEHOLD_DEATH}', '{DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE}')
                 UNION ALL
                 SELECT g.application_id, g.end_date AS event_date, '渐退期满' AS event_type,
                        '渐退期满重新核算' AS exit_reason,
@@ -1865,6 +1892,8 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                 FROM nc_biz_grace_periods g
                 LEFT JOIN nc_biz_applications a ON g.application_id = a.id
                 WHERE g.end_date >= $4 AND g.end_date < $5 AND g.deleted_at IS NULL
+                  -- 仅统计已生效档案：Draft 新档（户主死亡停旧建新待认定）渐退期满不构成退出事件
+                  AND a.status IN ('{ApplicationStatusCodes.APPROVED}', '{ApplicationStatusCodes.COMPLETED}')
             ) x
             ORDER BY x.event_date, x.application_id;
 ";
@@ -2097,12 +2126,12 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
                            t.difficulty_type, t.confirm_amount, t.confirmed_at,
                            t.bank_account
                     FROM nc_biz_temp_relief_applications t
-                    WHERE t.status = 'Confirmed'
+                    WHERE t.status = $4
                       AND t.confirmed_at >= $1 AND t.confirmed_at < $2
                       AND t.deleted_at IS NULL
                       AND ($3 = '' OR t.town = $3)
                     ORDER BY t.confirmed_at, t.id";
-        var result = await _db.QueryAsync<TempReliefSummaryRowData>(sql, ct, c.Start, c.End, townSafe);
+        var result = await _db.QueryAsync<TempReliefSummaryRowData>(sql, ct, c.Start, c.End, townSafe, TempReliefConstants.StatusConfirmed);
         if (result.IsFailure)
             return Result.Failure<List<MonthlyTempReliefRow>>(result.ErrorCode!, result.Message!);
 

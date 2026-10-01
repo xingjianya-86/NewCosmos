@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileElderlyPendingListPage"
+             x:DataType="ElderlyPendingListViewModel"
+             Title="高龄津贴下月待办"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="PendingNewCard" x:DataType="ent:ElderlyPendingItem">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border BackgroundColor="#F1F5F9" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Age}"/><Span Text=" 周岁 · "/><Span Text="{Binding StatusLabel}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="办理" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                            BackgroundColor="{StaticResource Primary}" TextColor="White" VerticalOptions="Center"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
+                            CommandParameter="{Binding .}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PendingTransferCard" x:DataType="ent:ElderlyPendingItem">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border BackgroundColor="#F1F5F9" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center">
+                                <Label Text="{Binding MemberRole}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Age}"/><Span Text=" 周岁 · "/><Span Text="{Binding StatusLabel}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="停发/建档" FontSize="12" Padding="10,0" HeightRequest="34" CornerRadius="8"
+                            BackgroundColor="{StaticResource Warning}" TextColor="White" VerticalOptions="Center"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                            CommandParameter="{Binding .}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 紫色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="10">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="高龄津贴下月待办" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="已完结档案中年满80周岁的待办老人名单" FontSize="13" TextColor="#E6FFFFFF"/>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding PendingNewCountText}" Caption="待新增（人）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding PendingTransferCountText}" Caption="需停旧增新（人）"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Tab 胶囊 -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
+            <Border Grid.Column="0" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="待新增" FontSize="13" VerticalOptions="Center"
+                           TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding PendingNewCountText}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
+                </HorizontalStackLayout>
+            </Border>
+            <Border Grid.Column="1" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="需停旧增新" FontSize="13" VerticalOptions="Center"
+                           TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding PendingTransferCountText}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
+                </HorizontalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 列表 -->
+        <Grid Grid.Row="2">
+            <CollectionView ItemsSource="{Binding PendingNewItems}" ItemTemplate="{StaticResource PendingNewCard}"
+                            IsVisible="{Binding IsTab0Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无待新增老人" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+            <CollectionView ItemsSource="{Binding PendingTransferItems}" ItemTemplate="{StaticResource PendingTransferCard}"
+                            IsVisible="{Binding IsTab1Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无需停旧增新的老人" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </Grid>
+
+        <!-- 刷新 -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
+            <Button Text="刷新待办" HeightRequest="42" FontSize="14" CornerRadius="10"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    Command="{Binding RefreshCommand}"/>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

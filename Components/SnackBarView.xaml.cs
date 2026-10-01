@@ -69,13 +69,15 @@ public partial class SnackBarView : ContentView
 
     private void UpdateStyle(SnackBarType type)
     {
+        // Android 无 Segoe 字体，使用 emoji/通用字符，避免显示为方块
+        var useSegoe = DeviceInfo.Platform != DevicePlatform.Android;
         var (bgColor, icon) = type switch
         {
-            SnackBarType.Success => ("#10B981", "\uE73E"),
-            SnackBarType.Info => ("#3B82F6", "\uE946"),
-            SnackBarType.Warning => ("#F59E0B", "\uE7BA"),
-            SnackBarType.Error => ("#EF4444", "\uE783"),
-            _ => ("#10B981", "\uE73E")
+            SnackBarType.Success => ("#10B981", useSegoe ? "\uE73E" : "✓"),
+            SnackBarType.Info => ("#3B82F6", useSegoe ? "\uE946" : "ℹ"),
+            SnackBarType.Warning => ("#F59E0B", useSegoe ? "\uE7BA" : "⚠"),
+            SnackBarType.Error => ("#EF4444", useSegoe ? "\uE783" : "✕"),
+            _ => ("#10B981", useSegoe ? "\uE73E" : "✓")
         };
 
         if (SnackBarFrame != null)
@@ -85,6 +87,7 @@ public partial class SnackBarView : ContentView
         if (IconLabel != null)
         {
             IconLabel.Text = icon;
+            IconLabel.FontFamily = useSegoe ? "Segoe Fluent Icons" : null;
         }
     }
 

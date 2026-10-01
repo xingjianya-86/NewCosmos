@@ -20,6 +20,25 @@ public enum ReprintDomainMode
 }
 
 /// <summary>
+/// 补打中心·月份窗口策略：决定选中某年某月后，按哪个日期区间过滤该域记录。
+/// 各域服务端按月查询均为自然月口径，本策略在客户端将其收敛到业务月份窗口。
+/// </summary>
+public enum ReprintMonthWindow
+{
+    /// <summary>自然月 [本月1日, 次月1日)</summary>
+    NaturalMonth,
+
+    /// <summary>B线业务线 [上月(结算日+1)日, 本月(结算日+1)日]（结算日由 app.ini BCycleSettleDay 配置）</summary>
+    BusinessProcess,
+
+    /// <summary>A线经济核查 [上月11日, 本月10日]</summary>
+    EconomicReview,
+
+    /// <summary>C线临时救助完整窗口 [入户调查起日, 验收日]</summary>
+    TempReliefFull
+}
+
+/// <summary>
 /// 统一列表项：五域记录的统一投影（跨域按人聚合后仍能定位回原记录）。
 /// BusinessTime 为该域业务时间（档案=更新时间/临时救助=申请时间/高龄=申请时间/核查=创建时间/动态管理=最近变更时间）。
 /// Status 保留原始状态码（下游 PrintNavigationData.Status 依赖英文码做模板分类，如 ArchiveOutput 的 "Stopped" 判断）；
@@ -105,6 +124,9 @@ public interface IReprintDomainProvider
 
     /// <summary>补打模式</summary>
     ReprintDomainMode Mode { get; }
+
+    /// <summary>该域按月筛选时使用的月份窗口策略</summary>
+    ReprintMonthWindow MonthWindow { get; }
 
     /// <summary>
     /// 按关键词（姓名/身份证）搜索该域记录（全状态聚合；草稿等无补打意义的记录由各域自行排除）。

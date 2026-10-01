@@ -340,6 +340,38 @@ public partial class ChangeViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 变更入口状态门槛（统一前置，6 个入口共用）：
+    /// 只有已审批/已完结的在保档案才允许变更；Draft（未归档）/Stopped（已停保）/Refused 不允许。
+    /// 例外：导入库建档档案尚未补全时先进入补全模式（NeedsCompletionAsync 为真），
+    /// 此时放行——由 ResolveChangeEntryModeAsync 把表单切到 Completion 模式。
+    /// 注意：只校验"家庭信息修正"会导致 Draft 档案从经济复核等入口溜进变更流程，
+    /// 停旧建新会把 Draft 直写成 Stopped（状态机禁止的脏状态）。
+    /// </summary>
+    private async Task<bool> EnsureChangeableStatusAsync()
+    {
+        if (await NeedsCompletionAsync()) return true;
+
+        var appResult = await _applicationService.GetByIdAsync(ApplicationId, CancellationToken);
+        if (appResult.IsFailure || appResult.Value == null)
+        {
+            await ShowTipAsync("档案不存在或已被删除");
+            return false;
+        }
+
+        var status = appResult.Value.Status;
+        if (status == ApplicationStatusCodes.APPROVED || status == ApplicationStatusCodes.COMPLETED)
+            return true;
+
+        await ShowTipAsync(status switch
+        {
+            ApplicationStatusCodes.STOPPED => "已停保档案不可变更。如需调整请先办理恢复保障。",
+            ApplicationStatusCodes.REFUSED => "不予受理的档案不可变更。",
+            _ => "档案尚未完成归档（仍在草稿阶段），请先完成建档归档后再办理变更。"
+        });
+        return false;
+    }
+
+    /// <summary>
     /// 变更操作统一前置：读取数据来源 → 判断建档状态 → 导入库档案自动建档后进入对应变更流程
     /// </summary>
     private async Task<bool> PrepareForChangeAsync()
@@ -436,7 +468,7 @@ public partial class ChangeViewModel : ViewModelBase
     [ObservableProperty]
     private string _monthlyChangesText = StatNA;
 
-    /// <summary>渐退期临期户数</summary>
+    /// <summary>渐退期进行中/已到期户数</summary>
     [ObservableProperty]
     private string _graceExpiringText = StatNA;
 
@@ -593,10 +625,15 @@ public partial class ChangeViewModel : ViewModelBase
     {
         try
         {
-            var history = await _changeService.GetChangeHistoryAsync(ApplicationId, CancellationToken);
+            var historyResult = await _changeService.GetChangeHistoryAsync(ApplicationId, CancellationToken);
+            if (historyResult.IsFailure)
+            {
+                _logger.Error($"加载变更历史失败: {historyResult.Message}");
+                return;
+            }
 
             ChangeHistory.Clear();
-            foreach (var record in history)
+            foreach (var record in historyResult.Value)
             {
                 ChangeHistory.Add(record);
             }
@@ -621,6 +658,7 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
 
         var mode = await ResolveChangeEntryModeAsync(FormOperationMode.Review);
 
@@ -631,23 +669,28 @@ public partial class ChangeViewModel : ViewModelBase
     /// <summary>
     /// 变更入口模式解析：导入库建档档案（source_type=ImportedArchive）且未补全（data_completed_at 为空）
     /// → 先进补全模式（保存后标记已补全，此后进入正常变更模式）；原生档案/已补全档案直接进入正常变更模式。
-    /// 经济状况复核与家庭成员变更共用，保证"导入库数据先补全"的流程一致。
+    /// 全部变更入口共用，保证"导入库数据先补全"的流程一致。
     /// </summary>
     private async Task<FormOperationMode> ResolveChangeEntryModeAsync(FormOperationMode normalMode)
     {
+        return await NeedsCompletionAsync() ? FormOperationMode.Completion : normalMode;
+    }
+
+    /// <summary>
+    /// 是否需要先进补全模式：导入库建档（source_type=ImportedArchive）且未补全（data_completed_at 为空）。
+    /// 供进专用页面的变更入口（户主死亡变更/户主变更）做补全前置拦截。
+    /// </summary>
+    private async Task<bool> NeedsCompletionAsync()
+    {
         var appResult = await _applicationService.GetByIdAsync(ApplicationId, CancellationToken);
-        if (appResult.IsSuccess && appResult.Value != null
+        return appResult.IsSuccess && appResult.Value != null
             && string.Equals(appResult.Value.SourceType, "ImportedArchive", StringComparison.OrdinalIgnoreCase)
-            && appResult.Value.DataCompletedAt == null)
-        {
-            return FormOperationMode.Completion;
-        }
-        return normalMode;
+            && appResult.Value.DataCompletedAt == null;
     }
 
     /// <summary>
     /// 导航到家庭信息修正（复用低收入人口认定申请表单，可编辑全部步骤但户主姓名/身份证锁定）
-    /// 仅限本月本周期的当前库档案
+    /// 导入库建档档案未补全时先进入数据补全模式；仅限本月本周期的当前库档案
     /// </summary>
     [RelayCommand]
     private async Task NavigateToFamilyCorrectionAsync()
@@ -655,6 +698,7 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
 
         // 前端周期校验：检查档案是否属于本月经济复核周期
         var periodValidation = await ValidateCurrentPeriodAsync();
@@ -664,13 +708,16 @@ public partial class ChangeViewModel : ViewModelBase
             return;
         }
 
-        _logger.LogBusiness("导航到家庭信息修正", ("ApplicationId", ApplicationId));
+        var mode = await ResolveChangeEntryModeAsync(FormOperationMode.ReviewWithFamilyCorrection);
+
+        _logger.LogBusiness("导航到家庭信息修正", ("ApplicationId", ApplicationId), ("Mode", mode.ToString()));
         await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(
-            new FormPageParameter(FormOperationMode.ReviewWithFamilyCorrection, ApplicationId));
+            new FormPageParameter(mode, ApplicationId));
     }
 
     /// <summary>
     /// 导航到编辑家庭信息（复用低收入人口认定申请表单，可编辑全部步骤但户主姓名/身份证锁定，无周期限制）
+    /// 导入库建档档案未补全时先进入数据补全模式（与经济状况复核一致）
     /// </summary>
     [RelayCommand]
     private async Task NavigateToEditFamilyInfoAsync()
@@ -678,10 +725,13 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
 
-        _logger.LogBusiness("导航到编辑家庭信息", ("ApplicationId", ApplicationId));
+        var mode = await ResolveChangeEntryModeAsync(FormOperationMode.EditFamilyInfo);
+
+        _logger.LogBusiness("导航到编辑家庭信息", ("ApplicationId", ApplicationId), ("Mode", mode.ToString()));
         await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(
-            new FormPageParameter(FormOperationMode.EditFamilyInfo, ApplicationId));
+            new FormPageParameter(mode, ApplicationId));
     }
 
     /// <summary>
@@ -714,7 +764,13 @@ public partial class ChangeViewModel : ViewModelBase
             // 检查档案的最近变更记录是否在当前周期内
             // 如果档案没有任何变更记录，说明是新档案，可以修正
             // 如果有变更记录，检查最近一次变更是否在当前周期内
-            var changeHistory = await _changeService.GetChangeHistoryAsync(ApplicationId, CancellationToken);
+            var changeHistoryResult = await _changeService.GetChangeHistoryAsync(ApplicationId, CancellationToken);
+            if (changeHistoryResult.IsFailure)
+            {
+                _logger.Error($"变更历史查询失败: {changeHistoryResult.Message}");
+                return "变更历史查询失败，请稍后重试";
+            }
+            var changeHistory = changeHistoryResult.Value;
             if (changeHistory != null && changeHistory.Count > 0)
             {
                 var latestChange = changeHistory.OrderByDescending(c => c.ChangedAt).First();
@@ -743,6 +799,7 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
 
         var mode = await ResolveChangeEntryModeAsync(FormOperationMode.MemberChange);
 
@@ -752,6 +809,7 @@ public partial class ChangeViewModel : ViewModelBase
 
     /// <summary>
     /// 导航到户主死亡变更页面
+    /// 导入库建档档案未补全时先进入数据补全模式（保存返回变更页后再进入本入口）
     /// </summary>
     [RelayCommand]
     private async Task NavigateToHouseholdDeathAsync()
@@ -759,6 +817,15 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
+
+        if (await NeedsCompletionAsync())
+        {
+            _logger.LogBusiness("导航到数据补全（户主死亡变更前置）", ("ApplicationId", ApplicationId));
+            await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(
+                new FormPageParameter(FormOperationMode.Completion, ApplicationId));
+            return;
+        }
 
         _logger.LogBusiness("导航到户主死亡变更", ("ApplicationId", ApplicationId));
         await NavigateToPageAsync<Pages.ChangeManagement.HouseholdDeathChangePage, long>(ApplicationId);
@@ -766,6 +833,7 @@ public partial class ChangeViewModel : ViewModelBase
 
     /// <summary>
     /// 导航到户主变更页面
+    /// 导入库建档档案未补全时先进入数据补全模式（保存返回变更页后再进入本入口）
     /// </summary>
     [RelayCommand]
     private async Task NavigateToHeadChangeAsync()
@@ -773,6 +841,15 @@ public partial class ChangeViewModel : ViewModelBase
         if (!await EnsureApplicationSelectedAsync()) return;
         if (!await PrepareForChangeAsync()) return;
         if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
+
+        if (await NeedsCompletionAsync())
+        {
+            _logger.LogBusiness("导航到数据补全（户主变更前置）", ("ApplicationId", ApplicationId));
+            await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(
+                new FormPageParameter(FormOperationMode.Completion, ApplicationId));
+            return;
+        }
 
         _logger.LogBusiness("导航到户主变更", ("ApplicationId", ApplicationId));
         await NavigateToPageAsync<Pages.ChangeManagement.HeadChangePage, long>(ApplicationId);

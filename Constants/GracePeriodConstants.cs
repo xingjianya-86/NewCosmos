@@ -21,8 +21,10 @@ public static class GracePeriodConstants
     public const int MAX_MONTHS = 12;
 
     /// <summary>
-    /// 到期预警窗口天数：渐退期将在该天数内到期（含已到期未处理）时触发首页横幅提醒。
-    /// 调用点：GetExpiringCountAsync(ExpiringWarningDays)，禁止在调用处写死 30。
+    /// 到期预警窗口天数（首页横幅口径：N 天内到期 + 已到期才提醒）。
+    /// 调用点：MainViewModel → GracePeriodService.GetWarningCountAsync(ExpiringWarningDays)，
+    /// 禁止在调用处写死 30。
+    /// 注意：渐退期管理页/两处胶囊走 GetExpiringCountAsync（进行中+已到期全量），不适用本窗口。
     /// </summary>
     public const int EXPIRING_WARNING_DAYS = 30;
 

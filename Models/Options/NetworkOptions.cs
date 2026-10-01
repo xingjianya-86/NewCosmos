@@ -29,6 +29,12 @@ public class NetworkOptions
     /// <summary>网页授权地址（自建控制器 UI）</summary>
     public string WebControllerUrl { get; set; } = string.Empty;
 
+    /// <summary>ZeroTier CLI 搜索路径（分号分隔；空则用内置默认）</summary>
+    public string ZeroTierCliPaths { get; set; } = string.Empty;
+
+    /// <summary>ZeroTier 本地管理令牌路径（空则用内置默认）</summary>
+    public string ZeroTierTokenPath { get; set; } = string.Empty;
+
     public const string ModePublic = "Public";
     public const string ModePrivate = "Private";
 

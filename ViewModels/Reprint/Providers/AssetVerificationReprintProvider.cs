@@ -57,6 +57,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
     public string DomainKey => "AssetVerification";
     public string DisplayName => "资产核查";
     public ReprintDomainMode Mode => ReprintDomainMode.AssetVerification;
+    public ReprintMonthWindow MonthWindow => ReprintMonthWindow.EconomicReview;
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByPersonAsync(string keyword, int limit = 20, CancellationToken ct = default)
     {
@@ -519,8 +520,10 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                 return null;
             return TemplateConfig.FromJson(template.ConfigJson);
         }
-        catch
+        catch (Exception ex)
         {
+            // 解析失败降级为原始全量替换（与 PrintService 策略对齐），必须留日志定位打印错位
+            _logger.LogError(ex, "补打-模板配置解析失败 TemplateId=" + templateId);
             return null;
         }
     }
@@ -537,7 +540,10 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                 return user?.Value?.FullName ?? "未配";
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "补打-获取操作员姓名失败");
+        }
         return "未配";
     }
 

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+		<TargetFrameworks>net10.0-android36.0;net10.0-windows10.0.19041.0</TargetFrameworks>
 		<MauiEnableXamlCBindingWithSourceCompilation>false</MauiEnableXamlCBindingWithSourceCompilation>
 		<!-- XAML 源生成充气器：编译期生成强类型代码，替代运行时解析 -->
 		<MauiXamlInflator>SourceGen</MauiXamlInflator>
@@ -27,7 +27,7 @@
 
 		<!-- Microsoft.Windows.Storage.Pickers（文件夹选择器）在 WinAppSDK 1.8 存在本地化缺陷：
 		     仅自包含部署可用。全配置启用 WinAppSDK 自包含，保证调试与发布均能弹出文件夹选择器。 -->
-		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+		<WindowsAppSDKSelfContained Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">true</WindowsAppSDKSelfContained>
 
 		<!-- Display name -->
 		<ApplicationTitle>帝皇权杖δ-me13</ApplicationTitle>
@@ -36,23 +36,27 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.1.20260919</ApplicationDisplayVersion>
-		<ApplicationVersion>20260919</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.20261002</ApplicationDisplayVersion>
+		<ApplicationVersion>20261002</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
-		<WindowsPackageType>None</WindowsPackageType>
-		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
-		<AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
-		<GenerateTestArtifacts>False</GenerateTestArtifacts>
-		<AppxBundle>Never</AppxBundle>
+		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
+		<GenerateAppInstallerFile Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">False</GenerateAppInstallerFile>
+		<AppxAutoIncrementPackageRevision Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">False</AppxAutoIncrementPackageRevision>
+		<AppxSymbolPackageEnabled Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">False</AppxSymbolPackageEnabled>
+		<GenerateTestArtifacts Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">False</GenerateTestArtifacts>
+		<AppxBundle Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">Never</AppxBundle>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24</SupportedOSPlatformVersion>
+		<!-- 仅打包 arm64-v8a：ONNX Runtime 原生库含 x86_64（模拟器版 ~39MB），真机用不到，
+		     限定后 APK 体积大幅下降。如后续需要模拟器调试，改为 android-arm64;android-x86_64 -->
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64</RuntimeIdentifiers>
 	</PropertyGroup>
 
-	<!-- 发布优化（仅 Release）：ReadyToRun 预编译显著减少首次启动 JIT 开销，加快启动速度 -->
-	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+	<!-- 发布优化（仅 Release + Windows）：ReadyToRun 预编译显著减少首次启动 JIT 开销，加快启动速度 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release' AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<!-- 仅保留简体中文卫星资源，减少启动时加载的本地化程序集数量 -->
 		<SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
@@ -64,7 +68,7 @@
 		<!-- 完全自包含发布：.NET 运行时与 WinAppSDK 运行时均随包分发，部署机无需安装
 		     .NET Desktop Runtime / Windows App Runtime（仅当显式指定 RID 发布时启用，避免影响普通 build） -->
 		<SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
-		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+		<WindowsAppSDKSelfContained Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">true</WindowsAppSDKSelfContained>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -109,17 +113,37 @@
 		     该包为纯构建期工具、不进发布产物；本项目无 git 仓库，任务实际 no-op -->
 		<PackageReference Include="Microsoft.Build.Tasks.Git" Version="10.0.303" />
 		<PackageReference Include="PDFsharp" Version="6.1.1" />
-		<PackageReference Include="System.Management" Version="10.0.10" />
-		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
+		<PackageReference Include="System.Management" Version="10.0.10"
+		                  Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10"
+		                  Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+		<PackageReference Include="BsDiff" Version="1.1.0" />
+		<!-- 端侧身份证 OCR 推理运行时（Android 内置原生库 + XNNPACK；Windows 端 IIdentityReader 为桩） -->
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<!-- database.ini 含数据库凭据，绝不随构建产物/安装包分发；
 		     部署机由配置向导生成，开发机由 ConfigService 回退到项目 config/ 目录读取 -->
-		<None Include="config\**" Exclude="config\database.ini">
+		<None Include="config\**" Exclude="config\database.ini"
+		      Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'android'">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
 		</None>
+	</ItemGroup>
+
+	<!-- Android: config 文件作为 AndroidAsset 打包，首次启动由 ConfigService 复制到可写目录 -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidAsset Include="config\app.ini" Link="app.ini" />
+		<AndroidAsset Include="config\database.ini.example" Link="database.ini.example" />
+		<AndroidAsset Include="config\performance.ini" Link="performance.ini" />
+		<AndroidAsset Include="config\update.ini" Link="update.ini" />
+		<AndroidAsset Include="config\network.ini" Link="network.ini" />
+		<AndroidAsset Include="config\document_output.yaml" Link="document_output.yaml" />
+		<AndroidAsset Include="config\print_settings.yaml" Link="print_settings.yaml" />
+		<AndroidAsset Include="config\timeline_config.yaml" Link="timeline_config.yaml" />
+		<!-- 端侧 OCR 模型（PP-OCRv3 det/rec），资源路径 Ocr/xxx.onnx -->
+		<AndroidAsset Include="Resources\Ocr\**\*.onnx" Link="Ocr\%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -141,9 +165,12 @@
 
 	<ItemGroup>
 		<EmbeddedResource Include="Resources\Seed\**\*.yaml" />
-		<Content Include="Resources\Seed\**\*.csv">
+		<Content Include="Resources\Seed\**\*.csv" Condition="'$(TargetPlatformIdentifier)' != 'android'">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<None Include="Resources\Seed\**\*.csv" Condition="'$(TargetPlatformIdentifier)' == 'android'">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -158,15 +185,15 @@
 		</None>
 	</ItemGroup>
 
-	<!-- PostgreSQL 备份工具（pg_dump 及依赖 DLL） -->
-	<ItemGroup>
+	<!-- PostgreSQL 备份工具（pg_dump 及依赖 DLL）— 仅 Windows -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<None Include="Resources\PostgreSQL\**">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
 
-	<!-- 彩票模块：Python 脚本自动复制到输出目录 -->
-	<ItemGroup>
+	<!-- 彩票模块：Python 脚本自动复制到输出目录 — 仅 Windows（依赖 Python 运行时） -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<None Include="Scripts\Lottery\**\*.py">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
@@ -197,7 +224,7 @@
 	<PropertyGroup>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 	</PropertyGroup>
-	<ItemGroup>
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<None Include="python-embed\**\*">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
@@ -215,11 +242,13 @@
 		</None>
 	</ItemGroup>
 
-	<!-- ZeroTier 接入向导：随包分发安装包（客户端离线安装用） -->
-	<ItemGroup>
+	<!-- ZeroTier 接入向导：随包分发安装包（客户端离线安装用）— 仅 Windows -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<None Include="Resources\ZeroTier\**\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
+	<!-- Android 发布签名（凭据文件已 gitignore；缺失时跳过，回退调试签名） -->
+	<Import Project="keystore\keystore.props" Condition="Exists('$(MSBuildProjectDirectory)\keystore\keystore.props')" />
 
 </Project>

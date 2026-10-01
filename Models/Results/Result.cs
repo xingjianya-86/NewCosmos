@@ -61,20 +61,38 @@ public class Result
 
     private static string GetErrorCodeFromException(Exception ex)
     {
-        if (ex.GetType().Name == "NpgsqlException")
+        // 沿内部异常链识别连接级失败（网络中断/超时/IO），使弱网错误映射为可操作的提示，
+        // 而非笼统的 UNKNOWN_ERROR/DB_QUERY_ERROR。类型按名称判定以避免 Models 层依赖 Npgsql/网络类型。
+        for (var current = ex; current != null; current = current.InnerException)
         {
-            var errorCodeProp = ex.GetType().GetProperty("ErrorCode");
-            if (errorCodeProp != null)
+            var typeName = current.GetType().Name;
+
+            if (typeName is "NpgsqlException" or "PostgresException")
             {
-                var errorCode = errorCodeProp.GetValue(ex)?.ToString();
-                return errorCode switch
+                var sqlState = current.GetType().GetProperty("SqlState")?.GetValue(current)?.ToString()
+                    ?? current.GetType().GetProperty("ErrorCode")?.GetValue(current)?.ToString();
+
+                if (string.IsNullOrEmpty(sqlState))
+                    return ErrorCodes.DB_CONNECTION_FAILED; // 无 SQLSTATE 的 Npgsql 异常=连接级
+
+                if (sqlState.StartsWith("08", StringComparison.Ordinal))
+                    return ErrorCodes.DB_CONNECTION_FAILED;
+                return sqlState switch
                 {
-                    "08001" or "08006" => ErrorCodes.DB_CONNECTION_FAILED,
                     "57014" => ErrorCodes.DB_TIMEOUT,
                     "23505" => ErrorCodes.DB_UNIQUE_VIOLATION,
                     "23503" => ErrorCodes.DB_FOREIGN_KEY_VIOLATION,
                     _ => ErrorCodes.DB_QUERY_ERROR
                 };
+            }
+
+            switch (typeName)
+            {
+                case "SocketException":
+                case "IOException":
+                    return ErrorCodes.DB_CONNECTION_FAILED;
+                case "TimeoutException":
+                    return ErrorCodes.DB_TIMEOUT;
             }
         }
 

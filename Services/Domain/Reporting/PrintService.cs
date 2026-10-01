@@ -80,43 +80,6 @@ public class PrintService : BaseService, IPrintService
         return Result.Success(pdfResult.Value);
     }
 
-    public async Task<Result<byte[]>> PrintChangeConfirmationAsync(long changeRecordId, CancellationToken ct = default)
-    {
-        LogInfo("开始打印变更确认书");
-
-        var sql = @"SELECT cr.*, a.applicant_name
-                    FROM nc_biz_change_records cr
-                    LEFT JOIN nc_biz_archives a ON cr.archive_id = a.id
-                    WHERE cr.id = $1";
-
-        var changeResult = await _db.QuerySingleAsync<ChangeRecordPrintData>(sql, ct, changeRecordId);
-        if (changeResult.IsFailure)
-            return Result.Failure<byte[]>(changeResult.ErrorCode!, changeResult.Message!);
-
-        var change = changeResult.Value;
-        if (change == null)
-            return Result.Failure<byte[]>(ErrorCodes.NOT_FOUND, "变更记录不存在");
-
-        var fields = new Dictionary<string, string>
-        {
-            ["{变更编号}"] = changeRecordId.ToString(),
-            ["{户主姓名}"] = change.ApplicantName ?? "",
-            ["{变更类型}"] = change.ChangeType ?? "",
-            ["{变更原因}"] = change.ChangeReason ?? "",
-            ["{变更前值}"] = change.BeforeValue ?? "",
-            ["{变更后值}"] = change.AfterValue ?? "",
-            ["{变更日期}"] = change.CreatedAt.ToString("yyyy-MM-dd")
-        };
-
-        var templateId = await ResolveTemplateIdByNameAsync("ChangeConfirmation", ct);
-        var pdfResult = await GeneratePdfAsync(templateId, fields, ct);
-        if (pdfResult.IsFailure)
-            return Result.Failure<byte[]>(pdfResult.ErrorCode!, pdfResult.Message!);
-
-        LogInfo("变更确认书打印完成");
-        return Result.Success(pdfResult.Value);
-    }
-
 /// <summary>
     /// 渲染月报表单为合并 PDF（单页/双页按表单类型），供页面预览
     /// </summary>
@@ -1699,7 +1662,7 @@ public class PrintService : BaseService, IPrintService
         catch (Exception ex)
         {
             LogError($"获取模板列表失败: {ex.Message}");
-            return Result.Success(new List<PrintTemplate>());
+            return Result.Failure<List<PrintTemplate>>(ErrorCodes.DB_QUERY_ERROR, $"获取模板列表失败: {ex.Message}");
         }
     }
 
@@ -1733,14 +1696,4 @@ public class PrintService : BaseService, IPrintService
         public DateTime CreatedAt { get; set; }
     }
 
-    private class ChangeRecordPrintData
-    {
-        public long Id { get; set; }
-        public string ApplicantName { get; set; } = string.Empty;
-        public string ChangeType { get; set; } = string.Empty;
-        public string ChangeReason { get; set; } = string.Empty;
-        public string BeforeValue { get; set; } = string.Empty;
-        public string AfterValue { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-    }
 }

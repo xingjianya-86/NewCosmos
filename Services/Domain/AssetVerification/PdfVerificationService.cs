@@ -80,13 +80,15 @@ public class PdfVerificationService : BaseService, IPdfVerificationService
         string name, CancellationToken ct = default)
     {
         var trimmedName = name.Trim();
-        LogInfo("核查搜索: Name=" + trimmedName);
+        LogInfo("核查搜索: Name=" + DataMasker.MaskName(trimmedName));
 
-        var sql = "SELECT id, applicant_name, applicant_id_card, relationship, status, batch_id, head_id_card FROM nc_biz_asset_checks WHERE TRIM(applicant_name) ILIKE TRIM($1) AND status IN ('0', '1', '2', '3') ORDER BY id DESC LIMIT 1";
+        var sql = "SELECT id, applicant_name, applicant_id_card, relationship, status, batch_id, head_id_card FROM nc_biz_asset_checks WHERE TRIM(applicant_name) ILIKE TRIM($1) AND status = ANY($2) ORDER BY id DESC LIMIT 1";
 
         try
         {
-            var result = await _db.QuerySingleAsync<AssetCheckItemResult>(sql, ct, trimmedName);
+            var result = await _db.QuerySingleAsync<AssetCheckItemResult>(sql, ct, trimmedName,
+                new List<string> { AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED,
+                    AssetCheckStatusConstants.INCLUDED, AssetCheckStatusConstants.REFUSED });
             if (result.IsFailure)
                 return Result.Failure<AssetCheckItemResult?>(result.ErrorCode!, result.Message!);
 
@@ -169,11 +171,12 @@ public class PdfVerificationService : BaseService, IPdfVerificationService
 
         // 整户口径：与 UpdateCheckStatusAsync 一致，同户主（head_id_card）的全部成员行一并处理；
         // 仅升级未终态任务（0 已提交 / 1 有报告），已纳入(2)/已拒绝(3)不动
-        var sql = "UPDATE nc_biz_asset_checks SET status = '2', updated_at = NOW() WHERE head_id_card = $1 AND status IN ('0', '1') AND deleted_at IS NULL";
+        var sql = "UPDATE nc_biz_asset_checks SET status = $2, updated_at = NOW() WHERE head_id_card = $1 AND status = ANY($3) AND deleted_at IS NULL";
 
         try
         {
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, idCard);
+            var result = await _db.ExecuteNonQueryAsync(sql, ct, idCard, AssetCheckStatusConstants.INCLUDED,
+                new List<string> { AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED });
             if (result.IsFailure)
                 return Result.Failure(result.ErrorCode!, result.Message!);
 

@@ -24,7 +24,7 @@ tables:
       - name: change_type
         type: character varying(50)
         nullable: false
-        comment: 变更类型：EconomicChange=经济状况变更, MemberChange=成员变更, HeadOnlyChange=仅户主变更, HeadWithMemberChange=户主及成员变更
+        comment: 变更类型：FundChange=经济复核, MemberAdd/Remove/Death/Modify=成员变更, HouseholdDeath=户主死亡, HouseholdHeadChange=户主变更, CategoryStop/CategoryAdd=跨大类停增, ClassifiedSubsidyReduce=分类施保减除
       - name: change_category
         type: character varying(50)
         nullable: true
@@ -76,7 +76,7 @@ tables:
       - name: triggered_grace_period
         type: boolean
         nullable: true
-        comment: 是否触发渐退期，从低保降为低收入时触发
+        comment: 是否触发渐退期（经济复核降档/成员变更降档/户主死亡命中低保边缘区间时为真）
       - name: triggered_stop
         type: boolean
         nullable: true

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileElderlyReviewListPage"
+             x:DataType="ElderlyReviewListViewModel"
+             Title="高龄津贴复核"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="PendingReviewCard" x:DataType="ent:ElderlyReview">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CategoryChangeDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding TriggerSourceName}" FontSize="12" TextColor="{StaticResource Info}"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="办理" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                            BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
+                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
+                            CommandParameter="{Binding .}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ReviewSearchCard" x:DataType="ent:ElderlyApplication">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CategoryName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding IssueStartMonth}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="复核" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                            BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
+                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
+                            CommandParameter="{Binding .}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 紫色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="高龄津贴复核" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="身份 + 年龄重评 · 停旧增新" FontSize="13" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 待复核队列 -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasPendingReviews}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="{Binding PendingCount, StringFormat='待复核队列（{0} 人）'}" FontSize="15"
+                               FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding PendingReviews}"
+                                             BindableLayout.ItemTemplate="{StaticResource PendingReviewCard}" Spacing="0"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 在享人员检索 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="在享人员检索" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Grid.Column="0" Placeholder="搜索在享人员姓名、身份证号" Text="{Binding SearchText}"
+                                   HeightRequest="40" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
+                            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="40"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                                    Command="{Binding SearchCommand}"/>
+                        </Grid>
+                        <Button Text="按身份证复核（18位）" HeightRequest="42" FontSize="14" CornerRadius="10"
+                                BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
+                                Command="{Binding ReviewByIdCardCommand}" IsEnabled="{Binding CanReview}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 检索结果 -->
+                <VerticalStackLayout Spacing="0" BindableLayout.ItemsSource="{Binding SearchResults}"
+                                     BindableLayout.ItemTemplate="{StaticResource ReviewSearchCard}"/>
+
+                <!-- 分页 -->
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="12" Margin="0,6">
+                    <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                            BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                            BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                            Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
+                    <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                            BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                            BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                            Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="2" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

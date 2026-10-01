@@ -59,9 +59,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -69,13 +67,13 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             var existsResult = await _db.ExecuteScalarAsync(existsSql, ct, request.ApplicationId, request.IdCard);
             if (existsResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(existsResult.ErrorCode!, existsResult.Message!);
             }
 
             if (existsResult.Value > 0)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(ErrorCodes.DUPLICATE_ID_CARD, "该身份证号已在此申请中存在");
             }
 
@@ -125,12 +123,11 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             if (insertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             Logger.LogBusiness("添加家庭成员", ("MemberId", insertResult.Value), ("Name", DataMasker.MaskName(request.Name)));
@@ -138,7 +135,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException<long>(ex);
         }
@@ -150,23 +147,21 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var memberResult = await GetByIdAsync(request.MemberId, ct);
             if (memberResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(memberResult.ErrorCode!, memberResult.Message!);
             }
 
             var member = memberResult.Value;
             if (member == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "家庭成员不存在");
             }
 
@@ -218,19 +213,18 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             if (updateResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException(ex);
         }
@@ -258,9 +252,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
         if (!canDeleteResult.Value)
             return Result.Failure(ErrorCodes.LAST_MEMBER_CANNOT_DELETE, "最后一个家庭成员不能删除");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -270,7 +262,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             if (deleteResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
             }
 
@@ -279,31 +271,27 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             // 删除 family_member 时，对应的 member_category='赡养抚养扶养' 记录也会被软删除
             // 因为它们是同一条记录
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"删除家庭成员失败: {ex.Message}");
             return Result.Failure(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }
     }
 
     /// <summary>
-    /// 删除申请的所有家庭成员（软删除）
+    /// 删除申请的所有家庭成员（软删除），返回删除行数
     /// </summary>
-    public async Task<Result> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default)
+    public async Task<Result<int>> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -313,27 +301,37 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             if (deleteResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
+                await tx.RollbackAsync(ct);
+                return Result.Failure<int>(deleteResult.ErrorCode!, deleteResult.Message!);
             }
 
             // 2. 同时标记所有关联的赡养抚养扶养记录
             // 注意：nc_biz_supporters 表已废弃，赡养人数据现在存储在 nc_biz_family_members 中
             // 删除所有 family_member 时，member_category='赡养抚养扶养' 的记录也会被上面的 SQL 一并软删除
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
-            return Result.Success();
+            LogInfo($"执行操作: 删除行数={deleteResult.Value}");
+            return Result.Success(deleteResult.Value);
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"删除家庭成员失败: {ex.Message}");
-            return Result.Failure(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
+            return Result.Failure<int>(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// 查询申请下已登记死亡的成员身份证（历史数据未软删，展示/生成档案时须过滤）
+    /// </summary>
+    public async Task<Result<List<string>>> GetDeadIdCardsByApplicationIdAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = "SELECT member_id_card FROM nc_biz_death_records WHERE application_id = $1 AND member_id_card IS NOT NULL";
+        var result = await _db.QueryAsync<string>(sql, ct, applicationId);
+        return result.IsSuccess
+            ? Result.Success(result.Value ?? new List<string>())
+            : Result.Failure<List<string>>(result.ErrorCode!, result.Message!);
     }
 
     public async Task<Result> SetHouseholdHeadAsync(long applicationId, long memberId, CancellationToken ct = default)
@@ -351,9 +349,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
         if (member.ApplicationId != applicationId)
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "确定");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -363,16 +359,14 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             var setSql = "UPDATE nc_biz_family_members SET is_applicant = true, updated_at = NOW() WHERE id = $1";
             await ExecOrThrowAsync(_db, setSql, ct, memberId);
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException(ex);
         }
@@ -403,28 +397,25 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
         LogInfo($"批量更新收入: ApplicationId={applicationId}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
-            foreach (var (memberId, income) in incomes)
-            {
-                var sql = "UPDATE nc_biz_family_members SET annual_income = $1, updated_at = NOW() WHERE id = $2 AND application_id = $3";
-                await ExecOrThrowAsync(_db, sql, ct, income, memberId, applicationId);
-            }
+            // unnest 数组批改（原逐行 UPDATE 为 N+1）；数组实参传 List<T>（勿传 T[]，防 params 协变）
+            var sql = @"UPDATE nc_biz_family_members SET annual_income = v.annual_income, updated_at = NOW()
+                FROM (SELECT * FROM unnest($1::bigint[], $2::numeric[]) AS t(id, annual_income)) v
+                WHERE nc_biz_family_members.id = v.id AND nc_biz_family_members.application_id = $3";
+            await ExecOrThrowAsync(_db, sql, ct,
+                incomes.Keys.ToList(), incomes.Values.ToList(), applicationId);
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException(ex);
         }

@@ -1,6 +1,7 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
@@ -8,6 +9,7 @@ using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.StateMachine;
+using NewCosmos.Services.System;
 
 namespace NewCosmos.Services.Domain.ChangeManagement;
 
@@ -49,6 +51,59 @@ public class EconomicReviewContext
     /// 是否为家庭信息修正模式（需要额外校验周期限制）
     /// </summary>
     public bool IsFamilyCorrection { get; set; }
+
+    // ── 覆写前捕获的变更前旧值 ──
+    // 经济复核入口（表单 ExecuteReviewSaveAsync）在调用本方法前已 SaveEconomicDetailsAsync
+    // 把新经济数据写回本档，此后读库拿到的"旧值"实为覆写后值（Before 快照 / old_per_capita_income 失真）。
+    // 真旧值只能由调用方在覆写前捕获填充；任一未提供时回退读 application（与历史行为一致）。
+
+    /// <summary>覆写前的家庭人数</summary>
+    public int? OldFamilySize { get; set; }
+
+    /// <summary>覆写前的家庭月总收入</summary>
+    public decimal? OldTotalFamilyIncome { get; set; }
+
+    /// <summary>覆写前的家庭年收入</summary>
+    public decimal? OldTotalAnnualIncome { get; set; }
+
+    /// <summary>覆写前的月人均收入</summary>
+    public decimal? OldPerCapitaIncome { get; set; }
+
+    /// <summary>覆写前的刚性支出数值（口径同上）</summary>
+    public decimal? OldRigidExpenditure { get; set; }
+
+    /// <summary>
+    /// 覆写前的分类结果。必须在 Step5「分类判定」落库之前捕获（表单加载时刻），
+    /// 否则 needRebuild 的分类比较读到的是覆写后值，恒判"无变化"。
+    /// </summary>
+    public string? OldClassification { get; set; }
+
+    /// <summary>
+    /// 覆写前的保障金合计（户月 + 分类施保 + 照料费）。同上必须在判定落库前捕获，
+    /// 否则 needRebuild 的金额比较恒判"无变化"，真正有变化的复核不重建。
+    /// </summary>
+    public decimal? OldGuaranteeAmount { get; set; }
+
+    /// <summary>
+    /// 覆写前的收入分项旧值（与 Application 列同名同口径：务工/经营/财产/转移/其他/刚性为月值，赡养/土地/补贴为年值）
+    /// </summary>
+    public IncomeComponentValues? OldComponents { get; set; }
+}
+
+/// <summary>
+/// 收入分项值（列口径与 nc_biz_applications 主表一致：前六项月值、后三项年值；读取方展示时统一换算年值）
+/// </summary>
+public class IncomeComponentValues
+{
+    public decimal WorkIncomeTotal { get; set; }
+    public decimal BusinessIncomeTotal { get; set; }
+    public decimal PropertyIncomeTotal { get; set; }
+    public decimal TransferIncomeTotal { get; set; }
+    public decimal OtherIncomeTotal { get; set; }
+    public decimal RigidExpenditure { get; set; }
+    public decimal AlimonyIncome { get; set; }
+    public decimal LandIncomeTotal { get; set; }
+    public decimal SubsidyTotal { get; set; }
 }
 
 /// <summary>
@@ -72,6 +127,15 @@ public class MemberChangeContext
 
     /// <summary>变更前家庭人数（表单加载时口径，用于 Before 快照）</summary>
     public int OldFamilySize { get; set; }
+
+    /// <summary>
+    /// 覆写前的分类结果。必须在 Step5「分类判定」落库之前捕获（表单加载时刻），
+    /// 否则停旧建新判定的分类/金额比较读到覆写后值，恒判"无变化"。
+    /// </summary>
+    public string? OldClassification { get; set; }
+
+    /// <summary>覆写前的保障金合计（户月 + 分类施保 + 照料费）。同上必须在判定落库前捕获。</summary>
+    public decimal? OldGuaranteeAmount { get; set; }
 
     public decimal NewTotalFamilyIncome { get; set; }
     public decimal NewPerCapitaIncome { get; set; }
@@ -215,6 +279,12 @@ public class ChangeResult
     public bool TriggeredStop { get; set; }
 
     /// <summary>
+    /// 是否已停旧建新生成新档案。
+    /// false = 保障金额/分类/停保三项均未变化，复核结果留在原档（原档保持有效，未生成新档案）。
+    /// </summary>
+    public bool Rebuilt { get; set; }
+
+    /// <summary>
     /// 户主死亡停旧建新后生成的新档案申请ID（其余变更场景为 0）
     /// </summary>
     public long NewApplicationId { get; set; }
@@ -231,14 +301,41 @@ public interface IChangeService
     Task<Result<long>> CreateChangeAsync(ChangeContext context, string beforeJson, string afterJson, CancellationToken ct = default);
 
     /// <summary>
+    /// 渐退超限减发：补写 change_type=FundChange（old&gt;new、同分类），供月报保障金减发表捕获。幂等。
+    /// </summary>
+    Task<Result<long>> CreateGraceCapFundChangeAsync(
+        long applicationId,
+        string newClassification,
+        string oldClassification,
+        decimal oldGuaranteeAmount,
+        decimal newGuaranteeAmount,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// 接续链档案 Step5 分类判定后同步跨大类 CategoryAdd 记录（月报「新增救助明细」跨类新增行数据源，
+    /// 同时使本档变更记录列表可见「新类别新增」）。仅链档案（original_application_id 非空）且新分类与
+    /// 上游档案跨四大类时写入；幂等——已存在且分类一致跳过，判定值变化就地更新，判定回同大类则软删。
+    /// change_date = 判定日；triggered_grace_period/triggered_stop 恒 false（死亡停保已由链上
+    /// HouseholdDeath 记录承载，置 true 会使月报「退出对象纠治表」误标经济复核降档事件）。
+    /// </summary>
+    Task<Result<long?>> EnsureChainCategoryAddAsync(long applicationId, string operatorName, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询与本档案关联（application_id 或 new_application_id）且含快照的最近变更记录的 Before/After 快照。
+    /// 定期复核审批表「死亡原因/家庭人口」取数兜底：停旧建新链的 CategoryAdd 行自身无快照
+    /// （经济复核跨类行/Step5 跨类补写行），快照在链上发起记录（如户主死亡记录）；无匹配时 Value 为 null 非失败。
+    /// </summary>
+    Task<Result<ChangeSnapshotPair?>> GetLinkedChangeSnapshotsAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 保存快照
     /// </summary>
-    Task SaveSnapshotAsync(long changeId, string snapshotType, string dataJson, CancellationToken ct = default);
+    Task<Result> SaveSnapshotAsync(long changeId, string snapshotType, string dataJson, CancellationToken ct = default);
 
     /// <summary>
     /// 保存变更明细
     /// </summary>
-    Task SaveDetailAsync(long changeId, string fieldName, string oldValue, string newValue, CancellationToken ct = default);
+    Task<Result> SaveDetailAsync(long changeId, string fieldName, string oldValue, string newValue, CancellationToken ct = default);
 
     /// <summary>
     /// 执行经济复核
@@ -266,9 +363,60 @@ public interface IChangeService
     Task<Result<ChangeResult>> ExecuteHouseholdDeathAsync(HouseholdDeathContext context, CancellationToken ct = default);
 
     /// <summary>
-    /// 获取变更历史
+    /// 获取变更历史（按变更时间倒序，最多 200 条）
     /// </summary>
-    Task<List<ChangeRecord>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default);
+    Task<Result<List<ChangeRecord>>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条触发停保的 CategoryStop 变更记录（档案告知书字段装配用；无则 Value 为 null）
+    /// </summary>
+    Task<Result<TriggeredStopChangeRecord?>> GetLatestTriggeredStopRecordAsync(long applicationId, IReadOnlyCollection<string> newClassifications, CancellationToken ct = default);
+
+    /// <summary>
+    /// 是否存在触发停保的 CategoryStop 变更记录（档案输出追加变更告知书判定用）
+    /// </summary>
+    Task<Result<bool>> HasTriggeredCategoryStopAsync(long applicationId, IReadOnlyCollection<string> stopCategoryCodes, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询家庭成员类变更记录（增减员调整表字段装配用，按变更日期倒序）
+    /// </summary>
+    Task<Result<List<MemberChangeRecord>>> GetMemberChangeRecordsAsync(long applicationId, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询逐人增/减员明细（增减员调整表字段装配用，按变更日期倒序、按身份证号去重）。
+    /// 数据源两路：①成员增减流程写入的 nc_biz_change_details（field_name=MemberAdd/MemberRemove，含逐人原因）；
+    /// ②成员死亡/户主死亡流程不写明细，按 change_reason 的 "动词: 姓名(身份证)" 解析兜底。
+    /// 两类人员均回查 nc_biz_family_members 补齐性别/家庭关系/身体状况/工作单位/年收入
+    /// （减员行可能只剩软删除历史行，故查询不带 deleted_at 过滤，优先取在册行）。
+    /// </summary>
+    Task<Result<List<MemberAdjustEntry>>> GetMemberAdjustEntriesAsync(long applicationId, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条与渐退退出相关的变更（经济复核/户主死亡/触发停保，档案渐退审批表退出说明用；无则 Value 为 null）
+    /// </summary>
+    Task<Result<GraceExitChangeRecord?>> GetLatestGraceExitChangeAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条含新旧人均收入的变更记录（渐退审批表「变动情况说明」经济复核场景取人均收入新旧值用；无则 Value 为 null）
+    /// </summary>
+    Task<Result<IncomeComparisonRecord?>> GetLatestIncomeComparisonAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条挂在旧档上的、Before 快照含 Components 的变更（渐退审批表分项对比取复核前旧值用；无则 Value 为 null）
+    /// </summary>
+    Task<Result<BeforeSnapshotOldValues?>> GetLatestBeforeSnapshotAsync(long originalApplicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条复核/变更记录（档案_定期复核审批表「复核情况/复核时间/待遇变化」取数用）。
+    /// 覆盖经济复核、户主死亡、成员变更等完整流程（同档案可能只有死亡类记录，如卢永华户主死亡链）；无匹配则 Value 为 null。
+    /// </summary>
+    Task<Result<ReviewChangeRecord?>> GetLatestReviewChangeRecordAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询指定变更记录的 Before/After 快照 JSON（定期复核审批表「复核情况」取家庭人口与死亡原因用；
+    /// 经济复核链的 Before 快照含 Components、死亡/成员变更链不含，故不复用 GetLatestBeforeSnapshotAsync；无则 Value 为 null）。
+    /// </summary>
+    Task<Result<ChangeSnapshotPair?>> GetChangeSnapshotsAsync(long changeId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -285,10 +433,152 @@ public class ChangeRecord
     public string OperatorName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime ChangedAt { get; set; }
+
+    /// <summary>变更类型显示名（列表绑定用；未知类型回退原值）</summary>
+    public string ChangeTypeDisplay => ChangeType switch
+    {
+        DictionaryConstants.ChangeType.FUND_CHANGE => "经济复核",
+        DictionaryConstants.ChangeType.MEMBER_ATTRIBUTE => "成员属性变更",
+        DictionaryConstants.ChangeType.MEMBER_ADD => "成员增加",
+        DictionaryConstants.ChangeType.MEMBER_REMOVE => "成员减少",
+        DictionaryConstants.ChangeType.MEMBER_DEATH => "成员死亡",
+        DictionaryConstants.ChangeType.MEMBER_MODIFY => "成员修改",
+        DictionaryConstants.ChangeType.HOUSEHOLD_DEATH => "户主死亡",
+        DictionaryConstants.ChangeType.HOUSEHOLD_HEAD_CHANGE => "户主变更",
+        DictionaryConstants.ChangeType.DRAFT_SAVE => "草稿保存",
+        DictionaryConstants.ChangeType.CATEGORY_STOP => "原类别停止",
+        DictionaryConstants.ChangeType.CATEGORY_ADD => "新类别新增",
+        DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE => "分类施保减除",
+        _ => ChangeType
+    };
 }
 
 /// <summary>
-/// 变更服务实现
+/// 触发停保的变更记录（档案告知书区分"停止告知/不予认定告知"用）
+/// </summary>
+public class TriggeredStopChangeRecord
+{
+    public string? OldClassification { get; set; }
+    public string? NewClassification { get; set; }
+}
+
+/// <summary>
+/// 家庭成员类变更记录行（增减员调整表字段装配用）
+/// </summary>
+public class MemberChangeRecord
+{
+    public long Id { get; set; }
+    public long ApplicationId { get; set; }
+    public long NewApplicationId { get; set; }
+    public string? ChangeType { get; set; }
+    public string? ChangeReason { get; set; }
+    public DateTime ChangeDate { get; set; }
+    public string? OldClassification { get; set; }
+    public string? NewClassification { get; set; }
+    public decimal? OldGuaranteeAmount { get; set; }
+    public decimal? NewGuaranteeAmount { get; set; }
+}
+
+/// <summary>
+/// 逐人增/减员明细行（增减员调整表字段装配用）
+/// </summary>
+public class MemberAdjustEntry
+{
+    /// <summary>方向：DictionaryConstants.ChangeType.MEMBER_ADD / MEMBER_REMOVE</summary>
+    public string Direction { get; set; } = DictionaryConstants.ChangeType.MEMBER_ADD;
+
+    public string Name { get; set; } = string.Empty;
+    public string IdCard { get; set; } = string.Empty;
+    public string RelationshipToHead { get; set; } = string.Empty;
+    public string MemberCategory { get; set; } = string.Empty;
+
+    /// <summary>逐人变更原因名称（成员增减流程登记；死亡类记录为空，由调用方兜底）</summary>
+    public string ReasonName { get; set; } = string.Empty;
+
+    /// <summary>事由日期（死亡减员=死亡日期，其余=生效日期）</summary>
+    public DateTime? EventDate { get; set; }
+
+    /// <summary>所属变更日期（倒序排序与兜底原因用）</summary>
+    public DateTime ChangeDate { get; set; }
+
+    /// <summary>所属变更类型（死亡类兜底原因文案用）</summary>
+    public string? ChangeType { get; set; }
+
+    // ── 成员表回填（减员可能只剩软删除历史行；查不到时保持空）──
+    public string? Gender { get; set; }
+    public string? HealthStatus { get; set; }
+    public string? WorkUnit { get; set; }
+    public decimal AnnualIncome { get; set; }
+}
+
+/// <summary>
+/// 渐退退出相关变更行（渐退期审批表「退出渐退期情况」分型拼句用）
+/// </summary>
+public class GraceExitChangeRecord
+{
+    public DateTime? ChangeDate { get; set; }
+    public string? ChangeReasonType { get; set; }
+    public string? ChangeType { get; set; }
+    public string? ChangeReason { get; set; }
+    public bool? TriggeredStop { get; set; }
+    public string? NewClassification { get; set; }
+    public string? OldClassification { get; set; }
+}
+
+/// <summary>
+/// 最近一条复核/变更行（档案_定期复核审批表「复核情况/复核时间/待遇变化」取数用）
+/// </summary>
+public class ReviewChangeRecord
+{
+    public long Id { get; set; }
+    public DateTime? ChangeDate { get; set; }
+    public string? ChangeReason { get; set; }
+    public string? ChangeReasonType { get; set; }
+    public string? ChangeType { get; set; }
+    public string? OldClassification { get; set; }
+    public string? NewClassification { get; set; }
+    public decimal? OldGuaranteeAmount { get; set; }
+    public decimal? NewGuaranteeAmount { get; set; }
+}
+
+/// <summary>
+/// 指定变更记录的 Before/After 快照 JSON（复核情况取家庭人口、死亡原因等；两键可能均为 null）
+/// </summary>
+public class ChangeSnapshotPair
+{
+    public string? BeforeJson { get; set; }
+    public string? AfterJson { get; set; }
+}
+
+/// <summary>
+/// 变更新旧人均收入行（渐退期审批表「变动情况说明」经济复核场景取数用）
+/// </summary>
+public class IncomeComparisonRecord
+{
+    public decimal? OldPerCapitaIncome { get; set; }
+    public decimal? NewPerCapitaIncome { get; set; }
+    public DateTime? ChangeDate { get; set; }
+    public string? ChangeType { get; set; }
+}
+
+/// <summary>
+/// Before 快照中捕获的变更前旧值（经济复核表单覆写前写入，供渐退审批表人口/总额/分项对比）
+/// </summary>
+public class BeforeSnapshotOldValues
+{
+    public int? OldFamilySize { get; set; }
+    public decimal? OldTotalFamilyIncome { get; set; }
+    public decimal? OldTotalAnnualIncome { get; set; }
+    public decimal? OldPerCapitaIncome { get; set; }
+    public IncomeComponentValues? Components { get; set; }
+}
+
+/// <summary>
+/// 变更服务实现。
+/// [宽表豁免] 本文件对 nc_biz_applications / nc_biz_family_members / nc_biz_caregivers 的读取保留
+/// <c>SELECT *</c>：这些是"整实体读取 → 分类判定/复制落库"的读改写路径，显式列必须穷尽全部被持久化列，
+/// 否则漏列会被按实体默认值回写造成静默数据丢失；且实体属性数（如成员 53）多于 Schema YAML 列数（34），
+/// 以 Schema 生成列清单并不可靠。故保留全列读取，仅列表/宽表分页查询按规范显式列 + LIMIT。
 /// </summary>
 public class ChangeService : BaseService, IChangeService
 {
@@ -301,6 +591,8 @@ public class ChangeService : BaseService, IChangeService
     private readonly IEconomicDetailService _economicDetailService;
     private readonly Services.Utilities.IBusinessTimelineService _businessTimelineService;
     private readonly Services.Domain.ElderlyBenefits.IElderlyApplicationService _elderlyApplicationService;
+    private readonly IIncomeCalculationService _incomeCalculationService;
+    private readonly Services.Core.IApplicationStatusService _statusService;
 
     public ChangeService(
         IDatabaseService db,
@@ -311,7 +603,9 @@ public class ChangeService : BaseService, IChangeService
         IEconomicDetailService economicDetailService,
         ILoggerService logger,
         Services.Utilities.IBusinessTimelineService businessTimelineService,
-        Services.Domain.ElderlyBenefits.IElderlyApplicationService elderlyApplicationService) : base(logger)
+        Services.Domain.ElderlyBenefits.IElderlyApplicationService elderlyApplicationService,
+        IIncomeCalculationService incomeCalculationService,
+        Services.Core.IApplicationStatusService statusService) : base(logger)
     {
         _db = db;
         _classificationService = classificationService;
@@ -321,15 +615,15 @@ public class ChangeService : BaseService, IChangeService
         _economicDetailService = economicDetailService;
         _businessTimelineService = businessTimelineService;
         _elderlyApplicationService = elderlyApplicationService;
+        _incomeCalculationService = incomeCalculationService;
+        _statusService = statusService;
     }
 
     public async Task<Result<long>> CreateChangeAsync(ChangeContext context, string beforeJson, string afterJson, CancellationToken ct = default)
     {
         var changeNo = $"CHG{DateTime.Now:yyyyMMddHHmmssfff}";
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -347,60 +641,308 @@ public class ChangeService : BaseService, IChangeService
             // 审计链条就断了。Result 化后由调用方显式检查并回滚。
             if (result.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     result.Message ?? "创建变更记录失败");
             }
 
             var changeId = result.Value;
 
-            try
+            // 快照是变更审计的核心证据：写入失败即整体失败（避免"变更成功但无快照"断档）
+            var beforeSnap = string.IsNullOrEmpty(beforeJson)
+                ? Result.Success()
+                : await SaveSnapshotAsync(changeId, "Before", beforeJson, ct);
+            if (beforeSnap.IsFailure)
             {
-                if (!string.IsNullOrEmpty(beforeJson))
-                    await SaveSnapshotAsync(changeId, "Before", beforeJson, ct);
-                if (!string.IsNullOrEmpty(afterJson))
-                    await SaveSnapshotAsync(changeId, "After", afterJson, ct);
-            }
-            catch (Exception snapEx)
-            {
-                // 快照是变更审计的核心证据：写入失败即整体失败（避免"变更成功但无快照"断档）
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                LogException(snapEx, "保存变更快照");
-                return Result.Failure<long>(ErrorCodes.DB_QUERY_ERROR,
-                    $"保存变更快照失败: {snapEx.Message}");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<long>(beforeSnap.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    beforeSnap.Message ?? "保存变更快照失败");
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            var afterSnap = string.IsNullOrEmpty(afterJson)
+                ? Result.Success()
+                : await SaveSnapshotAsync(changeId, "After", afterJson, ct);
+            if (afterSnap.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<long>(afterSnap.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    afterSnap.Message ?? "保存变更快照失败");
+            }
+
+            await tx.CommitAsync(ct);
 
             LogInfo($"创建变更记录: ChangeId={changeId}");
             return Result.Success(changeId);
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "创建变更记录");
             return Result.FromException<long>(ex);
         }
     }
 
-    public async Task SaveSnapshotAsync(long changeId, string snapshotType, string dataJson, CancellationToken ct = default)
+    public async Task<Result> SaveSnapshotAsync(long changeId, string snapshotType, string dataJson, CancellationToken ct = default)
     {
         var sql = @"INSERT INTO nc_biz_change_snapshots (change_id, snapshot_type, snapshot_data) VALUES ($1,$2,$3::jsonb);";
         var result = await _db.ExecuteNonQueryAsync(sql, ct, changeId, snapshotType, dataJson);
         // 快照是变更审计的核心证据，写入失败不能吞掉（否则出现"变更成功但无快照"的断档）
         if (result.IsFailure)
-            throw new BusinessException(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                 result.Message ?? $"保存变更快照失败: ChangeId={changeId}, Type={snapshotType}");
+        return Result.Success();
     }
 
-    public async Task SaveDetailAsync(long changeId, string fieldName, string oldValue, string newValue, CancellationToken ct = default)
+    /// <summary>
+    /// 渐退超限减发：补写 FundChange（old&gt;new、同分类）供月报保障金减发表。
+    /// 幂等：同户同 change_reason_type=户主死亡 且 old/new 金额一致的 FundChange 已存在则跳过。
+    /// </summary>
+    public async Task<Result<long>> CreateGraceCapFundChangeAsync(
+        long applicationId,
+        string newClassification,
+        string oldClassification,
+        decimal oldGuaranteeAmount,
+        decimal newGuaranteeAmount,
+        CancellationToken ct = default)
+    {
+        if (newGuaranteeAmount >= oldGuaranteeAmount)
+            return Result.Success(0L);
+
+        try
+        {
+            var existSql = @"SELECT id FROM nc_biz_change_records
+                WHERE application_id = $1 AND change_type = $2
+                  AND change_reason_type = $3
+                  AND old_guarantee_amount = $4 AND new_guarantee_amount = $5
+                  AND deleted_at IS NULL
+                LIMIT 1";
+            var exist = await _db.QuerySingleAsync<long?>(existSql, ct,
+                applicationId, DictionaryConstants.ChangeType.FUND_CHANGE,
+                ChangeReasonTypeConstants.HeadDeceased,
+                oldGuaranteeAmount, newGuaranteeAmount);
+            if (exist.IsSuccess && exist.Value.HasValue && exist.Value.Value > 0)
+                return Result.Success(exist.Value.Value);
+
+            await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
+            var changeContext = new ChangeContext
+            {
+                ApplicationId = applicationId,
+                ChangeType = DictionaryConstants.ChangeType.FUND_CHANGE,
+                ChangeCategory = DictionaryConstants.ChangeCategory.FUND_CHANGE,
+                ChangeReason = "户主死亡进入渐退期，原保障金超户口类型上限封顶减发",
+                ChangeReasonType = ChangeReasonTypeConstants.HeadDeceased,
+                ChangeDate = DateTime.Today,
+                OperatorName = "System"
+            };
+            var beforeJson = global::System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Classification = oldClassification,
+                GuaranteeAmount = oldGuaranteeAmount
+            });
+            var afterJson = global::System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Classification = newClassification,
+                GuaranteeAmount = newGuaranteeAmount,
+                GraceCapped = true
+            });
+
+            var createResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
+            if (createResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<long>(createResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    createResult.Message ?? "创建渐退减发变更记录失败");
+            }
+            var changeId = createResult.Value;
+
+            var updateSql = @"UPDATE nc_biz_change_records SET
+                old_classification = $1, new_classification = $2,
+                old_guarantee_amount = $3, new_guarantee_amount = $4,
+                triggered_grace_period = TRUE,
+                changed_at = NOW()
+                WHERE id = $5";
+            var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
+                oldClassification, newClassification,
+                oldGuaranteeAmount, newGuaranteeAmount,
+                changeId);
+            if (updateResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<long>(updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    updateResult.Message ?? "回填渐退减发金额字段失败");
+            }
+
+            await tx.CommitAsync(ct);
+
+            LogInfo($"渐退超限减发FundChange: ChangeId={changeId}, {oldGuaranteeAmount}→{newGuaranteeAmount}");
+            return Result.Success(changeId);
+        }
+        catch (Exception ex)
+        {
+            // await using 作用域在 try 内：异常展开时 Dispose 已自动回滚，无需显式回滚
+            LogException(ex, "创建渐退减发FundChange");
+            return Result.FromException<long>(ex);
+        }
+    }
+
+    /// <summary>接续链跨类判定读取行（EnsureChainCategoryAddAsync 用：链型/分类/保障金）</summary>
+    private sealed class ChainClassificationRow
+    {
+        public long OriginalApplicationId { get; set; }
+        public string? ClassificationResult { get; set; }
+        public string? ChainType { get; set; }
+        public decimal TotalGuaranteeAmount { get; set; }
+    }
+
+    /// <summary>已存在的 CategoryAdd 行（EnsureChainCategoryAddAsync 幂等判定用）</summary>
+    private sealed class CategoryAddExistingRow
+    {
+        public long Id { get; set; }
+        public string? NewClassification { get; set; }
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<long?>> EnsureChainCategoryAddAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    {
+        try
+        {
+            var appSql = @"SELECT original_application_id, classification_result, chain_type, total_guarantee_amount
+                           FROM nc_biz_applications
+                           WHERE id = $1 AND deleted_at IS NULL";
+            var appResult = await _db.QuerySingleAsync<ChainClassificationRow>(appSql, ct, applicationId);
+            if (appResult.IsFailure)
+                return Result.Failure<long?>(appResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    appResult.Message ?? "读取接续链档案失败");
+
+            var app = appResult.Value;
+            // 非链档案（无上游）或分类未判定 → 不涉及跨类新增，显式跳过
+            if (app == null || app.OriginalApplicationId <= 0 || string.IsNullOrEmpty(app.ClassificationResult))
+                return Result.Success<long?>(null);
+
+            var oldSql = @"SELECT classification_result, total_guarantee_amount
+                           FROM nc_biz_applications
+                           WHERE id = $1 AND deleted_at IS NULL";
+            var oldResult = await _db.QuerySingleAsync<ChainClassificationRow>(oldSql, ct, app.OriginalApplicationId);
+            if (oldResult.IsFailure)
+                return Result.Failure<long?>(oldResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    oldResult.Message ?? "读取上游档案失败");
+            var old = oldResult.Value;
+            // 上游档案缺失/未分类 → 无法判断跨类，显式跳过（不猜测、不写入）
+            if (old == null || string.IsNullOrEmpty(old.ClassificationResult))
+                return Result.Success<long?>(null);
+
+            var newClassification = app.ClassificationResult!;
+            var oldClassification = old.ClassificationResult!;
+
+            if (!IsCrossCategoryChange(oldClassification, newClassification))
+            {
+                // 判定回同大类（草稿期重新判定/上游调整）：软删可能误存的 CategoryAdd，避免月报误记转入
+                var purge = await _db.ExecuteNonQueryAsync(
+                    @"UPDATE nc_biz_change_records SET deleted_at = NOW()
+                      WHERE application_id = $1 AND change_type = $2 AND deleted_at IS NULL",
+                    ct, applicationId, DictionaryConstants.ChangeType.CATEGORY_ADD);
+                if (purge.IsFailure)
+                    return Result.Failure<long?>(purge.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        purge.Message ?? "清理跨类新增记录失败");
+                if (purge.Value > 0)
+                    LogInfo($"接续链判定回同大类，软删 CategoryAdd: ApplicationId={applicationId}, {oldClassification}→{newClassification}");
+                return Result.Success<long?>(null);
+            }
+
+            var oldMajorName = ClassificationConstants.ConvertToMajorCategoryName(oldClassification);
+            var newMajorName = ClassificationConstants.ConvertToMajorCategoryName(newClassification);
+            var changeReason = app.ChainType switch
+            {
+                ChainTypeConstants.HOUSEHOLD_DEATH => $"户主死亡后 由{oldMajorName}转入{newMajorName}",
+                ChainTypeConstants.MEMBER_CHANGE => $"成员变更后 由{oldMajorName}转入{newMajorName}",
+                _ => $"由{oldMajorName}转入{newMajorName}"
+            };
+            var reasonType = app.ChainType switch
+            {
+                ChainTypeConstants.HOUSEHOLD_DEATH => ChangeReasonTypeConstants.HeadDeceased,
+                ChainTypeConstants.MEMBER_CHANGE => ChangeReasonTypeConstants.MemberChange,
+                _ => ChangeReasonTypeConstants.CrossCategoryTransfer
+            };
+
+            // 幂等：已存在则比对分类，一致跳过，不一致就地更新（月报跨类行按 change_date/id 取最新，同 ID 更新不会重复）
+            var existSql = @"SELECT id, new_classification FROM nc_biz_change_records
+                             WHERE application_id = $1 AND change_type = $2 AND deleted_at IS NULL
+                             ORDER BY id DESC LIMIT 1";
+            var exist = await _db.QuerySingleAsync<CategoryAddExistingRow>(existSql, ct,
+                applicationId, DictionaryConstants.ChangeType.CATEGORY_ADD);
+            if (exist.IsFailure)
+                return Result.Failure<long?>(exist.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    exist.Message ?? "查询跨类新增记录失败");
+
+            if (exist.Value != null)
+            {
+                if (string.Equals(exist.Value.NewClassification, newClassification, StringComparison.Ordinal))
+                    return Result.Success<long?>(exist.Value.Id);
+
+                var updateSql = @"UPDATE nc_biz_change_records SET
+                    new_classification = $1, new_guarantee_amount = $2,
+                    old_classification = $3, old_guarantee_amount = $4,
+                    change_reason = $5, change_reason_type = $6,
+                    change_date = $7, operator_name = $8, changed_at = NOW()
+                    WHERE id = $9";
+                var update = await _db.ExecuteNonQueryAsync(updateSql, ct,
+                    newClassification, app.TotalGuaranteeAmount,
+                    oldClassification, old.TotalGuaranteeAmount,
+                    changeReason, reasonType,
+                    DateTime.Today, operatorName,
+                    exist.Value.Id);
+                if (update.IsFailure)
+                    return Result.Failure<long?>(update.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        update.Message ?? "更新跨类新增记录失败");
+                LogInfo($"接续链 CategoryAdd 更新: ApplicationId={applicationId}, {oldClassification}→{newClassification}, ChangeId={exist.Value.Id}");
+                return Result.Success<long?>(exist.Value.Id);
+            }
+
+            await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
+            var insertSql = @"INSERT INTO nc_biz_change_records
+                (application_id, change_no, change_type, change_reason, change_reason_type, change_date,
+                 old_classification, new_classification, old_guarantee_amount, new_guarantee_amount,
+                 triggered_grace_period, triggered_stop, operator_name, changed_at)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, FALSE, FALSE, $11, NOW())
+                RETURNING id;";
+            var insert = await _db.ExecuteScalarAsync<long>(insertSql, ct,
+                applicationId,
+                $"CHG{DateTime.Now:yyyyMMddHHmmssfff}",
+                DictionaryConstants.ChangeType.CATEGORY_ADD,
+                changeReason, reasonType, DateTime.Today,
+                oldClassification, newClassification,
+                old.TotalGuaranteeAmount, app.TotalGuaranteeAmount,
+                operatorName);
+            if (insert.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<long?>(insert.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    insert.Message ?? "写入跨类新增记录失败");
+            }
+
+            await tx.CommitAsync(ct);
+
+            LogInfo($"接续链 CategoryAdd 写入: ApplicationId={applicationId}, {oldClassification}→{newClassification}, ChangeId={insert.Value}");
+            return Result.Success<long?>(insert.Value);
+        }
+        catch (Exception ex)
+        {
+            // await using 作用域在 try 内：异常展开时 Dispose 已自动回滚
+            LogException(ex, "同步接续链跨类新增CategoryAdd");
+            return Result.FromException<long?>(ex);
+        }
+    }
+
+    public async Task<Result> SaveDetailAsync(long changeId, string fieldName, string oldValue, string newValue, CancellationToken ct = default)
     {
         var sql = @"INSERT INTO nc_biz_change_details (change_id, field_name, old_value, new_value) VALUES ($1,$2,$3,$4);";
         var result = await _db.ExecuteNonQueryAsync(sql, ct, changeId, fieldName, oldValue, newValue);
         if (result.IsFailure)
-            throw new BusinessException(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                 result.Message ?? $"保存变更明细失败: ChangeId={changeId}, Field={fieldName}");
+        return Result.Success();
     }
 
     /// <summary>
@@ -431,13 +973,35 @@ public class ChangeService : BaseService, IChangeService
             var activateRes = await _gracePeriodService.ActivateAsync(
                 applicationId, graceCheck.Months,
                 graceCheck.StartDate, graceCheck.EndDate,
-                oldClassification, oldGuaranteeAmount, ct);
+                oldClassification, oldGuaranteeAmount,
+                graceGrantAmount: null, ct: ct);
             if (activateRes.IsFailure)
                 return Result.Failure(activateRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     activateRes.Message ?? "激活渐退期失败");
         }
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// 照料护理费解析（H2）：非特困一律 0；特困集中供养 0；特困分散按能力鉴定重算。
+    /// 禁止沿用旧档 DB 值——分类离开特困后旧照料费必须清零。
+    /// </summary>
+    private async Task<decimal> ResolveCaregiverSubsidyAsync(
+        string classification, string supportMode, long applicationId, CancellationToken ct)
+    {
+        if (!ClassificationConstants.IsCodeDestitute(classification))
+            return 0m;
+
+        var isCentralized =
+            classification is ClassificationConstants.RuralDestituteCentralized
+                or ClassificationConstants.UrbanDestituteCentralized
+            || string.Equals(supportMode, ClassificationConstants.SupportMode.CENTRALIZED,
+                StringComparison.OrdinalIgnoreCase);
+
+        return isCentralized
+            ? 0m
+            : await _classificationService.CalculateCareAllowanceAsync(applicationId, ct);
     }
 
     /// <summary>
@@ -489,7 +1053,7 @@ public class ChangeService : BaseService, IChangeService
 
         // 2. 读取源档案与成员（供附属复制 + 成员ID映射）
         var srcResult = await _db.QuerySingleAsync<ApplicationEntity>(
-            "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
+            $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
         if (srcResult.IsFailure || srcResult.Value == null)
             return Result.Failure<(long, Dictionary<long, long>)>(ErrorCodes.APPLICATION_NOT_FOUND, "源档案不存在");
 
@@ -539,7 +1103,7 @@ public class ChangeService : BaseService, IChangeService
                 classified_subsidy_type, classified_subsidy_amount,
                 household_monthly_guarantee_amount, person_category_protection_total_amount,
                 caregiver_subsidy_amount, total_guarantee_amount,
-                'Draft', 1,
+                $7, $8,
                 $2, source_table, source_id,
                 $6,
                 $3,
@@ -552,7 +1116,8 @@ public class ChangeService : BaseService, IChangeService
             FROM nc_biz_applications WHERE id = $5
             RETURNING id;";
         var newAppResult = await _db.ExecuteScalarAsync<long?>(newAppInsertSql, ct,
-            appNoResult.Value, sourceType, sourceApplicationId, operatorName ?? "System", sourceApplicationId, chainType);
+            appNoResult.Value, sourceType, sourceApplicationId, operatorName ?? "System", sourceApplicationId, chainType,
+            ApplicationStatusCodes.DRAFT, WorkflowSteps.ENTRY_START);
         if (newAppResult.IsFailure || newAppResult.Value is not > 0)
             return Result.Failure<(long, Dictionary<long, long>)>(newAppResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                 newAppResult.Message ?? "创建新档案失败");
@@ -654,22 +1219,36 @@ public class ChangeService : BaseService, IChangeService
         var caregivers = caregiversResult.Value ?? new List<Caregiver>();
         if (caregivers.Count > 0)
         {
-            var caregiverSql = @"INSERT INTO nc_biz_caregivers
+            // 分批多行 VALUES 单语句（19 参数/行 + 行内 NOW()/NULL 字面量；500 行/批防参数上限）
+            const int caregiverParamsPerRow = 19;
+            const int caregiverBatchSize = 500;
+            var caregiverInsertSql = @"INSERT INTO nc_biz_caregivers
                 (application_id, cared_member_id, name, id_card, phone, relationship,
                  gender, age, ethnicity, health_status, employment_status, main_income_source,
                  work_unit, position, address,
                  marital_status, hukou_type, education_level, political_status,
                  created_at, deleted_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NULL);";
-            foreach (var cg in caregivers)
+                VALUES ";
+            for (var offset = 0; offset < caregivers.Count; offset += caregiverBatchSize)
             {
-                var insertCaregiverResult = await _db.ExecuteNonQueryAsync(caregiverSql, ct,
-                    newApplicationId, MapMemberId(cg.CaredMemberId),
-                    cg.Name, cg.IdCard, cg.Phone, cg.Relationship,
-                    cg.Gender, cg.Age, cg.Ethnicity, cg.HealthStatus,
-                    cg.EmploymentStatus, cg.MainIncomeSource,
-                    cg.WorkUnit, cg.Position, cg.Address,
-                    cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus);
+                var chunk = caregivers.GetRange(offset, Math.Min(caregiverBatchSize, caregivers.Count - offset));
+                var (valuesClause, args) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(
+                    chunk.Count, caregiverParamsPerRow,
+                    r =>
+                    {
+                        var cg = chunk[r];
+                        return new object?[]
+                        {
+                            newApplicationId, MapMemberId(cg.CaredMemberId),
+                            cg.Name, cg.IdCard, cg.Phone, cg.Relationship,
+                            cg.Gender, cg.Age, cg.Ethnicity, cg.HealthStatus,
+                            cg.EmploymentStatus, cg.MainIncomeSource,
+                            cg.WorkUnit, cg.Position, cg.Address,
+                            cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus
+                        };
+                    },
+                    o => "(" + string.Join(",", Enumerable.Range(o, caregiverParamsPerRow).Select(n => "$" + n)) + ",NOW(),NULL)");
+                var insertCaregiverResult = await _db.ExecuteNonQueryAsync(caregiverInsertSql + valuesClause + ";", ct, args);
                 if (insertCaregiverResult.IsFailure)
                     return Result.Failure<(long, Dictionary<long, long>)>(insertCaregiverResult.ErrorCode!, insertCaregiverResult.Message ?? "复制照料人失败");
             }
@@ -686,27 +1265,27 @@ public class ChangeService : BaseService, IChangeService
                 household_monthly_guarantee_amount = $7, total_guarantee_amount = $8,
                 classified_subsidy_type = $9, classified_subsidy_amount = $10,
                 total_annual_income = $11, per_capita_annual_income = $12,
-                updated_at = NOW(), updated_by = $13
-                WHERE id = $14;";
+                caregiver_subsidy_amount = $13,
+                updated_at = NOW(), updated_by = $14
+                WHERE id = $15;";
             var updResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
                 newAppEntity.TotalFamilyIncome, newAppEntity.PerCapitaIncome, newAppEntity.RigidExpenditure,
                 newAppEntity.FamilySize, newAppEntity.ClassificationResult, newAppEntity.IsEligible,
                 newAppEntity.HouseholdMonthlyGuaranteeAmount, newAppEntity.TotalGuaranteeAmount,
                 newAppEntity.ClassifiedSubsidyType, newAppEntity.ClassifiedSubsidyAmount,
                 newAppEntity.TotalAnnualIncome, newAppEntity.PerCapitaAnnualIncome,
+                newAppEntity.CaregiverSubsidyAmount,
                 operatorName ?? "System", newApplicationId);
             if (updResult.IsFailure)
                 return Result.Failure<(long, Dictionary<long, long>)>(updResult.ErrorCode!, updResult.Message ?? "更新新档案失败");
         }
 
         // 9. 停止旧档案 + 结清渐退期
-        var stopSql = @"UPDATE nc_biz_applications SET
-            status = $1, stop_reason = $2, stop_date = $3,
-            updated_at = NOW(), updated_by = $4
-            WHERE id = $5;";
-        var stopResult = await _db.ExecuteNonQueryAsync(stopSql, ct,
-            ApplicationStatus.Stopped.GetCode(), changeReason, DateTime.Today,
-            operatorName ?? "System", sourceApplicationId);
+        // 状态写入统一走 ApplicationStatusService：状态机校验（Draft/Refused→Stopped 拒绝，
+        // 避免直写产生"从未进入保障却已停保"的脏状态）+ stop_reason/stop_date 落库 + 审计留痕
+        var stopResult = await _statusService.StopAsync(
+            sourceApplicationId, changeReason, DateTime.Today, operatorName ?? "System",
+            allowSubmittedOverride: true, ct: ct);
         if (stopResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(stopResult.ErrorCode!, stopResult.Message ?? "停止旧档案失败");
         var graceClearResult = await _gracePeriodService.ClearAsync(sourceApplicationId, ct);
@@ -723,27 +1302,29 @@ public class ChangeService : BaseService, IChangeService
     {
         LogInfo("执行经济复核");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             // 1. 获取当前申请数据（已软删的申请不允许再做经济复核）
-            var appSql = "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            var appSql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
             var appResult = await _db.QuerySingleAsync<ApplicationEntity>(appSql, ct, context.ApplicationId);
 
             if (!appResult.IsSuccess || appResult.Value == null)
             {
                 // 提前返回必须先回滚：环境事务的连接由作用域持有，
                 // 不回滚会泄漏连接并在数据库端留下 idle in transaction 会话
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("APPLICATION_NOT_FOUND", "申请不存在");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             var application = appResult.Value;
-            var oldClassification = application.ClassificationResult ?? string.Empty;
-            var oldGuaranteeAmount = application.TotalGuaranteeAmount;
+            // 真旧值必须由调用方在 Step5 分类判定落库之前捕获（表单加载时刻）。
+            // 这里读 application 的 ClassificationResult/TotalGuaranteeAmount 已被判定按钮覆写，
+            // 直接用会让 needRebuild 的分类/金额比较恒判"无变化"，也会让
+            // nc_biz_change_records.old_classification/old_guarantee_amount 记假旧值。
+            var oldClassification = context.OldClassification ?? application.ClassificationResult ?? string.Empty;
+            var oldGuaranteeAmount = context.OldGuaranteeAmount ?? application.TotalGuaranteeAmount;
 
             // 家庭信息修正模式：校验档案必须属于当前经济复核周期
             if (context.IsFamilyCorrection)
@@ -755,19 +1336,25 @@ public class ChangeService : BaseService, IChangeService
                 // 检查档案状态：必须是已批准状态
                 if (application.Status != ApplicationStatusCodes.APPROVED)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                    return Result.Failure<ChangeResult>("INVALID_STATUS", "只能修正已批准状态的档案");
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(ErrorCodes.ECONOMIC_REVIEW_INVALID_STATUS, "只能修正已批准状态的档案");
                 }
 
                 // 检查档案的最近变更记录是否在当前周期内
                 var changeHistory = await GetChangeHistoryAsync(context.ApplicationId, ct);
-                if (changeHistory != null && changeHistory.Count > 0)
+                if (changeHistory.IsFailure)
                 {
-                    var latestChange = changeHistory.OrderByDescending(c => c.ChangedAt).First();
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(changeHistory.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        changeHistory.Message ?? "变更历史查询失败");
+                }
+                if (changeHistory.Value != null && changeHistory.Value.Count > 0)
+                {
+                    var latestChange = changeHistory.Value.OrderByDescending(c => c.ChangedAt).First();
                     if (latestChange.ChangedAt < cycleStart || latestChange.ChangedAt > cycleEnd)
                     {
-                        if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                        return Result.Failure<ChangeResult>("OUT_OF_PERIOD",
+                        await tx.RollbackAsync(ct);
+                        return Result.Failure<ChangeResult>(ErrorCodes.ECONOMIC_REVIEW_OUT_OF_PERIOD,
                             $"该档案最近一次变更不在当前复核周期内（{cycleStart:MM月dd日}-{cycleEnd:MM月dd日}）");
                     }
                 }
@@ -789,11 +1376,14 @@ public class ChangeService : BaseService, IChangeService
             }
 
             // 变更前值必须在改写 application 之前落到局部变量，
-            // 否则 Before 快照序列化的是改写后的对象，before==after，审计快照失去意义
-            var oldTotalIncome = application.TotalFamilyIncome;
-            var oldPerCapitaIncome = application.PerCapitaIncome;
-            var oldRigidExpenditure = application.RigidExpenditure;
-            var oldFamilySize = application.FamilySize;
+            // 否则 Before 快照序列化的是改写后的对象，before==after，审计快照失去意义。
+            // 经济复核入口（表单）在调本方法前已 SaveEconomicDetailsAsync 把新经济数据写回本档，
+            // 读 application 拿到的实为覆写后值——优先取调用方覆写前捕获的 context.Old*（真旧值），
+            // 同时修正 nc_biz_change_records.old_per_capita_income 列的覆写后失真。
+            var oldTotalIncome = context.OldTotalFamilyIncome ?? application.TotalFamilyIncome;
+            var oldPerCapitaIncome = context.OldPerCapitaIncome ?? application.PerCapitaIncome;
+            var oldRigidExpenditure = context.OldRigidExpenditure ?? application.RigidExpenditure;
+            var oldFamilySize = context.OldFamilySize ?? application.FamilySize;
 
             // 2. 获取家庭成员（查询失败不能按"空成员"继续——分类判定会漏掉
             //    残疾/疾病等成员型补贴，算出错误金额并写库）
@@ -801,7 +1391,7 @@ public class ChangeService : BaseService, IChangeService
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     membersResult.Message ?? "家庭成员查询失败");
             }
@@ -819,7 +1409,7 @@ public class ChangeService : BaseService, IChangeService
             var supportersResult = await _supporterService.GetByApplicationIdAsync(context.ApplicationId, ct);
             if (supportersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(supportersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     supportersResult.Message ?? "赡养抚养扶养人查询失败");
             }
@@ -829,14 +1419,27 @@ public class ChangeService : BaseService, IChangeService
 
             if (!classificationResult.IsSuccess)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("CLASSIFICATION_FAILED", "分类判定失败");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.CLASSIFICATION_FAILED, "分类判定失败");
             }
 
             var newClassification = classificationResult.Value.Classification;
             var newGuaranteeAmount = classificationResult.Value.GuaranteeAmount;
+            var newClassifiedAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
+            var newClassifiedType = classificationResult.Value.ClassifiedSubsidy.Types;
+            var newCaregiverAmount = await ResolveCaregiverSubsidyAsync(
+                newClassification, application.SupportMode, context.ApplicationId, ct);
 
-            // 5. 渐退期状态重建（同事务）：按复核后新分类决定去留——
+            // 5. 停旧建新判定：保障金额 / 分类 / 停保 三项任一变化才生成新档案。
+            //    金额必须用合计口径（户月 + 分类施保 + 照料费，同 applyOverrides 落库式）比较，
+            //    不能用 ChangeResult.NewGuaranteeAmount（户月口径，会恒不相等）。
+            var newTotalGuaranteeAmount = newGuaranteeAmount + newClassifiedAmount + newCaregiverAmount;
+            var triggeredStop = ClassificationConstants.IsCodeStop(newClassification);
+            var needRebuild = oldGuaranteeAmount != newTotalGuaranteeAmount
+                           || newClassification != oldClassification
+                           || triggeredStop;
+
+            // 6. 渐退期状态重建（同事务）：按复核后新分类决定去留——
             //    新分类仍属低收入 → 保留/续接（含"渐退期中间政策变动仍符合"的情形）；
             //    非低收入（回低保/停保等）→ 结清既有渐退期。
             var reconcileResult = await ReconcileGracePeriodAsync(
@@ -844,7 +1447,7 @@ public class ChangeService : BaseService, IChangeService
                 graceOldClassification, oldGuaranteeAmount, ct: ct);
             if (reconcileResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(reconcileResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     reconcileResult.Message ?? "渐退期状态重建失败");
             }
@@ -862,42 +1465,51 @@ public class ChangeService : BaseService, IChangeService
                 });
             }
 
-            // 6. 检查是否停保
-            bool triggeredStop = ClassificationConstants.IsCodeStop(newClassification);
-
-            // 7. 停旧建新：经济复核属信息变更，一律复制为新档案（original_application_id=旧ID、Draft），
-            //    旧档案置 Stopped。新档案应用复核后的收入/分类/金额/保障金。
-            var rebuildResult = await StopAndRebuildAsync(
-                context.ApplicationId,
-                DictionaryConstants.ChangeType.FUND_CHANGE,
-                ChainTypeConstants.CATEGORY_REBUILD,
-                $"经济复核后 由 {ClassificationConstants.ConvertToMajorCategoryName(oldClassification ?? "")}转入{ClassificationConstants.ConvertToMajorCategoryName(newClassification ?? "")}",
-                context.OperatorName,
-                applyOverrides: target =>
-                {
-                    target.TotalFamilyIncome = application.TotalFamilyIncome;
-                    target.PerCapitaIncome = application.PerCapitaIncome;
-                    target.TotalAnnualIncome = application.TotalAnnualIncome;
-                    target.PerCapitaAnnualIncome = application.PerCapitaAnnualIncome;
-                    target.RigidExpenditure = application.RigidExpenditure;
-                    target.FamilySize = application.FamilySize;
-                    target.ClassificationResult = newClassification;
-                    target.IsEligible = classificationResult.Value.IsEligible;
-                    target.HouseholdMonthlyGuaranteeAmount = newGuaranteeAmount;
-                    target.TotalGuaranteeAmount = newGuaranteeAmount +
-                        classificationResult.Value.ClassifiedSubsidy.TotalAmount +
-                        application.CaregiverSubsidyAmount;
-                    target.ClassifiedSubsidyType = classificationResult.Value.ClassifiedSubsidy.Types;
-                    target.ClassifiedSubsidyAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
-                },
-                ct);
-            if (rebuildResult.IsFailure)
+            // 7. 停旧建新：金额/分类/停保任一变化才复制为新档案（original_application_id=旧ID、Draft），
+            //    旧档案置 Stopped。新档案应用复核后的收入/分类/金额/保障金；
+            //    三项均未变（如 0 元保障户复核 0→0）→ 跳过，复核结果留在原档。
+            long newApplicationId;
+            if (needRebuild)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>(rebuildResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    rebuildResult.Message ?? "经济复核停旧建新失败");
+                var rebuildResult = await StopAndRebuildAsync(
+                    context.ApplicationId,
+                    DictionaryConstants.ChangeType.FUND_CHANGE,
+                    ChainTypeConstants.CATEGORY_REBUILD,
+                    $"经济复核后 由 {ClassificationConstants.ConvertToMajorCategoryName(oldClassification ?? "")}转入{ClassificationConstants.ConvertToMajorCategoryName(newClassification ?? "")}",
+                    context.OperatorName,
+                    applyOverrides: target =>
+                    {
+                        target.TotalFamilyIncome = application.TotalFamilyIncome;
+                        target.PerCapitaIncome = application.PerCapitaIncome;
+                        target.TotalAnnualIncome = application.TotalAnnualIncome;
+                        target.PerCapitaAnnualIncome = application.PerCapitaAnnualIncome;
+                        target.RigidExpenditure = application.RigidExpenditure;
+                        target.FamilySize = application.FamilySize;
+                        target.ClassificationResult = newClassification;
+                        target.IsEligible = classificationResult.Value.IsEligible;
+                        target.HouseholdMonthlyGuaranteeAmount = newGuaranteeAmount;
+                        target.TotalGuaranteeAmount = newTotalGuaranteeAmount;
+                        target.ClassifiedSubsidyType = newClassifiedType;
+                        target.ClassifiedSubsidyAmount = newClassifiedAmount;
+                        target.CaregiverSubsidyAmount = newCaregiverAmount;
+                    },
+                    ct);
+                if (rebuildResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(rebuildResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        rebuildResult.Message ?? "经济复核停旧建新失败");
+                }
+                newApplicationId = rebuildResult.Value.NewApplicationId;
             }
-            var newApplicationId = rebuildResult.Value.NewApplicationId;
+            else
+            {
+                // 金额/分类/停保均未变：不生成新档案。原档保持有效（不置 Stopped、不清渐退期，
+                // 上方渐退重建对原档的 Activate/Clear 结果自然保留）；
+                // 收入列已在表单阶段写回原档，分类/金额新旧同值无需回写。
+                newApplicationId = context.ApplicationId;
+                LogInfo($"经济复核无金额/分类/停保变化，跳过停旧建新: ApplicationId={context.ApplicationId}");
+            }
 
             // 8. 创建变更记录（挂在旧档案上，After 快照含新档案ID）
             var changeContext = new ChangeContext
@@ -917,7 +1529,14 @@ public class ChangeService : BaseService, IChangeService
                 TotalIncome = oldTotalIncome,
                 PerCapitaIncome = oldPerCapitaIncome,
                 RigidExpenditure = oldRigidExpenditure,
-                FamilySize = oldFamilySize
+                FamilySize = oldFamilySize,
+                // 表单覆写前捕获的真旧值：Old* 供审计核对，OldTotalAnnualIncome/Components
+                // 供档案渐退审批表「变动情况说明」分项对比（旧档行在复核链已被覆写，不再可信）
+                OldFamilySize = context.OldFamilySize,
+                OldTotalFamilyIncome = context.OldTotalFamilyIncome,
+                OldTotalAnnualIncome = context.OldTotalAnnualIncome,
+                OldPerCapitaIncome = context.OldPerCapitaIncome,
+                Components = context.OldComponents
             });
 
             var afterJson = JsonSerializer.Serialize(new
@@ -934,7 +1553,7 @@ public class ChangeService : BaseService, IChangeService
             var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
             if (changeIdResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     changeIdResult.Message ?? "创建变更记录失败");
             }
@@ -953,12 +1572,15 @@ public class ChangeService : BaseService, IChangeService
             var updateChangeResult = await _db.ExecuteNonQueryAsync(updateChangeSql, ct,
                 ChangeReasonTypeConstants.EconomicReview, oldClassification, newClassification,
                 oldPerCapitaIncome, application.PerCapitaIncome,
-                oldGuaranteeAmount, application.TotalGuaranteeAmount,
+                oldGuaranteeAmount, newTotalGuaranteeAmount,
                 triggeredGracePeriod, triggeredStop,
-                changeId, newApplicationId);
+                changeId,
+                // 无重建时留 NULL：写自身 ID 会形成 new_application_id = application_id 的自引用，
+                // 档案链归一（DynamicManagementRecordService 递归 CTE）无法区分"无新档"与"新档=旧档"。
+                needRebuild ? newApplicationId : null);
             if (updateChangeResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(updateChangeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     updateChangeResult.Message ?? "更新变更记录对比字段失败");
             }
@@ -980,17 +1602,17 @@ public class ChangeService : BaseService, IChangeService
                     DictionaryConstants.ChangeType.CATEGORY_STOP,
                     categoryReason, ChangeReasonTypeConstants.EconomicReview, DateTime.Today,
                     (object?)oldClassification, (object?)newClassification,
-                    (object?)oldGuaranteeAmount, (object?)application.TotalGuaranteeAmount,
+                    (object?)oldGuaranteeAmount, (object?)newTotalGuaranteeAmount,
                     triggeredGracePeriod, triggeredStop,
                     context.OperatorName,
                     newApplicationId,
                     DictionaryConstants.ChangeType.CATEGORY_ADD,
                     (object?)null, (object?)newClassification,
-                    (object?)null, (object?)application.TotalGuaranteeAmount,
+                    (object?)null, (object?)newTotalGuaranteeAmount,
                     (object?)newApplicationId, (object?)null);
                 if (crossResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(crossResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         crossResult.Message ?? "写入跨类变更记录失败");
                 }
@@ -1001,20 +1623,19 @@ public class ChangeService : BaseService, IChangeService
                 // 同大类转停保（如低保→收入超标）：补写 CategoryStop，供《档案_变更告知书》输出
                 var stopWrite = await WriteCategoryStopRecordAsync(
                     context.ApplicationId, oldClassification, newClassification,
-                    oldGuaranteeAmount, newGuaranteeAmount, triggeredGracePeriod,
+                    oldGuaranteeAmount, newTotalGuaranteeAmount, triggeredGracePeriod,
                     context.ReviewReason ?? "经济复核后", ChangeReasonTypeConstants.EconomicReview,
                     context.OperatorName, newApplicationId, ct);
                 if (stopWrite.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(stopWrite.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         stopWrite.Message ?? "写入停保变更记录失败");
                 }
                 LogInfo($"经济复核停保记录: {oldClassification} → {newClassification}（新档案ID={newApplicationId}）");
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"经济复核完成: 原分类={oldClassification} 新分类={newClassification}");
 
@@ -1040,12 +1661,14 @@ public class ChangeService : BaseService, IChangeService
                 OldGuaranteeAmount = oldGuaranteeAmount,
                 NewGuaranteeAmount = newGuaranteeAmount,
                 TriggeredGracePeriod = triggeredGracePeriod,
-                TriggeredStop = triggeredStop
+                TriggeredStop = triggeredStop,
+                Rebuilt = needRebuild,
+                NewApplicationId = newApplicationId
             });
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, ChangeReasonTypeConstants.EconomicReview);
             return Result.FromException<ChangeResult>(ex);
         }
@@ -1060,24 +1683,24 @@ public class ChangeService : BaseService, IChangeService
     {
         LogInfo("执行家庭成员变更");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             // 1. 当前申请（已软删的申请不允许再做成员变更）
-            var appSql = "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            var appSql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
             var appResult = await _db.QuerySingleAsync<ApplicationEntity>(appSql, ct, context.ApplicationId);
             if (!appResult.IsSuccess || appResult.Value == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("APPLICATION_NOT_FOUND", "申请不存在");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             var application = appResult.Value;
-            var oldClassification = application.ClassificationResult ?? string.Empty;
-            var oldGuaranteeAmount = application.TotalGuaranteeAmount;
+            // 真旧值由调用方在 Step5 分类判定落库之前捕获（表单加载时刻）。
+            // 直接读 application 会被判定按钮覆写，导致停旧建新判定恒判"无变化"。
+            var oldClassification = context.OldClassification ?? application.ClassificationResult ?? string.Empty;
+            var oldGuaranteeAmount = context.OldGuaranteeAmount ?? application.TotalGuaranteeAmount;
 
             // 变更链新建档案（户主死亡/既往复核停旧建新）：注入上游分类供渐退期"低保→低收入"判定
             var graceOldClassification = oldClassification;
@@ -1103,7 +1726,7 @@ public class ChangeService : BaseService, IChangeService
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     membersResult.Message ?? "家庭成员查询失败");
             }
@@ -1121,7 +1744,7 @@ public class ChangeService : BaseService, IChangeService
             var supportersResult = await _supporterService.GetByApplicationIdAsync(context.ApplicationId, ct);
             if (supportersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(supportersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     supportersResult.Message ?? "赡养抚养扶养人查询失败");
             }
@@ -1130,12 +1753,16 @@ public class ChangeService : BaseService, IChangeService
                 application, members, supporters, new List<Caregiver>(), ct);
             if (!classificationResult.IsSuccess)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("CLASSIFICATION_FAILED", "分类判定失败");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.CLASSIFICATION_FAILED, "分类判定失败");
             }
 
             var newClassification = classificationResult.Value.Classification;
             var newGuaranteeAmount = classificationResult.Value.GuaranteeAmount;
+            var newClassifiedAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
+            var newClassifiedType = classificationResult.Value.ClassifiedSubsidy.Types;
+            var newCaregiverAmount = await ResolveCaregiverSubsidyAsync(
+                newClassification, application.SupportMode, context.ApplicationId, ct);
 
             // 5. 渐退期状态重建（同复核：新分类仍低收入 → 保留/续接；否则结清）
             var reconcileResult = await ReconcileGracePeriodAsync(
@@ -1143,7 +1770,7 @@ public class ChangeService : BaseService, IChangeService
                 graceOldClassification, oldGuaranteeAmount, ct: ct);
             if (reconcileResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(reconcileResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     reconcileResult.Message ?? "渐退期状态重建失败");
             }
@@ -1190,16 +1817,15 @@ public class ChangeService : BaseService, IChangeService
                     target.ClassificationResult = newClassification;
                     target.IsEligible = classificationResult.Value.IsEligible;
                     target.HouseholdMonthlyGuaranteeAmount = newGuaranteeAmount;
-                    target.TotalGuaranteeAmount = newGuaranteeAmount +
-                        classificationResult.Value.ClassifiedSubsidy.TotalAmount +
-                        application.CaregiverSubsidyAmount;
-                    target.ClassifiedSubsidyType = classificationResult.Value.ClassifiedSubsidy.Types;
-                    target.ClassifiedSubsidyAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
+                    target.TotalGuaranteeAmount = newGuaranteeAmount + newClassifiedAmount + newCaregiverAmount;
+                    target.ClassifiedSubsidyType = newClassifiedType;
+                    target.ClassifiedSubsidyAmount = newClassifiedAmount;
+                    target.CaregiverSubsidyAmount = newCaregiverAmount;
                 },
                 ct);
             if (rebuildResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(rebuildResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     rebuildResult.Message ?? "家庭成员变更停旧建新失败");
             }
@@ -1264,7 +1890,7 @@ public class ChangeService : BaseService, IChangeService
             var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
             if (changeIdResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     changeIdResult.Message ?? "创建变更记录失败");
             }
@@ -1288,7 +1914,7 @@ public class ChangeService : BaseService, IChangeService
                 changeId, newApplicationId);
             if (updateChangeResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(updateChangeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     updateChangeResult.Message ?? "更新变更记录对比字段失败");
             }
@@ -1314,32 +1940,50 @@ public class ChangeService : BaseService, IChangeService
                 var detailResult = await _db.ExecuteNonQueryAsync(detailSql, ct, detailParams.ToArray());
                 if (detailResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(detailResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         detailResult.Message ?? "写入变更明细失败");
                 }
             }
 
-            // 死亡减员联动：减员原因为"人员死亡"时写死亡记录（与户主死亡同表，供统计/公示退出识别）
-            foreach (var e in entries.Where(e =>
+            // 死亡减员联动：减员原因为"人员死亡"时批量写死亡记录（与户主死亡同表，供统计/公示退出识别）
+            // 单语句 CTE 保留每行 WHERE NOT EXISTS 去重语义（同批重复证件号由 DISTINCT ON 收口）
+            var deathEntries = entries.Where(e =>
                 string.Equals(e.Direction, DictionaryConstants.ChangeType.MEMBER_REMOVE, StringComparison.OrdinalIgnoreCase)
-                && MemberChangeReasonConstants.IsDeath(e.ReasonCode)))
+                && MemberChangeReasonConstants.IsDeath(e.ReasonCode)).ToList();
+            if (deathEntries.Count > 0)
             {
-                var deathSql = @"INSERT INTO nc_biz_death_records
-                    (application_id, member_id, member_name, member_id_card, relationship_to_head,
-                     death_date, death_reason, is_household_head, remark, operator_name, created_at)
-                    SELECT $1,$2,$3,$4,$5,$6,$7,false,$8,$9,NOW()
+                const int deathParamsPerRow = 9;
+                var (deathValues, deathArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(
+                    deathEntries.Count, deathParamsPerRow,
+                    i =>
+                    {
+                        var e = deathEntries[i];
+                        return new object?[]
+                        {
+                            context.ApplicationId, e.MemberId, e.Name, e.IdCard, e.RelationshipToHead,
+                            e.EventDate,
+                            string.IsNullOrWhiteSpace(e.Remark) ? "成员变更-人员死亡" : e.Remark,
+                            e.Remark, context.OperatorName
+                        };
+                    });
+                var deathSql = @"WITH input(application_id, member_id, member_name, member_id_card, relationship_to_head, death_date, death_reason, remark, operator_name) AS (
+                        VALUES " + deathValues + @")
+                    INSERT INTO nc_biz_death_records
+                        (application_id, member_id, member_name, member_id_card, relationship_to_head,
+                         death_date, death_reason, is_household_head, remark, operator_name, created_at)
+                    SELECT DISTINCT ON (member_id_card)
+                        application_id, member_id, member_name, member_id_card, relationship_to_head,
+                        death_date, death_reason, false, remark, operator_name, NOW()
+                    FROM input i
                     WHERE NOT EXISTS (
                         SELECT 1 FROM nc_biz_death_records d
-                        WHERE d.application_id = $1 AND d.member_id_card = $4)";
-                var deathResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
-                    context.ApplicationId, e.MemberId, e.Name, e.IdCard, e.RelationshipToHead,
-                    e.EventDate,
-                    string.IsNullOrWhiteSpace(e.Remark) ? "成员变更-人员死亡" : e.Remark,
-                    e.Remark, context.OperatorName);
+                        WHERE d.application_id = i.application_id AND d.member_id_card = i.member_id_card)
+                    ORDER BY member_id_card";
+                var deathResult = await _db.ExecuteNonQueryAsync(deathSql, ct, deathArgs);
                 if (deathResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(deathResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         deathResult.Message ?? "写入死亡记录失败");
                 }
@@ -1371,7 +2015,7 @@ public class ChangeService : BaseService, IChangeService
                     (object?)newApplicationId, (object?)null);
                 if (crossResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(crossResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         crossResult.Message ?? "写入跨类变更记录失败");
                 }
@@ -1386,15 +2030,14 @@ public class ChangeService : BaseService, IChangeService
                     context.OperatorName, newApplicationId, ct);
                 if (stopWrite.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(stopWrite.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         stopWrite.Message ?? "写入停保变更记录失败");
                 }
                 LogInfo($"家庭成员变更停保记录: {oldClassification} → {newClassification}（新档案ID={newApplicationId}）");
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"家庭成员变更完成: 原分类={oldClassification} 新分类={newClassification} 新档案ID={newApplicationId}");
 
@@ -1426,7 +2069,7 @@ public class ChangeService : BaseService, IChangeService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, ChangeReasonTypeConstants.MemberChange);
             return Result.FromException<ChangeResult>(ex);
         }
@@ -1465,20 +2108,18 @@ public class ChangeService : BaseService, IChangeService
     {
         LogInfo($"处理成员死亡: ApplicationId={context.ApplicationId}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             // 1. 获取当前申请数据（已软删的申请不允许再做成员死亡处理）
-            var appSql = "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            var appSql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
             var appResult = await _db.QuerySingleAsync<ApplicationEntity>(appSql, ct, context.ApplicationId);
 
             if (!appResult.IsSuccess || appResult.Value == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("APPLICATION_NOT_FOUND", "申请不存在");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             var application = appResult.Value;
@@ -1495,7 +2136,7 @@ public class ChangeService : BaseService, IChangeService
             var markResult = await _db.ExecuteNonQueryAsync(updateMemberSql, ct, context.MemberId, context.ApplicationId);
             if (markResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(markResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     markResult.Message ?? "标记成员死亡失败");
             }
@@ -1509,7 +2150,7 @@ public class ChangeService : BaseService, IChangeService
                 context.MemberIdCard, context.DeathDate, context.DeathReason, context.OperatorName);
             if (deathInsertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(deathInsertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     deathInsertResult.Message ?? "创建死亡记录失败");
             }
@@ -1524,7 +2165,7 @@ public class ChangeService : BaseService, IChangeService
             var countResult = await _db.ExecuteScalarAsync(countSql, ct, context.ApplicationId);
             if (countResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(countResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     countResult.Message ?? "家庭人数统计失败");
             }
@@ -1535,7 +2176,7 @@ public class ChangeService : BaseService, IChangeService
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     membersResult.Message ?? "家庭成员查询失败");
             }
@@ -1548,7 +2189,7 @@ public class ChangeService : BaseService, IChangeService
             var supportersResult = await _supporterService.GetByApplicationIdAsync(context.ApplicationId, ct);
             if (supportersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(supportersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     supportersResult.Message ?? "赡养抚养扶养人查询失败");
             }
@@ -1566,13 +2207,38 @@ public class ChangeService : BaseService, IChangeService
                 newGuaranteeAmount = classificationResult.Value.GuaranteeAmount;
                 triggeredStop = ClassificationConstants.IsCodeStop(newClassification);
 
+                // 保障金三项合成（户月 + 分类施保 + 照料），与 GuaranteeAmountService 同口径；
+                // 照料费：特困分散按能力鉴定重算，集中/非特困一律 0（禁止沿用旧档 DB 值）
+                var newClassifiedAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
+                var newClassifiedType = classificationResult.Value.ClassifiedSubsidy.Types;
+                var newCaregiverAmount = await ResolveCaregiverSubsidyAsync(
+                    newClassification, application.SupportMode, application.Id, ct);
+
+                // 人数变化后重算人均（年值权威；月值 = 年÷人数÷12 一次舍入）
+                if (newFamilySize > 0)
+                {
+                    if (application.TotalAnnualIncome > 0)
+                    {
+                        application.PerCapitaAnnualIncome = Math.Round(application.TotalAnnualIncome / newFamilySize, 2);
+                        application.PerCapitaIncome = Math.Round(application.TotalAnnualIncome / newFamilySize / 12m, 2);
+                    }
+                    else
+                    {
+                        application.PerCapitaAnnualIncome = 0m;
+                        application.PerCapitaIncome = Math.Round(application.TotalFamilyIncome / newFamilySize, 2);
+                    }
+                }
+
                 // 更新申请
                 application.ClassificationResult = newClassification;
                 application.IsEligible = classificationResult.Value.IsEligible;
+                application.ClassifiedSubsidyType = newClassifiedType;
+                application.ClassifiedSubsidyAmount = newClassifiedAmount;
+                application.CaregiverSubsidyAmount = newCaregiverAmount;
                 application.HouseholdMonthlyGuaranteeAmount = newGuaranteeAmount;
-                application.TotalGuaranteeAmount = newGuaranteeAmount;
+                application.TotalGuaranteeAmount = newGuaranteeAmount + newClassifiedAmount + newCaregiverAmount;
                 application.FamilySize = newFamilySize;
-                application.UpdatedAt = DateTime.UtcNow;
+                application.UpdatedAt = DateTime.Now;
                 application.UpdatedBy = context.OperatorName;
 
                 // 如果最后成员死亡，停止档案。
@@ -1597,7 +2263,7 @@ public class ChangeService : BaseService, IChangeService
                         if (transition.IsFailure &&
                             currentStatus is ApplicationStatus.Draft or ApplicationStatus.Refused)
                         {
-                            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                            await tx.RollbackAsync(ct);
                             return Result.Failure<ChangeResult>(
                                 ErrorCodes.INVALID_TRANSITION,
                                 transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
@@ -1622,37 +2288,66 @@ public class ChangeService : BaseService, IChangeService
                     forceClear: newFamilySize <= 0, ct: ct);
                 if (reconcileRes.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(reconcileRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         reconcileRes.Message ?? "渐退期状态重建失败");
                 }
 
+                // 业务字段更新（不含 status/stop_*：状态写入统一走 ApplicationStatusService）
                 var updateSql = @"UPDATE nc_biz_applications SET
                     family_size = $1, classification_result = $2, is_eligible = $3,
                     household_monthly_guarantee_amount = $4, total_guarantee_amount = $5,
-                    status = $6, stop_reason = $7, stop_date = $8,
-                    updated_at = $9, updated_by = $10
-                    WHERE id = $11;";
+                    classified_subsidy_type = $6, classified_subsidy_amount = $7,
+                    caregiver_subsidy_amount = $8,
+                    per_capita_income = $9, per_capita_annual_income = $10,
+                    updated_at = $11, updated_by = $12
+                    WHERE id = $13;";
 
                 var appUpdateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
                     application.FamilySize, application.ClassificationResult, application.IsEligible,
                     application.HouseholdMonthlyGuaranteeAmount, application.TotalGuaranteeAmount,
-                    application.Status, application.StopReason, application.StopDate,
+                    application.ClassifiedSubsidyType, application.ClassifiedSubsidyAmount,
+                    application.CaregiverSubsidyAmount,
+                    application.PerCapitaIncome, application.PerCapitaAnnualIncome,
                     application.UpdatedAt, application.UpdatedBy,
                     application.Id);
                 if (appUpdateResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(appUpdateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        appUpdateResult.Message ?? "保存申请更新失败");
+                        appUpdateResult.Message ?? "更新业务字段失败");
+                }
+
+                // 状态写入统一走 ApplicationStatusService（状态机校验 + stop_* 落库 + 审计留痕）
+                if (triggeredStop)
+                {
+                    var deathStop = await _statusService.StopAsync(
+                        context.ApplicationId, application.StopReason ?? "最后成员死亡",
+                        application.StopDate == default ? DateTime.Today : application.StopDate, context.OperatorName,
+                        allowSubmittedOverride: true, ct: ct);
+                    if (deathStop.IsFailure)
+                    {
+                        await tx.RollbackAsync(ct);
+                        return Result.Failure<ChangeResult>(deathStop.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            deathStop.Message ?? "停保失败");
+                    }
                 }
             }
+            else
+            {
+                // 分类判定失败绝不能按"沿用旧分类"静默提交：家庭人数已因死亡变化，
+                // 沿用旧结果会写出与实际不符的补贴，必须回滚并失败返回。
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(classificationResult.ErrorCode ?? ErrorCodes.CLASSIFICATION_FAILED,
+                    classificationResult.Message ?? "分类判定失败");
+            }
 
-            // 8. 创建变更记录
+            // 8. 创建变更记录（写入三要素：category=MemberChange、reason 可解析、随后回填金额）
             var changeContext = new ChangeContext
             {
                 ApplicationId = context.ApplicationId,
                 ChangeType = DictionaryConstants.ChangeType.MEMBER_DEATH,
+                ChangeCategory = DictionaryConstants.ChangeCategory.MEMBER_CHANGE,
                 ChangeReason = $"成员死亡: {context.MemberName}({context.MemberIdCard})",
                 ChangeDate = context.DeathDate,
                 OperatorName = context.OperatorName
@@ -1678,14 +2373,33 @@ public class ChangeService : BaseService, IChangeService
             var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
             if (changeIdResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     changeIdResult.Message ?? "创建变更记录失败");
             }
             var changeId = changeIdResult.Value;
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            // 结构化金额回填（增减员调整表 old/new_guarantee 取数）
+            var updateDeathChange = await _db.ExecuteNonQueryAsync(
+                @"UPDATE nc_biz_change_records SET
+                    old_classification = $1, new_classification = $2,
+                    old_guarantee_amount = $3, new_guarantee_amount = $4,
+                    change_reason_type = $5,
+                    changed_at = NOW()
+                  WHERE id = $6",
+                ct,
+                oldClassification, newClassification,
+                oldGuaranteeAmount, newGuaranteeAmount,
+                ChangeReasonTypeConstants.MemberChange,
+                changeId);
+            if (updateDeathChange.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(updateDeathChange.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    updateDeathChange.Message ?? "回填成员死亡变更金额失败");
+            }
+
+            await tx.CommitAsync(ct);
 
             LogInfo($"成员死亡处理完成: 新家庭人数={newFamilySize}");
 
@@ -1702,7 +2416,7 @@ public class ChangeService : BaseService, IChangeService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "成员死亡处理");
             return Result.FromException<ChangeResult>(ex);
         }
@@ -1715,9 +2429,7 @@ public class ChangeService : BaseService, IChangeService
     {
         LogInfo("执行户主变更（停旧建新）");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -1727,7 +2439,7 @@ public class ChangeService : BaseService, IChangeService
             var memberResult = await _db.QuerySingleAsync<FamilyMember>(memberSql, ct, context.NewHeadMemberId, context.ApplicationId);
             if (!memberResult.IsSuccess || memberResult.Value == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "新户主成员不存在");
             }
             var newHead = memberResult.Value;
@@ -1742,7 +2454,7 @@ public class ChangeService : BaseService, IChangeService
                 ct: ct);
             if (rebuildResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(rebuildResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     rebuildResult.Message ?? "户主变更停旧建新失败");
             }
@@ -1759,7 +2471,7 @@ public class ChangeService : BaseService, IChangeService
                 newApplicationId);
             if (appHeadResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(appHeadResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     appHeadResult.Message ?? "更新新档案户主信息失败");
             }
@@ -1775,7 +2487,7 @@ public class ChangeService : BaseService, IChangeService
                     ct, oldHeadMemberId, newApplicationId);
                 if (updOld.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<ChangeResult>(updOld.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         updOld.Message ?? "更新旧户主关系失败");
                 }
@@ -1785,17 +2497,21 @@ public class ChangeService : BaseService, IChangeService
                 ct, newHeadMemberId, newApplicationId);
             if (updNew.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(updNew.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     updNew.Message ?? "更新新户主关系失败");
             }
 
             // 5. 创建变更记录（挂在旧档案上，After 快照含新档案ID）
+            //    写入三要素：category=MemberChange、reason 可解析、随后回填金额
             var changeContext = new ChangeContext
             {
                 ApplicationId = context.ApplicationId,
                 ChangeType = DictionaryConstants.ChangeType.HOUSEHOLD_HEAD_CHANGE,
-                ChangeReason = context.ChangeReason ?? $"户主变更: {context.OldHeadName} -> {context.NewHeadName}",
+                ChangeCategory = DictionaryConstants.ChangeCategory.MEMBER_CHANGE,
+                ChangeReason = string.IsNullOrWhiteSpace(context.ChangeReason)
+                    ? $"户主变更: {context.OldHeadName} -> {context.NewHeadName}"
+                    : $"户主变更: {context.OldHeadName} -> {context.NewHeadName}；{context.ChangeReason}",
                 ChangeDate = DateTime.Today,
                 OperatorName = context.OperatorName
             };
@@ -1806,26 +2522,44 @@ public class ChangeService : BaseService, IChangeService
             var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
             if (changeIdResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     changeIdResult.Message ?? "创建变更记录失败");
             }
             var changeId = changeIdResult.Value;
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            // 结构化金额回填（增减员调整表取数；户主变更本身金额可能不变）
+            var updateHeadChange = await _db.ExecuteNonQueryAsync(
+                @"UPDATE nc_biz_change_records SET
+                    change_reason_type = $1,
+                    new_application_id = $2,
+                    changed_at = NOW()
+                  WHERE id = $3",
+                ct,
+                ChangeReasonTypeConstants.MemberChange,
+                newApplicationId,
+                changeId);
+            if (updateHeadChange.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(updateHeadChange.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    updateHeadChange.Message ?? "回填户主变更记录失败");
+            }
+
+            await tx.CommitAsync(ct);
 
             LogInfo($"户主变更完成（停旧建新）: 新档案ID={newApplicationId}");
 
             return Result.Success(new ChangeResult
             {
                 ChangeId = changeId,
-                IsSuccess = true
+                IsSuccess = true,
+                NewApplicationId = newApplicationId
             });
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "户主变更");
             return Result.FromException<ChangeResult>(ex);
         }
@@ -1842,19 +2576,17 @@ public class ChangeService : BaseService, IChangeService
         if (context.NewHeadMemberId <= 0)
             return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择新户主");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             // 1. 获取旧档案（已软删的申请不允许再变更）
             var appResult = await _db.QuerySingleAsync<ApplicationEntity>(
-                "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
+                $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (!appResult.IsSuccess || appResult.Value == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("APPLICATION_NOT_FOUND", "申请不存在");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
             var application = appResult.Value;
             var oldClassification = application.ClassificationResult ?? string.Empty;
@@ -1863,18 +2595,19 @@ public class ChangeService : BaseService, IChangeService
             var oldHeadName = application.ApplicantName;
             var oldHeadIdCard = application.ApplicantIdCard;
 
-            // 2. 状态校验：仅在保/已提交等存量档案允许停旧，草稿/不予受理不允许停保建新。
-            //    状态变更必须过状态机，不能从任意状态直写 "Stopped"（同 ProcessMemberDeathAsync 的语义）
+            // 2. 状态校验：已停保幂等拒绝；不予受理（Refused，从未进入保障）不允许停保建新；
+            //    草稿（含导入库建档未归档户）/已提交按业务规则（户主死亡客观事件）放行 LogWarn，
+            //    与成员变更/户主变更/经济复核对 Draft 的既有容忍度一致。
             var currentStatus = ApplicationStatusExtensions.FromCode(application.Status ?? string.Empty);
             if (currentStatus == ApplicationStatus.Stopped)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION, "该档案已停保，不能重复执行户主死亡变更");
             }
             var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
-            if (transition.IsFailure && currentStatus is ApplicationStatus.Draft or ApplicationStatus.Refused)
+            if (transition.IsFailure && currentStatus is ApplicationStatus.Refused)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(
                     ErrorCodes.INVALID_TRANSITION,
                     transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
@@ -1891,7 +2624,7 @@ public class ChangeService : BaseService, IChangeService
                 "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     membersResult.Message ?? "家庭成员查询失败");
             }
@@ -1906,25 +2639,25 @@ public class ChangeService : BaseService, IChangeService
                         && string.Equals(m.Name, oldHeadName, StringComparison.Ordinal)));
             if (deceasedHead == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("FAMILY_MEMBER_NOT_FOUND", "未找到死亡原户主成员记录");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "未找到死亡原户主成员记录");
             }
 
             // 4. 校验新户主成员（必须属于本申请、未删除、且不是死亡户主本人）
             var newHeadMember = allMembers.FirstOrDefault(m => m.Id == context.NewHeadMemberId);
             if (newHeadMember == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>("FAMILY_MEMBER_NOT_FOUND", "新户主成员不存在或已删除");
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "新户主成员不存在或已删除");
             }
             if (newHeadMember.Id == deceasedHead.Id)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "新户主不能是死亡人员本人");
             }
             if (string.IsNullOrWhiteSpace(newHeadMember.IdCard))
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED,
                     $"新户主 {DataMasker.MaskName(newHeadMember.Name)} 缺少身份证号，无法建立新档案");
             }
@@ -1933,7 +2666,7 @@ public class ChangeService : BaseService, IChangeService
             var dupResult = await _applicationService.CheckIdCardExistsAsync(newHeadMember.IdCard ?? string.Empty, null, ct);
             if (dupResult.IsSuccess && dupResult.Value)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.DUPLICATE_ID_CARD,
                     $"新户主 {DataMasker.MaskName(newHeadMember.Name)} 的身份证号已存在于其他申请档案");
             }
@@ -1943,15 +2676,141 @@ public class ChangeService : BaseService, IChangeService
                 && !string.Equals(m.MemberCategory, MemberCategoryConstants.SUPPORT, StringComparison.OrdinalIgnoreCase));
             if (newFamilySize <= 0)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "户主死亡后无共同生活成员，无法建立新档案");
             }
+
+            // 6.5 现算幸存家庭收入（1B 变体：死亡只建链不判渐退；年值权威，剔除已故者成员级明细，
+            //     土地有确权组走组汇总（LandShareCalculator），否则面积×单价；公式单点走 IncomeCalculationService）
+            var econLoadResult = await _economicDetailService.LoadAllAsync(context.ApplicationId, ct);
+            if (econLoadResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(econLoadResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    econLoadResult.Message ?? "经济明细加载失败");
+            }
+            var econ = econLoadResult.Value;
+
+            var survivorSupportersResult = await _supporterService.GetByApplicationIdAsync(context.ApplicationId, ct);
+            if (survivorSupportersResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(survivorSupportersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    survivorSupportersResult.Message ?? "赡养义务人加载失败");
+            }
+            var survivorSupporters = survivorSupportersResult.Value ?? new List<Supporter>();
+
+            var deadMemberId = deceasedHead.Id;
+            var laborSurv = econ.LaborIncomes.Where(x => x.MemberId != deadMemberId).ToList();
+            var businessSurv = econ.BusinessIncomes.Where(x => x.MemberId != deadMemberId).ToList();
+            var propertySurv = econ.PropertyIncomes.Where(x => x.MemberId != deadMemberId).ToList();
+            var transferSurv = econ.TransferIncomes.Where(x => x.MemberId != deadMemberId).ToList();
+            var rigidSurv = econ.RigidExpenditures.Where(x => x.MemberId != deadMemberId).ToList();
+
+            var workIncome = _incomeCalculationService.CalculateLaborIncome(laborSurv);
+            var businessIncome = _incomeCalculationService.CalculateBusinessNetIncome(businessSurv);
+            var propertyIncome = propertySurv.Sum(p => p.Amount);
+            var transferIncome = transferSurv.Sum(t => t.TotalAmount);
+            var otherIncome = econ.OtherIncomes.Sum(o => o.Amount);
+            var alimonyIncome = _incomeCalculationService.CalculateAlimonyAnnual(survivorSupporters);
+            var subsidyIncome = _incomeCalculationService.CalculateSubsidyIncome(econ.Subsidies);
+            var rigidExpenditure = _incomeCalculationService.CalculateRigidExpenditure(rigidSurv);
+
+            decimal landIncome;
+            decimal familyLandArea = application.FamilyLandArea;
+            decimal selfFarmedArea = application.SelfFarmedLandArea;
+            decimal subleasedArea = application.SubleasedLandArea;
+            decimal contractedArea = application.ContractedLandArea;
+            decimal totalConfirmedLandArea = application.TotalConfirmedLandArea;
+            var confirmedPersonCount = application.ConfirmedPersonCount;
+            if (econ.LandConfirmationGroups.Count > 0)
+            {
+                var survivorFamilyNames = new HashSet<string>(StringComparer.Ordinal);
+                if (!string.IsNullOrWhiteSpace(newHeadMember.Name))
+                    survivorFamilyNames.Add(newHeadMember.Name);
+                foreach (var m in allMembers)
+                {
+                    if (m.Id == deadMemberId) continue;
+                    if (string.Equals(m.MemberCategory, MemberCategoryConstants.SUPPORT, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (m.IsHouseholdHead || string.Equals(m.MemberCategory, MemberCategoryConstants.SHARED_LIVING, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrWhiteSpace(m.Name))
+                            survivorFamilyNames.Add(m.Name);
+                    }
+                }
+
+                totalConfirmedLandArea = (decimal)econ.LandConfirmationGroups.Sum(g => g.TotalArea);
+                var totalLandShares = (decimal)econ.LandConfirmationGroups.Sum(g => g.TotalShares);
+                confirmedPersonCount = econ.LandConfirmationGroups.Sum(g => g.PersonCount);
+
+                decimal selfTotal = 0, subTotal = 0, conTotal = 0;
+                foreach (var group in econ.LandConfirmationGroups)
+                {
+                    foreach (var record in group.Records)
+                    {
+                        switch (record.LandUsage)
+                        {
+                            case DictionaryConstants.LandUsage.SELF_FARM: selfTotal += record.LandArea; break;
+                            case DictionaryConstants.LandUsage.SUBLEASE: subTotal += record.LandArea; break;
+                            case DictionaryConstants.LandUsage.CONTRACT: conTotal += record.LandArea; break;
+                        }
+                    }
+                }
+
+                decimal familyIncome = 0;
+                decimal familyLandShares = 0;
+                foreach (var group in econ.LandConfirmationGroups)
+                {
+                    var gShares = (decimal)group.TotalShares;
+                    if (gShares <= 0) continue;
+                    var effectiveShares = LandShareCalculator.ComputeEffectiveShares(group);
+                    decimal familyRatio = 0;
+                    foreach (var kv in effectiveShares)
+                    {
+                        if (survivorFamilyNames.Contains(kv.Key))
+                        {
+                            familyLandShares += kv.Value;
+                            familyRatio += kv.Value;
+                        }
+                    }
+                    familyRatio /= gShares;
+                    decimal groupIncome = 0;
+                    foreach (var record in group.Records)
+                        groupIncome += record.LandValue;
+                    familyIncome += Math.Round(groupIncome * familyRatio, 2);
+                }
+                landIncome = Math.Round(familyIncome, 2);
+                var familyRatioAll = totalLandShares > 0 ? familyLandShares / totalLandShares : 0m;
+                familyLandArea = totalLandShares > 0
+                    ? Math.Round(totalConfirmedLandArea / totalLandShares * familyLandShares, 2)
+                    : 0m;
+                selfFarmedArea = Math.Round(selfTotal * familyRatioAll, 2);
+                subleasedArea = Math.Round(subTotal * familyRatioAll, 2);
+                contractedArea = Math.Round(conTotal * familyRatioAll, 2);
+            }
+            else
+            {
+                landIncome = _incomeCalculationService.CalculateLandIncome(
+                    selfFarmedArea, (double)IncomeTypeConstants.LandUnitPrice.SELF_FARM,
+                    subleasedArea, (double)IncomeTypeConstants.LandUnitPrice.SUBLEASE,
+                    contractedArea, (double)IncomeTypeConstants.LandUnitPrice.CONTRACT);
+            }
+
+            // 年值权威 → 月值/人均一次舍入；渐退期留给表单 Step5 正式判定（1B：死亡瞬间不判、不建）
+            var recalculatedAnnualIncome = _incomeCalculationService.CalculateAnnualFamilyIncome(
+                workIncome, businessIncome, propertyIncome, transferIncome, otherIncome,
+                alimonyIncome, landIncome, subsidyIncome, rigidExpenditure);
+            var recalculatedMonthlyIncome = _incomeCalculationService.MonthlyFromAnnual(recalculatedAnnualIncome);
+            var newPerCapitaMonthly = _incomeCalculationService.PerCapitaMonthly(recalculatedAnnualIncome, newFamilySize);
+            var newPerCapitaAnnual = _incomeCalculationService.CalculatePerCapitaAnnual(recalculatedAnnualIncome, newFamilySize);
+            var inGraceBand = false;
+            var grantAmount = 0m;
 
             // 7. 生成新申请编号
             var appNoResult = await _applicationService.GetNextApplicationNoAsync(ct);
             if (appNoResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(appNoResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     appNoResult.Message ?? "生成申请编号失败");
             }
@@ -1971,6 +2830,7 @@ public class ChangeService : BaseService, IChangeService
                 application_reason, application_reason_detail, caregiver_type, destitute_support_type, support_institution_id,
                 work_income_total, business_income_total, property_income_total,
                 transfer_income_total, other_income_total, total_family_income, per_capita_income, rigid_expenditure, alimony_income,
+                total_annual_income, per_capita_annual_income,
                 is_eligible, classification_result,
                 classified_subsidy_type, classified_subsidy_amount,
                 household_monthly_guarantee_amount, person_category_protection_total_amount,
@@ -1996,12 +2856,13 @@ public class ChangeService : BaseService, IChangeService
                 $11, $12,
                 is_single_rescue, support_mode,
                 application_reason, application_reason_detail, caregiver_type, destitute_support_type, support_institution_id,
-                work_income_total, business_income_total, property_income_total,
-                transfer_income_total, other_income_total, total_family_income, per_capita_income, rigid_expenditure, alimony_income,
+                $22, $23, $24,
+                $25, $26, $27, $19, $28, $29,
+                $20, $21,
                 false, NULL,
                 NULL, 0,
-                0, 0, 0, 0,
-                'Draft', 1,
+                $18, 0, 0, $18,
+                $38, $39,
                 'HouseholdDeath', 'nc_biz_applications', $13,
                 'HouseholdDeath',
                 $14,
@@ -2009,8 +2870,8 @@ public class ChangeService : BaseService, IChangeService
                 NOW(), NOW(), $15, $16,
                 city_id, county_id, town_id, village_id,
                 hukou_city_id, hukou_county_id, hukou_town_id, hukou_village_id,
-                family_land_area, self_farmed_land_area, subleased_land_area, contracted_land_area,
-                land_income_total, subsidy_total, total_confirmed_land_area, confirmed_person_count
+                $30, $31, $32, $33,
+                $34, $35, $36, $37
             FROM nc_biz_applications WHERE id = $17
             RETURNING id;";
 
@@ -2023,10 +2884,20 @@ public class ChangeService : BaseService, IChangeService
                 context.ApplicationId,
                 context.ApplicationId,
                 context.OperatorName, context.OperatorName,
-                context.ApplicationId);
+                context.ApplicationId,
+                grantAmount,
+                newPerCapitaMonthly,
+                recalculatedAnnualIncome,
+                newPerCapitaAnnual,
+                workIncome, businessIncome, propertyIncome,
+                transferIncome, otherIncome, recalculatedMonthlyIncome,
+                rigidExpenditure, alimonyIncome,
+                familyLandArea, selfFarmedArea, subleasedArea, contractedArea,
+                landIncome, subsidyIncome, totalConfirmedLandArea, confirmedPersonCount,
+                ApplicationStatusCodes.DRAFT, WorkflowSteps.ENTRY_START);
             if (newAppResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(newAppResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     newAppResult.Message ?? "创建新档案失败");
             }
@@ -2064,7 +2935,7 @@ public class ChangeService : BaseService, IChangeService
                 newApplicationId, context.NewHeadMemberId, context.ApplicationId, deceasedHead.Id);
             if (memberCopyResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(memberCopyResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     memberCopyResult.Message ?? "复制家庭成员失败");
             }
@@ -2074,7 +2945,7 @@ public class ChangeService : BaseService, IChangeService
                 "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
             if (newMembersResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(newMembersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     newMembersResult.Message ?? "新档案成员查询失败");
             }
@@ -2089,15 +2960,7 @@ public class ChangeService : BaseService, IChangeService
                     memberIdMap[oldMember.Id] = match.Id;
             }
 
-            // 10. 复制经济明细（LoadAll → 重映射 member_id → SaveAll；死亡原户主的明细行 member_id 置 0，文本字段保留）
-            var econLoadResult = await _economicDetailService.LoadAllAsync(context.ApplicationId, ct);
-            if (econLoadResult.IsFailure)
-            {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
-                return Result.Failure<ChangeResult>(econLoadResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    econLoadResult.Message ?? "经济明细加载失败");
-            }
-            var econ = econLoadResult.Value;
+            // 10. 复制经济明细（复用 6.5 已加载的 econ → 重映射 member_id → SaveAll；死亡原户主的明细行 member_id 置 0，文本字段保留）
             long MapMemberId(long oldId) => oldId > 0 && memberIdMap.TryGetValue(oldId, out var nid) ? nid : 0;
             foreach (var it in econ.LaborIncomes) it.MemberId = MapMemberId(it.MemberId);
             foreach (var it in econ.BusinessIncomes) it.MemberId = MapMemberId(it.MemberId);
@@ -2115,7 +2978,7 @@ public class ChangeService : BaseService, IChangeService
                 econ.LandConfirmationGroups, ct);
             if (econSaveResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(econSaveResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     econSaveResult.Message ?? "经济明细复制失败");
             }
@@ -2135,7 +2998,7 @@ public class ChangeService : BaseService, IChangeService
             var surveyCopyResult = await _db.ExecuteNonQueryAsync(surveyCopySql, ct, newApplicationId, context.ApplicationId);
             if (surveyCopyResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(surveyCopyResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     surveyCopyResult.Message ?? "复制入户调查失败");
             }
@@ -2145,32 +3008,46 @@ public class ChangeService : BaseService, IChangeService
                 "SELECT * FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (caregiversResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(caregiversResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     caregiversResult.Message ?? "照料人查询失败");
             }
             var caregivers = caregiversResult.Value ?? new List<Caregiver>();
             if (caregivers.Count > 0)
             {
-                var caregiverSql = @"INSERT INTO nc_biz_caregivers
+                // 分批多行 VALUES 单语句（19 参数/行 + 行内 NOW()/NULL 字面量；500 行/批防参数上限）
+                const int caregiverParamsPerRow = 19;
+                const int caregiverBatchSize = 500;
+                var caregiverInsertSql = @"INSERT INTO nc_biz_caregivers
                     (application_id, cared_member_id, name, id_card, phone, relationship,
                      gender, age, ethnicity, health_status, employment_status, main_income_source,
                      work_unit, position, address,
                      marital_status, hukou_type, education_level, political_status,
                      created_at, deleted_at)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NULL);";
-                foreach (var cg in caregivers)
+                    VALUES ";
+                for (var offset = 0; offset < caregivers.Count; offset += caregiverBatchSize)
                 {
-                    var insertCaregiverResult = await _db.ExecuteNonQueryAsync(caregiverSql, ct,
-                        newApplicationId, MapMemberId(cg.CaredMemberId),
-                        cg.Name, cg.IdCard, cg.Phone, cg.Relationship,
-                        cg.Gender, cg.Age, cg.Ethnicity, cg.HealthStatus,
-                        cg.EmploymentStatus, cg.MainIncomeSource,
-                        cg.WorkUnit, cg.Position, cg.Address,
-                        cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus);
+                    var chunk = caregivers.GetRange(offset, Math.Min(caregiverBatchSize, caregivers.Count - offset));
+                    var (valuesClause, args) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(
+                        chunk.Count, caregiverParamsPerRow,
+                        r =>
+                        {
+                            var cg = chunk[r];
+                            return new object?[]
+                            {
+                                newApplicationId, MapMemberId(cg.CaredMemberId),
+                                cg.Name, cg.IdCard, cg.Phone, cg.Relationship,
+                                cg.Gender, cg.Age, cg.Ethnicity, cg.HealthStatus,
+                                cg.EmploymentStatus, cg.MainIncomeSource,
+                                cg.WorkUnit, cg.Position, cg.Address,
+                                cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus
+                            };
+                        },
+                        o => "(" + string.Join(",", Enumerable.Range(o, caregiverParamsPerRow).Select(n => "$" + n)) + ",NOW(),NULL)");
+                    var insertCaregiverResult = await _db.ExecuteNonQueryAsync(caregiverInsertSql + valuesClause + ";", ct, args);
                     if (insertCaregiverResult.IsFailure)
                     {
-                        if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                        await tx.RollbackAsync(ct);
                         return Result.Failure<ChangeResult>(insertCaregiverResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                             insertCaregiverResult.Message ?? "复制照料人失败");
                     }
@@ -2192,22 +3069,18 @@ public class ChangeService : BaseService, IChangeService
                 context.OperatorName);
             if (deathInsertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(deathInsertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     deathInsertResult.Message ?? "创建死亡记录失败");
             }
 
-            // 14. 停止旧档案（户主死亡）
-            var stopSql = @"UPDATE nc_biz_applications SET
-                status = $1, stop_reason = $2, stop_date = $3,
-                updated_at = NOW(), updated_by = $4
-                WHERE id = $5;";
-            var stopResult = await _db.ExecuteNonQueryAsync(stopSql, ct,
-                ApplicationStatus.Stopped.GetCode(), ChangeReasonTypeConstants.HeadDeceased, context.DeathDate,
-                context.OperatorName, context.ApplicationId);
+            // 14. 停止旧档案（户主死亡）——状态写入统一走 ApplicationStatusService（状态机校验 + 审计留痕）
+            var stopResult = await _statusService.StopAsync(
+                context.ApplicationId, ChangeReasonTypeConstants.HeadDeceased, context.DeathDate,
+                context.OperatorName, allowSubmittedOverride: true, ct: ct);
             if (stopResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(stopResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     stopResult.Message ?? "停止旧档案失败");
             }
@@ -2216,17 +3089,23 @@ public class ChangeService : BaseService, IChangeService
             var graceClearResult = await _gracePeriodService.ClearAsync(context.ApplicationId, ct);
             if (graceClearResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(graceClearResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     graceClearResult.Message ?? "结清旧档案渐退期失败");
             }
 
-            // 15. 创建变更记录（挂在旧档案上，After 快照含新档案ID）
+            // 14.2（1B 变体）死亡瞬间不判定/不预建渐退期——渐退资格在表单 Step5 正式分类判定后由确认页决定；
+            //     新档此刻 triggered_grace_period=false，收入列已是 6.5 现算的幸存家庭口径。
+
+            // 15. 创建变更记录（挂在旧档上，After 快照含新档ID）
+            //     change_category=MemberChange：户主死亡必然人员变动，供"增减员调整表"按类别取数
+            //     change_reason 可解析格式：与成员死亡同构，冒号后 "姓名(身份证)" 供 ADJ 减员槽解析
             var changeContext = new ChangeContext
             {
                 ApplicationId = context.ApplicationId,
                 ChangeType = DictionaryConstants.ChangeType.HOUSEHOLD_DEATH,
-                ChangeReason = $"户主死亡变更: {oldHeadName} → 新户主 {context.NewHeadName}",
+                ChangeCategory = DictionaryConstants.ChangeCategory.MEMBER_CHANGE,
+                ChangeReason = $"户主死亡: {deceasedHead.Name}({oldHeadIdCard}) → 新户主 {context.NewHeadName}",
                 ChangeDate = context.DeathDate,
                 OperatorName = context.OperatorName
             };
@@ -2250,32 +3129,43 @@ public class ChangeService : BaseService, IChangeService
             var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
             if (changeIdResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     changeIdResult.Message ?? "创建变更记录失败");
             }
             var changeId = changeIdResult.Value;
 
-            // 填充 nc_biz_change_records 的结构化对比字段（户主死亡审计对应）
+            // 填充 nc_biz_change_records 的结构化对比字段（户主死亡审计对应）：
+            // 旧值一律取旧档保存值（与经济复核 L1073 同源），新值取判定落库值（与新档 INSERT $19 同源）
             var updateChangeSql = @"UPDATE nc_biz_change_records SET
                 change_reason_type = $1,
-                old_classification = $2, old_guarantee_amount = $3,
-                triggered_stop = $4,
+                old_classification = $2, new_classification = $3,
+                old_per_capita_income = $4, new_per_capita_income = $5,
+                old_guarantee_amount = $6, new_guarantee_amount = $7,
+                triggered_stop = $8,
+                triggered_grace_period = $9,
+                new_application_id = $10,
+                original_application_id = $11,
                 changed_at = NOW()
-                WHERE id = $5;";
+                WHERE id = $12;";
             var updateChangeResult = await _db.ExecuteNonQueryAsync(updateChangeSql, ct,
-                ChangeReasonTypeConstants.HeadDeceased, oldClassification, oldGuaranteeAmount, true, changeId);
+                ChangeReasonTypeConstants.HeadDeceased,
+                oldClassification, (object?)null,
+                application.PerCapitaIncome, newPerCapitaMonthly,
+                oldGuaranteeAmount, grantAmount,
+                true, inGraceBand,
+                newApplicationId, context.ApplicationId,
+                changeId);
             if (updateChangeResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(updateChangeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     updateChangeResult.Message ?? "更新变更记录对比字段失败");
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
-            LogInfo($"户主死亡变更完成: 旧档案={context.ApplicationId} → 新档案={newApplicationId}, 新家庭人数={newFamilySize}");
+            LogInfo($"户主死亡变更完成: 旧档案={context.ApplicationId} → 新档案={newApplicationId}, 新家庭人数={newFamilySize}, 幸存家庭年收入={recalculatedAnnualIncome:F2}, 渐退期=Step5待判定");
 
             return Result.Success(new ChangeResult
             {
@@ -2284,12 +3174,13 @@ public class ChangeService : BaseService, IChangeService
                 OldClassification = oldClassification,
                 OldGuaranteeAmount = oldGuaranteeAmount,
                 TriggeredStop = true,
+                TriggeredGracePeriod = inGraceBand,
                 NewApplicationId = newApplicationId
             });
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "户主死亡变更");
             return Result.FromException<ChangeResult>(ex);
         }
@@ -2298,7 +3189,7 @@ public class ChangeService : BaseService, IChangeService
     /// <summary>
     /// 获取变更历史
     /// </summary>
-    public async Task<List<ChangeRecord>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default)
+    public async Task<Result<List<ChangeRecord>>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default)
     {
         // nc_biz_change_records 无 created_at 列（只有 changed_at）：
         // 查询改用 changed_at，避免 42703 使环境事务进入 aborted 状态而引发后续 25P02
@@ -2306,9 +3197,483 @@ public class ChangeService : BaseService, IChangeService
                     change_date, operator_name, changed_at
                     FROM nc_biz_change_records 
                     WHERE application_id = $1 
-                    ORDER BY changed_at DESC;";
+                    ORDER BY changed_at DESC LIMIT 200;";
 
         var result = await _db.QueryAsync<ChangeRecord>(sql, ct, applicationId);
-        return result.IsSuccess && result.Value != null ? result.Value : new List<ChangeRecord>();
+        return result.IsSuccess
+            ? Result.Success(result.Value ?? new List<ChangeRecord>())
+            : Result.Failure<List<ChangeRecord>>(result.ErrorCode!, result.Message!);
+    }
+
+    public async Task<Result<TriggeredStopChangeRecord?>> GetLatestTriggeredStopRecordAsync(long applicationId, IReadOnlyCollection<string> newClassifications, CancellationToken ct = default)
+    {
+        var sql = @"SELECT old_classification, new_classification FROM nc_biz_change_records
+                          WHERE (application_id = $1 OR new_application_id = $1)
+                            AND triggered_stop = true AND change_type = 'CategoryStop'
+                            AND new_classification = ANY($2::text[])
+                            AND deleted_at IS NULL
+                          ORDER BY changed_at DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<TriggeredStopChangeRecord>(sql, ct, applicationId, newClassifications.ToArray());
+        if (result.IsFailure)
+            return Result.Failure<TriggeredStopChangeRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<TriggeredStopChangeRecord?>(result.Value);
+    }
+
+    public async Task<Result<bool>> HasTriggeredCategoryStopAsync(long applicationId, IReadOnlyCollection<string> stopCategoryCodes, CancellationToken ct = default)
+    {
+        var sql = @"SELECT EXISTS(SELECT 1 FROM nc_biz_change_records
+                                  WHERE (application_id = $1 OR new_application_id = $1)
+                                    AND triggered_stop = true AND change_type = 'CategoryStop'
+                                    AND new_classification = ANY($2::text[])
+                                    AND deleted_at IS NULL)";
+        var result = await _db.ExecuteScalarAsync<bool>(sql, ct, applicationId, stopCategoryCodes.ToArray());
+        return result.IsSuccess
+            ? Result.Success(result.Value)
+            : Result.Failure<bool>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <summary>
+    /// 查询家庭成员类变更记录（增减员调整表字段装配用，按变更日期倒序）。
+    /// 规范：停旧建新/重建链场景下，变更可能挂在旧档（application_id）而新档经 new_application_id 关联；
+    /// 存量记录 change_category 可能为空，用 change_type 兜底，保证人员变动类流程都能取到数。
+    /// </summary>
+    public async Task<Result<List<MemberChangeRecord>>> GetMemberChangeRecordsAsync(long applicationId, int limit, CancellationToken ct = default)
+    {
+        var sql = @"SELECT id, application_id, new_application_id, change_type, change_reason, change_date,
+                           old_classification, new_classification,
+                           old_guarantee_amount, new_guarantee_amount
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND deleted_at IS NULL
+                      AND (
+                        change_category = 'MemberChange'
+                        OR change_type IN ('HouseholdDeath','MemberDeath','MemberRemove','MemberAdd','HouseholdHeadChange')
+                      )
+                    ORDER BY change_date DESC, id DESC LIMIT $2";
+        var result = await _db.QueryAsync<MemberChangeRecord>(sql, ct, applicationId, limit);
+        return result.IsSuccess
+            ? Result.Success(result.Value ?? new List<MemberChangeRecord>())
+            : Result.Failure<List<MemberChangeRecord>>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <summary>nc_biz_change_details 行（增减员逐人明细读取用）</summary>
+    private sealed class MemberAdjustDetailRow
+    {
+        public long ChangeId { get; set; }
+        public string? FieldName { get; set; }
+        public string? FieldLabel { get; set; }
+        public string? OldValue { get; set; }
+        public string? NewValue { get; set; }
+    }
+
+    /// <summary>nc_biz_family_members 行（逐人明细补齐展示字段用，含软删除历史行）</summary>
+    private sealed class MemberAdjustProfileRow
+    {
+        public long ApplicationId { get; set; }
+        public string? IdCard { get; set; }
+        public string? Name { get; set; }
+        public string? Gender { get; set; }
+        public string? RelationshipToHead { get; set; }
+        public string? HealthStatus { get; set; }
+        public string? WorkUnit { get; set; }
+        public decimal AnnualIncome { get; set; }
+        public DateTime? DeletedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+    }
+
+    public async Task<Result<List<MemberAdjustEntry>>> GetMemberAdjustEntriesAsync(long applicationId, int limit, CancellationToken ct = default)
+    {
+        var recordsRes = await GetMemberChangeRecordsAsync(applicationId, limit, ct);
+        if (recordsRes.IsFailure)
+            return Result.Failure<List<MemberAdjustEntry>>(recordsRes.ErrorCode!, recordsRes.Message!);
+
+        var records = recordsRes.Value ?? new List<MemberChangeRecord>();
+        if (records.Count == 0)
+            return Result.Success(new List<MemberAdjustEntry>());
+
+        var entries = new List<MemberAdjustEntry>();
+
+        // ① 成员增减流程的逐人明细（唯一权威源，含逐人原因）
+        var changeIds = records.Select(r => r.Id).Distinct().ToArray();
+        var detailSql = @"SELECT change_id, field_name, field_label, old_value, new_value
+                          FROM nc_biz_change_details
+                          WHERE change_id = ANY($1::bigint[])
+                            AND field_name IN ('MemberAdd','MemberRemove')
+                          ORDER BY id";
+        var detailRes = await _db.QueryAsync<MemberAdjustDetailRow>(detailSql, ct, new object[] { changeIds });
+        if (detailRes.IsFailure)
+            return Result.Failure<List<MemberAdjustEntry>>(detailRes.ErrorCode!, detailRes.Message!);
+
+        var detailsByChange = (detailRes.Value ?? new List<MemberAdjustDetailRow>())
+            .GroupBy(d => d.ChangeId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var rec in records)
+        {
+            if (detailsByChange.TryGetValue(rec.Id, out var rows))
+            {
+                foreach (var row in rows)
+                {
+                    if (string.IsNullOrWhiteSpace(row.FieldName)) continue;
+                    ParseMemberDetailRow(row, rec, entries);
+                }
+                continue;
+            }
+
+            // ② 成员死亡/户主死亡/旧版减员流程不写明细：按 change_reason "动词: 姓名(身份证)" 解析兜底
+            var recType = rec.ChangeType ?? string.Empty;
+            if (recType == DictionaryConstants.ChangeType.MEMBER_DEATH ||
+                recType == DictionaryConstants.ChangeType.HOUSEHOLD_DEATH ||
+                recType == DictionaryConstants.ChangeType.MEMBER_REMOVE)
+            {
+                if (!TryParseMemberFromReason(rec.ChangeReason, out var dName, out var dIdCard)) continue;
+                entries.Add(new MemberAdjustEntry
+                {
+                    Direction = DictionaryConstants.ChangeType.MEMBER_REMOVE,
+                    Name = dName,
+                    IdCard = dIdCard,
+                    ChangeDate = rec.ChangeDate,
+                    ChangeType = recType
+                });
+            }
+        }
+
+        // ③ 回查成员表补齐展示字段（本档案行优先 → 在册行优先 → 其次最新历史行）；
+        //    历史原因无证件号的减员行按姓名回填，并补回证件号
+        var appIds = records
+            .SelectMany(r => new[] { r.ApplicationId, r.NewApplicationId })
+            .Append(applicationId)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+        var idCards = entries
+            .Select(e => e.IdCard?.Trim())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var names = entries
+            .Select(e => e.Name?.Trim())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (appIds.Length > 0 && (idCards.Length > 0 || names.Length > 0))
+        {
+            var profileSql = @"SELECT application_id, id_card, name, gender, relationship_to_head,
+                                      health_status, work_unit, annual_income, deleted_at, updated_at
+                               FROM nc_biz_family_members
+                               WHERE application_id = ANY($1::bigint[])
+                                 AND (id_card = ANY($2::text[]) OR name = ANY($3::text[]))";
+            var profileRes = await _db.QueryAsync<MemberAdjustProfileRow>(profileSql, ct,
+                new object[] { appIds, idCards, names });
+            if (profileRes.IsFailure)
+                return Result.Failure<List<MemberAdjustEntry>>(profileRes.ErrorCode!, profileRes.Message!);
+
+            var rows = profileRes.Value ?? new List<MemberAdjustProfileRow>();
+            static IEnumerable<MemberAdjustProfileRow> Prefer(IEnumerable<MemberAdjustProfileRow> group, long currentAppId) =>
+                group.OrderByDescending(p => p.ApplicationId == currentAppId)
+                     .ThenByDescending(p => p.DeletedAt == null)
+                     .ThenByDescending(p => p.UpdatedAt ?? DateTime.MinValue);
+
+            var byIdCard = rows
+                .Where(p => !string.IsNullOrWhiteSpace(p.IdCard))
+                .GroupBy(p => (p.IdCard ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => Prefer(g, applicationId).First(), StringComparer.OrdinalIgnoreCase);
+            var byName = rows
+                .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                .GroupBy(p => (p.Name ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => Prefer(g, applicationId).First(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var e in entries)
+            {
+                var idKey = e.IdCard?.Trim();
+                var nameKey = e.Name?.Trim();
+                MemberAdjustProfileRow? p = null;
+                if (!string.IsNullOrEmpty(idKey) && byIdCard.TryGetValue(idKey, out var byId))
+                    p = byId;
+                if (p == null && !string.IsNullOrEmpty(nameKey) && byName.TryGetValue(nameKey, out var byNameHit))
+                    p = byNameHit;
+                if (p == null) continue;
+
+                e.Gender = p.Gender;
+                e.HealthStatus = p.HealthStatus;
+                e.WorkUnit = p.WorkUnit;
+                e.AnnualIncome = p.AnnualIncome;
+                // 关系/姓名以成员表为准（明细登记的是变更当刻的值）
+                if (!string.IsNullOrWhiteSpace(p.RelationshipToHead)) e.RelationshipToHead = p.RelationshipToHead!;
+                if (!string.IsNullOrWhiteSpace(p.Name)) e.Name = p.Name!;
+                if (string.IsNullOrWhiteSpace(e.IdCard) && !string.IsNullOrWhiteSpace(p.IdCard)) e.IdCard = p.IdCard!;
+            }
+        }
+
+        // ④ 按证件号（无证件号按姓名）去重：同人多次变更只保留最近一次，保持变更日期倒序
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var distinct = new List<MemberAdjustEntry>(entries.Count);
+        foreach (var e in entries)
+        {
+            var key = (!string.IsNullOrWhiteSpace(e.IdCard) ? e.IdCard : e.Name)?.Trim() ?? string.Empty;
+            if (key.Length > 0 && !seen.Add(key)) continue;
+            distinct.Add(e);
+        }
+
+        return Result.Success(distinct);
+    }
+
+    /// <summary>
+    /// 解析 nc_biz_change_details 一行：
+    /// field_label=姓名；old_value="{姓名}({身份证}) {成员分类} {与户主关系}"；new_value="{原因}|{yyyy-MM-dd}|{备注}"
+    /// </summary>
+    private static void ParseMemberDetailRow(MemberAdjustDetailRow row, MemberChangeRecord rec, List<MemberAdjustEntry> entries)
+    {
+        var direction = string.Equals(row.FieldName, DictionaryConstants.ChangeType.MEMBER_ADD, StringComparison.OrdinalIgnoreCase)
+            ? DictionaryConstants.ChangeType.MEMBER_ADD
+            : DictionaryConstants.ChangeType.MEMBER_REMOVE;
+
+        var name = row.FieldLabel?.Trim() ?? string.Empty;
+        var idCard = string.Empty;
+        var relation = string.Empty;
+        var category = string.Empty;
+
+        var oldValue = row.OldValue?.Trim() ?? string.Empty;
+        if (oldValue.Length > 0)
+        {
+            var match = global::System.Text.RegularExpressions.Regex.Match(
+                oldValue, @"^(?<name>.*?)\((?<id>[^()]*)\)(?<rest>.*)$");
+            if (match.Success)
+            {
+                if (string.IsNullOrWhiteSpace(name)) name = match.Groups["name"].Value.Trim();
+                idCard = match.Groups["id"].Value.Trim();
+
+                var tokens = match.Groups["rest"].Value
+                    .Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                var start = 0;
+                if (tokens.Length > 0 && IsMemberCategory(tokens[0])) { category = tokens[0]; start = 1; }
+                if (tokens.Length > start) relation = string.Join(' ', tokens.Skip(start));
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(idCard)) return;
+
+        DateTime? eventDate = null;
+        var reasonName = string.Empty;
+        var newValueParts = (row.NewValue ?? string.Empty).Split('|');
+        if (newValueParts.Length > 0) reasonName = newValueParts[0].Trim();
+        if (newValueParts.Length > 1 &&
+            DateTime.TryParseExact(newValueParts[1].Trim(), "yyyy-MM-dd",
+                global::System.Globalization.CultureInfo.InvariantCulture,
+                global::System.Globalization.DateTimeStyles.None, out var parsedDate))
+        {
+            eventDate = parsedDate;
+        }
+
+        entries.Add(new MemberAdjustEntry
+        {
+            Direction = direction,
+            Name = name,
+            IdCard = idCard,
+            RelationshipToHead = relation,
+            MemberCategory = category,
+            ReasonName = reasonName,
+            EventDate = eventDate,
+            ChangeDate = rec.ChangeDate,
+            ChangeType = rec.ChangeType
+        });
+    }
+
+    /// <summary>成员分类标识（nc_biz_family_members.member_category 的取值）</summary>
+    private static bool IsMemberCategory(string token) =>
+        token is MemberCategoryConstants.SHARED_LIVING or MemberCategoryConstants.SUPPORT or MemberCategoryConstants.HOUSEHOLD_HEAD;
+
+    /// <summary>
+    /// 从变更原因解析被减员人：
+    /// "成员死亡: 张三(身份证)" / "户主死亡: 张三(身份证) → 新户主 李四"（有证件号）；
+    /// "户主死亡变更: 贺传波 → 新户主 李建英"（历史原因无证件号 → 只取姓名，IdCard 留空由成员表回填）。
+    /// </summary>
+    private static bool TryParseMemberFromReason(string? reason, out string name, out string idCard)
+    {
+        name = string.Empty;
+        idCard = string.Empty;
+        if (string.IsNullOrWhiteSpace(reason)) return false;
+
+        var colonIdx = reason.IndexOf(':');
+        var fullColonIdx = reason.IndexOf('：');
+        if (colonIdx < 0) colonIdx = fullColonIdx;
+        else if (fullColonIdx >= 0) colonIdx = Math.Min(colonIdx, fullColonIdx);
+        if (colonIdx < 0 || colonIdx >= reason.Length - 1) return false;
+
+        var rest = reason.Substring(colonIdx + 1).Trim();
+        // 冒号后可能接长句说明，截断到箭头/换行/标点为止
+        var stopIdx = rest.IndexOfAny(new[] { '→', '\n', '\r', '，', '。', '；', ',' });
+        if (stopIdx > 0) rest = rest[..stopIdx].Trim();
+
+        var parenStart = rest.IndexOf('(');
+        var parenEnd = rest.IndexOf(')');
+        if (parenStart > 0 && parenEnd > parenStart)
+        {
+            name = rest[..parenStart].Trim();
+            idCard = rest[(parenStart + 1)..parenEnd].Trim();
+            return name.Length > 0 && idCard.Length > 0;
+        }
+
+        name = rest.Trim();
+        return IsPersonName(name);
+    }
+
+    /// <summary>姓名形态校验（无证件号兜底时用）：2~8 字中文，不含数字与标点</summary>
+    private static bool IsPersonName(string name)
+    {
+        if (name.Length is < 2 or > 8) return false;
+        foreach (var c in name)
+        {
+            if (c < 0x4E00 || c > 0x9FA5) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 查询最近一条与渐退退出相关的变更（经济复核/户主死亡/触发停保）。
+    /// 档案渐退审批表「退出渐退期情况」分型拼句取数；无匹配则 Value=null（非失败）。
+    /// </summary>
+    public async Task<Result<GraceExitChangeRecord?>> GetLatestGraceExitChangeAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT change_date, change_reason_type, change_type, change_reason,
+                           triggered_stop, new_classification, old_classification
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND deleted_at IS NULL
+                      AND (
+                        change_reason_type IN ('经济复核','户主死亡')
+                        OR change_type IN ('FundChange','HouseholdDeath','CategoryStop')
+                        OR triggered_stop = true
+                      )
+                    ORDER BY change_date DESC, id DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<GraceExitChangeRecord>(sql, ct, applicationId);
+        if (result.IsFailure)
+            return Result.Failure<GraceExitChangeRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<GraceExitChangeRecord?>(result.Value);
+    }
+
+    /// <summary>
+    /// 查询最近一条复核/变更记录（定期复核审批表复核组字段取数；经济复核或死亡/成员变更等完整流程均覆盖；无匹配则 Value=null 非失败）。
+    /// </summary>
+    public async Task<Result<ReviewChangeRecord?>> GetLatestReviewChangeRecordAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT id, change_date, change_reason, change_reason_type, change_type,
+                           old_classification, new_classification,
+                           old_guarantee_amount, new_guarantee_amount
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND deleted_at IS NULL
+                      AND (
+                        change_reason_type IN ('经济复核','户主死亡','成员变更')
+                        OR change_type IN ('FundChange','CategoryAdd','CategoryStop','HouseholdDeath','MemberDeath','MemberRemove')
+                      )
+                    ORDER BY change_date DESC, id DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<ReviewChangeRecord>(sql, ct, applicationId);
+        if (result.IsFailure)
+            return Result.Failure<ReviewChangeRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<ReviewChangeRecord?>(result.Value);
+    }
+
+    /// <summary>
+    /// 查询指定变更记录的 Before/After 快照 JSON（无匹配子查询返回 NULL 行，两键均空时 Value=null 非失败）。
+    /// </summary>
+    public async Task<Result<ChangeSnapshotPair?>> GetChangeSnapshotsAsync(long changeId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT (SELECT snapshot_data::text FROM nc_biz_change_snapshots
+                            WHERE change_id = $1 AND snapshot_type = 'Before') AS before_json,
+                           (SELECT snapshot_data::text FROM nc_biz_change_snapshots
+                            WHERE change_id = $1 AND snapshot_type = 'After') AS after_json";
+        var result = await _db.QuerySingleAsync<ChangeSnapshotPair>(sql, ct, changeId);
+        if (result.IsFailure)
+            return Result.Failure<ChangeSnapshotPair?>(result.ErrorCode!, result.Message!);
+        var pair = result.Value;
+        if (pair != null && string.IsNullOrEmpty(pair.BeforeJson) && string.IsNullOrEmpty(pair.AfterJson))
+            return Result.Success<ChangeSnapshotPair?>(null);
+        return Result.Success<ChangeSnapshotPair?>(pair);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<ChangeSnapshotPair?>> GetLinkedChangeSnapshotsAsync(long applicationId, CancellationToken ct = default)
+    {
+        // 仅取含快照的关联记录（CategoryAdd/CategoryStop 跨类行本身无快照，会被 EXISTS 排除），
+        // 无关联记录时 0 行 → QuerySingleAsync 返回 Success(null)
+        var sql = @"SELECT (SELECT s.snapshot_data::text FROM nc_biz_change_snapshots s
+                            WHERE s.change_id = c.id AND s.snapshot_type = 'Before') AS before_json,
+                           (SELECT s.snapshot_data::text FROM nc_biz_change_snapshots s
+                            WHERE s.change_id = c.id AND s.snapshot_type = 'After') AS after_json
+                    FROM nc_biz_change_records c
+                    WHERE (c.application_id = $1 OR c.new_application_id = $1)
+                      AND c.deleted_at IS NULL
+                      AND EXISTS (SELECT 1 FROM nc_biz_change_snapshots s WHERE s.change_id = c.id)
+                    ORDER BY c.change_date DESC, c.id DESC
+                    LIMIT 1";
+        var result = await _db.QuerySingleAsync<ChangeSnapshotPair>(sql, ct, applicationId);
+        if (result.IsFailure)
+            return Result.Failure<ChangeSnapshotPair?>(result.ErrorCode!, result.Message!);
+        var pair = result.Value;
+        if (pair != null && string.IsNullOrEmpty(pair.BeforeJson) && string.IsNullOrEmpty(pair.AfterJson))
+            return Result.Success<ChangeSnapshotPair?>(null);
+        return Result.Success<ChangeSnapshotPair?>(pair);
+    }
+
+    /// <summary>
+    /// 查询最近一条含新旧人均收入的变更记录（渐退期审批表「变动情况说明」经济复核场景取数）。
+    /// 经济复核按同档更新，旧人均收入仅存于变更记录；无匹配则 Value=null（非失败）。
+    /// </summary>
+    public async Task<Result<IncomeComparisonRecord?>> GetLatestIncomeComparisonAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT old_per_capita_income, new_per_capita_income, change_date, change_type
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND deleted_at IS NULL
+                      AND old_per_capita_income IS NOT NULL
+                      AND new_per_capita_income IS NOT NULL
+                    ORDER BY change_date DESC, id DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<IncomeComparisonRecord>(sql, ct, applicationId);
+        if (result.IsFailure)
+            return Result.Failure<IncomeComparisonRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<IncomeComparisonRecord?>(result.Value);
+    }
+
+    /// <summary>
+    /// 查询最近一条挂在旧档上的、Before 快照含 Components 的变更（渐退审批表分项对比取复核前旧值用）。
+    /// 仅经济复核入口写入 Components；死亡/户主变更链无此键 → Value=null（消费方回退旧档行）。
+    /// </summary>
+    public async Task<Result<BeforeSnapshotOldValues?>> GetLatestBeforeSnapshotAsync(long originalApplicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT s.snapshot_data::text AS snapshot_json
+                    FROM nc_biz_change_snapshots s
+                    JOIN nc_biz_change_records c ON c.id = s.change_id
+                    WHERE c.application_id = $1
+                      AND c.deleted_at IS NULL
+                      AND s.snapshot_type = 'Before'
+                      AND jsonb_typeof(s.snapshot_data -> 'Components') = 'object'
+                    ORDER BY c.id DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<SnapshotJsonRow>(sql, ct, originalApplicationId);
+        if (result.IsFailure)
+            return Result.Failure<BeforeSnapshotOldValues?>(result.ErrorCode!, result.Message!);
+
+        var json = result.Value?.SnapshotJson;
+        if (string.IsNullOrEmpty(json))
+            return Result.Success<BeforeSnapshotOldValues?>(null);
+
+        try
+        {
+            // 快照含 Classification/TotalIncome 等额外键，未映射成员默认忽略
+            return Result.Success<BeforeSnapshotOldValues?>(JsonSerializer.Deserialize<BeforeSnapshotOldValues>(json));
+        }
+        catch (JsonException ex)
+        {
+            LogWarn($"解析 Before 快照旧值失败: OriginalApplicationId={originalApplicationId}, {ex.Message}");
+            return Result.Success<BeforeSnapshotOldValues?>(null);
+        }
+    }
+
+    private sealed class SnapshotJsonRow
+    {
+        public string? SnapshotJson { get; set; }
     }
 }

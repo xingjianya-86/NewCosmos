@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ChangeManagement;
@@ -184,6 +185,53 @@ public partial class HeadChangeViewModel : ViewModelBase
             if (changeResult.IsSuccess)
             {
                 await _dialogService.DisplayAlertAsync("成功", "户主变更已完成", "确定");
+
+                // 出口三选一：整套档案 / 仅出文书 / 稍后
+                var choice = await _dialogService.DisplayActionSheetAsync(
+                    "户主变更完成", "取消", null, "整套档案", "仅出文书", "稍后再说");
+                if (choice == "仅出文书")
+                {
+                    try
+                    {
+                        // 户主变更停旧建新：新档 ID 在 ChangeResult（若有）否则用当前档
+                        var newAppId = changeResult.Value?.NewApplicationId is long na && na > 0
+                            ? na
+                            : ApplicationId;
+                        var originalId = changeResult.Value?.NewApplicationId is long na3 && na3 > 0
+                            ? ApplicationId
+                            : (long?)null;
+
+                        // 预置输出文书上下文 → 进档案制作页 → 用户点「档案输出」
+                        PrintNavigationData.OutputCategories = Helpers.ArchiveCategoryResolver.DocumentOperationCategories;
+                        PrintNavigationData.OperationOverride = "户主变更";
+                        PrintNavigationData.PrefilterTemplateNames = new[]
+                        {
+                            Constants.DocumentTemplateNames.MemberChangeTable,
+                            Constants.DocumentTemplateNames.ChangeNotice
+                        };
+                        PrintNavigationData.TemplateFilter = null;
+
+                        await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                            new ApplicationReviewArchiveParameter(newAppId, originalId, "户主变更"));
+                    }
+                    catch (Exception navEx)
+                    {
+                        _logger.LogError(navEx, "导航到户主变更文书输出失败");
+                        await _dialogService.DisplayAlertAsync("错误", $"打开文书输出失败: {navEx.Message}", "确定");
+                    }
+                }
+                else if (choice == "整套档案")
+                {
+                    PrintNavigationData.OutputCategories = null;
+                    PrintNavigationData.OperationOverride = null;
+                    PrintNavigationData.PrefilterTemplateNames = null;
+                    PrintNavigationData.TemplateFilter = null;
+                    var newAppId = changeResult.Value?.NewApplicationId is long na2 && na2 > 0
+                        ? na2
+                        : ApplicationId;
+                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                        new ApplicationReviewArchiveParameter(newAppId, ApplicationId, "户主变更"));
+                }
             }
             else
             {

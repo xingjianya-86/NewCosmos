@@ -11,9 +11,6 @@ public partial class AgriculturalSubsidyImportService : BaseImportService
     protected override string ServiceName => ImportTypeName;
     public override string ImportTypeName => ImportTypeCodes.AGRICULTURAL_SUBSIDY;
 
-    private string _subsidyType = string.Empty;
-    private int _dataYear;
-
     private static readonly Dictionary<string, string[]> ColumnAliases = new()
     {
         ["name"] = new[] { "收款人全称" },
@@ -45,23 +42,25 @@ public partial class AgriculturalSubsidyImportService : BaseImportService
         }
     }
 
-    protected override async Task<ImportResult> ImportSingleFileAsync(string filePath, IProgress<string> progress = null, CancellationToken ct = default)
+    /// <summary>按文件名派生每文件上下文：补贴类型（社保卡/非社保卡）与数据年度。</summary>
+    private static (string SubsidyType, int DataYear) DeriveFileContext(string filePath)
     {
         var fileName = Path.GetFileName(filePath);
-        _subsidyType = fileName.Contains("非社保卡") ? "非社保卡" : "社保卡";
+        var subsidyType = fileName.Contains("非社保卡") ? "非社保卡" : "社保卡";
 
-        _dataYear = DateTime.Now.Year;
+        var dataYear = DateTime.Now.Year;
         var yearMatch = YearRegex().Match(fileName);
         if (yearMatch.Success && int.TryParse(yearMatch.Value, out var year))
         {
-            _dataYear = year;
+            dataYear = year;
         }
-
-        return await base.ImportSingleFileAsync(filePath, progress, ct);
+        return (subsidyType, dataYear);
     }
 
     protected override async Task ProcessWorksheetAsync(IExcelSheetReader reader, ImportResult result, IProgress<string>? progress, CancellationToken ct)
     {
+        // 每文件上下文由文件名派生（原 Singleton 实例字段存在并发导入交错写错风险）
+        var (subsidyType, dataYear) = DeriveFileContext(result.FilePath);
         var rowCount = reader.RowCount;
         var mapping = BuildColumnMapping(reader, ColumnAliases);
 
@@ -109,9 +108,9 @@ public partial class AgriculturalSubsidyImportService : BaseImportService
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP);
 ";
 
-                await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_soil_subsidy WHERE id_card = $1 AND data_year = $2 AND subsidy_type = $3", ct, idCard, _dataYear, _subsidyType);
+                await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_soil_subsidy WHERE id_card = $1 AND data_year = $2 AND subsidy_type = $3", ct, idCard, dataYear, subsidyType);
                 var execResult = await DatabaseService.ExecuteNonQueryAsync(sql, ct,
-                    name, idCard, subsidyAmount, phone, address, account, bank, branch, _subsidyType, _dataYear);
+                    name, idCard, subsidyAmount, phone, address, account, bank, branch, subsidyType, dataYear);
 
                 if (execResult.IsSuccess)
                 {

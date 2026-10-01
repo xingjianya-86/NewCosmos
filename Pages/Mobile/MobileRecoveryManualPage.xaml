@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileRecoveryManualPage"
+             x:DataType="RecoveryManualViewModel"
+             Title="手工录入追缴"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="手工录入追缴" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="人员姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding PersonName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="追缴分类 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding SourceTypeList}" SelectedItem="{Binding SelectedSourceType}"
+                                    ItemDisplayBinding="{Binding Value}" Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="月保障额（元）*" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding MonthlyAmount, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <Label Text="追缴区间" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold" Margin="0,6,0,0"/>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="起始年月" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
+                                <Picker Grid.Column="0" ItemsSource="{Binding YearList}" SelectedItem="{Binding StartYear}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                <Label Grid.Column="1" Text="年" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker Grid.Column="2" ItemsSource="{Binding MonthList}" SelectedItem="{Binding StartMonthValue}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                <Label Grid.Column="3" Text="月" Style="{StaticResource FormFieldLabelStyle}"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="终止年月" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
+                                <Picker Grid.Column="0" ItemsSource="{Binding YearList}" SelectedItem="{Binding EndYear}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                <Label Grid.Column="1" Text="年" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker Grid.Column="2" ItemsSource="{Binding MonthList}" SelectedItem="{Binding EndMonthValue}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                <Label Grid.Column="3" Text="月" Style="{StaticResource FormFieldLabelStyle}"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴月数" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding RecoveryMonths, StringFormat='{0} 个月'}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="应追缴金额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding RecoveryAmount, StringFormat='{0:N2}'}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="已追缴金额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding RecoveredAmount, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="追缴理由" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Editor Text="{Binding RecoveryReason}" HeightRequest="80" Placeholder="追缴理由说明..."/>
+                        </VerticalStackLayout>
+                        <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                            <Label Text="手机端请使用「保存并推送打印」，任务将在电脑端自动打印。" FontSize="12" TextColor="{StaticResource PrimaryDark}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="2" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                <Button Grid.Row="0" Grid.Column="0" Text="保存草稿" HeightRequest="46" CornerRadius="10" FontSize="14"
+                        BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
+                        Command="{Binding SaveDraftCommand}"/>
+                <Button Grid.Row="0" Grid.Column="1" Text="保存并打印" HeightRequest="46" CornerRadius="10" FontSize="14"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding SaveAndPrintCommand}"/>
+                <Button Grid.Row="1" Grid.ColumnSpan="2" Text="保存并推送打印" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding SaveAndPushPrintCommand}"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="0" Grid.RowSpan="3" BackgroundColor="#80000000" IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

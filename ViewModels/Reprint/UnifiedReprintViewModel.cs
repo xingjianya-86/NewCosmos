@@ -113,6 +113,26 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     /// <summary>分类筛选选项（"全部" + 各域显示名，构造时按 Providers 顺序生成）</summary>
     public List<string> DomainFilterOptions { get; }
 
+    /// <summary>输出分类选项：按档案分类（默认整档）/ 变动文书（DocumentOperationCategories 单独出变动模板）</summary>
+    public List<string> OutputCategoryOptions { get; } = new() { "按档案分类", "变动文书" };
+
+    /// <summary>输出分类索引（0=按档案分类，1=变动文书）</summary>
+    [ObservableProperty]
+    private int _outputCategoryIndex;
+
+    partial void OnOutputCategoryIndexChanged(int value)
+    {
+        // 已选中记录时切换输出分类 → 立即重建模板列表
+        //（ArchiveSet 域 / 动态域文书清单两种情况都要重建）
+        if (SelectedRecord is { } rec)
+        {
+            if (IsArchiveSetMode)
+                _ = PrepareArchiveSetAsync(rec);
+            else if (ShowDynamicDocs)
+                _ = PrepareDynamicDocsAsync(rec);
+        }
+    }
+
     /// <summary>当前分类筛中的域（null=全部）</summary>
     private IReprintDomainProvider? ActiveDomainFilter =>
         DomainFilterIndex > 0 && DomainFilterIndex <= _providers.Count ? _providers[DomainFilterIndex - 1] : null;
@@ -136,9 +156,9 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             var scope = ActiveDomainFilter is { } d ? d.DisplayName : "全部业务";
             if (MonthFilterIndex <= 0)
                 return $"{scope} · 当前名单 {PersonResults.Count} 人（全部月份，默认各业务最近记录）";
-            var monthPart = _personBusinessRange is { } r
-                ? $"{FilterYear}年{MonthFilterIndex}月（B线 {r.From:yyyy-MM-dd}~{r.To:yyyy-MM-dd}）"
-                : $"{FilterYear}年{MonthFilterIndex}月";
+            var monthPart = _personSingleDomain && _personBusinessRange is { } r
+                ? $"{FilterYear}年{MonthFilterIndex}月（{_personWindowLabel} {r.From:yyyy-MM-dd}~{r.To:yyyy-MM-dd}）"
+                : $"{FilterYear}年{MonthFilterIndex}月（各域按自身月份口径）";
             return $"{scope} · {monthPart}：命中 {PersonResults.Count} 人";
         }
     }
@@ -149,8 +169,17 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     /// <summary>最近一次搜索的原始记录（月份过滤作用于名单本身：按月重建 PersonResults）</summary>
     private List<ReprintArchiveItem> _cachedRecords = new();
 
-    /// <summary>最近一次按月搜索所用的 B 线周期区间（FilterByMonth 同步过滤用）</summary>
+    /// <summary>最近一次按月搜索所用月份窗口（首个域；提示展示用）</summary>
     private (DateTime From, DateTime To)? _personBusinessRange;
+
+    /// <summary>各域本次月份窗口（FilterByMonth 按域过滤用）</summary>
+    private Dictionary<string, (DateTime From, DateTime To)> _personDomainWindows = new();
+
+    /// <summary>首个域的窗口口径显示名（提示用）</summary>
+    private string _personWindowLabel = "月份";
+
+    /// <summary>当前是否仅单域筛选（提示是否展示具体区间）</summary>
+    private bool _personSingleDomain;
 
     public int SelectedMonthIndex
     {
@@ -330,7 +359,7 @@ public partial class UnifiedReprintViewModel : ViewModelBase
 
     public List<int> BatchYearOptions { get; } = new() { DateTime.Now.Year - 1, DateTime.Now.Year, DateTime.Now.Year + 1 };
 
-    /// <summary>批量月份选项（0=全部，1..12=B线业务月；月份筛选按 B 线周期区间：上月15日~本月15日）</summary>
+    /// <summary>批量月份选项（0=全部，1..12=业务月；月份筛选按域自身时间轴周期区间过滤）</summary>
     public List<string> BatchMonthOptions { get; } = new List<string> { "全部" }
         .Concat(Enumerable.Range(1, 12).Select(m => $"{m}月")).ToList();
 
@@ -402,19 +431,50 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     /// <summary>批量页月份过滤是否生效（0=全部，不加时间轴过滤）</summary>
     public bool HasBatchMonthFilter => BatchMonthIndex > 0;
 
-    /// <summary>指定年月对应的 B 线周期区间（含端点）；month&lt;=0 返回 null（全部）</summary>
-    private async Task<(DateTime From, DateTime To)?> GetBusinessRangeAsync(int year, int month)
+    /// <summary>指定年月对应的月份窗口区间（含端点）；month&lt;=0 返回 null（全部）</summary>
+    private async Task<(DateTime From, DateTime To)?> GetMonthWindowAsync(int year, int month, ReprintMonthWindow window)
     {
         if (month <= 0) return null;
-        var tl = await _timelineService.CalculateTimelineAsync(year, month, TimelineType.BusinessProcess);
-        return (tl.CycleStartDate.Date, tl.CycleEndDate.Date);
+        var monthStart = new DateTime(year, month, 1);
+        switch (window)
+        {
+            case ReprintMonthWindow.NaturalMonth:
+                return (monthStart, monthStart.AddMonths(1).AddDays(-1));
+            case ReprintMonthWindow.BusinessProcess:
+            {
+                var tl = await _timelineService.CalculateTimelineAsync(year, month, TimelineType.BusinessProcess);
+                return (tl.CycleStartDate.Date, tl.CycleEndDate.Date);
+            }
+            case ReprintMonthWindow.EconomicReview:
+            {
+                var tl = await _timelineService.CalculateTimelineAsync(year, month, TimelineType.EconomicReview);
+                return (tl.CycleStartDate.Date, tl.CycleEndDate.Date);
+            }
+            case ReprintMonthWindow.TempReliefFull:
+            {
+                var tl = await _timelineService.CalculateTempReliefAsync(year, month, simplified: false);
+                return (tl.InvestigationStartDate.Date, tl.AuditDate.Date);
+            }
+            default:
+                return (monthStart, monthStart.AddMonths(1).AddDays(-1));
+        }
     }
 
-    /// <summary>批量当月 B 线周期区间（含端点）；全部月份返回 null</summary>
-    private Task<(DateTime From, DateTime To)?> GetBatchBusinessRangeAsync()
-        => GetBusinessRangeAsync(BatchYear, BatchMonthIndex);
+    /// <summary>月份窗口口径显示名</summary>
+    private static string WindowLabel(ReprintMonthWindow window) => window switch
+    {
+        ReprintMonthWindow.NaturalMonth => "自然月",
+        ReprintMonthWindow.BusinessProcess => "B线",
+        ReprintMonthWindow.EconomicReview => "A线",
+        ReprintMonthWindow.TempReliefFull => "C线",
+        _ => "月份"
+    };
 
-    /// <summary>B线区间跨的自然月列表（如 7/15~8/15 → (年,7)、(年,8)）</summary>
+    /// <summary>批量当月月份窗口区间（含端点）；全部月份返回 null</summary>
+    private Task<(DateTime From, DateTime To)?> GetBatchBusinessRangeAsync(IReprintDomainProvider provider)
+        => GetMonthWindowAsync(BatchYear, BatchMonthIndex, provider.MonthWindow);
+
+    /// <summary>窗口区间跨的自然月列表（如 7/21~8/20 → (年,7)、(年,8)）</summary>
     private static IEnumerable<(int Year, int Month)> SpannedMonths(DateTime from, DateTime to)
     {
         var cur = new DateTime(from.Year, from.Month, 1);
@@ -426,10 +486,10 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         }
     }
 
-    /// <summary>批量页 B 线区间标签（摘要/日志用）</summary>
-    private string BatchScopeText((DateTime From, DateTime To)? range)
+    /// <summary>批量页月份窗口标签（摘要/日志用）</summary>
+    private string BatchScopeText((DateTime From, DateTime To)? range, ReprintMonthWindow window)
         => range is { } r
-            ? $"{BatchYear}年{BatchMonthIndex}月（B线 {r.From:yyyy-MM-dd}~{r.To:yyyy-MM-dd}）"
+            ? $"{BatchYear}年{BatchMonthIndex}月（{WindowLabel(window)} {r.From:yyyy-MM-dd}~{r.To:yyyy-MM-dd}）"
             : "全部月份";
 
     /// <summary>
@@ -475,6 +535,18 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     public bool IsArchiveSetMode => _activeProvider?.Mode == ReprintDomainMode.ArchiveSet;
     public bool IsAssetMode => _activeProvider?.Mode == ReprintDomainMode.AssetVerification;
     public bool IsDynamicMode => _activeProvider?.Mode == ReprintDomainMode.DynamicRecord;
+
+    /// <summary>
+    /// 动态管理记录的文书清单面板开关：选中动态域记录且全档文书数据（含变动文书）准备成功时为 true。
+    /// 让动态管理档案域不离开本域即可输出渐退审批表等变动文书（不再依赖"搜索→低收入域"深路径）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _showDynamicDocs;
+
+    /// <summary>文书清单面板（输出分类/模板 + 打印设置/预览/打印）可见：ArchiveSet 域或动态域文书准备成功</summary>
+    public bool ShowDocsPanel => IsArchiveSetMode || ShowDynamicDocs;
+
+    partial void OnShowDynamicDocsChanged(bool value) => OnPropertyChanged(nameof(ShowDocsPanel));
 
     /// <summary>中栏标题（随域）</summary>
     public string BranchTitle => SelectedBranch == null ? "分类分支" : $"{SelectedBranch.DisplayName}（{BranchRecords.Count} 条）";
@@ -592,7 +664,7 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 跨域按月搜索：按 B 线周期区间（上月15日~本月15日）合并两自然月查询后过滤；
+    /// 跨域按月搜索：各域按自身时间轴类型（A/B/C线）计算周期区间，合并查询后过滤；
     /// 关键词非空时在结果上客户端过滤。
     /// </summary>
     private async Task SearchPersonsByMonthAsync()
@@ -604,20 +676,30 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             if (IsBusy) return;
             IsBusy = true;
 
-            var range = await GetBusinessRangeAsync(FilterYear, MonthFilterIndex);
-            _personBusinessRange = range;
-            OnPropertyChanged(nameof(MonthFilterHint));
-            if (range == null) return;
-
-            _logger.LogBusiness("统一补打中心·按月搜索(B线)",
-                ("Year", FilterYear), ("Month", MonthFilterIndex),
-                ("From", range.Value.From), ("To", range.Value.To));
-
             var providerList = GetActiveProviders();
+            if (providerList.Count == 0) return;
+
+            // 预计算各域月份窗口（FilterByMonth 按域过滤用）
+            var windows = new Dictionary<string, (DateTime From, DateTime To)>();
+            foreach (var p in providerList)
+            {
+                var w = await GetMonthWindowAsync(FilterYear, MonthFilterIndex, p.MonthWindow);
+                if (w.HasValue) windows[p.DomainKey] = (w.Value.From, w.Value.To);
+            }
+            _personDomainWindows = windows;
+            _personSingleDomain = ActiveDomainFilter != null;
+            _personWindowLabel = WindowLabel(providerList[0].MonthWindow);
+            _personBusinessRange = windows.TryGetValue(providerList[0].DomainKey, out var firstWindow) ? firstWindow : null;
+            OnPropertyChanged(nameof(MonthFilterHint));
+
+            // 各域按自身月份窗口分别搜索
             var tasksArray = providerList
-                .Select(p => SearchByBusinessRangeAsync(p, range.Value.From, range.Value.To, CancellationToken))
+                .Select(p => SearchByProviderMonthAsync(p, FilterYear, MonthFilterIndex, CancellationToken))
                 .ToArray();
             await Task.WhenAll(tasksArray);
+
+            _logger.LogBusiness("统一补打中心·按月搜索",
+                ("Year", FilterYear), ("Month", MonthFilterIndex));
 
             var allRecords = new List<ReprintArchiveItem>();
             for (var i = 0; i < tasksArray.Length; i++)
@@ -721,26 +803,19 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSelectedBranch));
     }
 
-    /// <summary>月份过滤（0=全部；按 B 线周期区间过滤；BusinessTime 为空值时不过滤）</summary>
+    /// <summary>月份过滤（0=全部；按各域自身月份窗口过滤；BusinessTime 为空值时不过滤）</summary>
     private List<ReprintArchiveItem> FilterByMonth(IEnumerable<ReprintArchiveItem> records)
     {
         if (MonthFilterIndex <= 0)
             return records.ToList();
 
-        if (_personBusinessRange is { } r)
+        return records.Where(x =>
         {
-            var hiExclusive = r.To.Date.AddDays(1);
-            return records
-                .Where(x => x.BusinessTime == DateTime.MinValue
-                            || (x.BusinessTime.Date >= r.From.Date && x.BusinessTime.Date < hiExclusive))
-                .ToList();
-        }
-
-        // 兜底（理论上按月搜索后已有区间）：按自然月
-        return records
-            .Where(r => r.BusinessTime.Year == FilterYear && r.BusinessTime.Month == MonthFilterIndex
-                        || r.BusinessTime == DateTime.MinValue)
-            .ToList();
+            if (x.BusinessTime == DateTime.MinValue) return true;
+            if (!_personDomainWindows.TryGetValue(x.DomainKey, out var w)) return true;
+            var hiExclusive = w.To.Date.AddDays(1);
+            return x.BusinessTime.Date >= w.From.Date && x.BusinessTime.Date < hiExclusive;
+        }).ToList();
     }
 
     partial void OnSelectedBranchChanged(ReprintBranch? value)
@@ -754,6 +829,7 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsArchiveSetMode));
         OnPropertyChanged(nameof(IsAssetMode));
         OnPropertyChanged(nameof(IsDynamicMode));
+        OnPropertyChanged(nameof(ShowDocsPanel));
 
         // 选中高亮由 IsSelected 驱动
         foreach (var b in Branches)
@@ -819,6 +895,11 @@ public partial class UnifiedReprintViewModel : ViewModelBase
                     break;
                 case ReprintDomainMode.DynamicRecord:
                     await PrepareDynamicAsync(record);
+                    // 进入动态记录默认输出分类「变动文书」（此刻 ShowDynamicDocs=false，
+                    // 赋值触发的 OnOutputCategoryIndexChanged 重备条件不命中，无自循环）
+                    if (OutputCategoryIndex != 1) OutputCategoryIndex = 1;
+                    // 文书清单（输出分类/模板/预览）：低收入域字段构建同源；失败静默降级，留痕不受影响
+                    await PrepareDynamicDocsAsync(record);
                     break;
             }
         }
@@ -848,6 +929,17 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             ("BusinessId", payload.BusinessId.ToString()),
             ("Applicant", DataMasker.MaskName(payload.Name)));
 
+        ApplyArchivePayloadToNav(payload, record);
+        await Output.InitializeAsync();
+        await LoadPrintHistoryAsync(record);
+    }
+
+    /// <summary>
+    /// 把档案字段 payload 写入 PrintNavigationData（ArchiveSet 域与动态域文书清单共用；
+    /// OutputCategories 每次显式赋值含置 null，防跨记录残留）。
+    /// </summary>
+    private void ApplyArchivePayloadToNav(ReprintArchivePayload payload, ReprintArchiveItem record)
+    {
         PrintNavigationData.BusinessType = payload.DomainKey;
         PrintNavigationData.BusinessId = payload.BusinessId;
         PrintNavigationData.Classification = payload.Classification;
@@ -855,9 +947,50 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         PrintNavigationData.FieldData = payload.FieldData;
         PrintNavigationData.TableData = payload.TableData;
         PrintNavigationData.SupporterTableData = payload.SupporterTableData;
+        PrintNavigationData.OutputCategories = OutputCategoryIndex == 1
+            ? ArchiveCategoryResolver.DocumentOperationCategories
+            : null;
+    }
 
-        await Output.InitializeAsync();
-        await LoadPrintHistoryAsync(record);
+    /// <summary>
+    /// 动态管理记录的文书清单准备：用低收入人口域字段构建（全档字段，含渐退审批表分项句）
+    /// 填充 PrintNavigationData 与 Output，使动态域不离开本域即可输出变动文书。
+    /// 默认输出分类「变动文书」在选中记录时设置（见 PrepareSelectedRecordAsync）；此处尊重当前 OutputCategoryIndex。
+    /// 准备失败静默降级为 Warn 日志——留痕补打是该域主功能，不被文书面板打断。
+    /// </summary>
+    private async Task PrepareDynamicDocsAsync(ReprintArchiveItem record)
+    {
+        try
+        {
+            var provider = _providers.FirstOrDefault(p => p.DomainKey == SocialAssistanceReprintProvider.DomainKeyConst);
+            if (provider == null)
+            {
+                _logger.Warn("动态域文书清单：未注册低收入人口域能力，无法构建文书");
+                ShowDynamicDocs = false;
+                return;
+            }
+
+            var prepare = await provider.PrepareAsync(record.BusinessId, CancellationToken);
+            if (prepare.IsFailure || prepare.Value == null)
+            {
+                _logger.Warn($"动态域文书清单准备失败: BusinessId={record.BusinessId}, {prepare.Message}");
+                ShowDynamicDocs = false;
+                return;
+            }
+
+            _logger.LogBusiness("统一补打中心·动态域文书数据构建完成",
+                ("BusinessId", record.BusinessId.ToString()),
+                ("Applicant", DataMasker.MaskName(prepare.Value.Name)));
+
+            ApplyArchivePayloadToNav(prepare.Value, record);
+            await Output.InitializeAsync();
+            ShowDynamicDocs = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "动态域文书清单准备异常");
+            ShowDynamicDocs = false;
+        }
     }
 
     private async Task PrepareAssetAsync(ReprintArchiveItem record)
@@ -937,6 +1070,8 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         Output.SelectedPreviewTemplate = null!;
         Output.PdfFilePath = string.Empty;
         Output.HasPdf = false;
+        PrintNavigationData.OutputCategories = null;
+        ShowDynamicDocs = false; // 切换记录/分支后文书清单需重新准备
     }
 
     // ========================
@@ -1178,12 +1313,12 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             BatchRecords.Clear();
             BatchResultSummary = string.Empty;
 
-            var range = await GetBatchBusinessRangeAsync();
-            var scope = BatchScopeText(range);
+            var range = await GetBatchBusinessRangeAsync(provider);
+            var scope = BatchScopeText(range, provider.MonthWindow);
 
             if (provider.Mode == ReprintDomainMode.DynamicRecord)
             {
-                // 动态管理批量：按 B 线区间变更人群（不按关键词过滤），预览户数后合并导出
+                // 动态管理批量：按周期区间变更人群（不按关键词过滤），预览户数后合并导出
                 if (range == null)
                 {
                     BatchResultSummary = "动态管理档案请选择具体月份（不支持「全部」）";
@@ -1218,7 +1353,7 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             }
             else
             {
-                // 指定月份：按 B 线周期区间（上月15日~本月15日）合并两自然月查询后过滤
+                // 指定月份：按域自身时间轴周期区间合并自然月查询后过滤
                 var listResult = await SearchByBusinessRangeAsync(provider, range.Value.From, range.Value.To, CancellationToken);
                 if (listResult.IsFailure)
                 {
@@ -1252,8 +1387,20 @@ public partial class UnifiedReprintViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 按 B 线周期区间查询：合并区间所跨自然月的服务端查询，再按 [from, to] 过滤并去重。
-    /// （各域服务端仅有自然月查询，B线区间必然落在相邻两个月。）
+    /// 单域按月搜索：根据域的 MonthWindow 计算窗口区间，再调用 SearchByBusinessRangeAsync。
+    /// </summary>
+    private async Task<Result<List<ReprintArchiveItem>>> SearchByProviderMonthAsync(
+        IReprintDomainProvider provider, int year, int month, CancellationToken ct)
+    {
+        var range = await GetMonthWindowAsync(year, month, provider.MonthWindow);
+        if (range == null)
+            return Result.Success(new List<ReprintArchiveItem>());
+        return await SearchByBusinessRangeAsync(provider, range.Value.From, range.Value.To, ct);
+    }
+
+    /// <summary>
+    /// 按时间轴周期区间查询：合并区间所跨自然月的服务端查询，再按 [from, to] 过滤并去重。
+    /// （各域服务端仅有自然月查询，周期区间必然落在相邻两个月。）
     /// </summary>
     private async Task<Result<List<ReprintArchiveItem>>> SearchByBusinessRangeAsync(
         IReprintDomainProvider provider, DateTime from, DateTime to, CancellationToken ct)
@@ -1383,14 +1530,14 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             return;
         }
 
-        var range = await GetBatchBusinessRangeAsync();
+        var range = await GetBatchBusinessRangeAsync(provider);
         if (range == null)
         {
-            await _dialogService.DisplayAlertAsync("提示", "动态管理档案请选择具体月份（B线周期）后再批量导出", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "动态管理档案请选择具体月份（周期）后再批量导出", "确定");
             return;
         }
 
-        BatchProgressText = $"正在按 {BatchScopeText(range)} 变更人群导出...";
+        BatchProgressText = $"正在按 {BatchScopeText(range, provider.MonthWindow)} 变更人群导出...";
         var result = await capability.BatchExportRangeAsync(range.Value.From, range.Value.To, CancellationToken);
         if (result.IsSuccess && result.Value != null)
         {

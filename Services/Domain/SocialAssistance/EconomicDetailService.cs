@@ -36,9 +36,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
     {
         LogInfo($"保存经济明细: ApplicationId={applicationId}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -112,15 +110,14 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
 
             LogInfo("旧数据删除完成");
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo("经济明细保存完成");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"保存经济明细失败: {ex.Message}");
             return Result.Failure(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }
@@ -281,7 +278,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
     /// <summary>
     /// 单条多行 INSERT：把 N 行拼成一条 VALUES ($1..),($k..)... 语句一次执行，
     /// 替代逐行 await INSERT 的 N 次往返（行数通常小于 50，参数量远低于上限）。
-    /// 列列表和行数组必须包含 created_at 列及其 DateTime.UtcNow 值；
+    /// 列列表和行数组必须包含 created_at 列及其 DateTime.Now 值；
     /// deleted_at 不应出现在列列表中（走 DB 默认 NULL）。
     /// 运行时自校验：列数 ≠ paramsPerRow 或行数组长度 ≠ paramsPerRow 即抛异常，
     /// 杜绝静默参数错位。
@@ -333,7 +330,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
                 applicationId, item.MemberId, item.MemberName, item.MemberIdCard, item.MemberAge,
                 item.IncomeSubType, item.WorkUnit,
                 item.MonthlyIncome, item.MonthsWorked,
-                item.AnnualIncome, item.Remark, DateTime.UtcNow }).ToList(), ct);
+                item.AnnualIncome, item.Remark, DateTime.Now }).ToList(), ct);
 
     private Task InsertBusinessIncomesAsync(long applicationId, List<BusinessIncome> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_business_incomes
@@ -342,7 +339,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.MemberName, item.MemberIdCard, item.MemberAge,
                 item.VendorType, item.CompanyName,
-                item.MonthlyIncome, DateTime.UtcNow }).ToList(), ct);
+                item.MonthlyIncome, DateTime.Now }).ToList(), ct);
 
     private Task InsertPropertyIncomesAsync(long applicationId, List<PropertyIncome> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_property_incomes
@@ -350,7 +347,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
              income_type, property_description, amount, created_at)", 9,
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.MemberName, item.MemberIdCard, item.MemberAge,
-                item.IncomeType, item.PropertyDescription, item.Amount, DateTime.UtcNow }).ToList(), ct);
+                item.IncomeType, item.PropertyDescription, item.Amount, DateTime.Now }).ToList(), ct);
 
     private Task InsertTransferIncomesAsync(long applicationId, List<TransferIncome> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_transfer_incomes
@@ -358,40 +355,40 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
              income_type, monthly_amount, months_or_times, total_amount, created_at)", 10,
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.MemberName, item.MemberIdCard, item.MemberAge,
-                item.IncomeType, item.MonthlyAmount, item.MonthsOrTimes, item.TotalAmount, DateTime.UtcNow }).ToList(), ct);
+                item.IncomeType, item.MonthlyAmount, item.MonthsOrTimes, item.TotalAmount, DateTime.Now }).ToList(), ct);
 
     private Task InsertOtherIncomesAsync(long applicationId, List<OtherIncome> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_other_incomes
             (application_id, income_type, amount, created_at)", 4,
             items.Select(item => new object?[] {
-                applicationId, item.IncomeType, item.Amount, DateTime.UtcNow }).ToList(), ct);
+                applicationId, item.IncomeType, item.Amount, DateTime.Now }).ToList(), ct);
 
     private Task InsertSubsidiesAsync(long applicationId, List<Subsidy> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_subsidies
             (application_id, subsidy_type, area, unit_price, count, ratio_factor, original_amount, amount, member_name, member_id_card, created_at)", 11,
             items.Select(item => new object?[] {
                 applicationId, item.SubsidyType, item.Area, item.UnitPrice, item.Count,
-                item.RatioFactor, item.OriginalAmount, item.Amount, item.MemberName, item.MemberIdCard, DateTime.UtcNow }).ToList(), ct);
+                item.RatioFactor, item.OriginalAmount, item.Amount, item.MemberName, item.MemberIdCard, DateTime.Now }).ToList(), ct);
 
     private Task InsertBreedingIncomesAsync(long applicationId, List<BreedingIncome> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_breeding_incomes
             (application_id, breeding_type, quantity, annual_income, remark, created_at)", 6,
             items.Select(item => new object?[] {
-                applicationId, item.BreedingType, item.Quantity, item.AnnualIncome, item.Remark, DateTime.UtcNow }).ToList(), ct);
+                applicationId, item.BreedingType, item.Quantity, item.AnnualIncome, item.Remark, DateTime.Now }).ToList(), ct);
 
     private Task InsertRigidExpendituresAsync(long applicationId, List<RigidExpenditure> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_rigid_expenditures
             (application_id, member_id, person_description, remark, expenditure_type, amount, created_at)", 7,
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.PersonDescription, item.Remark,
-                item.ExpenditureType, item.Amount, DateTime.UtcNow }).ToList(), ct);
+                item.ExpenditureType, item.Amount, DateTime.Now }).ToList(), ct);
 
     private Task InsertFamilyPropertiesAsync(long applicationId, List<FamilyProperty> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_properties
             (application_id, member_id, property_type, address, housing_structure, housing_nature, area, room_count, build_year, estimated_value, created_at)", 11,
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.PropertyType, item.Address, item.HousingStructure,
-                item.HousingNature, item.Area, item.RoomCount, item.BuildYear, item.EstimatedValue, DateTime.UtcNow }).ToList(), ct);
+                item.HousingNature, item.Area, item.RoomCount, item.BuildYear, item.EstimatedValue, DateTime.Now }).ToList(), ct);
 
     private Task InsertVehiclesAsync(long applicationId, List<Vehicle> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_vehicles
@@ -399,7 +396,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
              purchase_year, purchase_price, estimated_value, created_at)", 10,
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.VehicleType, item.Brand, item.Model,
-                item.LicensePlate, item.PurchaseYear, item.PurchasePrice, item.EstimatedValue, DateTime.UtcNow }).ToList(), ct);
+                item.LicensePlate, item.PurchaseYear, item.PurchasePrice, item.EstimatedValue, DateTime.Now }).ToList(), ct);
 
     private Task InsertMachineriesAsync(long applicationId, List<Machinery> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_machineries
@@ -408,7 +405,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
             items.Select(item => new object?[] {
                 applicationId, item.MemberId, item.MachineryType, item.Brand, item.Model,
                 item.Quantity, item.Horsepower, item.PurchaseYear, item.PurchasePrice,
-                item.EstimatedValue, DateTime.UtcNow }).ToList(), ct);
+                item.EstimatedValue, DateTime.Now }).ToList(), ct);
 
     private Task InsertFinancialAssetsAsync(long applicationId, List<FinancialAsset> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_financial_assets
@@ -418,7 +415,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
             items.Select(item => new object?[] {
                 applicationId, item.HasCash, item.CashAmount, item.HasBankDeposit, item.BankDepositAmount,
                 item.HasSecurities, item.SecuritiesAmount, item.HasCommercialInsurance,
-                item.CommercialInsuranceType, item.CommercialInsuranceAmount, DateTime.UtcNow }).ToList(), ct);
+                item.CommercialInsuranceType, item.CommercialInsuranceAmount, DateTime.Now }).ToList(), ct);
 
     private Task InsertLandRegistrationsAsync(long applicationId, List<LandRegistration> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_land_registrations
@@ -426,7 +423,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
              measurement_type, area, price, subtotal, location, created_at)", 11,
             items.Select(item => new object?[] {
                 applicationId, item.OwnerName, item.OwnerIdCard, item.LandType, item.LandUsage,
-                item.MeasurementType, item.Area, item.Price, item.Subtotal, item.Location, DateTime.UtcNow }).ToList(), ct);
+                item.MeasurementType, item.Area, item.Price, item.Subtotal, item.Location, DateTime.Now }).ToList(), ct);
 
     private async Task InsertLandConfirmationGroupsAsync(long applicationId, List<LandConfirmationGroup> groups, CancellationToken ct)
     {
@@ -447,7 +444,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
                 group.Records.Select(record => new object?[] {
                     groupId, record.MemberName, record.MemberIdCard,
                     record.LandPlotInfo, record.PlotCode, record.ContractArea, record.MeasuredArea,
-                    record.LandArea, record.LandUsage, record.UnitPrice, record.IsImported, DateTime.UtcNow }).ToList(), ct);
+                    record.LandArea, record.LandUsage, record.UnitPrice, record.IsImported, DateTime.Now }).ToList(), ct);
 
             await InsertRowsAsync(@"INSERT INTO nc_biz_land_confirmation_persons
                     (confirmation_id, name, id_card, land_status, land_inherit_to,
@@ -455,7 +452,7 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
                 group.Persons.Select(person => new object?[] {
                     groupId, person.Name, person.IdCard,
                     person.LandStatus, person.LandInheritTo, person.SharesCount, person.TotalLandArea,
-                    person.IsImported, DateTime.UtcNow }).ToList(), ct);
+                    person.IsImported, DateTime.Now }).ToList(), ct);
         }
     }
 

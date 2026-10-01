@@ -203,12 +203,12 @@ public class NearRelativeService : BaseService, INearRelativeService
             object[] staffParams;
             if (string.IsNullOrWhiteSpace(town) || town == "全部")
             {
-                staffSql = "SELECT * FROM nc_biz_near_relative_staffs WHERE deleted_at IS NULL ORDER BY town, staff_name, id";
+                staffSql = "SELECT * FROM nc_biz_near_relative_staffs WHERE deleted_at IS NULL ORDER BY town, staff_name, id LIMIT 5000";
                 staffParams = Array.Empty<object>();
             }
             else
             {
-                staffSql = "SELECT * FROM nc_biz_near_relative_staffs WHERE deleted_at IS NULL AND town = $1 ORDER BY town, staff_name, id";
+                staffSql = "SELECT * FROM nc_biz_near_relative_staffs WHERE deleted_at IS NULL AND town = $1 ORDER BY town, staff_name, id LIMIT 5000";
                 staffParams = new object[] { town };
             }
 

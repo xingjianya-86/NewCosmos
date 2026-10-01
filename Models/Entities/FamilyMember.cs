@@ -7,7 +7,6 @@ using NewCosmos.Models;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.System;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace NewCosmos.Models.Entities;
 
@@ -22,17 +21,21 @@ public class FamilyMember : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    // 独立的地址选项集合
+    // 独立的地址选项集合（家庭住址级联用）
     public ObservableCollection<string> MemberCityOptions { get; } = new();
     public ObservableCollection<string> MemberDistrictOptions { get; } = new();
     public ObservableCollection<string> MemberTownOptions { get; } = new();
     public ObservableCollection<string> MemberVillageOptions { get; } = new();
 
-    // ServiceProvider依赖
-    private IServiceProvider? _serviceProvider;
-    public void SetServiceProvider(IServiceProvider serviceProvider)
+    // 户籍地址专属选项集合（与家庭住址分离，各自按自己的上级加载）
+    public ObservableCollection<string> HukouDistrictOptions { get; } = new();
+    public ObservableCollection<string> HukouTownOptions { get; } = new();
+
+    // 地区服务依赖（由 ViewModel 注入，避免实体持有 IServiceProvider 做服务定位）
+    private IRegionService? _regionService;
+    public void SetRegionService(IRegionService regionService)
     {
-        _serviceProvider = serviceProvider;
+        _regionService = regionService;
     }
 
     /// <summary>
@@ -300,18 +303,59 @@ public class FamilyMember : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 户籍地址-    /// </summary>
-    public string HukouCity { get; set; } = string.Empty;
+    /// 户籍地址-城市
+    /// </summary>
+    private string _hukouCity = string.Empty;
+    public string HukouCity
+    {
+        get => _hukouCity;
+        set
+        {
+            if (_hukouCity != value)
+            {
+                _hukouCity = value;
+                OnPropertyChanged();
+                if (!_isLoadingDefaults)
+                    _ = LoadHukouDistrictsForCityAsync(value);
+            }
+        }
+    }
 
     /// <summary>
     /// 户籍地址-区县
     /// </summary>
-    public string HukouDistrict { get; set; } = string.Empty;
+    private string _hukouDistrict = string.Empty;
+    public string HukouDistrict
+    {
+        get => _hukouDistrict;
+        set
+        {
+            if (_hukouDistrict != value)
+            {
+                _hukouDistrict = value;
+                OnPropertyChanged();
+                if (!_isLoadingDefaults)
+                    _ = LoadHukouTownsForDistrictAsync(value);
+            }
+        }
+    }
 
     /// <summary>
     /// 户籍地址-乡镇
     /// </summary>
-    public string HukouTown { get; set; } = string.Empty;
+    private string _hukouTown = string.Empty;
+    public string HukouTown
+    {
+        get => _hukouTown;
+        set
+        {
+            if (_hukouTown != value)
+            {
+                _hukouTown = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     /// <summary>
     /// 婚姻状况
@@ -875,9 +919,8 @@ public class FamilyMember : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 更新身体状况（与 Step 1 逻辑一致，使用 Key 值判断）
-    /// <summary>
-    /// 根据疾病和残疾情况更新健康状态
+    /// 更新身体状况（与 Step 1 逻辑一致，使用 Key 值判断）。
+    /// 根据疾病和残疾情况更新健康状态。
     /// </summary>
     public void UpdateHealthStatus(string noDiseaseKey, List<string> severeLevelKeys,
         string? diseaseCategoryKey)
@@ -972,12 +1015,12 @@ public class FamilyMember : INotifyPropertyChanged
     /// </summary>
     public async Task LoadInitialAddressOptionsAsync(string? city, string? district, string? town)
     {
-        if (_serviceProvider == null) return;
+        if (_regionService == null) return;
 
         _isLoadingDefaults = true;
         try
         {
-            var regionService = _serviceProvider.GetRequiredService<IRegionService>();
+            var regionService =         _regionService!;
 
             // 加载城市选项
             var citiesResult = await regionService.GetCitiesAsync();
@@ -1029,6 +1072,16 @@ public class FamilyMember : INotifyPropertyChanged
             {
                 HukouTown = town;
             }
+
+            // 户籍地址专属选项：按成员已有户籍值加载（与家庭住址集合互不干扰）
+            if (!string.IsNullOrEmpty(HukouCity))
+            {
+                await LoadHukouDistrictsForCityAsync(HukouCity);
+            }
+            if (!string.IsNullOrEmpty(HukouDistrict))
+            {
+                await LoadHukouTownsForDistrictAsync(HukouDistrict);
+            }
         }
         finally
         {
@@ -1041,9 +1094,9 @@ public class FamilyMember : INotifyPropertyChanged
     /// </summary>
     private async Task LoadDistrictsForCityAsync(string city)
     {
-        if (_serviceProvider == null || string.IsNullOrEmpty(city)) return;
+        if (_regionService == null || string.IsNullOrEmpty(city)) return;
 
-        var regionService = _serviceProvider.GetRequiredService<IRegionService>();
+        var regionService = _regionService!;
         var countiesResult = await regionService.GetCountiesByCityAsync(city);
 
         MemberDistrictOptions.Clear();
@@ -1059,9 +1112,9 @@ public class FamilyMember : INotifyPropertyChanged
     /// </summary>
     private async Task LoadTownsForDistrictAsync(string district)
     {
-        if (_serviceProvider == null || string.IsNullOrEmpty(district)) return;
+        if (_regionService == null || string.IsNullOrEmpty(district)) return;
 
-        var regionService = _serviceProvider.GetRequiredService<IRegionService>();
+        var regionService = _regionService!;
         
         // 先获取所有县区，找到匹配的县区ID
         var countiesResult = await regionService.GetCountiesAsync();
@@ -1087,9 +1140,9 @@ public class FamilyMember : INotifyPropertyChanged
     /// </summary>
     private async Task LoadVillagesForTownAsync(string town)
     {
-        if (_serviceProvider == null || string.IsNullOrEmpty(town)) return;
+        if (_regionService == null || string.IsNullOrEmpty(town)) return;
 
-        var regionService = _serviceProvider.GetRequiredService<IRegionService>();
+        var regionService =         _regionService!;
         
         // 先搜索乡镇，找到匹配的乡镇ID
         var townsResult = await regionService.SearchTownsAsync(town);
@@ -1105,6 +1158,52 @@ public class FamilyMember : INotifyPropertyChanged
                 {
                     foreach (var village in villagesResult.Value)
                         MemberVillageOptions.Add(village.VillageName);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 根据户籍城市加载户籍区县选项（独立于家庭住址）
+    /// </summary>
+    private async Task LoadHukouDistrictsForCityAsync(string city)
+    {
+        HukouDistrictOptions.Clear();
+        if (_regionService == null || string.IsNullOrEmpty(city)) return;
+
+        var regionService =         _regionService!;
+        var countiesResult = await regionService.GetCountiesByCityAsync(city);
+
+        if (countiesResult.IsSuccess)
+        {
+            foreach (var county in countiesResult.Value)
+                HukouDistrictOptions.Add(county.CountyName);
+        }
+    }
+
+    /// <summary>
+    /// 根据户籍区县加载户籍乡镇选项（独立于家庭住址）
+    /// </summary>
+    private async Task LoadHukouTownsForDistrictAsync(string district)
+    {
+        HukouTownOptions.Clear();
+        if (_regionService == null || string.IsNullOrEmpty(district)) return;
+
+        var regionService =         _regionService!;
+
+        // 先获取所有县区，找到匹配的县区ID
+        var countiesResult = await regionService.GetCountiesAsync();
+
+        if (countiesResult.IsSuccess)
+        {
+            var county = countiesResult.Value?.FirstOrDefault(c => c.CountyName == district);
+            if (county != null)
+            {
+                var townsResult = await regionService.GetTownsByCountyIdAsync(county.Id);
+                if (townsResult.IsSuccess)
+                {
+                    foreach (var town in townsResult.Value)
+                        HukouTownOptions.Add(town.TownName);
                 }
             }
         }

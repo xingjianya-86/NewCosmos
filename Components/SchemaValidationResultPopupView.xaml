@@ -35,8 +35,7 @@
                        TextColor="{StaticResource TextPrimary}"/>
 
                 <Button Grid.Column="1"
-                        Text="&#xE711;"
-                        FontFamily="Segoe Fluent Icons"
+                        Text="✕"
                         FontSize="16"
                         TextColor="#9CA3AF"
                         BackgroundColor="Transparent"
@@ -104,7 +103,7 @@
                            HeightRequest="350" Margin="20,12">
                 <CollectionView.EmptyView>
                     <VerticalStackLayout Padding="40" Spacing="8">
-                        <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="48"
+                        <Label Text="✅" FontSize="48"
                                TextColor="#10B981" HorizontalOptions="Center"/>
                         <Label Text="检查通过，所有表结构与 YAML 定义一致"
                                FontSize="18" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
@@ -162,17 +161,17 @@
 
             <!-- 底部按钮 -->
             <Grid Padding="20,16" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
-                <Button Grid.Column="0" Text="&#xE8C7; 修复错误和警告" FontFamily="Segoe Fluent Icons"
+                <Button Grid.Column="0" Text="🔧 修复错误和警告"
                         Style="{StaticResource WarningButton}" 
                         Command="{Binding FixSchemaErrorsCommand, Source={x:Reference ThisView}}"
                         IsVisible="{Binding HasFixableIssues, Source={x:Reference ThisView}}"/>
 
-                <Button Grid.Column="1" Text="&#xE72C; 刷新" FontFamily="Segoe Fluent Icons"
+                <Button Grid.Column="1" Text="🔄 刷新"
                         Style="{StaticResource ButtonOutline}" 
                         Command="{Binding RefreshCommand, Source={x:Reference ThisView}}"
                         Margin="12,0,0,0"/>
 
-                <Button Grid.Column="2" Text="&#xE896; 导出报告" FontFamily="Segoe Fluent Icons"
+                <Button Grid.Column="2" Text="📤 导出报告"
                         Style="{StaticResource ButtonOutline}" Command="{Binding ExportCommand, Source={x:Reference ThisView}}"
                         Margin="12,0,0,0"/>
 

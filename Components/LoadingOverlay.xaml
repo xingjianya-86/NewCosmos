@@ -30,13 +30,12 @@
                             StrokeThickness="4"
                             BackgroundColor="Transparent"/>
 
-                    <!-- 中心图标 -->
-                    <Label Text="&#xE80F;"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="28"
-                           TextColor="{StaticResource Primary}"
-                           HorizontalOptions="Center"
-                           VerticalOptions="Center"/>
+                    <!-- 中心图标（原生进度环，跨平台安全；原 Segoe 字符在 Android 显示为方块） -->
+                    <ActivityIndicator IsRunning="True"
+                                       Color="{StaticResource Primary}"
+                                       WidthRequest="36" HeightRequest="36"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"/>
                 </Grid>
 
                 <!-- 加载文字 -->

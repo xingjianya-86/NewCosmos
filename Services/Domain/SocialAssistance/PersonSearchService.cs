@@ -15,23 +15,10 @@ public class PersonSearchService : BaseService, IPersonSearchService
     private readonly IDatabaseService _db;
     private readonly IDictCacheService _dictCache;
 
-    private static readonly HashSet<string> AllowedTables = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "nc_biz_rural_subsistence_persons",
-        "nc_biz_urban_subsistence_persons",
-        "nc_biz_low_income_edge_persons",
-        "nc_biz_destitute_persons",
-        "nc_biz_applications",
-        "nc_biz_rural_subsistence_families",
-        "nc_biz_urban_subsistence_families",
-        "nc_biz_low_income_edge_families",
-        "nc_biz_destitute_families"
-    };
-
+    /// <summary>表名白名单统一走 Helpers.TableNameValidator（原本地白名单为其子集，已删除）。</summary>
     private static void ValidateTableName(string tableName)
     {
-        if (!AllowedTables.Contains(tableName))
-            throw new InvalidOperationException($"无效的表名: {tableName}");
+        TableNameValidator.ValidateOrThrow(tableName);
     }
 
     public PersonSearchService(IDatabaseService db, IDictCacheService dictCache, ILoggerService logger) : base(logger)
@@ -76,22 +63,28 @@ public class PersonSearchService : BaseService, IPersonSearchService
 
             var completedTasks = await Task.WhenAll(tasks);
 
-            var results = completedTasks.SelectMany(r => r).ToList();
+            // §6 加载失败必须显式失败：任一源表查询失败 → 整体 Failure，绝不吞掉返回空集合
+            //（空集会与"该来源无记录"不可区分，调用方将当作"人不存在"继续业务流）
+            var failed = completedTasks.FirstOrDefault(t => t.IsFailure);
+            if (failed != null)
+                return Result.Failure<List<PersonSearchResult>>(failed.ErrorCode!, failed.Message!);
+
+            var results = completedTasks.SelectMany(r => r.Value ?? new List<PersonSearchResult>()).ToList();
 
             // 逐人补查家庭成员：无共享连接/事务，可并行执行（连接池上限内安全）。
             // 原先串行 2-3 次往返 × 命中条数；并行后整体等待时间 ≈ 单条最慢耗时。
+            // §6：补查失败显式失败（空集会被当"无成员"保存回去，静默清空真实成员）。
             var enrichTasks = results.Select(person => Task.Run(async () =>
             {
-                try
-                {
-                    await EnrichFamilyMembersAsync(person, ct);
-                }
-                catch (Exception ex)
-                {
-                    LogWarn($"警告: {ex.Message}");
-                }
+                return await EnrichFamilyMembersAsync(person, ct);
             }, ct)).ToArray();
             await Task.WhenAll(enrichTasks);
+
+            var enrichFailed = enrichTasks.Select(t => t.Result).FirstOrDefault(r => r.IsFailure);
+            if (enrichFailed != null)
+                return Result.Failure<List<PersonSearchResult>>(
+                    enrichFailed.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    enrichFailed.Message ?? "家庭成员补查失败");
 
             Debug.WriteLine($"[PersonSearch] 查询完成，共找到 {results.Count} 条记录");
             return Result.Success(results);
@@ -105,24 +98,33 @@ public class PersonSearchService : BaseService, IPersonSearchService
 
     /// <summary>
     /// 为单条检索结果补查家庭成员（逻辑与旧串行循环一致，提取为独立方法以便并行）。
+    /// §6：成员查询失败返回 Failure 并中止本次补查——绝不按"无成员"落库。
     /// </summary>
-    private async Task EnrichFamilyMembersAsync(PersonSearchResult person, CancellationToken ct)
+    private async Task<Result> EnrichFamilyMembersAsync(PersonSearchResult person, CancellationToken ct)
     {
         if (person.ApplicationId.HasValue)
         {
-            person.FamilyMembers = await GetFamilyMembersAsync(
+            var membersResult = await GetFamilyMembersAsync(
                 person.ApplicationId.Value, ct);
+            if (membersResult.IsFailure)
+                return Result.Failure(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, membersResult.Message!);
+            person.FamilyMembers = membersResult.Value!;
 
             if (person.FamilyMembers.Count == 0)
             {
                 if (person.SourceTable.Contains("_persons") && person.RecordId > 0)
                 {
-                    var familyId = await GetFamilyIdFromPersonAsync(
+                    var familyIdResult = await GetFamilyIdFromPersonAsync(
                         person.SourceTable, person.RecordId ?? 0, ct);
-                    if (familyId.HasValue)
+                    if (familyIdResult.IsFailure)
+                        return Result.Failure(familyIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, familyIdResult.Message!);
+                    if (familyIdResult.Value.HasValue)
                     {
-                        person.FamilyMembers = await GetFamilyMembersFromPersonsAsync(
-                            person.SourceTable, familyId.Value, ct);
+                        var fromPersons = await GetFamilyMembersFromPersonsAsync(
+                            person.SourceTable, familyIdResult.Value.Value, ct);
+                        if (fromPersons.IsFailure)
+                            return Result.Failure(fromPersons.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, fromPersons.Message!);
+                        person.FamilyMembers = fromPersons.Value!;
                         LogInfo($"从{person.SourceDisplay}人员表补充导入家庭成员: {person.FamilyMembers.Count} 人");
                     }
                 }
@@ -130,9 +132,11 @@ public class PersonSearchService : BaseService, IPersonSearchService
                 {
                     var familyResult = await GetFamilyMembersFromPersonTablesByIdCardAsync(
                         person.IdCard, ct);
-                    if (familyResult.Count > 0)
+                    if (familyResult.IsFailure)
+                        return Result.Failure(familyResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, familyResult.Message!);
+                    if (familyResult.Value!.Count > 0)
                     {
-                        person.FamilyMembers = familyResult;
+                        person.FamilyMembers = familyResult.Value;
                         LogInfo($"从人员表反查导入家庭成员: {person.FamilyMembers.Count} 人（身份证: {DataMasker.MaskIdCard(person.IdCard)}）");
                     }
                     else
@@ -152,12 +156,17 @@ public class PersonSearchService : BaseService, IPersonSearchService
         }
         else if (person.SourceTable.Contains("_persons") && person.RecordId > 0)
         {
-            var familyId = await GetFamilyIdFromPersonAsync(
+            var familyIdResult = await GetFamilyIdFromPersonAsync(
                 person.SourceTable, person.RecordId ?? 0, ct);
-            if (familyId.HasValue)
+            if (familyIdResult.IsFailure)
+                return Result.Failure(familyIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, familyIdResult.Message!);
+            if (familyIdResult.Value.HasValue)
             {
-                person.FamilyMembers = await GetFamilyMembersFromPersonsAsync(
-                    person.SourceTable, familyId.Value, ct);
+                var fromPersons = await GetFamilyMembersFromPersonsAsync(
+                    person.SourceTable, familyIdResult.Value.Value, ct);
+                if (fromPersons.IsFailure)
+                    return Result.Failure(fromPersons.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, fromPersons.Message!);
+                person.FamilyMembers = fromPersons.Value!;
                 LogInfo($"从{person.SourceDisplay}导入家庭成员: {person.FamilyMembers.Count} 人");
             }
             else
@@ -165,9 +174,11 @@ public class PersonSearchService : BaseService, IPersonSearchService
                 LogWarn($"人员表 {person.SourceDisplay} 中身份证 {DataMasker.MaskIdCard(person.IdCard)} 的 family_id 为空，无法关联家庭成员。可能原因：1)导入时未执行家庭关联 2)head_id_card 与 applicant_id_card 不匹配 3)家庭记录不存在");
             }
         }
+
+        return Result.Success();
     }
 
-    private async Task<List<FamilyMember>> GetFamilyMembersAsync(
+    private async Task<Result<List<FamilyMember>>> GetFamilyMembersAsync(
         long applicationId, CancellationToken ct)
     {
         var sql = @"SELECT * FROM nc_biz_family_members 
@@ -175,12 +186,14 @@ public class PersonSearchService : BaseService, IPersonSearchService
                     ORDER BY is_applicant DESC, id ASC";
 
         var result = await _db.QueryAsync<FamilyMember>(sql, ct, applicationId);
-        return result.IsSuccess && result.Value != null
-            ? result.Value
-            : new List<FamilyMember>();
+        if (result.IsFailure)
+            return Result.Failure<List<FamilyMember>>(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"查询家庭成员失败: {result.Message}");
+        return Result.Success(result.Value ?? new List<FamilyMember>());
     }
 
-    private async Task<long?> GetFamilyIdFromPersonAsync(
+    private async Task<Result<long?>> GetFamilyIdFromPersonAsync(
         string personsTable, long personId, CancellationToken ct)
     {
         ValidateTableName(personsTable);
@@ -189,10 +202,14 @@ public class PersonSearchService : BaseService, IPersonSearchService
         // 而不是被压成 0。这样调用方 familyId.HasValue 才能正确走"family_id 为空"的
         // 诊断告警分支，也不会再拿 family_id = 0 去做一次注定空结果的成员查询。
         var result = await _db.ExecuteScalarAsync<long?>(sql, ct, personId);
-        return result.IsSuccess ? result.Value : null;
+        if (result.IsFailure)
+            return Result.Failure<long?>(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"查询人员家庭关联失败: {result.Message}");
+        return Result.Success<long?>(result.Value);
     }
 
-    private async Task<List<FamilyMember>> GetFamilyMembersFromPersonsAsync(
+    private async Task<Result<List<FamilyMember>>> GetFamilyMembersFromPersonsAsync(
         string personsTable, long familyId, CancellationToken ct)
     {
         ValidateTableName(personsTable);
@@ -213,13 +230,17 @@ public class PersonSearchService : BaseService, IPersonSearchService
                          p.id_card";
 
         var result = await _db.QueryAsync<FamilyMemberDto>(sql, ct, familyId);
-        if (!result.IsSuccess || result.Value == null)
-            return new List<FamilyMember>();
+        if (result.IsFailure)
+            return Result.Failure<List<FamilyMember>>(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"从人员表查询家庭成员失败: {result.Message}");
+        if (result.Value == null)
+            return Result.Success(new List<FamilyMember>());
 
-        return result.Value.Select(dto => MapToFamilyMember(dto)).ToList();
+        return Result.Success(result.Value.Select(dto => MapToFamilyMember(dto)).ToList());
     }
 
-    private async Task<List<FamilyMember>> GetFamilyMembersFromPersonTablesByIdCardAsync(
+    private async Task<Result<List<FamilyMember>>> GetFamilyMembersFromPersonTablesByIdCardAsync(
         string idCard, CancellationToken ct)
     {
         var personTables = new[]
@@ -232,29 +253,39 @@ public class PersonSearchService : BaseService, IPersonSearchService
 
         foreach (var table in personTables)
         {
-            var familyId = await GetFamilyIdFromPersonTableByIdCardAsync(table, idCard, ct);
-            if (familyId.HasValue)
+            var familyIdResult = await GetFamilyIdFromPersonTableByIdCardAsync(table, idCard, ct);
+            if (familyIdResult.IsFailure)
+                return Result.Failure<List<FamilyMember>>(
+                    familyIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    familyIdResult.Message!);
+            if (familyIdResult.Value.HasValue)
             {
                 LogInfo($"{table} 找到身份证: {DataMasker.MaskIdCard(idCard)}");
-                var members = await GetFamilyMembersFromPersonsAsync(table, familyId.Value, ct);
-                if (members.Count > 0)
+                var members = await GetFamilyMembersFromPersonsAsync(table, familyIdResult.Value.Value, ct);
+                if (members.IsFailure)
+                    return members;
+                if (members.Value!.Count > 0)
                 {
                     return members;
                 }
             }
         }
 
-        return new List<FamilyMember>();
+        return Result.Success(new List<FamilyMember>());
     }
 
-    private async Task<long?> GetFamilyIdFromPersonTableByIdCardAsync(
+    private async Task<Result<long?>> GetFamilyIdFromPersonTableByIdCardAsync(
         string personsTable, string idCard, CancellationToken ct)
     {
         ValidateTableName(personsTable);
         var sql = $"SELECT family_id FROM {personsTable} WHERE id_card = $1 LIMIT 1";
         // 同 GetFamilyIdFromPersonAsync：无行 / NULL 需返回 null 而非 0
         var result = await _db.ExecuteScalarAsync<long?>(sql, ct, idCard);
-        return result.IsSuccess ? result.Value : null;
+        if (result.IsFailure)
+            return Result.Failure<long?>(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"查询人员家庭关联失败: {result.Message}");
+        return Result.Success<long?>(result.Value);
     }
 
     private static FamilyMember MapToFamilyMember(FamilyMemberDto dto)
@@ -319,7 +350,7 @@ public class PersonSearchService : BaseService, IPersonSearchService
                relationship == "本人/户主";
     }
 
-    private async Task<List<PersonSearchResult>> ExecuteSingleQueryAsync(
+    private async Task<Result<List<PersonSearchResult>>> ExecuteSingleQueryAsync(
         string table, string display, string columns, string where,
         string idCard, string join, CancellationToken ct)
     {
@@ -330,18 +361,16 @@ public class PersonSearchService : BaseService, IPersonSearchService
         Debug.WriteLine($"执行SQL: {table}");
         var result = await _db.QueryAsync<PersonSearchResult>(sql, ct, idCard);
 
-        Debug.WriteLine($"[PersonSearch] {table}: IsSuccess={result.IsSuccess}");
-
-        if (!result.IsSuccess)
+        if (result.IsFailure)
         {
             LogWarn($"[PersonSearch] {table} 查询失败: {result.Message}");
-        }
-        else
-        {
-            LogInfo($"[PersonSearch] {table} 查询成功: {result.Value?.Count ?? 0} 条记录");
+            return Result.Failure<List<PersonSearchResult>>(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"人员搜索源表 {table} 查询失败: {result.Message}");
         }
 
-        return result.Value ?? new List<PersonSearchResult>();
+        LogInfo($"[PersonSearch] {table} 查询成功: {result.Value?.Count ?? 0} 条记录");
+        return Result.Success(result.Value ?? new List<PersonSearchResult>());
     }
 
     private class FamilyMemberDto

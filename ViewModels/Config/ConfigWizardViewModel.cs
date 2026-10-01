@@ -1,26 +1,60 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NewCosmos.Models.Options;
 using NewCosmos.Services.Core;
+using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 
 namespace NewCosmos.ViewModels.Config;
 
-public partial class ConfigWizardViewModel : ObservableObject
+public partial class ConfigWizardViewModel : ViewModelBase
 {
+    private readonly IServiceProvider _serviceProvider;
     private readonly IConfigService _configService;
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
 
+    protected override IServiceProvider ServiceProvider => _serviceProvider;
+    protected override ILoggerService Logger => _logger;
+
     [ObservableProperty]
     private ObservableCollection<string> _missingConfigFiles = new();
 
-    public ConfigWizardViewModel(IConfigService configService, ILoggerService logger, IDialogService dialogService)
+    [ObservableProperty]
+    private bool _isAndroid;
+
+    [ObservableProperty]
+    private bool _isNotAndroid = true;
+
+    [ObservableProperty]
+    private string _dbHost = "127.0.0.1";
+
+    [ObservableProperty]
+    private string _dbPort = "5432";
+
+    [ObservableProperty]
+    private string _dbName = "new_cosmos";
+
+    [ObservableProperty]
+    private string _dbUsername = "new_cosmos";
+
+    [ObservableProperty]
+    private string _dbPassword = string.Empty;
+
+    public ConfigWizardViewModel(IServiceProvider serviceProvider, IConfigService configService, ILoggerService logger, IDialogService dialogService)
     {
+        _serviceProvider = serviceProvider;
         _configService = configService;
         _logger = logger;
         _dialogService = dialogService;
 
+#if ANDROID
+        IsAndroid = true;
+        IsNotAndroid = false;
+#endif
+
         LoadMissingFiles();
+        LoadExistingDbConfig();
     }
 
     private void LoadMissingFiles()
@@ -30,6 +64,24 @@ public partial class ConfigWizardViewModel : ObservableObject
         foreach (var file in missing)
         {
             MissingConfigFiles.Add(file);
+        }
+    }
+
+    private void LoadExistingDbConfig()
+    {
+        try
+        {
+            var options = _configService.GetDatabaseOptions();
+            if (!string.IsNullOrEmpty(options.Host)) DbHost = options.Host;
+            if (options.Port > 0) DbPort = options.Port.ToString();
+            if (!string.IsNullOrEmpty(options.DatabaseName)) DbName = options.DatabaseName;
+            if (!string.IsNullOrEmpty(options.Username)) DbUsername = options.Username;
+            if (!string.IsNullOrEmpty(options.Password) && !options.Password.StartsWith("enc:"))
+                DbPassword = options.Password;
+        }
+        catch
+        {
+            // 使用默认值
         }
     }
 
@@ -66,13 +118,64 @@ public partial class ConfigWizardViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task SaveDatabaseConfig()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(DbHost) || string.IsNullOrWhiteSpace(DbPassword))
+            {
+                await _dialogService.DisplayAlertAsync("提示", "主机和密码不能为空", "确定");
+                return;
+            }
+
+            if (!int.TryParse(DbPort, out var port) || port <= 0 || port > 65535)
+            {
+                await _dialogService.DisplayAlertAsync("提示", "端口号无效", "确定");
+                return;
+            }
+
+            var options = new DatabaseOptions
+            {
+                Host = DbHost.Trim(),
+                Port = port,
+                DatabaseName = DbName.Trim(),
+                Username = DbUsername.Trim(),
+                Password = DbPassword.Trim(),
+                ConnectionTimeout = 5,
+                CommandTimeout = 30,
+                MaxPoolSize = 30,
+                MinPoolSize = 5,
+                SslMode = "Disable",
+                TrustServerCertificate = true,
+                IncludeErrorDetail = true,
+                ApplicationName = "NewCosmos-Android"
+            };
+
+            _configService.SaveDatabaseOptions(options);
+
+            await _dialogService.DisplayAlertAsync("成功", "数据库配置已保存", "确定");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存数据库配置失败");
+            await _dialogService.DisplayAlertAsync("错误", $"保存失败: {ex.Message}", "确定");
+        }
+    }
+
+    [RelayCommand]
     private async Task OpenConfigDirectory()
     {
         try
         {
+#if ANDROID
+            await _dialogService.DisplayAlertAsync("配置目录",
+                "Android 配置文件位于应用私有目录，需使用文件管理器访问。\n\n" +
+                "请编辑 database.ini 填写数据库密码，然后点击「重新检查」。",
+                "确定");
+#else
             _configService.EnsureConfigDirectoryExists();
-
             await Launcher.OpenAsync(new Uri(Path.Combine(AppContext.BaseDirectory, "config")));
+#endif
         }
         catch (Exception ex)
         {

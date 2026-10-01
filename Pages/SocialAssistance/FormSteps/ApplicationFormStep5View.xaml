@@ -321,6 +321,10 @@
                                 <Label Text="{Binding GracePeriodStatusText}" FontSize="15" TextColor="{StaticResource Warning}"/>
                             </VerticalStackLayout>
                         </Grid>
+                        <Button Text="输出文书（增减员表 / 渐退审批表）"
+                                Style="{StaticResource ButtonSecondary}"
+                                Command="{Binding ShowGraceDocumentSheetCommand}"
+                                HorizontalOptions="Fill"/>
                     </VerticalStackLayout>
                 </Border>
 

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Platform;
 using System.Reflection;
 
@@ -297,6 +298,24 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     #region 通用导航方法
 
     /// <summary>
+    /// Android 上尝试解析手机专用页面（Pages.Mobile.Mobile{原页面名}），找不到则回退原页面。
+    /// </summary>
+    protected Page ResolvePage<TPage>() where TPage : Page
+    {
+        if (DeviceInfo.Platform == DevicePlatform.Android)
+        {
+            var mobileTypeName = $"NewCosmos.Pages.Mobile.Mobile{typeof(TPage).Name}";
+            var mobileType = typeof(TPage).Assembly.GetType(mobileTypeName);
+            if (mobileType != null)
+            {
+                var resolved = ServiceProvider.GetService(mobileType) as Page;
+                if (resolved != null) return resolved;
+            }
+        }
+        return ServiceProvider.GetRequiredService<TPage>();
+    }
+
+    /// <summary>
     /// 带页面标题的导航：push 前将标题写入 Page.Title，使其成为窗口标题随导航栈恢复的数据源
     /// （push/pop 后窗口标题统一按栈顶 Page.Title 恢复）。
     /// </summary>
@@ -315,16 +334,19 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         
         try
         {
-            // 1. DI 解析页面
+            // 1. DI 解析页面（Android 自动解析手机专用页面）
             Logger.LogDiResolution(pageName, true);
-            var page = ServiceProvider.GetRequiredService<TPage>();
-            ServiceProvider.GetService<IWindowTitleService>()?.Register(page);
+            var resolvedPage = ResolvePage<TPage>();
+            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
             
-            // 2. 配置页面
-            configure?.Invoke(page);
+            // 2. 配置页面（Android 手机页与桌面页为兄弟类型，安全 cast 后才调用 configure）
+            if (resolvedPage is TPage typedPage)
+            {
+                configure?.Invoke(typedPage);
+            }
             
             // 3. 推送页面
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
+            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(resolvedPage);
             
             // 4. 导航成功并按新栈顶页面的 Page.Title 恢复窗口标题
             Logger.LogNavigationSuccess(fromPage, pageName);
@@ -351,19 +373,19 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         
         try
         {
-            // 1. DI 解析页面
+            // 1. DI 解析页面（Android 自动解析手机专用页面）
             Logger.LogDiResolution(pageName, true);
-            var page = ServiceProvider.GetRequiredService<TPage>();
-            ServiceProvider.GetService<IWindowTitleService>()?.Register(page);
+            var resolvedPage = ResolvePage<TPage>();
+            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
             
-            // 2. 配置页面
-            if (configure != null)
+            // 2. 配置页面（Android 手机页与桌面页为兄弟类型，安全 cast 后才调用 configure）
+            if (resolvedPage is TPage typedPage && configure != null)
             {
-                await configure(page);
+                await configure(typedPage);
             }
             
             // 3. 推送页面
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
+            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(resolvedPage);
             
             // 4. 导航成功并按新栈顶页面的 Page.Title 恢复窗口标题
             Logger.LogNavigationSuccess(fromPage, pageName);
@@ -386,10 +408,43 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     /// <summary>
     /// 参数化页面导航（单一传参通道）：DI 解析 → 按 <see cref="IParameterizedPage{TParam}"/> 注入参数 → 推送。
+    /// Android 手机专用页（Pages.Mobile.Mobile{页面名}）与桌面页为兄弟类型，<b>同样按接口注入参数</b>，
+    /// 因此手机页只需实现相同的 <see cref="IParameterizedPage{TParam}"/> 契约，业务 ViewModel 零改动。
     /// </summary>
     protected async Task NavigateToPageAsync<TPage, TParam>(TParam parameter) where TPage : Page, IParameterizedPage<TParam>
     {
-        await NavigateToPageAsync<TPage>(page => page.SetParameterAsync(parameter));
+        var pageName = typeof(TPage).Name;
+        var fromPage = Title ?? "Unknown";
+
+        Logger.LogNavigationStart(fromPage, pageName);
+
+        try
+        {
+            // 1. DI 解析页面（Android 自动解析手机专用页面）
+            Logger.LogDiResolution(pageName, true);
+            var resolvedPage = ResolvePage<TPage>();
+            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
+
+            // 2. 参数注入：桌面页与手机页统一走接口，不再受限于 resolvedPage is TPage
+            if (resolvedPage is IParameterizedPage<TParam> parameterized)
+            {
+                await parameterized.SetParameterAsync(parameter);
+            }
+
+            // 3. 推送页面
+            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(resolvedPage);
+
+            // 4. 导航成功并按新栈顶页面的 Page.Title 恢复窗口标题
+            Logger.LogNavigationSuccess(fromPage, pageName);
+            RestoreWindowTitleFromNavigation();
+        }
+        catch (Exception ex)
+        {
+            // 5. 导航失败
+            Logger.LogNavigationFailed(fromPage, pageName, ex.Message);
+            Logger.LogError(ex, $"导航到 {pageName} 失败");
+            throw;
+        }
     }
 
     /// <summary>
@@ -821,7 +876,7 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
     protected int CalculateOffset() => (PageIndex - 1) * PageSize;
 
     /// <summary>
-    /// 分页填充半段（<see cref="LoadPageAsync{T}"/> 的分解形态）：清空→填充→同步 TotalCount。
+    /// 分页填充半段（<see cref="PagedSearchViewModelBase.LoadPageAsync{T}(Func{CancellationToken, Task{Result{PagedResult{T}}}}, IList{T}, Action{PagedResult{T}}?, string)"/> 的分解形态）：清空→填充→同步 TotalCount。
     /// 供带额外并发守卫（如 Tab 版本校验）、无法整体套用模板的子类复用填充段。
     /// </summary>
     protected void FillPagedPage<T>(IList<T> target, Models.Results.PagedResult<T> page)
@@ -834,7 +889,7 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
 
     /// <summary>
     /// LoadDataAsync 推荐实现（模板方法）：执行分页查询，先清空后填充目标集合，并同步 TotalCount。
-    /// 成功时回调 onLoaded 供子类做附带联动（如徽章/统计文本）；失败仅记 Warn 日志、保留原列表。
+    /// 成功时回调 onLoaded 供子类做附带联动（如徽章/统计文本）；失败显式提示 + Warn 日志（禁止静默空列表）。
     /// </summary>
     protected async Task LoadPageAsync<T>(
         Func<CancellationToken, Task<Models.Results.Result<Models.Results.PagedResult<T>>>> fetch,
@@ -856,13 +911,17 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
             else
             {
                 Logger?.Warn($"分页列表加载失败: {result.Message}");
+                ErrorMessage = result.Message ?? "列表加载失败，请稍后重试";
+                var dialog = ServiceProvider?.GetService<IDialogService>();
+                if (dialog != null)
+                    await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
             }
         }, loadingHint);
     }
 
     /// <summary>
     /// 分页加载模板（async 回调版）：支持在 onLoadedAsync 中执行异步操作（如数据权限标注）。
-    /// 失败仅记 Warn 日志、保留原列表。
+    /// 失败显式提示 + Warn 日志（禁止静默空列表）。
     /// </summary>
     protected async Task LoadPageAsync<T>(
         Func<CancellationToken, Task<Models.Results.Result<Models.Results.PagedResult<T>>>> fetch,
@@ -885,6 +944,10 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
             else
             {
                 Logger?.Warn($"分页列表加载失败: {result.Message}");
+                ErrorMessage = result.Message ?? "列表加载失败，请稍后重试";
+                var dialog = ServiceProvider?.GetService<IDialogService>();
+                if (dialog != null)
+                    await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
             }
         }, loadingHint);
     }

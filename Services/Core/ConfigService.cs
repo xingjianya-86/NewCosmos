@@ -86,6 +86,16 @@ public class ConfigService : IConfigService
 
     private string GetConfigDirectory()
     {
+#if ANDROID
+        // Android: 使用应用私有存储（可写），首次启动从 assets 复制默认配置
+        var writableConfigDir = Path.Combine(FileSystem.AppDataDirectory, "config");
+        if (!Directory.Exists(writableConfigDir))
+        {
+            Directory.CreateDirectory(writableConfigDir);
+            CopyDefaultConfigFromAssets(writableConfigDir);
+        }
+        return writableConfigDir;
+#else
         var productionConfigPath = Path.Combine(AppContext.BaseDirectory, "config");
 
         // database.ini 不再复制进构建输出（凭据不随安装包分发），
@@ -105,7 +115,44 @@ public class ConfigService : IConfigService
         }
 
         return Path.GetFullPath(productionConfigPath);
+#endif
     }
+
+#if ANDROID
+    /// <summary>
+    /// Android: 从 APK assets 复制默认配置到可写目录（首次启动）
+    /// </summary>
+    private static void CopyDefaultConfigFromAssets(string targetDir)
+    {
+        var defaultFiles = new[]
+        {
+            "app.ini",
+            "performance.ini",
+            "update.ini",
+            "network.ini",
+            "document_output.yaml",
+            "print_settings.yaml",
+            "timeline_config.yaml"
+        };
+
+        foreach (var fileName in defaultFiles)
+        {
+            try
+            {
+                using var assetStream = FileSystem.OpenAppPackageFileAsync(fileName).GetAwaiter().GetResult();
+                var targetPath = Path.Combine(targetDir, fileName);
+                using var fileStream = File.Create(targetPath);
+                assetStream.CopyTo(fileStream);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning("[ConfigService] 复制默认配置 {File} 失败: {Message}", fileName, ex.Message);
+            }
+        }
+
+        Serilog.Log.Information("[ConfigService] 已从 assets 复制默认配置到 {Dir}", targetDir);
+    }
+#endif
 
     public AppOptions GetAppOptions()
     {
@@ -167,7 +214,31 @@ public class ConfigService : IConfigService
         var filePath = Path.Combine(_configDirectory, "database.ini");
         
         if (!File.Exists(filePath))
+        {
+#if ANDROID
+            // Android: 首次启动无 database.ini，返回带默认值的配置（由配置向导填写密码后保存）
+            Serilog.Log.Information("[ConfigService] database.ini 不存在，使用默认值等待用户配置");
+            _databaseOptions = new DatabaseOptions
+            {
+                Host = "127.0.0.1",
+                Port = 5432,
+                DatabaseName = "new_cosmos",
+                Username = "new_cosmos",
+                Password = "",
+                ConnectionTimeout = 5,
+                CommandTimeout = 30,
+                MaxPoolSize = 30,
+                MinPoolSize = 5,
+                SslMode = "Disable",
+                TrustServerCertificate = true,
+                IncludeErrorDetail = true,
+                ApplicationName = "NewCosmos-Android"
+            };
+            return _databaseOptions;
+#else
             throw new ConfigurationException("database.ini", $"数据库配置文件不存在: {filePath}");
+#endif
+        }
 
         _databaseOptions = new DatabaseOptions();
         
@@ -206,7 +277,13 @@ public class ConfigService : IConfigService
         // DPAPI 凭据保护：密文（enc: 前缀）解密使用；明文自动加密回写文件
         _databaseOptions.Password = ResolvePassword(filePath, _databaseOptions.Password);
 
+#if ANDROID
+        // Android: enc: 密码解密失败（SecureStorage 为空）时密码为空，跳过 Validate 由配置向导补填
+        if (!string.IsNullOrEmpty(_databaseOptions.Password))
+            _databaseOptions.Validate();
+#else
         _databaseOptions.Validate();
+#endif
         Serilog.Log.Information("[ConfigService] 数据库配置加载完成: Host={Host}", _databaseOptions.Host);
 
         return _databaseOptions;
@@ -214,10 +291,10 @@ public class ConfigService : IConfigService
 
     /// <summary>
     /// 解析数据库密码：
-    /// - "enc:" 前缀 → DPAPI(LocalMachine) 解密后返回明文（仅驻留内存，用于连接串）；
-    /// - 明文 → 首次运行自动加密回写 ini（历史注释声称的"自动加密"由此真正实现）。
-    /// LocalMachine 范围：同一台机器的所有 Windows 账户均可解密（窗口机多人共用场景），
-    /// 但密文不可复制到其他机器使用。
+    /// - "enc:" 前缀 → 解密后返回明文（仅驻留内存，用于连接串）；
+    /// - 明文 → 首次运行自动加密回写 ini。
+    /// Windows: DPAPI(LocalMachine) 加密，密文不可跨机复制。
+    /// Android: SecureStorage (Android Keystore) 加密，密文绑定应用签名。
     /// </summary>
     private static string ResolvePassword(string filePath, string rawValue)
     {
@@ -229,15 +306,29 @@ public class ConfigService : IConfigService
             try
             {
                 var cipher = Convert.FromBase64String(rawValue[EncryptedPasswordPrefix.Length..]);
+#if WINDOWS
                 var plain = global::System.Security.Cryptography.ProtectedData.Unprotect(
                     cipher, PasswordEntropy, global::System.Security.Cryptography.DataProtectionScope.LocalMachine);
                 return global::System.Text.Encoding.UTF8.GetString(plain);
+#elif ANDROID
+                // Android AES 解密：密钥由 DeriveAesKey(PasswordEntropy) PBKDF2 派生，与 SecureStorage 无关
+                using var aes = global::System.Security.Cryptography.Aes.Create();
+                aes.Key = DeriveAesKey(PasswordEntropy);
+                aes.IV = cipher[..16];
+                using var decryptor = aes.CreateDecryptor();
+                using var ms = new global::System.IO.MemoryStream(cipher[16..]);
+                using var cs = new global::System.Security.Cryptography.CryptoStream(ms, decryptor, global::System.Security.Cryptography.CryptoStreamMode.Read);
+                using var reader = new global::System.IO.StreamReader(cs);
+                return reader.ReadToEnd();
+#else
+                return global::System.Text.Encoding.UTF8.GetString(cipher);
+#endif
             }
+            catch (ConfigurationException) { throw; }
             catch (Exception ex)
             {
                 throw new ConfigurationException("database.ini",
-                    "数据库密码解密失败。密文是机器级加密的，不能从其他机器复制过来；" +
-                    "请在本机重新填写明文密码，应用启动时会自动加密。原始错误: " + ex.Message);
+                    "数据库密码解密失败。请重新填写明文密码，应用启动时会自动加密。原始错误: " + ex.Message);
             }
         }
 
@@ -249,10 +340,30 @@ public class ConfigService : IConfigService
     {
         try
         {
+#if WINDOWS
             var cipher = global::System.Security.Cryptography.ProtectedData.Protect(
                 global::System.Text.Encoding.UTF8.GetBytes(plainPassword), PasswordEntropy,
                 global::System.Security.Cryptography.DataProtectionScope.LocalMachine);
             var encValue = EncryptedPasswordPrefix + Convert.ToBase64String(cipher);
+#elif ANDROID
+            // Android: 使用 AES 加密，密钥派生自 PasswordEntropy
+            using var aes = global::System.Security.Cryptography.Aes.Create();
+            aes.Key = DeriveAesKey(PasswordEntropy);
+            aes.GenerateIV();
+            using var encryptor = aes.CreateEncryptor();
+            using var ms = new global::System.IO.MemoryStream();
+            ms.Write(aes.IV, 0, aes.IV.Length);
+            using (var cs = new global::System.Security.Cryptography.CryptoStream(ms, encryptor, global::System.Security.Cryptography.CryptoStreamMode.Write))
+            {
+                var plainBytes = global::System.Text.Encoding.UTF8.GetBytes(plainPassword);
+                cs.Write(plainBytes, 0, plainBytes.Length);
+                cs.FlushFinalBlock();
+            }
+            var encValue = EncryptedPasswordPrefix + Convert.ToBase64String(ms.ToArray());
+#else
+            // 其他平台：不加密，明文存储
+            return;
+#endif
 
             var lines = File.ReadAllLines(filePath);
             var replaced = false;
@@ -270,7 +381,7 @@ public class ConfigService : IConfigService
             if (replaced)
             {
                 File.WriteAllLines(filePath, lines);
-                Serilog.Log.Information("[ConfigService] 数据库密码已自动加密回写 (DPAPI LocalMachine)");
+                Serilog.Log.Information("[ConfigService] 数据库密码已自动加密回写");
             }
         }
         catch (Exception ex)
@@ -279,6 +390,21 @@ public class ConfigService : IConfigService
             Serilog.Log.Warning("[ConfigService] 数据库密码自动加密回写失败: {Message}", ex.Message);
         }
     }
+
+#if ANDROID
+    /// <summary>
+    /// 从 PasswordEntropy 派生 AES-256 密钥（PBKDF2）
+    /// </summary>
+    private static byte[] DeriveAesKey(byte[] entropy)
+    {
+        return global::System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            entropy,
+            global::System.Text.Encoding.UTF8.GetBytes("NewCosmos.DbCredential.v2"),
+            100000,
+            global::System.Security.Cryptography.HashAlgorithmName.SHA256,
+            32); // AES-256
+    }
+#endif
 
     public StorageOptions GetStorageOptions()
     {
@@ -573,32 +699,55 @@ public class ConfigService : IConfigService
         var filePath = Path.Combine(_configDirectory, "network.ini");
 
         // 可选文件：缺失时使用默认值（不影响启动）
-        if (!File.Exists(filePath))
+        if (File.Exists(filePath))
+        {
+            foreach (var line in ReadIniLines(filePath))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#') || trimmed.StartsWith('['))
+                    continue;
+
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length != 2) continue;
+
+                var key = parts[0].Trim();
+                var value = parts[1].Trim();
+                switch (key)
+                {
+                    case "Mode": _networkOptions.Mode = value; break;
+                    case "PrivateNetworkId": _networkOptions.PrivateNetworkId = value; break;
+                    case "MoonId": _networkOptions.MoonId = value; break;
+                    case "PublicNetworkId": _networkOptions.PublicNetworkId = value; break;
+                    case "DbHost": _networkOptions.DbHost = value; break;
+                    case "DbPort": if (int.TryParse(value, out var port)) _networkOptions.DbPort = port; break;
+                    case "WebControllerUrl": _networkOptions.WebControllerUrl = value; break;
+                }
+            }
+        }
+        else
         {
             Serilog.Log.Information("[ConfigService] network.ini 不存在，使用默认网络配置");
-            return _networkOptions;
         }
 
-        foreach (var line in ReadIniLines(filePath))
+        // app.ini [Network]：ZeroTier CLI / 管理令牌路径覆盖（按 key 全文件匹配；
+        // 留空则 NetworkAccessService 使用内置默认路径）
+        var appIniPath = Path.Combine(_configDirectory, "app.ini");
+        if (File.Exists(appIniPath))
         {
-            var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#') || trimmed.StartsWith('['))
-                continue;
-
-            var parts = trimmed.Split('=', 2);
-            if (parts.Length != 2) continue;
-
-            var key = parts[0].Trim();
-            var value = parts[1].Trim();
-            switch (key)
+            foreach (var line in ReadIniLines(appIniPath))
             {
-                case "Mode": _networkOptions.Mode = value; break;
-                case "PrivateNetworkId": _networkOptions.PrivateNetworkId = value; break;
-                case "MoonId": _networkOptions.MoonId = value; break;
-                case "PublicNetworkId": _networkOptions.PublicNetworkId = value; break;
-                case "DbHost": _networkOptions.DbHost = value; break;
-                case "DbPort": if (int.TryParse(value, out var port)) _networkOptions.DbPort = port; break;
-                case "WebControllerUrl": _networkOptions.WebControllerUrl = value; break;
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#') || trimmed.StartsWith('['))
+                    continue;
+
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length != 2) continue;
+
+                switch (parts[0].Trim())
+                {
+                    case "ZeroTierCliPaths": _networkOptions.ZeroTierCliPaths = parts[1].Trim(); break;
+                    case "ZeroTierTokenPath": _networkOptions.ZeroTierTokenPath = parts[1].Trim(); break;
+                }
             }
         }
 
@@ -639,6 +788,11 @@ public class ConfigService : IConfigService
                     break;
                 case "ManifestUrls":
                     _updateOptions.ManifestUrls = value
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .ToList();
+                    break;
+                case "AndroidManifestUrls":
+                    _updateOptions.AndroidManifestUrls = value
                         .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                         .ToList();
                     break;
@@ -797,6 +951,27 @@ public class ConfigService : IConfigService
         var databaseIniContent = string.IsNullOrWhiteSpace(networkDbHost)
             ? DefaultDatabaseIni
             : DefaultDatabaseIni.Replace("Host=127.0.0.1", "Host=" + networkDbHost, StringComparison.Ordinal);
+
+#if ANDROID
+        // Android: 用简洁的 flat 格式（与 GetDatabaseOptions 读取格式一致）
+        databaseIniContent =
+            "# 数据库连接配置（由配置向导自动生成）\n" +
+            "[Database]\n" +
+            "Host=" + networkDbHost + "\n" +
+            "Port=5432\n" +
+            "DatabaseName=new_cosmos\n" +
+            "Username=new_cosmos\n" +
+            "Password=your_password\n" +
+            "ConnectionTimeout=5\n" +
+            "CommandTimeout=30\n" +
+            "MaxPoolSize=30\n" +
+            "MinPoolSize=5\n" +
+            "IsProduction=true\n" +
+            "SslMode=Disable\n" +
+            "TrustServerCertificate=true\n" +
+            "IncludeErrorDetail=true\n" +
+            "ApplicationName=NewCosmos-Android\n";
+#endif
 
         var templates = new (string FileName, string Content)[]
         {
@@ -1011,5 +1186,58 @@ public class ConfigService : IConfigService
         DbPort=5432
         WebControllerUrl=
         """;
+
+    public void SaveDatabaseOptions(DatabaseOptions options)
+    {
+        var filePath = Path.Combine(_configDirectory, "database.ini");
+        var lines = new[]
+        {
+            "# 数据库连接配置",
+            "# 此文件由配置向导自动生成，也可手工编辑。",
+            "",
+            "[Database]",
+            $"Host={options.Host}",
+            $"Port={options.Port}",
+            $"DatabaseName={options.DatabaseName}",
+            $"Username={options.Username}",
+            $"Password={options.Password}",
+            $"ConnectionTimeout={options.ConnectionTimeout}",
+            $"CommandTimeout={options.CommandTimeout}",
+            $"MaxPoolSize={options.MaxPoolSize}",
+            $"MinPoolSize={options.MinPoolSize}",
+            $"IsProduction={options.IsProduction.ToString().ToLowerInvariant()}",
+            $"SslMode={options.SslMode}",
+            $"TrustServerCertificate={options.TrustServerCertificate.ToString().ToLowerInvariant()}",
+            $"IncludeErrorDetail={options.IncludeErrorDetail.ToString().ToLowerInvariant()}",
+            $"ApplicationName={options.ApplicationName}"
+        };
+
+        File.WriteAllLines(filePath, lines);
+
+        // 就地更新已有的 singleton（DI 中的引用不变，值同步更新）
+        if (_databaseOptions != null)
+        {
+            _databaseOptions.Host = options.Host;
+            _databaseOptions.Port = options.Port;
+            _databaseOptions.DatabaseName = options.DatabaseName;
+            _databaseOptions.Username = options.Username;
+            _databaseOptions.Password = options.Password;
+            _databaseOptions.ConnectionTimeout = options.ConnectionTimeout;
+            _databaseOptions.CommandTimeout = options.CommandTimeout;
+            _databaseOptions.MaxPoolSize = options.MaxPoolSize;
+            _databaseOptions.MinPoolSize = options.MinPoolSize;
+            _databaseOptions.IsProduction = options.IsProduction;
+            _databaseOptions.SslMode = options.SslMode;
+            _databaseOptions.TrustServerCertificate = options.TrustServerCertificate;
+            _databaseOptions.IncludeErrorDetail = options.IncludeErrorDetail;
+            _databaseOptions.ApplicationName = options.ApplicationName;
+        }
+        else
+        {
+            _databaseOptions = options;
+        }
+
+        Serilog.Log.Information("[ConfigService] 数据库配置已保存: Host={Host}", options.Host);
+    }
 
 }

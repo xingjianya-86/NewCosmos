@@ -5,6 +5,7 @@ using NewCosmos.Constants;
 using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.Domain.Reporting;
@@ -27,11 +28,13 @@ public partial class MainViewModel : ViewModelBase
     private readonly IStatisticsService _statisticsService = null!;
     private readonly IConfigService _configService = null!;
     private readonly IUpdateService _updateService = null!;
+    private readonly IAppUpdateCoordinator _updateCoordinator = null!;
     private readonly NewCosmos.Services.System.IClientVersionService _clientVersionService = null!;
     private readonly ISchemaService _schemaService = null!;
     private readonly IDictCacheService _dictCacheService = null!;
     private readonly IGracePeriodService _gracePeriodService = null!;
     private readonly IWindowTitleService _windowTitleService = null!;
+    private readonly INavigationService _navigationService = null!;
     private readonly IElderlyApplicationService _elderlyApplicationService = null!;
     private readonly ICollegeStudentService _collegeStudentService = null!;
     private readonly AppOptions _appOptions = null!;
@@ -218,8 +221,11 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>登录后定时更新检查定时器（间隔来自 update.ini；Dispose 时停止）</summary>
     private IDispatcherTimer? _updateTimer;
 
-    /// <summary>一次初始化守卫：主页每次 OnAppearing 都会调用 InitializeAsync，但重活只需首屏跑一次</summary>
-    private bool _initialized;
+        /// <summary>一次初始化守卫：主页每次 OnAppearing 都会调用 InitializeAsync，但重活只需首屏跑一次</summary>
+        private bool _initialized;
+
+        /// <summary>权限成功加载标记：失败时保留 false，下次 OnAppearing 重试（AGENTS §6）</summary>
+        private bool _permissionsLoaded;
 
     [ObservableProperty]
     private string _currentDateString = DateTime.Now.ToString(DateTimeDisplayFormat);
@@ -262,7 +268,7 @@ public partial class MainViewModel : ViewModelBase
 
     #region 渐退期到期提醒
 
-    /// <summary>渐退期在预警窗口内到期（含已到期未处理）的户数（窗口天数见 GracePeriodConstants.EXPIRING_WARNING_DAYS）</summary>
+    /// <summary>渐退期进行中/已到期户数</summary>
     [ObservableProperty]
     private int _gracePeriodExpiringCount;
 
@@ -272,7 +278,7 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>横幅文案（预警天数引用 GracePeriodConstants，禁止 XAML 写死 30）</summary>
     public string GracePeriodExpiringBannerText =>
-        $"有 {GracePeriodExpiringCount} 户渐退期将在{GracePeriodConstants.EXPIRING_WARNING_DAYS}天内到期（含已到期未处理），请及时前往「低收入人口救助帮扶」处理";
+        $"有 {GracePeriodExpiringCount} 户渐退期将在 {GracePeriodConstants.EXPIRING_WARNING_DAYS} 天内到期或已到期，请及时前往「低收入人口救助帮扶」处理";
 
     partial void OnGracePeriodExpiringCountChanged(int value) => OnPropertyChanged(nameof(GracePeriodExpiringBannerText));
 
@@ -332,6 +338,8 @@ public partial class MainViewModel : ViewModelBase
         ICollegeStudentService collegeStudentService,
         IWindowTitleService windowTitleService,
         IUpdateService updateService,
+        IAppUpdateCoordinator updateCoordinator,
+        INavigationService navigationService,
         NewCosmos.Services.System.IClientVersionService clientVersionService)
     {
         _logger = logger;
@@ -348,6 +356,8 @@ public partial class MainViewModel : ViewModelBase
         _collegeStudentService = collegeStudentService;
         _windowTitleService = windowTitleService;
         _updateService = updateService;
+        _updateCoordinator = updateCoordinator;
+        _navigationService = navigationService;
         _clientVersionService = clientVersionService;
 
         _appOptions = _configService.GetAppOptions();
@@ -372,7 +382,12 @@ public partial class MainViewModel : ViewModelBase
 
         // 重活（Office 检测、权限、统计、Schema、字典预热）只在首次执行
         if (_initialized)
+        {
+            // 首次权限加载失败时不锁死：每次 OnAppearing 重试至成功（失败不得清零 CanAccess*）
+            if (!_permissionsLoaded)
+                await LoadPermissionsAsync();
             return;
+        }
         _initialized = true;
 
         // 客户端版本台账上报（失败不阻断；县局据此查看未升级机器）
@@ -383,9 +398,11 @@ public partial class MainViewModel : ViewModelBase
 
         _logger.Info($"主页初始化开始");
 
+#if WINDOWS
         // 检测 Microsoft Office 是否安装（PDF 导出必需）
         // COM/注册表探测为同步阻塞操作，放到线程池执行，避免卡住 UI 线程；
         // 结果进程内缓存一次，后续返回主页不再重复探测。
+        // Android 端无 Office，跳过此检测（手机端打印走推送打印队列）。
         var officeInstalled = await Task.Run(() => OfficeProviderDetector.IsOfficeInstalled());
         if (!officeInstalled)
         {
@@ -398,6 +415,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         _logger.Info("Office 检测通过");
+#endif
 
         InitializeUserInfo();
 
@@ -525,104 +543,12 @@ public partial class MainViewModel : ViewModelBase
 
     private async Task CheckForUpdatesInternalAsync(bool manual)
     {
-        try
+        var launched = await _updateCoordinator.CheckAndPromptAsync(manual);
+        // Windows 需退出应用以便安装器覆盖升级；Android 由系统安装器接管，无需退出
+        if (launched && OperatingSystem.IsWindows())
         {
-            if (!_updateService.Options.Enabled)
-            {
-                if (manual)
-                    await _dialogService.DisplayAlertAsync("检查更新", "在线更新未启用（config/update.ini）", "确定");
-                return;
-            }
-
-            var check = await _updateService.CheckAsync(manual);
-            if (check.IsFailure)
-            {
-                _logger.Warn($"更新检查失败: {check.Message}");
-                if (manual)
-                    await _dialogService.DisplayAlertAsync("检查更新", $"无法连接更新服务器：{check.Message}", "确定");
-                return;
-            }
-
-            var result = check.Value;
-            if (!result.UpdateAvailable || result.Info == null)
-            {
-                if (manual)
-                    await _dialogService.DisplayAlertAsync("检查更新", $"当前已是最新版本（{_updateService.CurrentVersion}）", "确定");
-                return;
-            }
-
-            var info = result.Info;
-            // 定时检查：用户已跳过该版本则不重复提示（强制版本除外）
-            if (!result.ForceUpdate && !manual
-                && string.Equals(_updateService.GetSkippedVersion(), info.LatestVersion, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            var message = BuildUpdateMessage(info);
-            string? choice;
-            if (result.ForceUpdate)
-            {
-                var go = await _dialogService.DisplayAlertAsync("必须更新",
-                    message + "\n\n本次为强制更新，请尽快完成升级。", "立即更新", "稍后");
-                choice = go ? "立即更新" : "稍后";
-            }
-            else
-            {
-                choice = await _dialogService.DisplayActionSheetAsync(
-                    $"发现新版本 {info.LatestVersion}", "稍后", null, "立即更新", "跳过此版本");
-            }
-
-            if (choice == "跳过此版本")
-            {
-                _updateService.SetSkippedVersion(info.LatestVersion);
-                return;
-            }
-            if (choice != "立即更新") return;
-
-            await DownloadAndInstallFromMainAsync(info);
+            Application.Current?.Quit();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "检查更新异常");
-            if (manual)
-                await _dialogService.DisplayAlertAsync("检查更新", $"检查失败：{ex.Message}", "确定");
-        }
-    }
-
-    private string BuildUpdateMessage(UpdateInfo info)
-    {
-        var sizeText = info.PackageSize > 0 ? $"{info.PackageSize / 1024d / 1024d:F0} MB" : "未知大小";
-        var notes = string.IsNullOrWhiteSpace(info.Notes) ? string.Empty : $"\n\n更新说明：\n{info.Notes}";
-        return $"当前版本：{_updateService.CurrentVersion}\n最新版本：{info.LatestVersion}（{sizeText}）{notes}";
-    }
-
-    private async Task DownloadAndInstallFromMainAsync(UpdateInfo info)
-    {
-        var progressService = _serviceProvider.GetRequiredService<ILoadingProgressService>();
-        var completed = await Pages.Shared.LoadingProgressDialog.ShowAsync(_serviceProvider, async ct =>
-        {
-            progressService.UpdateProgress(0, "正在下载更新包...");
-            var download = await _updateService.DownloadAsync(info, p =>
-                progressService.UpdateProgress(
-                    (int)Math.Clamp(p / 100 * NewCosmos.Models.LoadingSteps.Total, 0, NewCosmos.Models.LoadingSteps.Total),
-                    $"正在下载更新包... {p:F0}%"), ct);
-            if (download.IsFailure)
-                throw new Exception(download.Message);
-
-            progressService.UpdateProgress(NewCosmos.Models.LoadingSteps.Total, "正在启动更新程序...");
-            var launch = _updateService.LaunchInstaller(download.Value, info.LatestVersion);
-            if (launch.IsFailure)
-                throw new Exception(launch.Message);
-        });
-
-        if (!completed)
-        {
-            await _dialogService.DisplayAlertAsync("更新", "更新未完成，可稍后重试或联系管理员手动安装。", "确定");
-            return;
-        }
-
-        Application.Current?.Quit();
     }
 
     #endregion
@@ -714,18 +640,14 @@ public partial class MainViewModel : ViewModelBase
             // 无权限卡片隐藏后其余卡片自动补位
             UpdateDashboardLayout();
 
+            _permissionsLoaded = true;
             _logger.Info($"权限加载完成: SocialAssistance={CanAccessSocialAssistance}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "权限加载失败");
-            await _dialogService.DisplayAlertAsync("错误", "权限加载失败，请重新登录", "确定");
-            App.ClearCurrentUserId();
-            var app = Application.Current;
-            if (app != null && app.Windows.Count > 0)
-            {
-                app.CloseWindow(app.Windows[0]);
-            }
+            // 失败不清零、不关窗：保留上次状态，下次 OnAppearing 重试（AGENTS §6）
+            _logger.LogError(ex, "权限加载失败（保留上次状态，稍后重试）");
+            await _dialogService.DisplayAlertAsync("提示", "权限加载失败，正在重试", "确定");
         }
     }
 
@@ -773,7 +695,7 @@ public partial class MainViewModel : ViewModelBase
     {
         try
         {
-            var result = await _gracePeriodService.GetExpiringCountAsync(GracePeriodConstants.EXPIRING_WARNING_DAYS);
+            var result = await _gracePeriodService.GetWarningCountAsync(GracePeriodConstants.EXPIRING_WARNING_DAYS);
             if (result.IsSuccess)
             {
                 GracePeriodExpiringCount = result.Value;
@@ -976,21 +898,22 @@ public partial class MainViewModel : ViewModelBase
     #region 提醒横幅导航命令
 
     /// <summary>
-    /// 导航到渐退期到期处理页面
-    /// 由首页渐退期到期提醒横幅点击触发
+    /// 导航到渐退期管理页面
+    /// 由首页渐退期提醒横幅点击触发
     /// </summary>
     [RelayCommand]
     private async Task NavigateToGracePeriodExpiringAsync()
     {
-        _logger.LogBusiness("导航到渐退期到期处理", ("Module", "GracePeriodExpiring"));
         try
         {
-            await NavigateToPageAsync<Pages.SocialAssistance.GracePeriodExpiringListPage>("渐退期到期处理");
+            _logger.LogBusiness("导航到渐退期管理", ("Module", "GracePeriodExpiring"));
+
+            await NavigateToPageAsync<Pages.SocialAssistance.GracePeriodExpiringListPage>("渐退期管理");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "导航到渐退期到期处理失败");
-            await _dialogService.DisplayAlertAsync("错误", $"打开渐退期到期处理页面失败: {ex.Message}", "确定");
+            _logger.LogError(ex, "导航到渐退期管理失败");
+            await _dialogService.DisplayAlertAsync("错误", $"打开渐退期管理页面失败: {ex.Message}", "确定");
         }
     }
 
@@ -1039,14 +962,19 @@ public partial class MainViewModel : ViewModelBase
         var confirm = await _dialogService.DisplayAlertAsync("确认", "确定要退出登录吗", "确定", "取消");
         if (confirm)
         {
-            App.ClearCurrentUserId();
+            App.ClearSession();
+            try
+            {
+                await _serviceProvider.GetRequiredService<ISessionStore>().ClearAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"清除会话存储失败: {ex.Message}");
+            }
             // 回到登录页（镜像 App.CreateWindow 的启动结构）。
             // 原先解析 AppShell 会抛 InvalidOperationException——AppShell 从未注册进 DI，退出登录必崩。
-            var loginPage = _serviceProvider.GetRequiredService<Pages.Auth.LoginPage>();
-            // 登出后导航栈整体替换，root 登录页同样注册标题跟随
-            _serviceProvider.GetRequiredService<IWindowTitleService>().Register(loginPage);
-            // WindowNavigator 内部已做窗口判空：无窗口时静默跳过，与原 Application.Current 判空语义一致
-            Helpers.WindowNavigator.CurrentPage = new NavigationPage(loginPage);
+            // 登出后导航栈整体替换，root 登录页同样注册标题跟随（SetRootAsync 内部完成）
+            await _navigationService.SetRootAsync(NavigationKeys.Login);
             _windowTitleService.SetPageTitle(null);
         }
     }

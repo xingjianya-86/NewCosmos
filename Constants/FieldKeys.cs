@@ -447,7 +447,7 @@ public static class FieldKeys
     public const string TEMP_ACCEPTANCE_CONCLUSION = "TEMP_ACCEPTANCE_CONCLUSION";     // 验收结论整句（因病因学…，于…公示，…验收通过）
     public const string TEMP_INVESTIGATION_DATE = "TEMP_INVESTIGATION_DATE";           // 入户调查日期（C线调查核实窗口首日；入户调查表用）
     public const string TEMP_TOWN_OPINION_DATE = "TEMP_TOWN_OPINION_DATE";             // 街道（乡镇）意见日期（=公示结束日；审核审批表用）
-    public const string TEMP_DIFFICULTY_SUMMARY = "TEMP_DIFFICULTY_SUMMARY";           // 困难情况摘要（概括句，不含疾病名称/编码/费用；入户调查表+信息公示用）
+    public const string TEMP_DIFFICULTY_SUMMARY = "TEMP_DIFFICULTY_SUMMARY";           // 困难情况摘要（概括句，不含疾病名称/编码/费用；点名患病人；入户调查表+信息公示用）
     public const string TEMP_AUDIT_REASON = "TEMP_AUDIT_REASON";                       // 申请救助原因（精简句；审核审批表专用）
     public const string TEMP_BENEFICIARY_NAME = "TEMP_BENEFICIARY_NAME";               // 救助对象姓名（家庭成员中选定；空时兜底回退申请人）
     public const string TEMP_BENEFICIARY_ID_CARD = "TEMP_BENEFICIARY_ID_CARD";         // 救助对象身份证号
@@ -576,68 +576,91 @@ public static class FieldKeys
     public const string GP_PERIOD_MONTHS = "渐退期长度";                    // 渐退期月数
     public const string GP_START = "渐退期起";                              // 渐退期开始日期
     public const string GP_END = "渐退期止";                                // 渐退期结束日期
+    public const string GP_PERIOD_RANGE = "渐退期启止时间";                  // 起止组合（yyyy年M月d日至yyyy年M月d日）
+    public const string GP_EXIT_SITUATION = "退出渐退期情况";                // 退出说明（分型拼句，未退出留空）
     public const string GP_AUDIT_TIME = "审核确认时间";                    // 审核确认时间
 
-    // ── 增减员调整表（变更_增减员调整表） ── 值为模板实际中文占位符
-    public const string ADJ_FILL_UNIT = "填报单位";                          // 填报单位
-    public const string ADJ_HEAD_NAME = "新户主姓名";                        // 户主姓名
-    public const string ADJ_HEAD_GENDER = "新户主性别";                      // 户主性别
-    public const string ADJ_HEAD_BIRTH = "新户主出生日期";                    // 户主出生日期
-    public const string ADJ_HEAD_NATION = "新户主民族";                      // 户主民族
-    public const string ADJ_HEAD_FAMILY_SIZE = "新户主家庭人口";              // 户主家庭人口
-    public const string ADJ_HEAD_FAMILY_TYPE = "新户主家庭类型";              // 户主家庭类型
-    public const string ADJ_HEAD_ADDRESS = "新户主家庭居住地址";              // 户主家庭居住地址
-    public const string ADJ_HEAD_CLASSIFICATION = "新户主享受类别";          // 户主享受类别
-    public const string ADJ_HEAD_HUKOU = "新户主户籍所在地";                  // 户主户籍所在地
-    public const string ADJ_HEAD_ID_CARD = "新户主身份证号码";                // 户主身份证号码
+    // ── 档案_保障金减少（渐退超限封顶减发专用） ── 值为模板实际中文占位符
+    public const string GR_HEAD_NAME = "户主姓名";                        // 户主姓名
+    public const string GR_ID_CARD = "身份证号";                          // 身份证号
+    public const string GR_FAMILY_SIZE = "家庭人口";                      // 家庭人口
+    public const string GR_OLD_AMOUNT = "原保障金额";                     // 渐退前原月保障金
+    public const string GR_NEW_AMOUNT = "现保障金额";                     // 渐退期内封顶后月保障金
+    public const string GR_DECREASE_AMOUNT = "减发金额";                  // 原-现
+    public const string GR_CAP_BASIS = "封顶依据";                        // 户口类型标准×人数
+    public const string GR_GRACE_START = "渐退期起";                      // 渐退开始
+    public const string GR_GRACE_END = "渐退期止";                        // 渐退结束
+    public const string GR_DEATH_DATE = "死亡日期";                       // 原户主死亡日期（可空）
+    public const string GR_REASON = "减发原因";                          // 减发原因说明
+    public const string GR_AUDIT_TIME = "审核确认时间";                   // 审核确认时间
+
+    // ── 增减员调整表（档案_增员减员调整表） ──
+    // 约定同下方 658 行：常量值 = ASCII 字段键（= config_json 的 fieldKey），
+    // 模板中的中文花括号占位符由 config_json 的 placeholder 负责替换。
+    // （2026-09-30 由中文值迁移：原值与 config 的 fieldKey 不一致导致 57 项映射全部失配）
+    public const string ADJ_FILL_UNIT = "ADJ_FILL_UNIT";                      // 填报单位（config 由 OPERATOR_UNIT 兜底，本键未映射）
+    public const string ADJ_HEAD_NAME = "ADJ_HEAD_NAME";                      // 户主姓名
+    public const string ADJ_HEAD_GENDER = "ADJ_HEAD_GENDER";                  // 户主性别
+    public const string ADJ_HEAD_BIRTH = "ADJ_HEAD_BIRTH";                    // 户主出生日期
+    public const string ADJ_HEAD_NATION = "ADJ_HEAD_NATION";                  // 户主民族
+    public const string ADJ_HEAD_FAMILY_SIZE = "ADJ_HEAD_FAMILY_SIZE";        // 户主家庭人口
+    public const string ADJ_HEAD_FAMILY_TYPE = "ADJ_HEAD_FAMILY_TYPE";        // 户主家庭类型（xlsx 无对应占位符，未映射）
+    public const string ADJ_HEAD_ADDRESS = "ADJ_HEAD_ADDRESS";                // 户主家庭居住地址
+    public const string ADJ_HEAD_CLASSIFICATION = "ADJ_HEAD_CLASSIFICATION";  // 户主享受类别（config 由 COVER_CLASSIFICATION 取全称，本键未映射）
+    public const string ADJ_HEAD_HUKOU = "ADJ_HEAD_HUKOU";                    // 户主户籍所在地
+    public const string ADJ_HEAD_ID_CARD = "ADJ_HEAD_ID_CARD";                // 户主身份证号码
 
     // 增员信息（最多 3 人）
-    public const string ADJ_ADD_NAME_1 = "新增人员姓名1";
-    public const string ADJ_ADD_GENDER_1 = "新增人员性别1";
-    public const string ADJ_ADD_ID_CARD_1 = "新增人员身份证1";
-    public const string ADJ_ADD_RELATION_1 = "新增人员家庭关系1";
-    public const string ADJ_ADD_HEALTH_1 = "新增人员身体状况1";
-    public const string ADJ_ADD_WORKPLACE_1 = "新增人员工作单位1";
-    public const string ADJ_ADD_REASON = "新增人员理由";
-    public const string ADJ_ADD_INCOME_1 = "新增人员收入情况1";
-    public const string ADJ_ADD_NAME_2 = "新增人员姓名2";
-    public const string ADJ_ADD_GENDER_2 = "新增人员性别2";
-    public const string ADJ_ADD_ID_CARD_2 = "新增人员身份证2";
-    public const string ADJ_ADD_RELATION_2 = "新增人员家庭关系2";
-    public const string ADJ_ADD_HEALTH_2 = "新增人员身体状况2";
-    public const string ADJ_ADD_WORKPLACE_2 = "新增人员工作单位2";
-    public const string ADJ_ADD_INCOME_2 = "新增人员收入情况2";
-    public const string ADJ_ADD_NAME_3 = "新增人员姓名3";
-    public const string ADJ_ADD_GENDER_3 = "新增人员性别3";
-    public const string ADJ_ADD_ID_CARD_3 = "新增人员身份证3";
-    public const string ADJ_ADD_RELATION_3 = "新增人员家庭关系3";
-    public const string ADJ_ADD_HEALTH_3 = "新增人员身体状况3";
-    public const string ADJ_ADD_WORKPLACE_3 = "新增人员工作单位3";
-    public const string ADJ_ADD_INCOME_3 = "新增人员收入情况3";
+    public const string ADJ_ADD_NAME_1 = "ADJ_ADD_NAME_1";
+    public const string ADJ_ADD_GENDER_1 = "ADJ_ADD_GENDER_1";
+    public const string ADJ_ADD_ID_CARD_1 = "ADJ_ADD_ID_CARD_1";
+    public const string ADJ_ADD_RELATION_1 = "ADJ_ADD_RELATION_1";
+    public const string ADJ_ADD_HEALTH_1 = "ADJ_ADD_HEALTH_1";
+    public const string ADJ_ADD_WORKPLACE_1 = "ADJ_ADD_WORKPLACE_1";
+    public const string ADJ_ADD_REASON_1 = "ADJ_ADD_REASON_1";
+    public const string ADJ_ADD_INCOME_1 = "ADJ_ADD_INCOME_1";
+    public const string ADJ_ADD_NAME_2 = "ADJ_ADD_NAME_2";
+    public const string ADJ_ADD_GENDER_2 = "ADJ_ADD_GENDER_2";
+    public const string ADJ_ADD_ID_CARD_2 = "ADJ_ADD_ID_CARD_2";
+    public const string ADJ_ADD_RELATION_2 = "ADJ_ADD_RELATION_2";
+    public const string ADJ_ADD_HEALTH_2 = "ADJ_ADD_HEALTH_2";
+    public const string ADJ_ADD_WORKPLACE_2 = "ADJ_ADD_WORKPLACE_2";
+    public const string ADJ_ADD_REASON_2 = "ADJ_ADD_REASON_2";
+    public const string ADJ_ADD_INCOME_2 = "ADJ_ADD_INCOME_2";
+    public const string ADJ_ADD_NAME_3 = "ADJ_ADD_NAME_3";
+    public const string ADJ_ADD_GENDER_3 = "ADJ_ADD_GENDER_3";
+    public const string ADJ_ADD_ID_CARD_3 = "ADJ_ADD_ID_CARD_3";
+    public const string ADJ_ADD_RELATION_3 = "ADJ_ADD_RELATION_3";
+    public const string ADJ_ADD_HEALTH_3 = "ADJ_ADD_HEALTH_3";
+    public const string ADJ_ADD_WORKPLACE_3 = "ADJ_ADD_WORKPLACE_3";
+    public const string ADJ_ADD_REASON_3 = "ADJ_ADD_REASON_3";
+    public const string ADJ_ADD_INCOME_3 = "ADJ_ADD_INCOME_3";
 
     // 减员信息（最多 3 人）
-    public const string ADJ_REMOVE_NAME_1 = "减员人员姓名1";
-    public const string ADJ_REMOVE_GENDER_1 = "减员人员性别1";
-    public const string ADJ_REMOVE_ID_CARD_1 = "减员人员身份证1";
-    public const string ADJ_REMOVE_RELATION_1 = "减员人员家庭关系1";
-    public const string ADJ_REMOVE_HEALTH_1 = "减员人员身体状况1";
-    public const string ADJ_REMOVE_WORKPLACE_1 = "减员人员工作单位1";
-    public const string ADJ_REMOVE_REASON = "减员人员理由";
-    public const string ADJ_REMOVE_INCOME_1 = "减员人员收入情况1";
-    public const string ADJ_REMOVE_NAME_2 = "减员人员姓名2";
-    public const string ADJ_REMOVE_GENDER_2 = "减员人员性别2";
-    public const string ADJ_REMOVE_ID_CARD_2 = "减员人员身份证2";
-    public const string ADJ_REMOVE_RELATION_2 = "减员人员家庭关系2";
-    public const string ADJ_REMOVE_HEALTH_2 = "减员人员身体状况2";
-    public const string ADJ_REMOVE_WORKPLACE_2 = "减员人员工作单位2";
-    public const string ADJ_REMOVE_INCOME_2 = "减员人员收入情况2";
-    public const string ADJ_REMOVE_NAME_3 = "减员人员姓名3";
-    public const string ADJ_REMOVE_GENDER_3 = "减员人员性别3";
-    public const string ADJ_REMOVE_ID_CARD_3 = "减员人员身份证3";
-    public const string ADJ_REMOVE_RELATION_3 = "减员人员家庭关系3";
-    public const string ADJ_REMOVE_HEALTH_3 = "减员人员身体状况3";
-    public const string ADJ_REMOVE_WORKPLACE_3 = "减员人员工作单位3";
-    public const string ADJ_REMOVE_INCOME_3 = "减员人员收入情况3";
+    public const string ADJ_REMOVE_NAME_1 = "ADJ_REMOVE_NAME_1";
+    public const string ADJ_REMOVE_GENDER_1 = "ADJ_REMOVE_GENDER_1";
+    public const string ADJ_REMOVE_ID_CARD_1 = "ADJ_REMOVE_ID_CARD_1";
+    public const string ADJ_REMOVE_RELATION_1 = "ADJ_REMOVE_RELATION_1";
+    public const string ADJ_REMOVE_HEALTH_1 = "ADJ_REMOVE_HEALTH_1";
+    public const string ADJ_REMOVE_WORKPLACE_1 = "ADJ_REMOVE_WORKPLACE_1";
+    public const string ADJ_REMOVE_REASON_1 = "ADJ_REMOVE_REASON_1";
+    public const string ADJ_REMOVE_INCOME_1 = "ADJ_REMOVE_INCOME_1";
+    public const string ADJ_REMOVE_NAME_2 = "ADJ_REMOVE_NAME_2";
+    public const string ADJ_REMOVE_GENDER_2 = "ADJ_REMOVE_GENDER_2";
+    public const string ADJ_REMOVE_ID_CARD_2 = "ADJ_REMOVE_ID_CARD_2";
+    public const string ADJ_REMOVE_RELATION_2 = "ADJ_REMOVE_RELATION_2";
+    public const string ADJ_REMOVE_HEALTH_2 = "ADJ_REMOVE_HEALTH_2";
+    public const string ADJ_REMOVE_WORKPLACE_2 = "ADJ_REMOVE_WORKPLACE_2";
+    public const string ADJ_REMOVE_REASON_2 = "ADJ_REMOVE_REASON_2";
+    public const string ADJ_REMOVE_INCOME_2 = "ADJ_REMOVE_INCOME_2";
+    public const string ADJ_REMOVE_NAME_3 = "ADJ_REMOVE_NAME_3";
+    public const string ADJ_REMOVE_GENDER_3 = "ADJ_REMOVE_GENDER_3";
+    public const string ADJ_REMOVE_ID_CARD_3 = "ADJ_REMOVE_ID_CARD_3";
+    public const string ADJ_REMOVE_RELATION_3 = "ADJ_REMOVE_RELATION_3";
+    public const string ADJ_REMOVE_HEALTH_3 = "ADJ_REMOVE_HEALTH_3";
+    public const string ADJ_REMOVE_WORKPLACE_3 = "ADJ_REMOVE_WORKPLACE_3";
+    public const string ADJ_REMOVE_REASON_3 = "ADJ_REMOVE_REASON_3";
+    public const string ADJ_REMOVE_INCOME_3 = "ADJ_REMOVE_INCOME_3";
 
     // ── 社会救助对象动态管理记录（变更人群档案，模板_社会救助对象动态管理记录） ──
     // 约定与其他模板一致：常量值为 ASCII 字段键（= config_json 的 fieldKey），
@@ -687,11 +710,32 @@ public static class FieldKeys
     public const string DM_OTHER_SITUATION = "DM_OTHER_SITUATION";            // 手写栏，留空
     public const string DM_TOWN_OPINION = "DM_TOWN_OPINION";                  // 入户调查结论
 
-    // 底部公共字段
-    public const string ADJ_FAMILY_DETAIL = "变更后家庭人员具体情况";        // 镇政府意见
-    public const string ADJ_CHANGE_SUMMARY = "家庭人员增减情况";              // 经入户调查核实
-    public const string ADJ_AUDIT_TIME = "审核确认时间";                      // 审核确认时间
-    public const string ADJ_INCREASE_AMOUNT = "增发金额";                    // 增发金额
-    public const string ADJ_DECREASE_AMOUNT = "减发金额";                    // 减发金额
-    public const string ADJ_EFFECTIVE_DATE = "档案生效时间";                  // 执行时间
+    // 增减员调整表底部公共字段（ASCII 键，约定同 658 行）
+    public const string ADJ_FAMILY_DETAIL = "ADJ_FAMILY_DETAIL";              // 镇政府意见/家庭具体情况
+    public const string ADJ_CHANGE_SUMMARY = "ADJ_CHANGE_SUMMARY";            // 增减摘要（xlsx 由{增加人数}{减少人数}承担，本键未映射）
+    public const string ADJ_AUDIT_TIME = "ADJ_AUDIT_TIME";                    // 审批时间
+    public const string ADJ_INCREASE_AMOUNT = "ADJ_INCREASE_AMOUNT";          // 增发金额
+    public const string ADJ_DECREASE_AMOUNT = "ADJ_DECREASE_AMOUNT";          // 减发金额
+    public const string ADJ_EFFECTIVE_DATE = "ADJ_EFFECTIVE_DATE";            // 执行时间
+
+    // ===== 档案_增员减员调整表 / 档案_定期复核审批表（2026-09 新增；ASCII 键，中文占位符由 config placeholder 映射） =====
+    // 增员减员调整表（户籍类型复用既有 HUKOU_TYPE_DISPLAY 字面量键）
+    public const string ADJ_ADD_COUNT = "ADJ_ADD_COUNT";                              // 增加人数
+    public const string ADJ_REMOVE_COUNT = "ADJ_REMOVE_COUNT";                        // 减少人数
+
+    // 定期复核审批表
+    public const string REVIEW_METHOD = "REVIEW_METHOD";                                // 复核办法
+    public const string REVIEW_SITUATION = "REVIEW_SITUATION";                          // 定期复核情况（最近一次经济复核原因）
+    public const string REVIEW_TIME = "REVIEW_TIME";                                    // 复核时间
+    public const string REVIEW_CLASSIFICATION_CHANGE = "REVIEW_CLASSIFICATION_CHANGE";  // 待遇变化分类（保持/增发/减发/停发）
+    public const string REVIEW_AMOUNT_CHANGE = "REVIEW_AMOUNT_CHANGE";                  // 待遇金额变化（句尾：增减=，月保障金由X元调整为Y元（增发/减发Z元）；死亡=，原户主X元停发，现保障金Y元）
+    public const string REVIEW_EFFECTIVE_DATE = "REVIEW_EFFECTIVE_DATE";                // 审核次月日期（M月d日，仅本表）
+    public const string CLASSIFICATION_MAJOR = "CLASSIFICATION_MAJOR";                  // 享受类别缩写（低保/低保边缘/特困/刚性支出）
+    public const string ARCHIVE_CLASS = "ARCHIVE_CLASS";                                // 档案分类 A类/B类
+    public const string LAND_INCOME_SITUATION_V2 = "LAND_INCOME_SITUATION_V2";          // 土地收入情况（无"本人申请"段）
+    public const string RIGID_AND_EXEMPTION = "RIGID_AND_EXEMPTION";                    // 刚性支出财产豁免情况（两段拼接）
+    public const string PROPERTY_FOREST_LAND = "PROPERTY_FOREST_LAND";                  // 林地信息
+    public const string SIDEBUSINESS_TYPE = "SIDEBUSINESS_TYPE";                        // 副业种类
+    public const string SIDEBUSINESS_COUNT = "SIDEBUSINESS_COUNT";                      // 副业数量
+    public const string INCOME_PROPERTY_DESC = "INCOME_PROPERTY_DESC";                  // 财产性收入明细叙述
 }

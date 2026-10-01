@@ -27,7 +27,9 @@ public partial class EternalRegressionView : ContentView
 
     private readonly Random _random = new();
     private IDispatcherTimer? _timer;
+#pragma warning disable CS0649
     private CancellationTokenSource? _startCts;
+#pragma warning restore CS0649
 
     /// <summary>总已删除人数（跨轮回累积，持久化键值）</summary>
     private long _totalDeleted;
@@ -88,9 +90,11 @@ public partial class EternalRegressionView : ContentView
 
     private void OnLoaded(object? sender, EventArgs e)
     {
+#if WINDOWS
         _startCts?.Cancel();
         _startCts = new CancellationTokenSource();
         _ = StartAfterDelayAsync(_startCts.Token);
+#endif
     }
 
     private void OnUnloaded(object? sender, EventArgs e)
@@ -182,7 +186,7 @@ public partial class EternalRegressionView : ContentView
             var done = CurrentIndex;
             var row = _heirs[done];
             MarkDeleted(row);
-            AppendLog($"[{row.Signal}] {row.Name} · {row.FullName} 档案已删除", LogWarn);
+            AppendLog($"[{row.Signal}] {row.Name} 档案已删除", LogWarn);
             AppendLog($"  >> {row.RandomLine(_random)}", LogGold);
 
             _totalDeleted++;
@@ -330,7 +334,7 @@ public partial class EternalRegressionView : ContentView
             QuickSub.Text = $"PURGING · {row.Signal} · 文件队列";
 
             // 右栏：目标进度（当前人单独进度，符合时间轴；100% 由 OnTick 自动跳转下一人）
-            TargetPath.Text = $"C:\\永劫回归\\轮回#{CycleRemaining:N0}\\第{cur + 1}/{EternalRegressionData.HeirsPerCycle}人\\{row.Signal}\\{row.Name}档案_删除中";
+            TargetPath.Text = $"永劫回归\\轮回#{CycleRemaining:N0}\\第{cur + 1}/{EternalRegressionData.HeirsPerCycle}人\\{row.Signal}\\{row.Name}档案_删除中";
             TargetProgress.Progress = local;
             TargetSub.Text = $"{row.Signal} · {(int)(local * 100):D2}% / {EternalRegressionData.PersonWindowSeconds}s 时间轴";
 

@@ -1,9 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Config.ConfigWizardPage"
              x:DataType="ConfigWizardViewModel"
-             Title="系统配置向导"
+             Title="ϵͳ������"
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="{StaticResource Background}">
 
@@ -20,7 +20,7 @@
 
     <Grid RowDefinitions="Auto,*">
 
-        <!-- 渐变头部 -->
+        <!-- ����ͷ�� -->
         <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
             <VerticalStackLayout Spacing="16">
                 <HorizontalStackLayout Spacing="14">
@@ -29,8 +29,8 @@
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="系统配置向导" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="完成配置与网络接入后即可启动系统" Style="{StaticResource ModuleHeroSubtitle}"/>
+                        <Label Text="ϵͳ������" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="����������������󼴿�����ϵͳ" Style="{StaticResource ModuleHeroSubtitle}"/>
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
             </VerticalStackLayout>
@@ -39,13 +39,13 @@
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="24" Spacing="16" HorizontalOptions="Center" MaximumWidthRequest="760">
 
-                <!-- 缺失配置 -->
+                <!-- ȱʧ���� -->
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="10">
                         <HorizontalStackLayout Spacing="8">
                             <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="16"
                                    TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
-                            <Label Text="缺失的配置文件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Label Text="ȱʧ�������ļ�" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <CollectionView ItemsSource="{Binding MissingConfigFiles}" ItemTemplate="{StaticResource MissingConfigRow}"
@@ -53,24 +53,63 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- 操作 -->
+                <!-- Android: ���ݿ����� -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsAndroid}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="���ݿ���������" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                            <Label Grid.Row="0" Grid.Column="0" Text="����" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
+                            <Entry Grid.Row="0" Grid.Column="1" Text="{Binding DbHost}" Placeholder="127.0.0.1"
+                                   FontSize="15"/>
+
+                            <Label Grid.Row="1" Grid.Column="0" Text="�˿�" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
+                            <Entry Grid.Row="1" Grid.Column="1" Text="{Binding DbPort}" Placeholder="5432"
+                                   Keyboard="Numeric" FontSize="15"/>
+
+                            <Label Grid.Row="2" Grid.Column="0" Text="���ݿ�" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
+                            <Entry Grid.Row="2" Grid.Column="1" Text="{Binding DbName}" Placeholder="cosmos_next"
+                                   FontSize="15"/>
+
+                            <Label Grid.Row="3" Grid.Column="0" Text="�û���" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
+                            <Entry Grid.Row="3" Grid.Column="1" Text="{Binding DbUsername}" Placeholder="new_cosmos"
+                                   FontSize="15"/>
+
+                            <Label Grid.Row="4" Grid.Column="0" Text="����" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
+                            <Entry Grid.Row="4" Grid.Column="1" Text="{Binding DbPassword}" Placeholder="��д���ݿ�����"
+                                   IsPassword="True" FontSize="15"/>
+                        </Grid>
+
+                        <Button Text="�������ݿ�����" Style="{StaticResource ButtonPrimary}"
+                                Command="{Binding SaveDatabaseConfigCommand}" HorizontalOptions="Start" MinimumWidthRequest="150"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- ���� -->
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Text="配置操作" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Label Text="���ò���" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start">
-                            <Button Text="生成默认配置" Style="{StaticResource ButtonPrimary}"
+                            <Button Text="����Ĭ������" Style="{StaticResource ButtonPrimary}"
                                     Command="{Binding GenerateDefaultConfigCommand}" Margin="0,0,10,10" MinimumWidthRequest="150"/>
-                            <Button Text="网络接入" Style="{StaticResource ButtonOutline}"
-                                    Command="{Binding OpenNetworkAccessCommand}" Margin="0,0,10,10" MinimumWidthRequest="120"/>
-                            <Button Text="打开配置目录" Style="{StaticResource ButtonOutline}"
+                            <Button Text="�������" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenNetworkAccessCommand}" Margin="0,0,10,10" MinimumWidthRequest="120"
+                                    IsVisible="{Binding IsNotAndroid}"/>
+                            <Button Text="������Ŀ¼" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding OpenConfigDirectoryCommand}" Margin="0,0,10,10" MinimumWidthRequest="130"/>
-                            <Button Text="重新检查" Style="{StaticResource ButtonOutline}"
+                            <Button Text="���¼��" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding RecheckConfigCommand}" Margin="0,0,10,10" MinimumWidthRequest="110"/>
                         </FlexLayout>
-                        <Label Text="说明：一键生成默认配置（数据库为默认连接，密码首次连接后自动加密为 DPAPI 密文）；" 
+                        <Label Text="˵����һ������Ĭ�����ã����ݿ�ΪĬ�����ӣ������״����Ӻ��Զ�����Ϊ DPAPI ���ģ���" 
                                FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
-                        <Label Text="异地组网请先点「网络接入」安装/加入 ZeroTier，并在服务器网页端授权本机节点。"
+                        <Label Text="����������ȵ㡸������롹��װ/���� ZeroTier�����ڷ�������ҳ����Ȩ�����ڵ㡣"
                                FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Border>

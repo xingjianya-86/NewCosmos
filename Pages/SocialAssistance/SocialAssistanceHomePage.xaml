@@ -83,10 +83,10 @@
                                                 Command="{Binding OpenMonthlyReportCommand}"
                                                 Opacity="{Binding ReportOpacity}"/>
 
-                        <!-- 渐退期到期处理 -->
+                        <!-- 渐退期管理 -->
                         <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE783;"
                                                 IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
-                                                Title="渐退期到期处理" Description="临期对象核查与到期处置"
+                                                Title="渐退期管理" Description="进行中与已到期统一管理"
                                                 Command="{Binding OpenGracePeriodExpiringCommand}"/>
 
                         <!-- 后补追缴 -->

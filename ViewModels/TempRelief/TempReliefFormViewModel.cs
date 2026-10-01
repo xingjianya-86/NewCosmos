@@ -425,8 +425,15 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private DateTime _applyDate = DateTime.Today;
 
-    /// <summary>申请日期变化 → 重算 C 类时间轴公示日期（固定每月10日~12日，过12日滚下月）</summary>
+    /// <summary>申请日期变化 → 重算 C 类时间轴公示日期（固定每月10日~12日；调查截止（公示前一工作日）后即顺延下月）</summary>
     partial void OnApplyDateChanged(DateTime value)
+    {
+        if (_suppressReload) return;
+        SafeFireAndForget(ApplyPublicizeDefaultsAsync);
+    }
+
+    /// <summary>家庭类别变化 → 重算 C 类时间轴（简化/普通程序影响调查核实工作日数）</summary>
+    partial void OnApplicantFamilyCategoryChanged(string value)
     {
         if (_suppressReload) return;
         SafeFireAndForget(ApplyPublicizeDefaultsAsync);
@@ -453,13 +460,13 @@ public partial class TempReliefFormViewModel : ViewModelBase
     private string _difficultyType = string.Empty;
 
     /// <summary>是否为疾病困难（控制疾病明细区显隐）</summary>
-    public bool IsDiseaseType => _difficultyType == TempReliefConstants.DifficultyTypeDisease;
+    public bool IsDiseaseType => DifficultyType == TempReliefConstants.DifficultyTypeDisease;
 
     /// <summary>是否为意外灾害困难（控制意外灾害明细区显隐）</summary>
-    public bool IsAccidentType => _difficultyType == TempReliefConstants.DifficultyTypeAccident;
+    public bool IsAccidentType => DifficultyType == TempReliefConstants.DifficultyTypeAccident;
 
     /// <summary>是否为教育支出困难（控制教育支出明细区显隐）</summary>
-    public bool IsEducationType => _difficultyType == TempReliefConstants.DifficultyTypeEducation;
+    public bool IsEducationType => DifficultyType == TempReliefConstants.DifficultyTypeEducation;
 
     /// <summary>意外/灾害类型选项</summary>
     public string[] AccidentTypeOptions => TempReliefConstants.AccidentTypeOptions;
@@ -801,7 +808,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     /// <summary>
     /// 新建模式默认值：填报单位=当前登录用户所属单位、乡镇验收人=本单位民政助理、
-    /// 户籍地址=当前用户组织机构、公示日期=C线固定窗口每月10日~12日（过12日滚下月）、入户核实默认文本
+    /// 户籍地址=当前用户组织机构、公示日期=C线固定窗口每月10日~12日（调查截止后顺延下月）、入户核实默认文本
     /// </summary>
     private async Task ApplyCreateDefaultsAsync()
     {
@@ -936,7 +943,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     /// <summary>
     /// 公示日期默认值：按【申请日期】归属 C 线窗口（公示固定每月10日~12日）：
-    /// 取第一个"申请日 ≤ 该窗口调查核实起日"的月份，否则顺延；低保等特殊群体按5个工作日、普通按10个工作日。
+    /// 取第一个"申请日 ≤ 该窗口调查截止日"的月份（9号及以前归当月，10号起顺延下月），否则顺延；
+    /// 低保等特殊群体调查期按5个工作日、普通按10个工作日。
+    /// 申请日期仅自动提前到调查起日（不推后）；填报时间不参与计算。
     /// 仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算
     /// </summary>
     private async Task ApplyPublicizeDefaultsAsync()
@@ -959,6 +968,10 @@ public partial class TempReliefFormViewModel : ViewModelBase
                 PublicizeStartDateValue = timeline.PublicityStartDate;
                 PublicizeEndDateValue = timeline.PublicityEndDate;
                 HasPublicizeDates = true;
+
+                // 申请日期仅自动提前到调查核实窗口首日（赶本轮公示）；早于起日则保持真实申请日，不推后
+                if (ApplyDate > timeline.InvestigationStartDate)
+                    ApplyDate = timeline.InvestigationStartDate;
             }
             finally
             {
@@ -1257,6 +1270,10 @@ public partial class TempReliefFormViewModel : ViewModelBase
             return;
         }
 
+        // 命中成员信息在详情接口不回传，选中瞬间先取（列表清除后不可再读）
+        var matchedPersonInfo = SelectedCandidate.MatchedPersonInfo;
+        var matchedMemberIdCard = SelectedCandidate.MatchedMemberIdCard;
+
         await ExecuteAsync(async () =>
         {
             var result = await _applicationService.GetCandidateDetailAsync(
@@ -1350,12 +1367,14 @@ public partial class TempReliefFormViewModel : ViewModelBase
                     Members.Add(new TempReliefMember());
                 }
 
-                // 救助对象：默认户主（申请人），可在申请信息区改选家庭成员
-                RebuildBeneficiaryOptions();
+                // 救助对象：默认户主；按成员命中时预选该成员（无身份证则回退户主）
+                RebuildBeneficiaryOptions(string.IsNullOrWhiteSpace(matchedMemberIdCard) ? null : matchedMemberIdCard);
                 RebuildMemberNameOptions();
 
                 IsCandidateSelected = true;
-                CandidateSummary = $"已选择：{c.Name}（{c.SourceName}）";
+                CandidateSummary = string.IsNullOrEmpty(matchedPersonInfo)
+                    ? $"已选择：{c.Name}（{c.SourceName}）"
+                    : $"已选择：{c.Name}（{c.SourceName}）· {matchedPersonInfo}";
                 Candidates.Clear();
             });
 
@@ -1535,18 +1554,37 @@ public partial class TempReliefFormViewModel : ViewModelBase
             case TempReliefConstants.DifficultyTypeDisease:
                 var diseaseText = BuildDiseaseReasonText();
                 if (!string.IsNullOrWhiteSpace(diseaseText)) return diseaseText;
-                return "申请人家庭成员因患疾病，医疗费用支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
+                return BuildFallbackReasonHead() + "因患疾病，医疗费用支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
             case TempReliefConstants.DifficultyTypeAccident:
                 var accidentText = BuildAccidentReasonText();
                 if (!string.IsNullOrWhiteSpace(accidentText)) return accidentText;
-                return "申请人家庭成员因意外灾害，家庭基本生活暂时陷入困境，特申请临时救助。";
+                return BuildFallbackReasonHead() + "因意外灾害，家庭基本生活暂时陷入困境，特申请临时救助。";
             case TempReliefConstants.DifficultyTypeEducation:
                 var educationText = BuildEducationReasonText();
                 if (!string.IsNullOrWhiteSpace(educationText)) return educationText;
-                return "申请人家庭成员因家庭子女就学，教育支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
+                return BuildFallbackReasonHead() + "因家庭子女就学，教育支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
         }
         return BuildDefaultDifficultyReason(ApplicantFamilyCategory);
     }
+
+    /// <summary>
+    /// 救助原因句主语：单个对象用其姓名，多对象或取不到姓名时仅"申请人家庭成员"（避免"申请人家庭成员家庭成员"叠字）
+    /// </summary>
+    private string BuildReasonHead(IEnumerable<string> ownerNames)
+    {
+        var names = ownerNames
+            .Where(n => !string.IsNullOrWhiteSpace(n) && n != "家庭成员")
+            .Select(n => n.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (names.Count == 1) return $"申请人家庭成员{names[0]}";
+        if (names.Count > 1) return $"申请人家庭成员{string.Join("、", names)}";
+        return "申请人家庭成员";
+    }
+
+    /// <summary>明细未填时的兜底句主语：申请人姓名可用时点名，否则仅"申请人家庭成员"</summary>
+    private string BuildFallbackReasonHead()
+        => string.IsNullOrWhiteSpace(ApplicantName) ? "申请人家庭成员" : $"申请人家庭成员{ApplicantName.Trim()}";
 
     /// <summary>
     /// 疾病救助原因（详细）：逐条列病名与编码；共享模式取顶部共享值，多医院模式逐条取记录值
@@ -1558,21 +1596,32 @@ public partial class TempReliefFormViewModel : ViewModelBase
             .ToList();
         if (diseases.Count == 0) return string.Empty;
 
-        var name = string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName;
+        // 患病人：明细归属成员优先，空则回退申请人（与审批表精简句口径一致）
+        string SickName(TempReliefDisease d)
+            => !string.IsNullOrWhiteSpace(d.MemberName)
+                ? d.MemberName.Trim()
+                : (string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName.Trim());
 
-        // 病名（含编码），多条时逐条列举；条目归属成员姓名有值时前置
+        var sickNames = diseases.Select(SickName).Distinct(StringComparer.Ordinal).ToList();
+        // 主语：单一患病人点名；多患病人由句首"申请人家庭成员"+逐条前缀承担，句首不叠名
+        var head = BuildReasonHead(sickNames.Count == 1 ? sickNames : Enumerable.Empty<string>());
+        // 明细前缀：同一患病人（或主语已点名）不重复前缀；多患病人逐条标注归属
+        string ItemOwner(TempReliefDisease d)
+            => sickNames.Count == 1 ? string.Empty : OwnerPrefix(SickName(d));
+
+        // 病名（含编码），多条时逐条列举
         var diseaseText = diseases.Count == 1
-            ? OwnerPrefix(diseases[0].MemberName) + diseases[0].DiseaseName
+            ? diseases[0].DiseaseName
                 + (string.IsNullOrWhiteSpace(diseases[0].DiseaseCode) ? "" : $"（ICD-10编码：{diseases[0].DiseaseCode}）")
             : "以下疾病：" + string.Join("；", diseases.Select((d, i) =>
-                $"{i + 1}、{OwnerPrefix(d.MemberName)}{d.DiseaseName}" + (string.IsNullOrWhiteSpace(d.DiseaseCode) ? "" : $"（编码{d.DiseaseCode}）")));
+                $"{i + 1}、{ItemOwner(d)}{d.DiseaseName}" + (string.IsNullOrWhiteSpace(d.DiseaseCode) ? "" : $"（编码{d.DiseaseCode}）")));
 
         if (IsMultiHospitalMode)
         {
             // 多医院模式：每条疾病与其医院/日期/费用合并为一条，编号 1、2… 逐条列出，避免两套编号混淆
             var segments = diseases.Select((d, i) =>
             {
-                var diseasePart = OwnerPrefix(d.MemberName) + d.DiseaseName
+                var diseasePart = ItemOwner(d) + d.DiseaseName
                     + (string.IsNullOrWhiteSpace(d.DiseaseCode) ? "" : $"（编码{d.DiseaseCode}）");
                 var hospital = string.IsNullOrWhiteSpace(d.Hospital) ? "医院" : d.Hospital;
                 var date = FormatTreatRange(d.TreatStartDate, d.TreatEndDate);
@@ -1588,7 +1637,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
                 ? $"因患{segments[0]}"
                 : "因患以下疾病：" + string.Join("；", segments.Select((s, i) => $"{i + 1}、{s}"));
 
-            return $"申请人家庭成员{name}{body}，医疗费用支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
+            return $"{head}{body}，医疗费用支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。";
         }
         else
         {
@@ -1605,7 +1654,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
                 ? "，医疗费用支出较大，造成家庭基本生活暂时陷入困境，特申请临时救助。"
                 : $"，{costText}，个人自付费用较高，造成家庭基本生活暂时陷入困境，特申请临时救助。";
 
-            return $"申请人家庭成员{name}因患{diseaseText}，{body}{tail}";
+            return $"{head}因患{diseaseText}，{body}{tail}";
         }
     }
 
@@ -1648,11 +1697,21 @@ public partial class TempReliefFormViewModel : ViewModelBase
             .ToList();
         if (accidents.Count == 0) return string.Empty;
 
-        var name = string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName;
+        // 受灾人：明细归属成员优先，空则回退申请人
+        string AccidentOwner(TempReliefAccident a)
+            => !string.IsNullOrWhiteSpace(a.MemberName)
+                ? a.MemberName.Trim()
+                : (string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName.Trim());
+
+        var owners = accidents.Select(AccidentOwner).Distinct(StringComparer.Ordinal).ToList();
+        var head = BuildReasonHead(owners.Count == 1 ? owners : Enumerable.Empty<string>());
+        string ItemOwner(TempReliefAccident a)
+            => owners.Count == 1 ? string.Empty : OwnerPrefix(AccidentOwner(a));
+
         var items = accidents.Select(a =>
         {
             var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(a.AccidentType)) parts.Add(OwnerPrefix(a.MemberName) + a.AccidentType);
+            if (!string.IsNullOrWhiteSpace(a.AccidentType)) parts.Add(ItemOwner(a) + a.AccidentType);
             else if (!string.IsNullOrWhiteSpace(a.MemberName)) parts.Add(a.MemberName);
             if (a.HappenDate != DateTime.MinValue) parts.Add(a.HappenDate.ToString("yyyy年M月d日"));
             if (!string.IsNullOrWhiteSpace(a.HappenPlace)) parts.Add(a.HappenPlace);
@@ -1669,7 +1728,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
             ? $"因{items[0]}"
             : "因发生以下意外灾害：" + string.Join("；", items.Select((s, i) => $"{i + 1}、{s}"));
 
-        return $"申请人家庭成员{name}{body}，家庭基本生活暂时陷入困境，特申请临时救助。";
+        return $"{head}{body}，家庭基本生活暂时陷入困境，特申请临时救助。";
     }
 
     /// <summary>
@@ -1685,7 +1744,15 @@ public partial class TempReliefFormViewModel : ViewModelBase
             .ToList();
         if (educations.Count == 0) return string.Empty;
 
-        var name = string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName;
+        // 就学生：明细学生姓名优先，空则回退申请人
+        string StudentOf(TempReliefEducation e)
+            => !string.IsNullOrWhiteSpace(e.StudentName)
+                ? e.StudentName.Trim()
+                : (string.IsNullOrWhiteSpace(ApplicantName) ? "家庭成员" : ApplicantName.Trim());
+
+        var students = educations.Select(StudentOf).Distinct(StringComparer.Ordinal).ToList();
+        var head = BuildReasonHead(students.Count == 1 ? students : Enumerable.Empty<string>());
+
         var items = educations.Select(e =>
         {
             var parts = new List<string>();
@@ -1702,7 +1769,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
             ? $"因家庭子女就学，{items[0]}"
             : "因家庭子女就学，教育支出明细如下：" + string.Join("；", items.Select((s, i) => $"{i + 1}、{s}"));
 
-        return $"申请人家庭成员{name}{body}，学费等教育支出较大，家庭基本生活暂时陷入困境，特申请临时救助。";
+        return $"{head}{body}，学费等教育支出较大，家庭基本生活暂时陷入困境，特申请临时救助。";
     }
 
     /// <summary>

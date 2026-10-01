@@ -32,9 +32,7 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
         ValidateNotNull(survey, nameof(survey));
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -60,11 +58,11 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
 
                 if (updateResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<long>(updateResult.ErrorCode!, updateResult.Message!);
                 }
 
-                if (shouldManageTransaction) await _db.CommitTransactionAsync();
+                await tx.CommitAsync(ct);
                 LogInfo("入户调查更新成功");
                 return Result.Success(existing.Value.Id);
             }
@@ -88,18 +86,18 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
 
                 if (insertResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
                 }
 
-                if (shouldManageTransaction) await _db.CommitTransactionAsync();
+                await tx.CommitAsync(ct);
                 LogInfo("入户调查创建成功");
                 return Result.Success(insertResult.Value);
             }
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException<long>(ex);
         }

@@ -19,11 +19,13 @@ public partial class MatrixRainView : ContentView
 
     private void OnLoaded(object? sender, EventArgs e)
     {
+#if WINDOWS
         _timer?.Stop();
         _timer = Dispatcher.CreateTimer();
         _timer.Interval = TimeSpan.FromMilliseconds(100); // ~10fps（与永劫回归同频，双全屏动画总负载最低）
         _timer.Tick += OnTick;
         _timer.Start();
+#endif
     }
 
     private void OnUnloaded(object? sender, EventArgs e)

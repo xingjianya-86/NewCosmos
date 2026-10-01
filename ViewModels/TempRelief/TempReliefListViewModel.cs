@@ -87,16 +87,19 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
         ITempReliefService applicationService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        Services.Domain.Reporting.IStatisticsService statisticsService)
+        Services.Domain.Reporting.IStatisticsService statisticsService,
+        Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _applicationService = applicationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _statisticsService = statisticsService;
+        _printJobFactory = printJobFactory;
         Title = "临时救助";
     }
 
     private readonly Services.Domain.Reporting.IStatisticsService _statisticsService = null!;
+    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
 
     #region 页头统计栏
 
@@ -399,6 +402,33 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
             await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
             return Result.Success();
         }, "准备补打数据...");
+    }
+
+    /// <summary>
+    /// 手机端推送打印：构建单据字段后写入推送打印队列，由 PC 端打印代理执行。
+    /// </summary>
+    [RelayCommand]
+    private async Task PushPrintAsync(TempReliefApplication? app)
+    {
+        if (app == null) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _printJobFactory.EnqueueTempReliefAsync(app.Id, ct: CancellationToken);
+            var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+            if (result.IsFailure)
+            {
+                await dialogService.DisplayAlertAsync("推送失败", result.Message ?? "推送打印失败", "确定");
+                return result;
+            }
+
+            _logger.LogBusiness("临时救助推送打印入队",
+                ("ApplicationId", (object)app.Id),
+                ("JobNo", result.Value?.JobNo ?? string.Empty));
+            await dialogService.DisplayAlertAsync("已推送打印",
+                $"打印任务 {result.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+            return Result.Success();
+        }, "推送打印...");
     }
 
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）

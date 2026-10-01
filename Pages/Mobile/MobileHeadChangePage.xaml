@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileHeadChangePage"
+             x:DataType="HeadChangeViewModel"
+             Title="户主变更"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="0">
+
+        <!-- 绿色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="户主变更" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="仅变更户主，其他信息不变" FontSize="13" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 当前户主 -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}" Margin="12,12,12,0">
+            <VerticalStackLayout Spacing="6">
+                <Label Text="当前户主" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="{Binding CurrentHeadName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding CurrentHeadIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                    <Border Grid.Column="1" BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4" VerticalOptions="Center">
+                        <Label Text="{Binding CurrentClassificationName}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                    </Border>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 可选新户主 -->
+        <VerticalStackLayout Grid.Row="2" Spacing="0" Padding="12,8">
+            <Label Text="请选择新户主（仅显示非户主成员）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+            <CollectionView ItemsSource="{Binding EligibleMembers}" SelectionMode="Single" SelectedItem="{Binding SelectedNewHead}">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无可选成员" Style="{StaticResource EmptyStateLabel}" Margin="0,24"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="ent:FamilyMember">
+                        <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" StrokeThickness="0" Padding="12" Margin="0,4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                    <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
+                                                <Span Text=" · "/>
+                                                <Span Text="{Binding Gender}"/>
+                                                <Span Text=" "/>
+                                                <Span Text="{Binding Age, StringFormat='{0}岁'}"/>
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1" Text="{Binding HealthStatusDisplay}" FontSize="12"
+                                       TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+
+        <!-- 变更原因 -->
+        <VerticalStackLayout Grid.Row="3" Spacing="4" Padding="12,0">
+            <Label Text="变更原因" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+            <Editor Text="{Binding ChangeReason}" Placeholder="请详细描述变更原因..." HeightRequest="80"/>
+        </VerticalStackLayout>
+
+        <!-- 底部按钮 -->
+        <Border Grid.Row="4" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="返回" HeightRequest="46" CornerRadius="10" FontSize="15"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding GoBackCommand}"/>
+                <Button Grid.Column="1" Text="确认变更" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding ConfirmChangeCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="5" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

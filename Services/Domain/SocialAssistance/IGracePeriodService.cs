@@ -40,16 +40,23 @@ public interface IGracePeriodService
     bool IsInGracePeriod(ApplicationEntity application);
 
     /// <summary>
-    /// 统计渐退期将在指定天数内到期（含已到期未处理）的户数
+    /// 统计进行中 + 已到期的渐退期户数（渐退期管理页/横幅口径）
     /// </summary>
     Task<Result<int>> GetExpiringCountAsync(int withinDays, CancellationToken ct = default);
 
     /// <summary>
+    /// 首页预警口径：N 天内到期 + 已到期的渐退期户数（end_date &lt;= 今天 + withinDays）
+    /// </summary>
+    Task<Result<int>> GetWarningCountAsync(int withinDays, CancellationToken ct = default);
+
+    /// <summary>
     /// 激活/更新渐退期记录（UPSERT 到 nc_biz_grace_periods，已存在则覆盖）
+    /// graceGrantAmount：渐退期内实际应发月保障金（原额超户口类型上限时已封顶）
     /// </summary>
     Task<Result<bool>> ActivateAsync(long applicationId, int months,
         DateTime startDate, DateTime endDate,
         string? originalClassification, decimal? originalGuaranteeAmount,
+        decimal? graceGrantAmount = null,
         CancellationToken ct = default);
 
     /// <summary>
@@ -63,6 +70,17 @@ public interface IGracePeriodService
     Task<Result<GracePeriodRecord?>> GetActiveAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
+    /// 批量取多份申请的当前有效渐退期到期日（application_id = ANY 一次查询防 N+1）
+    /// </summary>
+    Task<Result<IReadOnlyDictionary<long, DateTime>>> GetActiveEndDateMapByApplicationIdsAsync(
+        IReadOnlyCollection<long> applicationIds, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取指定申请最近一条渐退期记录（不过滤 is_active，退出后补打审批表仍可取数）
+    /// </summary>
+    Task<Result<GracePeriodRecord?>> GetLatestAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 获取所有当前有效的渐退期记录（供列表/报表）
     /// </summary>
     Task<Result<List<GracePeriodRecord>>> GetActiveListAsync(CancellationToken ct = default);
@@ -73,9 +91,9 @@ public interface IGracePeriodService
     Task<Result<List<GracePeriodRecord>>> GetMonthlyAsync(int year, int month, CancellationToken ct = default);
 
     /// <summary>
-    /// 渐退期到期未处理列表（分页查询）
-    /// 条件：渐退期 is_active=TRUE 且 end_date &lt; 今天（已到期）
-    /// 且关联档案 status != 'Stopped'（已停保的不再显示）
+    /// 渐退期列表（进行中 + 已到期，分页查询）
+    /// 条件：渐退期 is_active=TRUE 且 end_date 非空
+    /// 关联档案 status ∈ Approved/Completed/Draft（含户主死亡新建草稿）
     /// 支持按姓名/身份证关键词模糊搜索
     /// </summary>
     Task<Result<PagedResult<GracePeriodExpiringItem>>> GetExpiringPagedAsync(

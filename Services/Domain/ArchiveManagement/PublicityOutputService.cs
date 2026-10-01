@@ -19,7 +19,7 @@ public interface IPublicityOutputService
 
     /// <summary>
     /// 取指定月份的公示名单（导入库基数 + 当前库在保合并 − 退出排除），返回统一公示行（未分组）。
-    /// 退出排除：当前库 status='Stopped' 且 stop_date ≤ 月末、死亡记录 is_household_head=true 的户主身份证。
+    /// 退出排除：当前库 status=ApplicationStatusCodes.STOPPED 且 stop_date ≤ 月末、死亡记录 is_household_head=true 的户主身份证。
     /// </summary>
     Task<Result<List<PublicityFamilyRow>>> GetPublicityFamiliesForMonthAsync(int year, int month, CancellationToken ct = default);
 
@@ -419,7 +419,7 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             // 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算退出，避免在保户被永久排除出公示
             var stoppedResult = await _db.QueryAsync<IdCardRow>(
                 $@"SELECT applicant_id_card FROM nc_biz_applications
-                  WHERE status = 'Stopped' AND stop_date IS NOT NULL AND stop_date <= $1::date AND deleted_at IS NULL
+                  WHERE status = '{ApplicationStatusCodes.STOPPED}' AND stop_date IS NOT NULL AND stop_date <= $1::date AND deleted_at IS NULL
                   {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}",
                 ct, monthEnd);
             if (stoppedResult.IsFailure)
@@ -482,12 +482,12 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
                     COALESCE(total_guarantee_amount, 0) AS total_amount,
                     COALESCE(application_reason, '') AS remark
                   FROM nc_biz_applications
-                 WHERE status = 'Approved'
+                 WHERE status = $2
                    AND (stop_date IS NULL OR stop_date >= $1::date)
                    AND deleted_at IS NULL";
         try
         {
-            var result = await _db.QueryAsync<PublicityFamilyRow>(sql, ct, monthEnd);
+            var result = await _db.QueryAsync<PublicityFamilyRow>(sql, ct, monthEnd, ApplicationStatusCodes.APPROVED);
             if (result.IsFailure)
                 return Result.Failure<List<PublicityFamilyRow>>(result.ErrorCode!, result.Message!);
             return Result.Success(result.Value ?? new List<PublicityFamilyRow>());

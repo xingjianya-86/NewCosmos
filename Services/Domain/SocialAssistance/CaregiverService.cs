@@ -29,9 +29,7 @@ public class CaregiverService : BaseService, ICaregiverService
 
         LogInfo($"保存照料人: ApplicationId={applicationId}, Count={caregivers.Count}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -39,49 +37,51 @@ public class CaregiverService : BaseService, ICaregiverService
             var delResult = await _db.ExecuteNonQueryAsync(delSql, ct, applicationId);
             if (delResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return delResult;
             }
 
             foreach (var caregiver in caregivers)
-            {
                 caregiver.ApplicationId = applicationId;
-                var insSql = @"INSERT INTO nc_biz_caregivers
+
+            // 多行 VALUES 批写（原逐行 INSERT 为 N+1）
+            const int chunkSize = 500;
+            for (var chunkStart = 0; chunkStart < caregivers.Count; chunkStart += chunkSize)
+            {
+                var chunk = caregivers.Skip(chunkStart).Take(chunkSize).ToList();
+                var (valuesClause, insertArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(chunk.Count, 19, i =>
+                {
+                    var c = chunk[i];
+                    return new object?[] { c.ApplicationId, c.CaredMemberId, c.Name, c.IdCard, c.Phone,
+                        c.Relationship, c.Gender, c.Age, c.Ethnicity, c.MaritalStatus,
+                        c.HukouType, c.EducationLevel, c.PoliticalStatus,
+                        c.HealthStatus, c.EmploymentStatus, c.MainIncomeSource,
+                        c.WorkUnit, c.Position, c.Address };
+                }, s => $"({string.Join(",", Enumerable.Range(0, 19).Select(k => $"${s + k}"))},NOW())");
+
+                var insSql = $@"INSERT INTO nc_biz_caregivers
                     (application_id, cared_member_id, name, id_card, phone,
                      relationship, gender, age, ethnicity, marital_status,
                      hukou_type, education_level, political_status,
                      health_status, employment_status, main_income_source,
                      work_unit, position, address, created_at)
-                    VALUES ($1, $2, $3, $4, $5,
-                            $6, $7, $8, $9, $10,
-                            $11, $12, $13,
-                            $14, $15, $16,
-                            $17, $18, $19, NOW());";
-                var insResult = await _db.ExecuteNonQueryAsync(insSql, ct,
-                    caregiver.ApplicationId, caregiver.CaredMemberId,
-                    caregiver.Name, caregiver.IdCard, caregiver.Phone,
-                    caregiver.Relationship, caregiver.Gender, caregiver.Age,
-                    caregiver.Ethnicity, caregiver.MaritalStatus,
-                    caregiver.HukouType, caregiver.EducationLevel, caregiver.PoliticalStatus,
-                    caregiver.HealthStatus, caregiver.EmploymentStatus, caregiver.MainIncomeSource,
-                    caregiver.WorkUnit, caregiver.Position, caregiver.Address);
+                    VALUES {valuesClause}";
+                var insResult = await _db.ExecuteNonQueryAsync(insSql, ct, insertArgs);
                 if (insResult.IsFailure)
                 {
-                    if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return insResult;
                 }
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo("照料人保存成功");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction)
-                await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError("照料人保存失败");
             return Result.Failure(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }

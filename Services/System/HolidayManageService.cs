@@ -167,7 +167,7 @@ public class HolidayManageService : BaseService, IHolidayManageService
         }
 
         LogInfo("节假日表为空，写入内置 2026 年种子数据");
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             // 逐行参数化写入（种子为编译期常量，仍统一走位置参数规范）
@@ -181,18 +181,18 @@ public class HolidayManageService : BaseService, IHolidayManageService
                     date, dateType, name, date.Year, DutyConstants.Sources.SEED);
                 if (insertResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return insertResult;
                 }
             }
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
             Logger.LogBusiness($"节假日种子数据写入完成: {SeedHolidays2026.Length} 条");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "节假日种子写入失败");
             return Result.FromException(ex);
         }
@@ -356,14 +356,14 @@ public class HolidayManageService : BaseService, IHolidayManageService
         var holidayCount = rows.Count(r => r.DateType == DutyConstants.HolidayRowTypes.HOLIDAY);
         var makeupCount = rows.Count - holidayCount;
 
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             var deleteResult = await _dbService.ExecuteNonQueryAsync(
                 "DELETE FROM nc_sys_holidays WHERE year = $1 AND source = $2", ct, year, DutyConstants.Sources.API);
             if (deleteResult.IsFailure)
             {
-                await _dbService.RollbackTransactionAsync(ct);
+                await tx.RollbackAsync(ct);
                 return Result.Failure<HolidayDownloadSummary>(deleteResult.ErrorCode!, deleteResult.Message!);
             }
 
@@ -382,16 +382,16 @@ public class HolidayManageService : BaseService, IHolidayManageService
                     date, dateType, name, year, DutyConstants.Sources.API);
                 if (upsertResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<HolidayDownloadSummary>(upsertResult.ErrorCode!, upsertResult.Message!);
                 }
             }
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "节假日数据写入失败");
             return Result.FromException<HolidayDownloadSummary>(ex);
         }

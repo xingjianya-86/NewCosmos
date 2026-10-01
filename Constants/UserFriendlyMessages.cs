@@ -105,6 +105,7 @@ public static class UserFriendlyMessages
         [ErrorCodes.SPECIAL_APPROVAL_REVIEW_DONE] = "该申报表已完成会议审议",
         [ErrorCodes.SPECIAL_APPROVAL_TEMPLATE_NOT_FOUND] = "未找到一事一议申报表模板，请先在模板管理中导入",
         [ErrorCodes.TIMELINE_CALCULATION_FAILED] = "时间线计算失败",
+        [ErrorCodes.CLASSIFICATION_FAILED] = "分类判定失败，请检查家庭经济与成员信息",
         [ErrorCodes.CONFIG_NOT_FOUND] = "未找到相关标准配置，请先在标准配置管理中维护",
 
         #endregion

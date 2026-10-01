@@ -48,7 +48,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
         try
         {
             var kw = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim();
-            LogInfo($"查询大学生档案列表: keyword={kw}");
+            LogInfo($"查询大学生档案列表: keywordLength={(kw ?? string.Empty).Length}");
 
             var sql = $@"
                 SELECT {SelectColumns} FROM nc_biz_college_students
@@ -74,12 +74,14 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
         try
         {
             var kw = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim();
-            LogInfo($"搜索可关联的18-23岁家庭成员: keyword={kw}");
+            LogInfo($"搜索可关联的18-23岁家庭成员: keywordLength={(kw ?? string.Empty).Length}");
 
             // 从已归档档案的 family_members + 6 张导入台账的 persons 中搜索18-23岁成员
             // 统一用身份证第7-14位提取出生日期计算周岁（family_members.birth_date 大量为 NULL）
             // 增加户主姓名、联系方式、所在村屯字段
             // 导入台账人员通过 head_id_card 关联家庭表获取户主信息
+            // [索引豁免] EXTRACT(YEAR FROM AGE(...TO_DATE(SUBSTRING(id_card)))) 由身份证推算周岁，
+            // 无原生列可索引（除非另建生成列）；CTE 内作候选集过滤，结果集小。
             var sql = @"
                 WITH family_members AS (
                     SELECT m.id, m.name, m.id_card, m.gender, m.birth_date, m.application_id,

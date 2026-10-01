@@ -91,8 +91,6 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     engine.ReplaceFields(placeholderFields);
                     var pdfBytes = await engine.ExportPdfAsync(ct);
                     allPdfBytes.Add(pdfBytes);
-
-                    LogInfo($"赡养人预览 {i + 1}/{tableRows.Count}");
                 }
 
                 var mergedPdf = allPdfBytes.Count == 1 ? allPdfBytes[0] : MergePdfBytes(allPdfBytes);
@@ -125,8 +123,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                             return Result.Failure<byte[]>(ErrorCodes.DOCUMENT_GENERATION_FAILED, $"分块预览生成失败: {chunkPdf.Message}");
                         }
                         chunkPdfBytes.Add(chunkPdf.Value);
-                        LogInfo($"分块预览 {chunkIndex + 1}/{chunkedRows.Count}");
                     }
+                    LogInfo($"分块预览完成: {chunkedRows.Count} 块");
                     pdfResult = Result.Success(chunkPdfBytes.Count == 1 ? chunkPdfBytes[0] : MergePdfBytes(chunkPdfBytes));
                 }
                 else
@@ -253,8 +251,6 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
                     var supporterSourceBytes = await File.ReadAllBytesAsync(supporterFilePath, ct);
                     allSourceBytes.Add(supporterSourceBytes);
-
-                    LogInfo($"赡养人 {i + 1}/{tableRows.Count}: {supporterName}");
                 }
 
                 // 合并所有PDF
@@ -278,7 +274,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     PrinterName = printerName,
                     Copies = copies,
                     OperatorId = currentUserId,
-                    Status = "Completed"
+                    Status = PrintJobConstants.StatusCompleted
                 };
 
                 var spSaveResult = await _printRecordService.SaveAsync(spRecord, ct);
@@ -398,7 +394,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 PrinterName = printerName,
                 Copies = copies,
                 OperatorId = currentUserId,
-                Status = "Completed"
+                Status = PrintJobConstants.StatusCompleted
             };
 
             var saveResult = await _printRecordService.SaveAsync(record, ct);
@@ -426,7 +422,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 BusinessId = businessId,
                 TemplateId = templateId,
                 TemplateName = templateName,
-                Status = "Failed",
+                Status = PrintJobConstants.StatusFailed,
                 Remark = ex.Message,
                 Copies = copies,
                 OperatorId = currentUserId

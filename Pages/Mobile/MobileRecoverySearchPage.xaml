@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileRecoverySearchPage"
+             x:DataType="RecoverySearchViewModel"
+             Title="后补追缴"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="0">
+
+        <!-- 头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="10">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="后补追缴" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="停止人员追缴办理与追缴记录" FontSize="12" TextColor="#E6FFFFFF"/>
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding TotalCountText}" Caption="停止人员（人）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding RuralSubsistenceCountText}" Caption="农村低保"/>
+                    <components:StatCapsule Grid.Column="2" Value="{Binding UrbanSubsistenceCountText}" Caption="城市低保"/>
+                    <components:StatCapsule Grid.Column="3" Value="{Binding RigidExpenditureCountText}" Caption="刚性支出"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 模式 Tab -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
+            <Border Grid.Column="0" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsStoppedMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#16A34A|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchToStoppedCommand}"/></Border.GestureRecognizers>
+                <Label Text="停止人员追缴" FontSize="13" HorizontalOptions="Center"
+                       TextColor="{Binding IsStoppedMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+            </Border>
+            <Border Grid.Column="1" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    BackgroundColor="{Binding IsHistoryMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#16A34A|#EEF2F7'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchToHistoryCommand}"/></Border.GestureRecognizers>
+                <Label Text="我的追缴记录" FontSize="13" HorizontalOptions="Center"
+                       TextColor="{Binding IsHistoryMode, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+            </Border>
+        </Grid>
+
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 停止人员追缴 -->
+                <VerticalStackLayout Spacing="10" IsVisible="{Binding IsStoppedMode}">
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Entry Grid.Column="0" Placeholder="输入姓名或身份证号搜索停止人员" Text="{Binding SearchKeyword}"
+                                       HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
+                                <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
+                                        BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                                        Command="{Binding SearchCommand}"/>
+                            </Grid>
+                            <Button Text="+ 手工录入追缴" HeightRequest="42" FontSize="14" CornerRadius="10"
+                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                    Command="{Binding GoToManualInputCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SearchResults}" Spacing="0"
+                                         IsVisible="{Binding HasSearchResults}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="ent:StoppedPersonDto">
+                                <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,4">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                            <Label Text="{Binding PersonName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Text="{Binding SourceDisplay}" FontSize="12" TextColor="{StaticResource Primary}"/>
+                                            <Label Text="{Binding MonthlyAmount, StringFormat='月保障额 {0:N2} 元'}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="追缴" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                                                BackgroundColor="{StaticResource Success}" TextColor="White" VerticalOptions="Center"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type RecoverySearchViewModel}}, Path=SelectPersonCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- 我的追缴记录 -->
+                <VerticalStackLayout Spacing="10" IsVisible="{Binding IsHistoryMode}">
+                    <Border Style="{StaticResource CardBorder}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Grid.Column="0" Placeholder="搜索追缴记录（姓名/身份证）" Text="{Binding HistoryKeyword}"
+                                   HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchHistoryCommand}"/>
+                            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                                    Command="{Binding SearchHistoryCommand}"/>
+                        </Grid>
+                    </Border>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding HistoryRecords}" Spacing="0"
+                                         IsVisible="{Binding HasHistoryRecords}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="ent:RecoveryRecord">
+                                <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,4">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Label Grid.Column="0" Text="{Binding PersonName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                            <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="8,2" StrokeThickness="0"
+                                                    BackgroundColor="{StaticResource Gray100}">
+                                                <Label Text="{Binding StatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                            </Border>
+                                        </Grid>
+                                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Label Text="应追缴金额" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                                <Label Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                <Label Text="已追缴金额" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                                <Label Text="{Binding RecoveredAmount, StringFormat='{0:N2} 元'}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding SourceTypeDisplay}"/><Span Text=" · "/><Span Text="{Binding InputModeDisplay}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Text="{Binding CreatedAtText, StringFormat='创建：{0}'}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+
+                                        <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                                            <Button Text="推送打印" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                                    BackgroundColor="{StaticResource Info}" TextColor="White"
+                                                    IsVisible="{Binding CanReprint}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type RecoverySearchViewModel}}, Path=PushPrintRecordCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            <Button Text="编辑" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                                    IsVisible="{Binding CanDelete}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type RecoverySearchViewModel}}, Path=EditRecordCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            <Button Text="删除" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                                    BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
+                                                    IsVisible="{Binding CanDelete}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type RecoverySearchViewModel}}, Path=DeleteRecordCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </HorizontalStackLayout>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="3" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

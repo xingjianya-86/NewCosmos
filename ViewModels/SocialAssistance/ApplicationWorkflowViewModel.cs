@@ -23,6 +23,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
 {
     private readonly IAssetVerificationService _verificationService;
     private readonly IApplicationService _applicationService;
+    private readonly IGracePeriodService _gracePeriodService;
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
@@ -109,6 +110,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     public ApplicationWorkflowViewModel(
         IAssetVerificationService verificationService,
         IApplicationService applicationService,
+        IGracePeriodService gracePeriodService,
         IDialogService dialogService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
@@ -117,6 +119,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     {
         _verificationService = verificationService;
         _applicationService = applicationService;
+        _gracePeriodService = gracePeriodService;
         _dialogService = dialogService;
         _logger = logger;
         _serviceProvider = serviceProvider;
@@ -177,6 +180,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     {
         Models.Results.PagedResult<AssetVerificationTask>? assetPage = null;
         Models.Results.PagedResult<ApplicationEntity>? appPage = null;
+        IReadOnlyDictionary<long, DateTime>? graceMap = null;
         string? loadError = null;
 
         try
@@ -247,6 +251,18 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
             // 资产核查两 Tab：预解析"县/镇/村"行政区名称，卡片家庭地址按完整地址展示
             if (assetPage != null)
                 await _addressResolver.WarmupFullAddressAsync(assetPage.Items.Select(x => x.Community), ct);
+
+            // 草稿/已建档两 Tab：批量取当前有效渐退期到期日（卡片注释）。
+            // 一次 = ANY 查询防 N+1；失败仅记 Warn、注释留空，不打断列表加载。
+            if (appPage != null && SelectedTabIndex is 2 or 3 && appPage.Items.Count > 0)
+            {
+                var graceResult = await _gracePeriodService.GetActiveEndDateMapByApplicationIdsAsync(
+                    appPage.Items.Select(x => x.Id).ToList(), ct);
+                if (graceResult.IsSuccess)
+                    graceMap = graceResult.Value;
+                else
+                    _logger.Warn("工作流渐退期到期日批量查询失败: " + graceResult.ErrorCode + " " + graceResult.Message);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -283,13 +299,13 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     if (assetPage != null) FillPagedPage(HasReportItems, MapAssetPage(assetPage, MapHasReportItem));
                     break;
                 case 2:
-                    if (appPage != null) FillPagedPage(DraftItems, MapApplicationPage(appPage, "草稿", "Danger", WorkflowCardAction.EditDelete));
+                    if (appPage != null) FillPagedPage(DraftItems, MapApplicationPage(appPage, "草稿", "Danger", WorkflowCardAction.EditDelete, graceMap));
                     break;
                 case 3:
-                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete));
+                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete, graceMap));
                     break;
                 case 4:
-                    if (appPage != null) FillPagedPage(ArchiveCompletedItems, MapApplicationPage(appPage, "已完结", "Success", WorkflowCardAction.None));
+                    if (appPage != null) FillPagedPage(ArchiveCompletedItems, MapApplicationPage(appPage, "已完结", "Success", WorkflowCardAction.ViewArchive));
                     break;
             }
         });
@@ -361,6 +377,24 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         }
     }
 
+    /// <summary>
+    /// 已完结 Tab：查看档案（FormOperationMode.View 只读打开，与档案查询页查看入口同模式）
+    /// </summary>
+    [RelayCommand]
+    private async Task ViewArchiveAsync(WorkflowCardItem? item)
+    {
+        if (item?.Source is not ApplicationEntity app) return;
+
+        try
+        {
+            await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(new FormPageParameter(FormOperationMode.View, app.Id));
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.DisplayAlertAsync("错误", "查看档案失败: " + ex.Message, "确定");
+        }
+    }
+
     [RelayCommand]
     private async Task EditDraftAsync(WorkflowCardItem? item)
     {
@@ -428,10 +462,20 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         PagedResult<ApplicationEntity> page,
         string statusText,
         string statusKind,
-        WorkflowCardAction action)
+        WorkflowCardAction action,
+        IReadOnlyDictionary<long, DateTime>? graceMap = null)
         => PagedResult<WorkflowCardItem>.FromList(
-            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action)).ToList(),
+            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action, graceMap)).ToList(),
             page.PageIndex, page.PageSize, page.TotalCount);
+
+    /// <summary>渐退期注释文案：进行中"渐退期至 yyyy-MM-dd"；已过到期日标"已到期"。</summary>
+    private static string BuildGraceNote(IReadOnlyDictionary<long, DateTime>? graceMap, long applicationId)
+    {
+        if (graceMap == null || !graceMap.TryGetValue(applicationId, out var endDate)) return string.Empty;
+        return endDate >= DateTime.Today
+            ? $"渐退期至 {endDate:yyyy-MM-dd}"
+            : $"渐退期已到期（至 {endDate:yyyy-MM-dd}）";
+    }
 
     private WorkflowCardItem MapSubmittedItem(AssetVerificationTask t) => new()
     {
@@ -462,7 +506,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     };
 
     private static WorkflowCardItem MapApplicationItem(
-        ApplicationEntity a, string statusText, string statusKind, WorkflowCardAction action) => new()
+        ApplicationEntity a, string statusText, string statusKind, WorkflowCardAction action,
+        IReadOnlyDictionary<long, DateTime>? graceMap = null) => new()
     {
         Source = a,
         Name = a.ApplicantName,
@@ -470,6 +515,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         StatusText = statusText,
         StatusKind = statusKind,
         ShowSingleRescue = a.IsSingleRescue,
+        GraceNote = BuildGraceNote(graceMap, a.Id),
         MetaLabel = "编号",
         MetaValue = a.ApplicationNo,
         Address = null,

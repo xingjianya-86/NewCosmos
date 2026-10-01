@@ -207,7 +207,7 @@
         </Border>
 
         <Border Grid.Row="3" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                 <Button Text="&#xE72B; 返回"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding GoBackCommand}"
@@ -230,9 +230,25 @@
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="4"
+                        Text="&#xE73E; 完成工单"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding CompleteWorkOrderCommand}"
+                        IsVisible="{Binding IsWorkOrderCompleteVisible}"
+                        Style="{StaticResource ButtonSecondary}"
+                        FontSize="13"
+                        HeightRequest="38">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsWorkOrderCompleted}" Value="True">
+                            <Setter Property="Text" Value="&#xE73E; 工单已完成"/>
+                            <Setter Property="IsEnabled" Value="False"/>
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Grid.Column="5"
                         Text="&#xE73E; 完成归档"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding CompleteCommand}"
+                        IsVisible="{Binding IsCompleteArchiveVisible}"
                         Style="{StaticResource ButtonSecondary}"
                         FontSize="13"
                         HeightRequest="38"/>

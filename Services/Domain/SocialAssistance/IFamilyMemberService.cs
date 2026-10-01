@@ -35,9 +35,14 @@ public interface IFamilyMemberService
     Task<Result> DeleteAsync(long id, CancellationToken ct = default);
 
     /// <summary>
-    /// 删除申请的所有家庭成员（软删除）
+    /// 删除申请的所有家庭成员（软删除），返回删除行数
     /// </summary>
-    Task<Result> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default);
+    Task<Result<int>> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询申请下已登记死亡的成员身份证（历史数据未软删，展示/生成档案时须过滤）
+    /// </summary>
+    Task<Result<List<string>>> GetDeadIdCardsByApplicationIdAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
     /// 设置户主

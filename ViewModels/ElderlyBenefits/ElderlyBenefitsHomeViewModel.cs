@@ -1,8 +1,9 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.Domain.Reporting;
 using NewCosmos.Services.UserManagement;
@@ -30,7 +31,7 @@ public partial class ElderlyBenefitsHomeViewModel : ModuleHomeViewModelBase
 
     #region 模块统计（失败降级显示 StatNA）
 
-    /// <summary>在享领取人数（status='Confirmed'）</summary>
+    /// <summary>在享领取人数（status=ApplicationStatusCodes.CONFIRMED）</summary>
     [ObservableProperty]
     private string _activeCountText = StatNA;
 
@@ -89,10 +90,12 @@ public partial class ElderlyBenefitsHomeViewModel : ModuleHomeViewModelBase
                 userId, new[] { PermissionCodes.ELDERLY_VIEW });
 
             CanAccessElderlyBenefit = permissions.TryGetValue(PermissionCodes.ELDERLY_VIEW, out var granted) && granted;
+            MarkPermissionsLoaded();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "模块权限加载失败");
+            // 失败不清零：保留上次状态，基类允许下次 OnAppearing 重试
+            Logger.LogError(ex, "模块权限加载失败（保留上次状态，稍后重试）");
         }
     }
 

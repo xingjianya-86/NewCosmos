@@ -74,14 +74,14 @@ public class ElderlyCategoryService : BaseService
             const string sql = @"
                 SELECT a.classification_result
                 FROM nc_biz_applications a
-                WHERE a.deleted_at IS NULL AND a.status = 'Approved'
+                WHERE a.deleted_at IS NULL AND a.status = $2
                   AND (a.applicant_id_card = $1
                        OR EXISTS (SELECT 1 FROM nc_biz_family_members fm
                                   WHERE fm.application_id = a.id AND fm.id_card = $1 AND fm.deleted_at IS NULL))
                   AND a.classification_result IS NOT NULL
                 ORDER BY a.updated_at DESC
                 LIMIT 5";
-            var result = await _db.QueryAsync<string>(sql, ct, idCard);
+            var result = await _db.QueryAsync<string>(sql, ct, idCard, ApplicationStatusCodes.APPROVED);
             if (result.IsFailure || result.Value == null || result.Value.Count == 0)
                 return null;
 

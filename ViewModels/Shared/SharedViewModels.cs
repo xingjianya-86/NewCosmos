@@ -8,6 +8,7 @@ namespace NewCosmos.ViewModels.Shared;
 
 /// <summary>
 /// 进度指示器ViewModel
+/// 不继承 ViewModelBase（审计豁免）：纯展示状态机 + 自带 CTS 管理，无服务调用。
 /// </summary>
 public partial class ProgressViewModel : ObservableObject
 {

@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
@@ -211,19 +211,19 @@ public class DictionaryService : BaseService, IDictionaryService
     {
         LogInfo("执行清空种子表操作");
 
-        await _dbService.BeginTransactionAsync();
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_dict_categories", ct);
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_dict_items", ct);
-            await _dbService.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             Logger.LogBusiness("种子表清空完成");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"清空种子表失败: {ex.Message}");
             return Result.FromException(ex);
         }

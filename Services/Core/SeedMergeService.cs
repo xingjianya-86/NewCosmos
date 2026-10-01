@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Models.Schema;
@@ -38,10 +39,21 @@ public class SeedMergeService : BaseService, ISeedMergeService
 
         var result = new MergeResult();
 
-        await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
         try
         {
-            var existingKeys = await LoadExistingKeysAsync(definition, ct);
+            var existingKeysResult = await LoadExistingKeysAsync(definition, ct);
+            if (existingKeysResult.IsFailure)
+            {
+                // §6：查询失败显式中止，绝不按"无现存行"继续（否则种子合并只插不删、UPDATE 全部静默失败）
+                await tx.RollbackAsync(ct);
+                result.IsSuccess = false;
+                result.ErrorMessage = existingKeysResult.Message;
+                return Result.Failure<MergeResult>(
+                    existingKeysResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    existingKeysResult.Message ?? "读取现存种子键失败");
+            }
+            var existingKeys = existingKeysResult.Value!;
             var seedKeys = new HashSet<string>(
                 seedRows.Select(r => GetBusinessKey(r, definition.BusinessKeyColumn)),
                 StringComparer.OrdinalIgnoreCase);
@@ -79,14 +91,14 @@ public class SeedMergeService : BaseService, ISeedMergeService
                 }
             }
 
-            await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
             LogInfo($"种子数据合并完成: {definition.TableName}");
             result.IsSuccess = true;
             return Result.Success(result);
         }
         catch (Exception ex)
         {
-            await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"操作失败");
             result.IsSuccess = false;
             result.ErrorMessage = ex.Message;
@@ -94,14 +106,18 @@ public class SeedMergeService : BaseService, ISeedMergeService
         }
     }
 
-    private async Task<HashSet<string>> LoadExistingKeysAsync(SeedMergeDefinition def, CancellationToken ct)
+    private async Task<Result<HashSet<string>>> LoadExistingKeysAsync(SeedMergeDefinition def, CancellationToken ct)
     {
         var sql = $"SELECT \"{def.BusinessKeyColumn}\" AS key_value FROM {def.TableName}";
         var rawResult = await _db.QueryAsync<SeedKeyRow>(sql, ct);
+        if (rawResult.IsFailure)
+            return Result.Failure<HashSet<string>>(
+                rawResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                rawResult.Message ?? "查询现存种子键失败");
         var rows = rawResult.Value ?? new List<SeedKeyRow>();
-        return new HashSet<string>(
+        return Result.Success(new HashSet<string>(
             rows.Select(r => r.KeyValue ?? string.Empty),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.OrdinalIgnoreCase));
     }
 
     private static string GetBusinessKey(Dictionary<string, object> row, string businessKeyColumn)

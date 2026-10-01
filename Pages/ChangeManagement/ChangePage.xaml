@@ -13,7 +13,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
-                        <Label Text="{Binding ChangeType}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ChangeTypeDisplay}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="{Binding ChangeReason}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                     <Label Grid.Column="2" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
@@ -25,7 +25,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Label Text="&#xE8AB;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
-                        <Label Text="{Binding ChangeType}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ChangeTypeDisplay}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="{Binding ChangeReason}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                     <Label Grid.Column="2" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>

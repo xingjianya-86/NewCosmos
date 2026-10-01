@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Options;
@@ -308,7 +308,9 @@ public class DutyService : BaseService, IDutyService
             SELECT id, member_id, group_code, sort_order
             FROM nc_duty_member_groups";
         var groupResult = await _dbService.QueryAsync<DutyGroupAssignment>(groupSql, ct);
-        var groups = groupResult.IsSuccess ? groupResult.Value ?? new List<DutyGroupAssignment>() : new List<DutyGroupAssignment>();
+        if (!groupResult.IsSuccess)
+            return Result.Failure<List<DutyMemberView>>(groupResult.ErrorCode!, groupResult.Message!);
+        var groups = groupResult.Value ?? new List<DutyGroupAssignment>();
 
         var members = memberResult.Value ?? new List<DutyMemberView>();
         var groupLookup = groups.ToLookup(g => g.MemberId);
@@ -338,7 +340,7 @@ public class DutyService : BaseService, IDutyService
         var ensureResult = await EnsureTablesExistAsync(ct);
         if (ensureResult.IsFailure) return ensureResult;
 
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             long memberId;
@@ -354,7 +356,7 @@ public class DutyService : BaseService, IDutyService
                     member.JoinDate, member.ExitDate, member.Remark?.Trim() ?? string.Empty);
                 if (insertResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return insertResult;
                 }
                 memberId = insertResult.Value;
@@ -365,7 +367,7 @@ public class DutyService : BaseService, IDutyService
                     "SELECT COUNT(*) FROM nc_duty_members WHERE id = $1", ct, member.Id);
                 if (!existsResult.IsSuccess || existsResult.Value == 0)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return Result.Failure(ErrorCodes.DUTY_MEMBER_NOT_FOUND, "未找到要编辑的成员");
                 }
 
@@ -377,7 +379,7 @@ public class DutyService : BaseService, IDutyService
                     member.JoinDate, member.ExitDate, member.Remark?.Trim() ?? string.Empty);
                 if (updateResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return updateResult;
                 }
                 memberId = member.Id;
@@ -388,7 +390,7 @@ public class DutyService : BaseService, IDutyService
             var existingResult = await _dbService.QueryAsync<DutyGroupAssignment>(existingSql, ct, memberId);
             if (!existingResult.IsSuccess)
             {
-                await _dbService.RollbackTransactionAsync(ct);
+                await tx.RollbackAsync(ct);
                 return existingResult;
             }
             var existing = existingResult.Value ?? new List<DutyGroupAssignment>();
@@ -400,7 +402,7 @@ public class DutyService : BaseService, IDutyService
                     "DELETE FROM nc_duty_member_groups WHERE id = $1", ct, removed.Id);
                 if (deleteResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return deleteResult;
                 }
             }
@@ -414,16 +416,16 @@ public class DutyService : BaseService, IDutyService
                 var insertGroupResult = await _dbService.ExecuteNonQueryAsync(insertGroupSql, ct, memberId, added);
                 if (insertGroupResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return insertGroupResult;
                 }
             }
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "保存值班成员");
             return Result.FromException(ex);
         }
@@ -492,28 +494,28 @@ public class DutyService : BaseService, IDutyService
         if (target < 0 || target >= list.Count)
             return Result.Success(); // 已在边界，无需移动
 
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             var swapFirst = await _dbService.ExecuteNonQueryAsync(
                 "UPDATE nc_duty_member_groups SET sort_order = $2 WHERE id = $1", ct, list[target].Id, list[index].SortOrder);
             if (swapFirst.IsFailure)
             {
-                await _dbService.RollbackTransactionAsync(ct);
+                await tx.RollbackAsync(ct);
                 return swapFirst;
             }
             var swapSecond = await _dbService.ExecuteNonQueryAsync(
                 "UPDATE nc_duty_member_groups SET sort_order = $2 WHERE id = $1", ct, list[index].Id, list[target].SortOrder);
             if (swapSecond.IsFailure)
             {
-                await _dbService.RollbackTransactionAsync(ct);
+                await tx.RollbackAsync(ct);
                 return swapSecond;
             }
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "调整组内顺序");
             return Result.FromException(ex);
         }
@@ -1010,7 +1012,7 @@ public class DutyService : BaseService, IDutyService
         var reason = change.Reason?.Trim() ?? string.Empty;
         var fromName = fromSchedule.MemberName;
 
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             // 留痕（from/to 姓名快照，成员删除后历史仍可显示）
@@ -1022,7 +1024,7 @@ public class DutyService : BaseService, IDutyService
                 change.ToMemberId, toMember.Name, isSwap ? toDutyDate : null, fromSchedule.GroupCode, reason);
             if (insertResult.IsFailure)
             {
-                await _dbService.RollbackTransactionAsync(ct);
+                await tx.RollbackAsync(ct);
                 return insertResult;
             }
 
@@ -1038,7 +1040,7 @@ public class DutyService : BaseService, IDutyService
                     fromSchedule.Id);
                 if (updateA.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return updateA;
                 }
 
@@ -1051,7 +1053,7 @@ public class DutyService : BaseService, IDutyService
                     toSchedule!.Id);
                 if (updateB.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return updateB;
                 }
             }
@@ -1067,16 +1069,16 @@ public class DutyService : BaseService, IDutyService
                     fromSchedule.Id);
                 if (updateResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return updateResult;
                 }
             }
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             return Result.FromException(ex);
         }
 
@@ -1774,7 +1776,7 @@ public class DutyService : BaseService, IDutyService
 
         var result = new DutyMemberImportResult();
 
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             // 1. 名单成员：新增 / 对齐归属与位次
@@ -1846,19 +1848,26 @@ public class DutyService : BaseService, IDutyService
                 result.UpdateCount++;
             }
 
-            // 2. 库内成员不在名单中 → 从其所有组移除（只摘组不删人）
+            // 2. 库内成员不在名单中 → 从其所有组移除（只摘组不删人；成对批量删除，保持 (member_id, group_code) 配对语义）
+            var removePairs = new List<(long MemberId, string GroupCode)>();
             foreach (var member in existingMembers)
             {
                 if (excelMemberGroups.ContainsKey(member.Name)) continue;
                 foreach (var g in member.Groups)
-                {
-                    var d = await _dbService.ExecuteNonQueryAsync(
-                        "DELETE FROM nc_duty_member_groups WHERE member_id = $1 AND group_code = $2",
-                        ct, member.Id, g.GroupCode);
-                    if (d.IsFailure)
-                        throw new BusinessException(d.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, d.Message ?? "移除组归属失败");
-                    result.RemoveCount++;
-                }
+                    removePairs.Add((member.Id, g.GroupCode));
+            }
+
+            if (removePairs.Count > 0)
+            {
+                var removeMemberIds = removePairs.Select(p => p.MemberId).ToArray();
+                var removeGroupCodes = removePairs.Select(p => p.GroupCode).ToArray();
+                var d = await _dbService.ExecuteNonQueryAsync(
+                    @"DELETE FROM nc_duty_member_groups
+                      WHERE (member_id, group_code) IN (SELECT * FROM unnest($1::bigint[], $2::text[]))",
+                    ct, removeMemberIds, removeGroupCodes);
+                if (d.IsFailure)
+                    throw new BusinessException(d.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, d.Message ?? "移除组归属失败");
+                result.RemoveCount += removePairs.Count;
             }
 
             // 3. 轮转锚点：有起始日期时，按轮转线分别设置游标为「当前序列的前一位」
@@ -1967,11 +1976,11 @@ public class DutyService : BaseService, IDutyService
                 result.AnchorDate = anchorDate.Value;
             }
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "批量导入值班成员名单");
             return Result.FromException<DutyMemberImportResult>(ex);
         }
@@ -2348,7 +2357,7 @@ public class DutyService : BaseService, IDutyService
 
         // 事务落库
         var replay = new ShiftReplayOutcome();
-        await _dbService.BeginTransactionAsync(ct);
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             if (force)
@@ -2357,54 +2366,61 @@ public class DutyService : BaseService, IDutyService
                     "DELETE FROM nc_duty_schedules WHERE year = $1 AND month = $2", ct, year, month);
                 if (deleteResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
+                    await tx.RollbackAsync(ct);
                     return Result.Failure<DutyGenerationSummary>(deleteResult.ErrorCode!, deleteResult.Message!);
                 }
             }
 
-            // 逐行参数化写入（一次性生成操作，事务内执行；ON CONFLICT 兜底防重复）
+            // 多行 VALUES 批写（占位骨架 + $n 位置参数；rotation_member_id 复用同占位；ON CONFLICT 兜底防重复）
             // rotation_member_id = 轮转消耗事实（选中成员），串班/代班等显示调整不覆盖该列
-            foreach (var s in pendingSchedules)
-            {
-                var insertResult = await _dbService.ExecuteNonQueryAsync(@"
-                    INSERT INTO nc_duty_schedules (duty_date, date_type, group_code, member_id, rotation_member_id, member_name, year, month)
-                    VALUES ($1, $2, $3, $4, $4, $5, $6, $7)
-                    ON CONFLICT (duty_date, group_code) DO NOTHING", ct,
-                    s.Date, s.DateType, s.Group, s.MemberId, s.MemberName, year, month);
-                if (insertResult.IsFailure)
+            var (scheduleValues, scheduleArgs) = MultiRowValuesBuilder.Build(
+                pendingSchedules.Count, 7,
+                i =>
                 {
-                    await _dbService.RollbackTransactionAsync(ct);
-                    return Result.Failure<DutyGenerationSummary>(insertResult.ErrorCode!, insertResult.Message!);
-                }
+                    var s = pendingSchedules[i];
+                    return new object?[] { s.Date, s.DateType, s.Group, s.MemberId, s.MemberName, year, month };
+                },
+                o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6})");
+            var insertResult = await _dbService.ExecuteNonQueryAsync(@"
+                INSERT INTO nc_duty_schedules (duty_date, date_type, group_code, member_id, rotation_member_id, member_name, year, month)
+                VALUES " + scheduleValues + @"
+                ON CONFLICT (duty_date, group_code) DO NOTHING", ct, scheduleArgs);
+            if (insertResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<DutyGenerationSummary>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
             // 游标批量 upsert（锚点月冻结游标：起点恒定取锚点校准值，保证重生成结果确定；后续月份由班次事实接续，不依赖游标）
-            if (!isAnchorMonth)
+            // 多行 VALUES 批写：updated_at 用 NOW() 字面量，仅 3 个位置参数/行
+            if (!isAnchorMonth && rotationUpdates.Count > 0)
             {
-                foreach (var item in rotationUpdates)
+                var rotationList = rotationUpdates.ToList();
+                var (rotationValues, rotationArgs) = MultiRowValuesBuilder.Build(
+                    rotationList.Count, 3,
+                    i => new object?[] { rotationList[i].Key.Group, rotationList[i].Key.DateType, rotationList[i].Value },
+                    o => $"(${o}, ${o + 1}, ${o + 2}, NOW())");
+                var upsertSql = @"
+                    INSERT INTO nc_duty_rotation_state (group_code, date_type, last_member_id, updated_at)
+                    VALUES " + rotationValues + @"
+                    ON CONFLICT (group_code, date_type)
+                    DO UPDATE SET last_member_id = EXCLUDED.last_member_id, updated_at = NOW()";
+                var upsertResult = await _dbService.ExecuteNonQueryAsync(upsertSql, ct, rotationArgs);
+                if (upsertResult.IsFailure)
                 {
-                    var upsertSql = @"
-                        INSERT INTO nc_duty_rotation_state (group_code, date_type, last_member_id, updated_at)
-                        VALUES ($1, $2, $3, NOW())
-                        ON CONFLICT (group_code, date_type)
-                        DO UPDATE SET last_member_id = EXCLUDED.last_member_id, updated_at = NOW()";
-                    var upsertResult = await _dbService.ExecuteNonQueryAsync(upsertSql, ct, item.Key.Group, item.Key.DateType, item.Value);
-                    if (upsertResult.IsFailure)
-                    {
-                        await _dbService.RollbackTransactionAsync(ct);
-                        return Result.Failure<DutyGenerationSummary>(upsertResult.ErrorCode!, upsertResult.Message!);
-                    }
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<DutyGenerationSummary>(upsertResult.ErrorCode!, upsertResult.Message!);
                 }
             }
 
             // 重放未撤销的串班/代班调整（force 重生成不丢手工调整；链式校验：班次值班人=记录原班人员才替换）
             replay = await ApplyShiftChangesAsync(year, month, ct);
 
-            await _dbService.CommitTransactionAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync(ct);
+            await tx.RollbackAsync(ct);
             LogException(ex, "生成月度值班表");
             return Result.FromException<DutyGenerationSummary>(ex);
         }

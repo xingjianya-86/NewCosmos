@@ -3,6 +3,8 @@ namespace NewCosmos.Services.Database;
 /// <summary>
 /// 事务作用域：由 IDatabaseService.BeginTransactionScopeAsync 创建。
 /// 作用域存活期间，当前异步流上的所有查询自动加入本事务。
+/// 嵌套语义：外层已有活动事务时，本作用域加入外层事务（与旧 HasTransaction 惯用法等价），
+/// Commit/Rollback/Dispose 均为 no-op，事务所有权归最外层作用域。
 /// 用法：
 /// <code>
 /// await using var tx = await _db.BeginTransactionScopeAsync(ct);

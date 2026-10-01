@@ -109,4 +109,49 @@ public class PrintRecordService : BaseService, IPrintRecordService
             ? Result.Success(result.Value ?? [])
             : Result.Failure<List<PrintRecord>>(result.ErrorCode!, result.Message!);
     }
+
+    public async Task<Result<List<PrintRecord>>> GetRecentByBusinessAsync(string businessType, long businessId, int limit, CancellationToken ct = default)
+    {
+        var sql = @"SELECT id, template_name, created_at, operator_name, status,
+                           COALESCE(remark, '') AS remark,
+                           COALESCE(OCTET_LENGTH(pdf_data), 0) AS pdf_size,
+                           COALESCE(pdf_path, '') AS pdf_path
+                    FROM nc_biz_print_records
+                    WHERE business_type = $1 AND business_id = $2
+                    ORDER BY created_at DESC
+                    LIMIT $3";
+        var result = await _db.QueryAsync<PrintRecord>(sql, ct, businessType, businessId, limit);
+        return result.IsSuccess
+            ? Result.Success(result.Value ?? [])
+            : Result.Failure<List<PrintRecord>>(result.ErrorCode!, result.Message!);
+    }
+
+    public async Task<Result<PrintRecord?>> GetPdfContentByIdAsync(long id, CancellationToken ct = default)
+    {
+        var sql = "SELECT id, pdf_data, COALESCE(pdf_path, '') AS pdf_path FROM nc_biz_print_records WHERE id = $1";
+        var result = await _db.QuerySingleAsync<PrintRecord>(sql, ct, id);
+        if (result.IsFailure)
+            return Result.Failure<PrintRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<PrintRecord?>(result.Value);
+    }
+
+    public async Task<Result<int>> MarkBatchWorkOrderCompletedAsync(string batchNo, string remark, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(batchNo))
+            return Result.Success(0);
+
+        // 幂等：remark 已含"工单办理完成"则不再追加（防止重复点击/重启后二次追加）
+        var sql = @"UPDATE nc_biz_print_records
+                    SET remark = CONCAT_WS('；', NULLIF(remark, ''), $2), updated_at = NOW()
+                    WHERE batch_no = $1
+                      AND (remark IS NULL OR remark NOT LIKE '%' || $3 || '%')";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, batchNo, remark, "工单办理完成");
+        if (result.IsFailure)
+        {
+            LogError($"工单完成留痕失败: {result.Message}");
+            return Result.Failure<int>(result.ErrorCode!, result.Message!);
+        }
+        LogInfo($"工单完成留痕: BatchNo={batchNo}, Rows={result.Value}");
+        return Result.Success(result.Value);
+    }
 }

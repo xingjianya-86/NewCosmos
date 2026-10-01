@@ -233,6 +233,9 @@ public static class ErrorCodes
     public const string SPECIAL_APPROVAL_TEMPLATE_NOT_FOUND = "SPECIAL_APPROVAL_TEMPLATE_NOT_FOUND";
     public const string TIMELINE_CALCULATION_FAILED = "TIMELINE_CALCULATION_FAILED";
 
+    /// <summary>分类判定失败</summary>
+    public const string CLASSIFICATION_FAILED = "CLASSIFICATION_FAILED";
+
     /// <summary>档案不在当前复核周期内</summary>
     public const string ECONOMIC_REVIEW_OUT_OF_PERIOD = "ECONOMIC_REVIEW_OUT_OF_PERIOD";
 

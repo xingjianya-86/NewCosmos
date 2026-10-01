@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Results;
+using NewCosmos.Models.Results;
 
 namespace NewCosmos.Services.Domain.Reporting;
 
@@ -28,7 +28,7 @@ public interface IStatisticsService
     /// <summary>保障对象变更统计（本月/年累计变更笔数）</summary>
     Task<Result<ChangeStats>> GetChangeStatsAsync(CancellationToken ct = default);
 
-    /// <summary>救助档案统计（归档总数）</summary>
+    /// <summary>救助档案统计（归档总数 = 当前库已归档 current_step=6 + 5 张历史导入库户数）</summary>
     Task<Result<ArchiveStats>> GetArchiveStatsAsync(CancellationToken ct = default);
 }
 
@@ -37,10 +37,10 @@ public interface IStatisticsService
 /// </summary>
 public class DashboardStatistics
 {
-    /// <summary>本月总新增：status='Approved' 且 first_approved_at∈B线周期（月报"新增救助明细"口径）</summary>
+    /// <summary>本月总新增：status=ApplicationStatusCodes.APPROVED 且 first_approved_at∈B线周期（月报"新增救助明细"口径）</summary>
     public int MonthlyNewAdditions { get; set; }
 
-    /// <summary>本月总退出：status='Stopped' 且 stop_date∈B线周期（月报"停保汇总"口径）</summary>
+    /// <summary>本月总退出：status=ApplicationStatusCodes.STOPPED 且 stop_date∈B线周期（月报"停保汇总"口径）</summary>
     public int MonthlyExits { get; set; }
 
     /// <summary>新申请资产核查：status='0'（已申请未出授权报告）且 application_date∈B线周期</summary>
@@ -55,13 +55,13 @@ public class DashboardStatistics
 /// </summary>
 public class SocialAssistanceModuleStats
 {
-    /// <summary>在享保障对象数（status='Approved'）</summary>
+    /// <summary>在享保障对象数（status=ApplicationStatusCodes.APPROVED）</summary>
     public int ActiveCount { get; set; }
 
-    /// <summary>本月总新增（status='Approved' 且 first_approved_at∈B线周期）</summary>
+    /// <summary>本月总新增（status=ApplicationStatusCodes.APPROVED 且 first_approved_at∈B线周期）</summary>
     public int MonthlyNewAdditions { get; set; }
 
-    /// <summary>本月总退出（status='Stopped' 且 stop_date∈B线周期）</summary>
+    /// <summary>本月总退出（status=ApplicationStatusCodes.STOPPED 且 stop_date∈B线周期）</summary>
     public int MonthlyExits { get; set; }
 }
 
@@ -100,7 +100,7 @@ public class AssetVerificationModuleStats
 /// </summary>
 public class ElderlyStopStats
 {
-    /// <summary>本月停发人次（status='Stopped' 且 stopped_at∈当月自然月）</summary>
+    /// <summary>本月停发人次（status=ApplicationStatusCodes.STOPPED 且 stopped_at∈当月自然月）</summary>
     public int MonthlyStopped { get; set; }
 
     /// <summary>年累计停发人次（stopped_at∈当年）</summary>
@@ -112,13 +112,13 @@ public class ElderlyStopStats
 /// </summary>
 public class TempReliefStats
 {
-    /// <summary>草稿数（status='Draft'）</summary>
+    /// <summary>草稿数（status=ApplicationStatusCodes.DRAFT）</summary>
     public int DraftCount { get; set; }
 
     /// <summary>已确认累计数（全部状态为已确认的申请）</summary>
     public int ConfirmedTotal { get; set; }
 
-    /// <summary>本年确认人次（confirmed_at∈当年且 status='Confirmed'）</summary>
+    /// <summary>本年确认人次（confirmed_at∈当年且 status=ApplicationStatusCodes.CONFIRMED）</summary>
     public int YearConfirmed { get; set; }
 
     /// <summary>本年确认金额合计（元）</summary>
@@ -142,6 +142,6 @@ public class ChangeStats
 /// </summary>
 public class ArchiveStats
 {
-    /// <summary>归档总数（nc_biz_archives，未删除）</summary>
+    /// <summary>归档总数（当前库 current_step=6 且未删除 + 5 张历史导入库户数；历史库无软删列）</summary>
     public int TotalArchives { get; set; }
 }

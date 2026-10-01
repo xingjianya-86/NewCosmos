@@ -27,7 +27,9 @@ public class ExcelEngine : ITemplateEngine
         _perfOptions = perfOptions;
         _storageOptions = storageOptions ?? throw new ArgumentNullException(nameof(storageOptions));
         ExcelPackage.License.SetNonCommercialOrganization("民政社会救助管理系统");
+#if WINDOWS
         OfficeComWorker.AttachLogger(logger);
+#endif
     }
 
     public void Load(byte[] templateData)
@@ -417,6 +419,7 @@ public class ExcelEngine : ITemplateEngine
         _logger.Info("执行操作");
     }
 
+#if WINDOWS
     public async Task<byte[]> ExportPdfAsync(CancellationToken ct = default)
     {
         if (_package == null)
@@ -450,7 +453,6 @@ public class ExcelEngine : ITemplateEngine
 
         Directory.CreateDirectory(outputDir);
 
-        // 修复：Load(byte[]) 路径下 _tempFilePath 为空串（非 null），原判断永真会生成 ".pdf" 无名文件
         var baseName = !string.IsNullOrEmpty(_tempFilePath)
             ? Path.GetFileNameWithoutExtension(_tempFilePath)
             : $"document_{DateTime.Now:yyyyMMdd_HHmmss}";
@@ -525,6 +527,19 @@ public class ExcelEngine : ITemplateEngine
             throw;
         }
     }
+#else
+    public Task<byte[]> ExportPdfAsync(CancellationToken ct = default)
+        => throw new NotSupportedException("PDF 导出仅 Windows 可用（需 Office COM）");
+
+    public Task<string> ExportPdfToFileAsync(string outputDir, CancellationToken ct = default)
+        => throw new NotSupportedException("PDF 导出仅 Windows 可用（需 Office COM）");
+
+    public Task PrintFromFileAsync(string filePath, int copies = 1, CancellationToken ct = default)
+        => throw new NotSupportedException("打印仅 Windows 可用（需 Office COM）");
+
+    public Task<byte[]> ExportPdfFromFileAsync(string sourceFilePath, string pdfOutputPath = null, CancellationToken ct = default)
+        => throw new NotSupportedException("PDF 导出仅 Windows 可用（需 Office COM）");
+#endif
 
     public List<string> GetUnresolvedPlaceholders()
     {

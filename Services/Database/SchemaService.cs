@@ -547,6 +547,8 @@ public class SchemaService : BaseService, ISchemaService
     /// 对已存在的表幂等补建缺失的索引与约束。
     /// 索引走 CREATE INDEX IF NOT EXISTS；约束先查 pg_constraint 再 ALTER TABLE ADD。
     /// 补建失败只告警不中断（外键可能因存量脏数据无法建立，需人工清理后重试）。
+    /// [N+1 豁免] DDL 管理域：CREATE INDEX/ADD CONSTRAINT 语句内容各不相同、无法合并为多行 VALUES，
+    /// 且属一次性幂等低频操作（仅建库/升级时执行）。
     /// </summary>
     private async Task EnsureIndexesAndConstraintsAsync(TableSchema table, CancellationToken ct)
     {
@@ -729,6 +731,7 @@ public class SchemaService : BaseService, ISchemaService
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToArray();
 
+            // [N+1 豁免] DDL：按分号拆分出的独立语句序列，语句内容互异不可合并；建表属一次性低频操作
             foreach (var statement in statements)
             {
                 var result = await _dbService.ExecuteNonQueryAsync(statement + ";", ct);
@@ -809,6 +812,7 @@ public class SchemaService : BaseService, ISchemaService
 
     public async Task<Result> ExecuteMultipleSqlAsync(string[] sqlStatements, CancellationToken ct = default)
     {
+        // [N+1 豁免] DDL/管理域：调用方传入的独立语句序列，内容互异不可合并；低频一次性执行
         foreach (var sql in sqlStatements)
         {
             if (string.IsNullOrWhiteSpace(sql)) continue;
@@ -1027,6 +1031,8 @@ public class SchemaService : BaseService, ISchemaService
         }
         catch (Exception ex)
         {
+            // [吞异常豁免] 解析失败与文件缺失统一返回 null；唯一调用方 EnsureTablesExistAsync 将 null
+            // 转为显式 Result.Failure(FILE_NOT_FOUND)（见 :773-776），失败链路完整非静默
             Logger.Error("加载Schema文件失败: " + ex.Message);
             return null;
         }

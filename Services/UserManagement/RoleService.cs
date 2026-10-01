@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities.UserManagement;
+using NewCosmos.Models.Entities.UserManagement;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
@@ -171,14 +171,14 @@ WHERE id = $5";
     {
         LogInfo($"同步角色权限: RoleId={roleId}");
 
-        await _dbService.BeginTransactionAsync();
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             const string deleteSql = "DELETE FROM nc_perm_role_permissions WHERE role_id = $1";
             var deleteResult = await _dbService.ExecuteNonQueryAsync(deleteSql, ct, roleId);
             if (deleteResult.IsFailure)
             {
-                await _dbService.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
             }
 
@@ -196,7 +196,7 @@ VALUES
                 var insertResult = await _dbService.ExecuteNonQueryAsync(insertSql, ct, parameters.ToArray());
                 if (insertResult.IsFailure)
                 {
-                    await _dbService.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     return Result.Failure(insertResult.ErrorCode!, insertResult.Message!);
                 }
             }
@@ -215,14 +215,14 @@ VALUES
                 await _dbService.ExecuteNonQueryAsync(insertSql, ct);
             }
 
-            await _dbService.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
             LogInfo("执行操作");
 
             return Result.Success();
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"操作失败: {ex.Message}");
             return Result.Failure("DB_ERROR", $"操作执行失败: {ex.Message}");
         }

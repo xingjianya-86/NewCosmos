@@ -19,6 +19,7 @@
             <converters:NullToInverseBoolConverter x:Key="NullToInverseBoolConverter"/>
             <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
             <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+    <converters:StringToColorConverter x:Key="StringToColorConverter"/>
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
             <converters:TemplateTypeToColorConverter x:Key="TemplateTypeToColorConverter"/>
 

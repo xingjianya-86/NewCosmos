@@ -1,0 +1,117 @@
+# 推送打印任务队列Schema定义
+# 手机端（Android）将打印请求写入本表，PC 端常驻打印代理轮询后调用 Office/WPS 打印。
+database: 推送打印队列
+version: 1.0
+description: 手机端推送打印任务队列（PC 端打印代理消费）
+
+tables:
+  - name: nc_biz_print_jobs
+    comment: 推送打印任务队列。手机端入队（Pending），PC 打印代理认领（Processing）并回写结果（Completed/Failed）
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: job_no
+        type: character varying(40)
+        nullable: false
+        comment: 任务编号（唯一）
+      - name: business_type
+        type: character varying(50)
+        nullable: false
+        comment: 业务类型（与 PrintExecuteService.PrintPermissionMap 一致的键）
+      - name: business_id
+        type: bigint
+        nullable: true
+        comment: 业务记录ID
+      - name: classification
+        type: character varying(50)
+        nullable: true
+        comment: 模板分类/操作类型（如 Stop/Review/Small/Large）
+      - name: template_id
+        type: bigint
+        nullable: true
+        comment: 解析后的模板ID（nc_biz_templates.id）
+      - name: template_name
+        type: character varying(200)
+        nullable: true
+        comment: 模板名称（快照）
+      - name: applicant_name
+        type: character varying(100)
+        nullable: true
+        comment: 申请人姓名（输出目录用，已由入队端脱敏需求自行处理）
+      - name: applicant_id_card
+        type: character varying(30)
+        nullable: true
+        comment: 申请人身份证号（输出目录用）
+      - name: printer_name
+        type: character varying(200)
+        nullable: true
+        comment: 目标打印机（空=默认打印机）
+      - name: copies
+        type: integer
+        nullable: false
+        default: 1
+        comment: 打印份数
+      - name: is_duplex
+        type: boolean
+        nullable: false
+        default: false
+        comment: 是否双面打印
+      - name: fields_json
+        type: jsonb
+        nullable: true
+        comment: 模板字段字典 JSON（Dictionary<string,string>）
+      - name: table_rows_json
+        type: jsonb
+        nullable: true
+        comment: 表格行数据 JSON（List<Dictionary<string,string>>）
+      - name: supporter_table_data_json
+        type: jsonb
+        nullable: true
+        comment: 赡养人表格数据 JSON（CopiesBySupporter 模板用）
+      - name: status
+        type: character varying(20)
+        nullable: false
+        comment: 状态：Pending=待打印, Processing=打印中, Completed=已完成, Failed=失败
+      - name: error_message
+        type: text
+        nullable: true
+        comment: 失败原因
+      - name: requested_by
+        type: integer
+        nullable: true
+        comment: 发起用户ID（nc_sys_users.id）
+      - name: requested_by_name
+        type: character varying(100)
+        nullable: true
+        comment: 发起用户姓名
+      - name: agent_machine
+        type: character varying(100)
+        nullable: true
+        comment: 认领该任务的打印代理机器名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 入队时间
+      - name: claimed_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 认领时间
+      - name: completed_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 完成时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: uq_print_jobs_job_no
+        columns: [job_no]
+        unique: true
+      - name: idx_print_jobs_status_created
+        columns: [status, created_at]
+      - name: idx_print_jobs_business
+        columns: [business_type, business_id]

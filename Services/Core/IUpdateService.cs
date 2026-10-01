@@ -12,7 +12,12 @@ public sealed record UpdateInfo(
     string PackageUrl,
     long PackageSize,
     string PackageSha256,
-    DateTime? PublishedAt);
+    DateTime? PublishedAt,
+    // ── schema=2 增量 patch 字段（schema=1 为 null / 0）──
+    string? PatchUrl,
+    long PatchSize,
+    string? PatchSha256,
+    string? PatchBaseVersion);
 
 /// <summary>更新检查结果</summary>
 public sealed record UpdateCheckResult(bool UpdateAvailable, bool ForceUpdate, UpdateInfo? Info);

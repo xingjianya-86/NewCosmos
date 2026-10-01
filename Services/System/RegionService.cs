@@ -136,7 +136,7 @@ public class RegionService : BaseService, IRegionService
 
         const int totalSteps = 10;
 
-        await _dbService.BeginTransactionAsync();
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             ReportProgress(progress, 1, totalSteps, "确保表结构存在");
@@ -160,7 +160,7 @@ public class RegionService : BaseService, IRegionService
             var counties = LoadCountiesFromYaml();
             if (counties == null || counties.Count == 0)
             {
-                await _dbService.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 LogError("加载县区数据失败");
                 return Result.Failure(ErrorCodes.FILE_NOT_FOUND, "县区数据文件未找到");
             }
@@ -191,14 +191,14 @@ public class RegionService : BaseService, IRegionService
                 villagesCount = await BulkInsertVillagesAsync(villages, ct);
             }
             ReportProgress(progress, 10, totalSteps, "提交事务");
-            await _dbService.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
             InvalidateRegionCaches();
             LogInfo($"地区数据初始化完成: 县区{counties.Count}个, 乡镇{towns?.Count ?? 0}个, 村/社区{villagesCount}个");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"初始化失败: {ex.Message}");
             return Result.FromException(ex);
         }
@@ -208,7 +208,7 @@ public class RegionService : BaseService, IRegionService
     {
         LogInfo("开始清空地区表");
 
-        await _dbService.BeginTransactionAsync();
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_villages"), ("Operation", "RegionService.ClearTables"));
@@ -217,7 +217,7 @@ public class RegionService : BaseService, IRegionService
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_towns", ct);
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_counties"), ("Operation", "RegionService.ClearTables"));
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_counties", ct);
-            await _dbService.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             InvalidateRegionCaches();
             LogInfo("地区表已清空");
@@ -225,7 +225,7 @@ public class RegionService : BaseService, IRegionService
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"清空失败: {ex.Message}");
             return Result.FromException(ex);
         }

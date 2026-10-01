@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.DutyManagement"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileDutySchedulePage"
+             x:DataType="vm:DutyScheduleViewModel"
+             Title="值班管理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 紫色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="10">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="值班管理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="工作日 / 休息日 / 法定节假日独立轮转" FontSize="12" TextColor="#E6FFFFFF"/>
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
+                    <Button Grid.Column="0" Text="‹" FontSize="18" BackgroundColor="#33FFFFFF" TextColor="White"
+                            WidthRequest="40" HeightRequest="36" CornerRadius="8" Padding="0"
+                            Command="{Binding PreviousMonthCommand}"/>
+                    <Label Grid.Column="1" Text="{Binding MonthTitle}" FontSize="17" FontAttributes="Bold" TextColor="White" VerticalOptions="Center"/>
+                    <Button Grid.Column="2" Text="›" FontSize="18" BackgroundColor="#33FFFFFF" TextColor="White"
+                            WidthRequest="40" HeightRequest="36" CornerRadius="8" Padding="0"
+                            Command="{Binding NextMonthCommand}"/>
+                </Grid>
+                <Label Text="{Binding SummaryText}" FontSize="12" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 月度值班表 -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Days}" Margin="12,8" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <Label Text="本月暂无值班表，请在电脑端生成" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="ent:DutyDayRow">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="12" Margin="0,5">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                <Label Grid.Column="0" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="{Binding DateDisplay}"/><Span Text="  "/><Span Text="{Binding WeekLabel}"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label Grid.Column="2" Text="{Binding DateTypeName}" FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsHoliday}" Value="True">
+                                            <Setter Property="TextColor" Value="#C62828"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsRestDay}" Value="True">
+                                            <Setter Property="TextColor" Value="#1565C0"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+                            <BoxView HeightRequest="1" Color="{StaticResource Gray200}"/>
+
+                            <!-- 领导组 -->
+                            <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
+                                <Label Text="领导组" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="{Binding LeaderCell.DisplayText}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Border StrokeShape="RoundRectangle 4" Padding="4,0" BackgroundColor="#FEF3C7" IsVisible="{Binding LeaderCell.IsAdjusted}" VerticalOptions="Center">
+                                        <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                    </Border>
+                                    <Label Text="{Binding LeaderCell.Phone}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="{Binding LeaderCell.HasPhone}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <!-- 中层管理组 -->
+                            <Grid ColumnDefinitions="70,*" ColumnSpacing="8" IsVisible="{Binding MiddleCell.HasPhone}">
+                                <Label Text="中层组" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="{Binding MiddleCell.DisplayText}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Border StrokeShape="RoundRectangle 4" Padding="4,0" BackgroundColor="#FEF3C7" IsVisible="{Binding MiddleCell.IsAdjusted}" VerticalOptions="Center">
+                                        <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                    </Border>
+                                    <Label Text="{Binding MiddleCell.Phone}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="{Binding MiddleCell.HasPhone}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <!-- 男生组 -->
+                            <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
+                                <Label Text="男生组" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="{Binding MaleCell.DisplayText}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                    <Border StrokeShape="RoundRectangle 4" Padding="4,0" BackgroundColor="#FEF3C7" IsVisible="{Binding MaleCell.IsAdjusted}" VerticalOptions="Center">
+                                        <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                    </Border>
+                                    <Label Text="{Binding MaleCell.Phone}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="{Binding MaleCell.HasPhone}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <!-- 女生组 -->
+                            <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
+                                <Label Text="女生组" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="{Binding FemaleCell.DisplayText}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                    <Border StrokeShape="RoundRectangle 4" Padding="4,0" BackgroundColor="#FEF3C7" IsVisible="{Binding FemaleCell.IsAdjusted}" VerticalOptions="Center">
+                                        <Label Text="调" FontSize="10" TextColor="#B45309"/>
+                                    </Border>
+                                    <Label Text="{Binding FemaleCell.Phone}" FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="{Binding FemaleCell.HasPhone}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.Footer>
+                <Label Text="值班表生成、班务调整、成员/节假日维护与导出打印请在电脑端操作。" FontSize="12"
+                       TextColor="{StaticResource TextTertiary}" Margin="4,12,4,24"/>
+            </CollectionView.Footer>
+        </CollectionView>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="2" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

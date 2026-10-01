@@ -15,11 +15,6 @@ public interface IPrintService
     Task<Result<byte[]>> PrintArchiveAsync(long archiveId, CancellationToken ct = default);
 
     /// <summary>
-    /// 打印变更确认书
-    /// </summary>
-    Task<Result<byte[]>> PrintChangeConfirmationAsync(long changeRecordId, CancellationToken ct = default);
-
-    /// <summary>
     /// 渲染月报表表单（8 张 Excel 表 + 2 张会议记录 docx，按"月报表"分类模板查名渲染）
     /// formKey：新增救助明细 / 新增救助明细_低收入 / 停保汇总表 / 停保汇总表_低收入 /
     ///           保障金增发表 / 保障金减发表 / 分类施保金减发人员表（低保） / 人员变动_自然减员月报表 / 会议记录 / 会议记录_一事一议

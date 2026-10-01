@@ -129,12 +129,16 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     private string BuildConnectionString()
     {
         var appName = string.IsNullOrWhiteSpace(_options.ApplicationName) ? "NewCosmos" : _options.ApplicationName;
+        // 会话时区固定 Asia/Shanghai：DB 的 timestamp without time zone 列与 C# DateTime.Now/Today
+        // 统一为本地墙钟口径。若不设，会话时区为 UTC，SQL NOW() 存 UTC 裸值，
+        // 而 DateTime.Today 存本地日期 → 月报 B 线周期（本地边界）比较产生 8 小时偏差。
         return $"Host={_options.Host};Port={_options.Port};Database={_options.DatabaseName};" +
                $"Username={_options.Username};Password={_options.Password};" +
                $"Timeout={_options.ConnectionTimeout};Command Timeout={_options.CommandTimeout};" +
                $"Pooling=true;Minimum Pool Size={_options.MinPoolSize};Maximum Pool Size={_options.MaxPoolSize};" +
                $"SSL Mode={_options.SslMode};Trust Server Certificate={_options.TrustServerCertificate};" +
                $"Include Error Detail={_options.IncludeErrorDetail};" +
+               $"Timezone=Asia/Shanghai;" +
                $"Application Name={appName}";
     }
 
@@ -381,7 +385,10 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     {
         if (_ambient.Value is { IsActive: true })
         {
-            throw new InvalidOperationException("已有活动事务");
+            // 嵌套加入外层事务（与旧 HasTransaction 惯用法等价语义）：
+            // 提交/回滚权归最外层作用域，嵌套作用域的 Commit/Rollback/Dispose 均为 no-op，
+            // 失败经返回值上抛由外层决定回滚（服务间组合调用不会抛"已有活动事务"）。
+            return Task.FromResult<ITransactionScope>(new JoinedScopeHandle());
         }
 
         var scope = new AmbientTransaction();
@@ -486,6 +493,18 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
         {
             scope.CommandGate.Release();
         }
+    }
+
+    /// <summary>
+    /// 嵌套作用域句柄：加入外层环境事务（旧 HasTransaction 惯用法的等价新式写法）。
+    /// Commit/Rollback/Dispose 均为 no-op——事务所有权归最外层作用域；
+    /// 嵌套参与者的失败经返回值（Result.Failure/异常）上抛，由外层决定回滚。
+    /// </summary>
+    private sealed class JoinedScopeHandle : ITransactionScope
+    {
+        public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task RollbackAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     /// <summary>

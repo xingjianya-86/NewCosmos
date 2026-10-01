@@ -6,13 +6,13 @@ using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
-using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.ChangeManagement;
 using NewCosmos.Services.Domain.Printing;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.Platform;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.SocialAssistance;
@@ -30,6 +30,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
 {
     private readonly IApplicationService _applicationService;
     private readonly IImportedArchiveService _importedArchiveService;
+    private readonly IFamilyMemberService _familyMemberService;
     private readonly IProofUnitTemplateService _proofUnitTemplateService;
     private readonly ITemplateService _templateService;
     private readonly IPrintExecuteService _printExecuteService;
@@ -38,6 +39,8 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly INewPermissionService _permissionService;
+    private readonly IPrintJobFactory _printJobFactory;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
@@ -184,6 +187,10 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isPrinting;
 
+    /// <summary>是否有打印证明权限（PRINT_LOWINCOMEPROOF）——手机端"推送打印"按钮门控用</summary>
+    [ObservableProperty]
+    private bool _canPrintProof;
+
     /// <summary>整体忙碌（加载蒙版绑定：自身 + 预览 + 打印）</summary>
     public bool IsOverallBusy => IsBusy || IsPreviewBusy || IsPrinting;
 
@@ -203,6 +210,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     public ArchiveQueryViewModel(
         IApplicationService applicationService,
         IImportedArchiveService importedArchiveService,
+        IFamilyMemberService familyMemberService,
         IProofUnitTemplateService proofUnitTemplateService,
         ITemplateService templateService,
         IPrintExecuteService printExecuteService,
@@ -211,10 +219,13 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         IDialogService dialogService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        Services.Domain.Reporting.IStatisticsService statisticsService)
+        Services.Domain.Reporting.IStatisticsService statisticsService,
+        INewPermissionService permissionService,
+        IPrintJobFactory printJobFactory)
     {
         _applicationService = applicationService;
         _importedArchiveService = importedArchiveService;
+        _familyMemberService = familyMemberService;
         _proofUnitTemplateService = proofUnitTemplateService;
         _templateService = templateService;
         _printExecuteService = printExecuteService;
@@ -224,6 +235,8 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         _logger = logger;
         _serviceProvider = serviceProvider;
         _statisticsService = statisticsService;
+        _permissionService = permissionService;
+        _printJobFactory = printJobFactory;
         Title = "救助档案管理";
     }
 
@@ -234,11 +247,11 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     /// <summary>统计加载失败占位</summary>
     private const string StatNA = "—";
 
-    /// <summary>归档总数</summary>
+    /// <summary>归档总数（当前库已归档 + 历史导入库合计）</summary>
     [ObservableProperty]
     private string _totalArchivesText = StatNA;
 
-    /// <summary>当月归档数</summary>
+    /// <summary>当月归档数（当前库本月完成归档，按 first_approved_at）</summary>
     [ObservableProperty]
     private string _monthlyArchivesText = StatNA;
 
@@ -283,8 +296,30 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     {
         await base.OnAppearingAsync();
         await LoadProofTemplateOptionsAsync();
+        await LoadProofPermissionAsync();
         LoadPrinterList();
         _ = LoadHeaderStatsAsync();
+    }
+
+    /// <summary>加载打印证明权限（手机端"推送打印"按钮门控；Windows 手动打印仍由 ExecutePrintAsync 内部校验）</summary>
+    private async Task LoadProofPermissionAsync()
+    {
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId <= 0)
+            {
+                CanPrintProof = false;
+                return;
+            }
+            CanPrintProof = await _permissionService.HasPermissionAsync(
+                userId, PermissionCodes.PRINT_LOWINCOMEPROOF, CancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载打印证明权限失败");
+            CanPrintProof = false;
+        }
     }
 
     protected override void OnBusyStateChanged()
@@ -928,21 +963,70 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 手机端推送打印证明：复用打印字段构建，写入推送打印队列，由 PC 端打印代理执行（使用 PC 默认打印机）。
+    /// 权限口径与 PC 手动打印一致（PRINT_LOWINCOMEPROOF）。
+    /// </summary>
+    [RelayCommand]
+    private async Task PushPrintProofAsync()
+    {
+        if (!EnsureCanProceed()) return;
+
+        if (!CanPrintProof)
+        {
+            await ShowTipAsync("您没有打印证明的权限（PRINT_LOWINCOMEPROOF），请联系管理员");
+            return;
+        }
+
+        var option = SelectedProofTemplateOption!;
+        var unitName = EffectiveUnitName;
+        var fields = BuildProofFieldsWithUnit(unitName);
+
+        await ExecuteAsync(async () =>
+        {
+            var request = new PrintJobRequest
+            {
+                BusinessType = ProofBusinessType,
+                BusinessId = _proofBusinessId,
+                Classification = "Proof",
+                TemplateId = option.TemplateId,
+                TemplateName = option.TemplateName,
+                ApplicantName = ApplicantName,
+                ApplicantIdCard = ApplicantIdCard,
+                PrinterName = null, // PC 代理使用默认打印机
+                Copies = Math.Max(1, Copies),
+                IsDuplex = IsDuplex,
+                Fields = fields,
+                TableRows = new()
+            };
+
+            var result = await _printJobFactory.EnqueueAsync(request, CancellationToken);
+            if (result.IsFailure)
+            {
+                await ShowTipAsync($"推送打印失败: {result.Message}");
+                return result;
+            }
+
+            _logger.LogBusiness("档案查询-推送打印证明",
+                ("TemplateId", option.TemplateId.ToString()),
+                ("Unit", unitName),
+                ("JobNo", result.Value?.JobNo ?? string.Empty));
+            await ShowTipAsync($"已推送打印（任务号 {result.Value?.JobNo}），将在电脑端打印。");
+            return Result.Success();
+        }, "推送打印...");
+    }
+
     /// <summary>当前库家庭成员文本列表（仅户主+共同生活成员；排除赡养人/抚养/扶养与死亡成员；姓名/身份证/家庭关系）</summary>
     private async Task<string> BuildFamilyMembersTextAsync(long applicationId)
     {
         try
         {
-            var memberService = _serviceProvider.GetRequiredService<IFamilyMemberService>();
-            var result = await memberService.GetByApplicationIdAsync(applicationId, CancellationToken);
+            var result = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
             if (result.IsFailure || result.Value == null || result.Value.Count == 0)
                 return string.Empty;
 
             // 已死亡登记成员（历史数据未软删，生成文本时须统一过滤）
-            var dbService = _serviceProvider.GetRequiredService<IDatabaseService>();
-            var deathResult = await dbService.QueryAsync<string>(
-                "SELECT member_id_card FROM nc_biz_death_records WHERE application_id = $1 AND member_id_card IS NOT NULL",
-                CancellationToken, applicationId);
+            var deathResult = await _familyMemberService.GetDeadIdCardsByApplicationIdAsync(applicationId, CancellationToken);
             var deathIdCards = (deathResult.IsSuccess && deathResult.Value != null)
                 ? deathResult.Value.ToHashSet()
                 : new HashSet<string>();

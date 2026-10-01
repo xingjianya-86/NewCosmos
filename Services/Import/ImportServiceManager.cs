@@ -47,14 +47,20 @@ public class ImportServiceManager : BaseService, IImportServiceManager
 
     private readonly Dictionary<string, ICombinedImportService> _combinedServices;
     private readonly IEnumerable<IImportService> _singleFileServices;
+    private readonly Services.Core.IDatabaseBackupService _backupService;
+    private readonly Models.Options.StorageOptions _storageOptions;
 
     public ImportServiceManager(
         IEnumerable<ICombinedImportService> combinedServices,
         IEnumerable<IImportService> singleFileServices,
+        Services.Core.IDatabaseBackupService backupService,
+        Models.Options.StorageOptions storageOptions,
         ILoggerService logger) : base(logger)
     {
         _combinedServices = combinedServices.ToDictionary(s => s.ImportTypeName, s => s);
         _singleFileServices = singleFileServices;
+        _backupService = backupService;
+        _storageOptions = storageOptions;
         LogInfo($"已注册{_combinedServices.Count}个整合导入服务, {_singleFileServices.Count()}个单文件服务");
     }
 
@@ -89,6 +95,12 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         }
 
         LogInfo($"执行整合导入: {importType}");
+        if (clearBeforeImport)
+        {
+            var backup = await BackupBeforeClearAsync(progress, ct);
+            if (backup.IsFailure)
+                return new CombinedImportResult { ErrorMessage = backup.Message };
+        }
         return await service.ImportCombinedAsync(familyFilePath, personFilePath, clearBeforeImport, progress, ct);
     }
 
@@ -114,7 +126,30 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         progress?.Report($"找到文件: 家庭={Path.GetFileName(familyPath)}");
         LogInfo($"从文件夹导入: 家庭={familyPath}");
 
+        if (clearBeforeImport)
+        {
+            var backup = await BackupBeforeClearAsync(progress, ct);
+            if (backup.IsFailure)
+                return new CombinedImportResult { ErrorMessage = backup.Message };
+        }
         return await service.ImportCombinedAsync(familyPath, personPath, clearBeforeImport, progress, ct);
+    }
+
+    /// <summary>
+    /// 破坏性清表（TRUNCATE）前自动 pg_dump 备份（对照 DatabaseManagementService 清理前备份做法）。
+    /// 备份失败返回 Failure，调用方中止导入，防止清空后无回滚介质。
+    /// </summary>
+    private async Task<NewCosmos.Models.Results.Result<string>> BackupBeforeClearAsync(IProgress<string>? progress, CancellationToken ct)
+    {
+        progress?.Report("正在备份数据库（清表前）...");
+        var backup = await _backupService.BackupDatabaseAsync(_storageOptions.GetBackupPath(), ct);
+        if (backup.IsFailure)
+        {
+            LogError($"清表前备份失败，已中止导入: {backup.Message}");
+            return backup;
+        }
+        LogInfo($"清表前备份完成: {backup.Value}");
+        return backup;
     }
 
     public ICombinedImportService? GetCombinedService(string importType)
@@ -269,6 +304,11 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         if (clearBeforeImport)
         {
             progress?.Report("正在清空现有数据...");
+            // 破坏性清表（TRUNCATE）前自动 pg_dump 备份；备份失败中止导入，防止清空后无回滚介质
+            var backup = await BackupBeforeClearAsync(progress, ct);
+            if (backup.IsFailure)
+                return ImportResult.Failed($"清表前备份失败，已中止导入: {backup.Message}");
+
             var clearResult = await service.ClearTableAsync(ct);
             if (clearResult.IsFailure)
             {

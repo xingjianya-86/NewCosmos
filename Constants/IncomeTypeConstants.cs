@@ -68,6 +68,17 @@ public static class IncomeTypeConstants
         public static readonly string[] All = { PENSION, LOW_INCOME_SUBSIDY, DISABILITY_SUBSIDY, OTHER_SUBSIDY };
     }
 
+    /// <summary>土地收入默认单价（元/亩，后续从配置读取）</summary>
+    public static class LandUnitPrice
+    {
+        public const decimal SELF_FARM = 700m;
+        public const decimal SUBLEASE = 400m;
+        public const decimal CONTRACT = 600m;
+    }
+
+    /// <summary>赡养费默认比例（默认月赡养费 = 低保标准 × 该比例）</summary>
+    public const decimal DEFAULT_SUPPORT_FEE_RATIO = 0.20m;
+
     public static string GetDescription(string code) =>
         Helpers.DictDisplayHelper.GetIncomeTypeDisplay(code);
 }

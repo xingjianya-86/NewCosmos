@@ -29,6 +29,4 @@ public interface ITemplateService
     Task ReorderAsync(long templateId, int newSortOrder, CancellationToken ct = default);
 
     Task ReplaceFileAsync(long id, byte[] fileData, string fileType, CancellationToken ct = default);
-
-    Task<Result> SyncSchemaAsync(IProgress<ProgressContext> progress = null, CancellationToken ct = default);
 }

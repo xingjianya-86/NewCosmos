@@ -5,6 +5,15 @@ public static class ClassificationConstants
     /// <summary>低收入认定倍数：低收入标准 = 低保标准 × 该倍数（唯一事实来源，政策调整只改这里）</summary>
     public const decimal LowIncomeMultiplier = 1.5m;
 
+    /// <summary>赡养能力年龄下限（未满该年龄视为无赡养能力）</summary>
+    public const int SUPPORT_ABILITY_MIN_AGE = 18;
+
+    /// <summary>赡养能力年龄上限（超过该年龄视为无赡养能力）</summary>
+    public const int SUPPORT_ABILITY_MAX_AGE = 70;
+
+    /// <summary>健康状况推导的高龄阈值（达到该年龄视为健康欠佳）</summary>
+    public const int ELDERLY_AGE = 60;
+
     // 代码表
     public const string RuralSubsistence = "RuralSubsistence";
     public const string UrbanSubsistence = "UrbanSubsistence";
@@ -178,6 +187,16 @@ public static class ClassificationConstants
     /// </summary>
     public static string ConvertToFullName(string code)
     {
+        return ConvertFromCode(code);
+    }
+
+    /// <summary>
+    /// 代码转简称（审核确认表等空间有限的场景）：单人保→"单人保"，其余走全称
+    /// </summary>
+    public static string ConvertToShortName(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return code;
+        if (IsCodeSingleRescue(code)) return "单人保";
         return ConvertFromCode(code);
     }
 

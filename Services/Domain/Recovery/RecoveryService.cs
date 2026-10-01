@@ -32,7 +32,7 @@ public class RecoveryService : BaseService, IRecoveryService
 
         try
         {
-            LogInfo($"搜索停止人员: keyword={keyword}");
+            LogInfo($"搜索停止人员: keywordLength={(keyword ?? string.Empty).Length}");
 
             var sql = @"
                 -- 农村低保停止人员
@@ -44,7 +44,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     COALESCE(a.household_monthly_guarantee_amount, 0) as monthly_amount,
                     '农村低保' as source_display
                 FROM nc_biz_applications a
-                WHERE a.status = 'Stopped'
+                WHERE a.status = $2
                   AND a.source_table = 'nc_biz_rural_subsistence_families'
                   AND (a.applicant_name LIKE '%' || $1 || '%' OR a.applicant_id_card = $1)
 
@@ -59,7 +59,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     COALESCE(a.household_monthly_guarantee_amount, 0) as monthly_amount,
                     '城市低保' as source_display
                 FROM nc_biz_applications a
-                WHERE a.status = 'Stopped'
+                WHERE a.status = $2
                   AND a.source_table = 'nc_biz_urban_subsistence_families'
                   AND (a.applicant_name LIKE '%' || $1 || '%' OR a.applicant_id_card = $1)
 
@@ -74,7 +74,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     COALESCE(a.rigid_expenditure, 0) as monthly_amount,
                     '刚性支出' as source_display
                 FROM nc_biz_applications a
-                WHERE a.status = 'Stopped'
+                WHERE a.status = $2
                   AND a.source_table = 'nc_biz_rigid_expenditure_families'
                   AND (a.applicant_name LIKE '%' || $1 || '%' OR a.applicant_id_card = $1)
 
@@ -89,7 +89,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     COALESCE(t.confirm_amount, 0) as monthly_amount,
                     '临时救助' as source_display
                 FROM nc_biz_temp_relief_applications t
-                WHERE t.status = 'Stopped'
+                WHERE t.status = $2
                   AND (t.applicant_name LIKE '%' || $1 || '%' OR t.applicant_id_card = $1)
 
                 UNION ALL
@@ -103,13 +103,13 @@ public class RecoveryService : BaseService, IRecoveryService
                     COALESCE(e.issue_amount, 0) as monthly_amount,
                     '高龄' as source_display
                 FROM nc_biz_elderly_applications e
-                WHERE e.status = 'Stopped'
+                WHERE e.status = $2
                   AND (e.name LIKE '%' || $1 || '%' OR e.id_card = $1)
 
                 ORDER BY person_name
                 LIMIT 50";
 
-            var result = await _db.QueryAsync<StoppedPersonDto>(sql, ct, keyword);
+            var result = await _db.QueryAsync<StoppedPersonDto>(sql, ct, keyword, ApplicationStatusCodes.STOPPED);
             
             if (result.IsSuccess)
             {
@@ -185,7 +185,7 @@ public class RecoveryService : BaseService, IRecoveryService
     {
         try
         {
-            LogInfo($"保存追缴记录（搜索录入）: personName={dto.PersonName}, sourceType={dto.SourceType}");
+            LogInfo($"保存追缴记录（搜索录入）: personName={DataMasker.MaskName(dto.PersonName ?? string.Empty)}, sourceType={dto.SourceType}");
 
             var months = CalculateRecoveryMonths(dto.StartMonth ?? string.Empty, dto.EndMonth ?? string.Empty);
             var amount = CalculateRecoveryAmount(dto.MonthlyAmount, months);
@@ -196,7 +196,7 @@ public class RecoveryService : BaseService, IRecoveryService
                  monthly_amount, recovery_months, recovery_amount, recovered_amount,
                  start_month, end_month, status, created_by, created_at, updated_at)
                 VALUES 
-                ('Search', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Draft', $12, NOW(), NOW())
+                ('Search', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $12, NOW(), NOW())
                 RETURNING id";
 
             var result = await _db.ExecuteScalarAsync<long>(sql, ct,
@@ -211,7 +211,7 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.RecoveredAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                "System"); // TODO: 从当前用户获取
+                "System", ApplicationStatusCodes.DRAFT); // TODO: 从当前用户获取
 
             if (result.IsSuccess)
             {
@@ -233,7 +233,7 @@ public class RecoveryService : BaseService, IRecoveryService
     {
         try
         {
-            LogInfo($"保存追缴记录（手工录入）: personName={dto.PersonName}, sourceType={dto.SourceType}");
+            LogInfo($"保存追缴记录（手工录入）: personName={DataMasker.MaskName(dto.PersonName ?? string.Empty)}, sourceType={dto.SourceType}");
 
             var months = CalculateRecoveryMonths(dto.StartMonth ?? string.Empty, dto.EndMonth ?? string.Empty);
             var amount = CalculateRecoveryAmount(dto.MonthlyAmount, months);
@@ -244,7 +244,7 @@ public class RecoveryService : BaseService, IRecoveryService
                  monthly_amount, recovery_months, recovery_amount, recovered_amount,
                  start_month, end_month, status, created_by, created_at, updated_at)
                 VALUES 
-                ('Manual', $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Draft', $11, NOW(), NOW())
+                ('Manual', $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12, $11, NOW(), NOW())
                 RETURNING id";
 
             var result = await _db.ExecuteScalarAsync<long>(sql, ct,
@@ -258,7 +258,7 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.RecoveredAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                "System"); // TODO: 从当前用户获取
+                "System", ApplicationStatusCodes.DRAFT); // TODO: 从当前用户获取
 
             if (result.IsSuccess)
             {
@@ -294,7 +294,7 @@ public class RecoveryService : BaseService, IRecoveryService
 
             if (result.IsSuccess && result.Value != null)
             {
-                LogInfo($"获取到追缴记录: {result.Value.PersonName}");
+                LogInfo($"获取到追缴记录: {DataMasker.MaskName(result.Value.PersonName ?? string.Empty)}");
             }
 
             return result;
@@ -314,7 +314,7 @@ public class RecoveryService : BaseService, IRecoveryService
         {
             var kw = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim();
             var st = string.IsNullOrWhiteSpace(status) ? null : status.Trim();
-            LogInfo($"查询追缴记录列表: keyword={kw}, status={st}, limit={limit}");
+            LogInfo($"查询追缴记录列表: keywordLength={(kw ?? string.Empty).Length}, status={st}, limit={limit}");
 
             var sql = @"
                 SELECT id, input_mode, source_type, source_id, person_name, id_card,
@@ -357,10 +357,10 @@ public class RecoveryService : BaseService, IRecoveryService
             // 仅草稿状态可删除（删除条件内联状态校验，杜绝误删已确认/已打印记录）
             var sql = @"
                 DELETE FROM nc_biz_recovery_records
-                WHERE id = $1 AND status = 'Draft'
+                WHERE id = $1 AND status = $2
                 RETURNING id";
 
-            var result = await _db.ExecuteScalarAsync<long?>(sql, ct, id);
+            var result = await _db.ExecuteScalarAsync<long?>(sql, ct, id, ApplicationStatusCodes.DRAFT);
 
             if (result.IsSuccess && result.Value.HasValue)
             {
@@ -384,7 +384,7 @@ public class RecoveryService : BaseService, IRecoveryService
     {
         try
         {
-            LogInfo($"更新追缴记录（搜索录入）: id={id}, personName={dto.PersonName}");
+            LogInfo($"更新追缴记录（搜索录入）: id={id}, personName={DataMasker.MaskName(dto.PersonName ?? string.Empty)}");
 
             var months = CalculateRecoveryMonths(dto.StartMonth ?? string.Empty, dto.EndMonth ?? string.Empty);
             var amount = CalculateRecoveryAmount(dto.MonthlyAmount, months);
@@ -395,7 +395,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     recovery_reason = $5, monthly_amount = $6, recovery_months = $7,
                     recovery_amount = $8, recovered_amount = $9, start_month = $10,
                     end_month = $11, updated_at = NOW()
-                WHERE id = $12 AND status = 'Draft'
+                WHERE id = $12 AND status = $13
                 RETURNING id";
 
             var result = await _db.ExecuteScalarAsync<long?>(sql, ct,
@@ -410,7 +410,7 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.RecoveredAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                id);
+                id, ApplicationStatusCodes.DRAFT);
 
             if (result.IsSuccess && result.Value.HasValue)
             {
@@ -445,7 +445,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     recovery_reason = $4, monthly_amount = $5, recovery_months = $6,
                     recovery_amount = $7, recovered_amount = $8, start_month = $9,
                     end_month = $10, updated_at = NOW()
-                WHERE id = $11 AND status = 'Draft'
+                WHERE id = $11 AND status = $12
                 RETURNING id";
 
             var result = await _db.ExecuteScalarAsync<long?>(sql, ct,
@@ -459,7 +459,7 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.RecoveredAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                id);
+                id, ApplicationStatusCodes.DRAFT);
 
             if (result.IsSuccess && result.Value.HasValue)
             {
@@ -573,7 +573,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     -- 农村低保停止人员
                     SELECT 'RuralSubsistence' as source_type
                     FROM nc_biz_applications a
-                    WHERE a.status = 'Stopped'
+                    WHERE a.status = $1
                       AND a.source_table = 'nc_biz_rural_subsistence_families'
 
                     UNION ALL
@@ -581,7 +581,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     -- 城市低保停止人员
                     SELECT 'UrbanSubsistence' as source_type
                     FROM nc_biz_applications a
-                    WHERE a.status = 'Stopped'
+                    WHERE a.status = $1
                       AND a.source_table = 'nc_biz_urban_subsistence_families'
 
                     UNION ALL
@@ -589,7 +589,7 @@ public class RecoveryService : BaseService, IRecoveryService
                     -- 刚性支出停止人员
                     SELECT 'RigidExpenditure' as source_type
                     FROM nc_biz_applications a
-                    WHERE a.status = 'Stopped'
+                    WHERE a.status = $1
                       AND a.source_table = 'nc_biz_rigid_expenditure_families'
 
                     UNION ALL
@@ -597,17 +597,17 @@ public class RecoveryService : BaseService, IRecoveryService
                     -- 临时救助停止人员
                     SELECT 'TempRelief' as source_type
                     FROM nc_biz_temp_relief_applications t
-                    WHERE t.status = 'Stopped'
+                    WHERE t.status = $1
 
                     UNION ALL
 
                     -- 高龄停止人员
                     SELECT 'Elderly' as source_type
                     FROM nc_biz_elderly_applications e
-                    WHERE e.status = 'Stopped'
+                    WHERE e.status = $1
                 ) all_stopped";
 
-            var result = await _db.QuerySingleAsync<StoppedPersonStats>(sql, ct);
+            var result = await _db.QuerySingleAsync<StoppedPersonStats>(sql, ct, ApplicationStatusCodes.STOPPED);
 
             if (result.IsSuccess && result.Value != null)
             {

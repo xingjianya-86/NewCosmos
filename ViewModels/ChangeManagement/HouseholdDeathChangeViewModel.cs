@@ -18,12 +18,15 @@ namespace NewCosmos.ViewModels.ChangeManagement;
 /// </summary>
 public partial class HouseholdDeathChangeViewModel : ViewModelBase
 {
+    private const string DeathReasonOther = "其他";
+
     private readonly IServiceProvider _serviceProvider = null!;
     private readonly IApplicationService _applicationService = null!;
     private readonly IFamilyMemberService _familyMemberService = null!;
     private readonly IChangeService _changeService = null!;
     private readonly IDialogService _dialogService = null!;
     private readonly ILoggerService _logger = null!;
+    private readonly IDictCacheService _dictCacheService = null!;
 
     /// <summary>
     /// 全部家庭成员（加载时缓存，供提交使用）
@@ -60,11 +63,34 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     [ObservableProperty]
     private DateTime _deathDate = DateTime.Today;
 
+    /// <summary>
+    /// 死亡原因（提交时由预设选择组装，不由 UI 直接编辑）
+    /// </summary>
     [ObservableProperty]
     private string _deathReason = string.Empty;
 
     [ObservableProperty]
     private string _deathCertificateNo = string.Empty;
+
+    /// <summary>死亡原因预设选项（字典 DeathReasons）</summary>
+    public ObservableCollection<DictItemOption> DeathReasonOptions { get; } = new();
+
+    [ObservableProperty]
+    private DictItemOption? _selectedDeathReason;
+
+    /// <summary>选中"其他"时显示补充说明输入框</summary>
+    [ObservableProperty]
+    private bool _isOtherReasonVisible;
+
+    [ObservableProperty]
+    private string _otherDeathReasonText = string.Empty;
+
+    partial void OnSelectedDeathReasonChanged(DictItemOption? value)
+    {
+        IsOtherReasonVisible = string.Equals(value?.Display, DeathReasonOther, StringComparison.Ordinal);
+        if (!IsOtherReasonVisible)
+            OtherDeathReasonText = string.Empty;
+    }
 
     #endregion
 
@@ -84,7 +110,8 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         IFamilyMemberService familyMemberService,
         IChangeService changeService,
         IDialogService dialogService,
-        ILoggerService logger)
+        ILoggerService logger,
+        IDictCacheService dictCacheService)
     {
         _serviceProvider = serviceProvider;
         _applicationService = applicationService;
@@ -92,6 +119,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         _changeService = changeService;
         _dialogService = dialogService;
         _logger = logger;
+        _dictCacheService = dictCacheService;
         Title = "户主死亡变更";
     }
 
@@ -111,6 +139,13 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         try
         {
             _logger.LogBusiness("加载户主死亡变更数据", ("ApplicationId", applicationId));
+
+            // 死亡原因预设选项（字典 DeathReasons，Key=Display=中文原因）
+            DeathReasonOptions.Clear();
+            foreach (var option in _dictCacheService.GetOptions(DictionaryTypeCodes.DeathReasons))
+            {
+                DeathReasonOptions.Add(option);
+            }
 
             // 加载申请信息
             var appResult = await _applicationService.GetByIdAsync(applicationId, CancellationToken);
@@ -177,6 +212,12 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         try
         {
             var operatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+
+            // 组装死亡原因：预设项直接取 Display；"其他"拼补充说明
+            DeathReason = string.Equals(SelectedDeathReason?.Display, DeathReasonOther, StringComparison.Ordinal)
+                ? $"{DeathReasonOther}:{OtherDeathReasonText.Trim()}"
+                : SelectedDeathReason?.Display ?? string.Empty;
+
             var context = new HouseholdDeathContext
             {
                 ApplicationId = ApplicationId,
@@ -198,10 +239,11 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                 var newApplicationId = result.Value.NewApplicationId;
                 _logger.LogBusiness("户主死亡变更提交成功",
                     ("OldApplicationId", ApplicationId),
-                    ("NewApplicationId", newApplicationId));
+                    ("NewApplicationId", newApplicationId),
+                    ("TriggeredGracePeriod", result.Value.TriggeredGracePeriod));
 
-                await _dialogService.DisplayAlertAsync("成功",
-                    "户主死亡变更已提交，旧档案已停止。请在新档案中核对成员与经济信息并重新认定。", "确定");
+                var successMessage = "户主死亡变更已提交，旧档案已停止。幸存家庭收入已按现行规则重算写入新档案，请在表单 Step5 完成正式分类判定（渐退资格在判定后确认）。";
+                await _dialogService.DisplayAlertAsync("成功", successMessage, "确定");
 
                 // 弹出本页，直接进入统一申请表单（Edit 模式）规划新档案，
                 // 家庭成员变化引发的资金变化在统一表单的认定步骤中完整处理
@@ -237,9 +279,16 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(DeathReason))
+        if (SelectedDeathReason == null || string.IsNullOrWhiteSpace(SelectedDeathReason.Display))
         {
-            _dialogService.DisplayAlertAsync("验证失败", "请填写死亡原因", "确定");
+            _dialogService.DisplayAlertAsync("验证失败", "请选择死亡原因", "确定");
+            return false;
+        }
+
+        if (string.Equals(SelectedDeathReason.Display, DeathReasonOther, StringComparison.Ordinal)
+            && string.IsNullOrWhiteSpace(OtherDeathReasonText))
+        {
+            _dialogService.DisplayAlertAsync("验证失败", "死亡原因为「其他」时，请填写补充说明", "确定");
             return false;
         }
 

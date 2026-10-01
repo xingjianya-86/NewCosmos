@@ -1,3 +1,4 @@
+using NewCosmos.Helpers;
 using NewCosmos.Models.Enums;
 using NewCosmos.Services.Core;
 
@@ -67,7 +68,7 @@ public interface IBusinessTimelineService
     DateTime GetTempReliefAcceptanceDate(DateTime? publicizeEnd);
 
     /// <summary>
-    /// 按申请日期归属 C 线窗口（公示固定每月10日~12日）：取第一个"申请日 ≤ 该月窗口调查核实起日"的月份，否则顺延到下月。
+    /// 按申请日期归属 C 线窗口（公示固定每月10日~12日）：取第一个"申请日 ≤ 该月窗口调查截止日"的月份（9号及以前归当月，10号起顺延下月），否则顺延到下月。
     /// </summary>
     Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate, bool simplified);
 }
@@ -80,13 +81,10 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
 
     // A线参数
     private const int A_END_DAY = 10;
-    // B线参数
-    private const int B_END_DAY = 15;
+    // B线参数（结算日由 BusinessCycleHelper.SettleDay 动态提供，不再硬编码）
     private const int B_MEETING_DAY = 7;
     private const int B_ACCEPTANCE_DEADLINE_OFFSET = -3;  // 会议前3个工作日
     private const int B_PUBLICITY_DAYS = 7;
-    private static readonly int[] B_HOLIDAY_CHECK_DAYS = { 10, 11, 12, 13, 14, 15 };
-    private const int B_HOLIDAY_PENALTY_DAYS = 5;
 
     // C线参数（临时救助验收线）
     private const int C_PUBLICITY_START_DAY = 10;        // 公示固定开始日（日历日，不顺延）
@@ -138,7 +136,8 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     }
 
     /// <summary>
-    /// 申请日归属窗口：从申请日所在月起，取第一个 applyDate ≤ InvestigationStartDate 的 C 线窗口；
+    /// 申请日归属窗口：从申请日所在月起，取第一个 applyDate ≤ InvestigationDeadline（调查截止=公示前一工作日，
+    /// 即9号及以前归当月、10号起顺延下月）的 C 线窗口；
     /// 最多顺延 24 个月（防御），仍无则回退申请日所在月。
     /// </summary>
     private TimelineResult CalculateCLineForApplyDate(DateTime applyDate, bool simplified)
@@ -149,7 +148,7 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         for (var i = 0; i < 24; i++)
         {
             var line = CalculateCLine(year, month, simplified);
-            if (date <= line.InvestigationStartDate.Date)
+            if (date <= line.InvestigationDeadline.Date)
                 return line;
 
             month++;
@@ -228,15 +227,15 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     private TimelineResult CalculateBLine(int year, int month)
     {
         bool isHolidayAffected = false;
-        var endDay = B_END_DAY;
+        var endDay = BusinessCycleHelper.SettleDay;
 
-        // 检查10~15号之间是否有节假日
-        for (int d = B_HOLIDAY_CHECK_DAYS[0]; d <= B_HOLIDAY_CHECK_DAYS[^1]; d++)
+        // 检查结算日前5天至结算日是否有节假日（如20号结算则检查15~20号）
+        for (int d = Math.Max(1, endDay - 5); d <= endDay; d++)
         {
             if (_holidayService.IsHoliday(new DateTime(year, month, d)))
             {
                 isHolidayAffected = true;
-                endDay -= B_HOLIDAY_PENALTY_DAYS;
+                endDay = Math.Max(1, endDay - 5);
                 break;
             }
         }
@@ -245,8 +244,8 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         if (!_holidayService.IsWorkDay(endDate))
             endDate = _holidayService.GetPreviousWorkDay(endDate);
 
-        // 受理窗口：上月15日~本月15日
-        var startDate = new DateTime(year, month, 1).AddMonths(-1).AddDays(14); // 上月15日
+        // 受理窗口：上月(结算日+1)日~本月(结算日+1)日
+        var startDate = new DateTime(year, month, 1).AddMonths(-1).AddDays(BusinessCycleHelper.SettleDay);
         // 会议日：本月7日，避开周末
         var meetingDate = new DateTime(year, month, B_MEETING_DAY);
         if (!_holidayService.IsWorkDay(meetingDate))

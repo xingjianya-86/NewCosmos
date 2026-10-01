@@ -142,12 +142,13 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             basic_situation = $1, special_matters = $2, template_key = $3,
             report_unit = $4, handler_name = $5, form_date = $6,
             audit_result = $7, audit_date = $8,
-            status = 'Submitted', updated_at = NOW()
-            WHERE id = $9 AND deleted_at IS NULL AND status = 'Draft'";
+            status = $10, updated_at = NOW()
+            WHERE id = $9 AND deleted_at IS NULL AND status = $11";
         var result = await _db.ExecuteNonQueryAsync(sql, ct,
             request.BasicSituation, request.SpecialMatters, request.TemplateKey,
             request.ReportUnit, request.HandlerName, request.FormDate,
-            request.AuditResult, request.AuditDate, existing.Id);
+            request.AuditResult, request.AuditDate, existing.Id,
+            ApplicationStatusCodes.SUBMITTED, ApplicationStatusCodes.DRAFT);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message);
 

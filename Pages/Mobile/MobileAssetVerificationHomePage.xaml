@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileAssetVerificationHomePage"
+             x:DataType="ViewModels.AssetVerification.AssetVerificationHomeViewModel"
+             Title="家庭经济状况核对"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 橙色英雄头部：返回 + 标题 + 4 统计胶囊 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardOrangeGradient}" Padding="16,20">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题 -->
+                <Label Text="家庭经济状况核对" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="核对报告上传与月度审核" FontSize="13" TextColor="#E6FFFFFF"/>
+
+                <!-- 统计胶囊 4 列 -->
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="0,4,0,0">
+                    <Border Grid.Column="0" StrokeShape="RoundRectangle 10" BackgroundColor="#33FFFFFF" StrokeThickness="0" Padding="4,8">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="{Binding PendingReportCountText}" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                            <Label Text="待上传" FontSize="10" TextColor="#E6FFFFFF" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="1" StrokeShape="RoundRectangle 10" BackgroundColor="#33FFFFFF" StrokeThickness="0" Padding="4,8">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="{Binding MonthlyCompletedText}" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                            <Label Text="本月完成" FontSize="10" TextColor="#E6FFFFFF" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="2" StrokeShape="RoundRectangle 10" BackgroundColor="#33FFFFFF" StrokeThickness="0" Padding="4,8">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="{Binding MonthlyNewText}" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                            <Label Text="本月新增" FontSize="10" TextColor="#E6FFFFFF" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="3" StrokeShape="RoundRectangle 10" BackgroundColor="#33FFFFFF" StrokeThickness="0" Padding="4,8">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="{Binding YearTotalText}" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                            <Label Text="全年累计" FontSize="10" TextColor="#E6FFFFFF" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 功能卡区（单列，图标 20% / 文字 80%） -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <Label Text="业务办理" FontSize="16" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}" Margin="4,4,0,4"/>
+
+                <!-- 快速经济核对 -->
+                <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding OpenQuickVerificationCommand}"/>
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                        <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#FFFBEB"
+                                StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                            <Label Text="⚡" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                            <Label Text="快速经济核对" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="发起单户家庭经济状况核对申请" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <!-- 月度审核 -->
+                <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding OpenMonthlyAuditCommand}"/>
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                        <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#FFFBEB"
+                                StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                            <Label Text="📋" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                            <Label Text="月度审核" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="核对报告上传、复核与批量处理" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="2" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

@@ -8,7 +8,7 @@ namespace NewCosmos.Helpers;
 /// <para>
 /// 数据结构示例：
 /// [{"type":1,"typenum":"11","typemoney":"6596605"}, {"type":2,...,"typemoney":"128382"}, ...]，
-/// <c>type</c> 与 <see cref="UserPurchaseService"/> 判定的奖级一一对应，<c>typemoney</c> 为单注奖金（元）。
+/// <c>type</c> 与 <see cref="NewCosmos.Services.Lottery.UserPurchaseService"/> 判定的奖级一一对应，<c>typemoney</c> 为单注奖金（元）。
 /// </para>
 /// <para>
 /// 解析不到（如大乐透当前未抓取奖级明细）时返回 0，由 UI 标注“浮动奖/以官方为准”。

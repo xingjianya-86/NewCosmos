@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Controls;
 using NewCosmos.Constants;
 using NewCosmos.Models.Options;
+using NewCosmos.Models.Session;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.System;
 using NewCosmos.ViewModels.Base;
@@ -22,6 +24,7 @@ public partial class LoginViewModel : ViewModelBase
     private readonly IWindowTitleService _windowTitleService;
     private readonly IUpdateService _updateService;
     private readonly INetworkAccessService _networkAccessService;
+    private readonly INavigationService _navigationService;
     private readonly PreferencesOptions _preferencesOptions;
 
     [ObservableProperty]
@@ -50,7 +53,8 @@ public partial class LoginViewModel : ViewModelBase
         IDialogService dialogService,
         IWindowTitleService windowTitleService,
         IUpdateService updateService,
-        INetworkAccessService networkAccessService)
+        INetworkAccessService networkAccessService,
+        INavigationService navigationService)
     {
         _serviceProvider = serviceProvider;
         _userService = userService;
@@ -61,6 +65,7 @@ public partial class LoginViewModel : ViewModelBase
         _windowTitleService = windowTitleService;
         _updateService = updateService;
         _networkAccessService = networkAccessService;
+        _navigationService = navigationService;
         _preferencesOptions = _configService.GetPreferencesOptions();
 
         LoadBackgroundImages();
@@ -308,13 +313,36 @@ public partial class LoginViewModel : ViewModelBase
                     }
                 }
 
+                // 持久化会话（不含密码，7 天有效期），进程重启后可免登录恢复
+                try
+                {
+                    await _serviceProvider.GetRequiredService<ISessionStore>().SaveAsync(new UserSession
+                    {
+                        UserId = result.Value.Id,
+                        UserName = result.Value.Username ?? Username,
+                        FullName = result.Value.FullName ?? result.Value.Username ?? Username,
+                        Phone = result.Value.Phone ?? string.Empty,
+                        OrganizationId = result.Value.OrganizationId,
+                        OrgName = App.CurrentUserOrgName,
+                        CityName = App.CurrentUserCityName,
+                        CountyName = App.CurrentUserCountyName,
+                        TownName = App.CurrentUserTownName,
+                        VillageName = App.CurrentUserVillageName,
+                        OrgAddress = App.CurrentUserOrgAddress,
+                        LoginAtUtc = DateTime.UtcNow
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"保存登录会话失败（不影响本次登录）: {ex.Message}");
+                }
+
                 if (Helpers.WindowNavigator.CurrentPage != null)
                 {
-                    var mainPage = App.Services.GetRequiredService<Pages.Main.MainPage>();
+                    // 设置导航根：桌面 MainPage / Android MobileMainPage 回退在 NavigationService 注册表内处理；
                     // 主首页是 NavigationPage 的 root（不经 push），必须显式注册标题跟随，
                     // 否则从模块页点系统返回按钮回主首页时标题残留（实测 BUG）
-                    App.Services.GetRequiredService<IWindowTitleService>().Register(mainPage);
-                    Helpers.WindowNavigator.CurrentPage = new NavigationPage(mainPage);
+                    await _navigationService.SetRootAsync(NavigationKeys.Main);
 
                     _windowTitleService.SetLoginTitle();
                 }

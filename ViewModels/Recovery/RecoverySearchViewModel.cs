@@ -103,13 +103,17 @@ public partial class RecoverySearchViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         ILoggerService logger,
         IRecoveryService recoveryService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
         _dialogService = dialogService;
+        _printJobFactory = printJobFactory;
     }
+
+    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
 
     /// <summary>
     /// 加载统计数据
@@ -379,11 +383,11 @@ public partial class RecoverySearchViewModel : ViewModelBase
         {
             if (record.InputMode == RecoveryConstants.INPUT_MODE_MANUAL)
             {
-                await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage>(page => page.SetEditRecord(record));
+                await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage, RecoveryRecord>(record);
             }
             else
             {
-                await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage>(page => page.SetEditRecord(record));
+                await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage, RecoveryRecord>(record);
             }
         }
         catch (Exception ex)
@@ -425,6 +429,52 @@ public partial class RecoverySearchViewModel : ViewModelBase
         {
             Logger.LogError(ex, "补打追缴记录异常");
             await _dialogService.DisplayAlertAsync("提示", "补打失败，请稍后重试", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 推送打印追缴办理单（仅已确认/已打印记录）：写入推送打印队列，由 PC 端打印代理执行。
+    /// </summary>
+    [RelayCommand]
+    private async Task PushPrintRecordAsync(RecoveryRecord? record)
+    {
+        if (record == null) return;
+
+        if (record.Status == RecoveryConstants.STATUS_DRAFT)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "草稿状态暂不支持推送打印", "确定");
+            return;
+        }
+
+        try
+        {
+            var request = new PrintJobRequest
+            {
+                BusinessType = "Recovery",
+                BusinessId = record.Id,
+                Classification = record.InputMode == RecoveryConstants.INPUT_MODE_MANUAL
+                    ? RecoveryConstants.INPUT_MODE_MANUAL
+                    : RecoveryConstants.INPUT_MODE_SEARCH,
+                ApplicantName = record.PersonName,
+                ApplicantIdCard = record.IdCard,
+                Fields = await BuildPrintFieldsAsync(record),
+                TableRows = new()
+            };
+
+            var push = await _printJobFactory.EnqueueAsync(request);
+            if (push.IsFailure)
+            {
+                await _dialogService.DisplayAlertAsync("推送失败", push.Message ?? "推送打印失败", "确定");
+                return;
+            }
+
+            await _dialogService.DisplayAlertAsync("已推送打印",
+                $"打印任务 {push.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "推送打印追缴记录异常");
+            await _dialogService.DisplayAlertAsync("提示", "推送打印失败，请稍后重试", "确定");
         }
     }
 

@@ -110,7 +110,14 @@
                         </Grid>
                         <VerticalStackLayout Spacing="8">
                             <Label Text="死亡原因" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding DeathReason}" Placeholder="请填写死亡原因" HeightRequest="80"/>
+                            <Picker ItemsSource="{Binding DeathReasonOptions}"
+                                    SelectedItem="{Binding SelectedDeathReason}"
+                                    ItemDisplayBinding="{Binding Display}"
+                                    HeightRequest="38"/>
+                            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsOtherReasonVisible}">
+                                <Label Text="其他原因说明" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding OtherDeathReasonText}" Placeholder="请补充说明"/>
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>

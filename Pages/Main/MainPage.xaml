@@ -92,7 +92,7 @@
                 </Grid>
             </Border>
 
-            <!-- 渐退期到期提醒横幅（点击跳转到渐退期到期处理页面） -->
+            <!-- 渐退期提醒横幅（点击跳转到渐退期管理页面） -->
             <Border IsVisible="{Binding ShowGracePeriodWarning}"
                     BackgroundColor="#FFF3CD"
                     StrokeShape="RoundRectangle 0"
@@ -383,7 +383,7 @@
                                             <Label Text="认定审核确认 · 动态管理" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
                                         </VerticalStackLayout>
                                     </HorizontalStackLayout>
-                                    <Label Grid.Row="1" Text="覆盖救助申请、保障对象动态管理、临时救助、月报表与渐退期到期处理" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Label Grid.Row="1" Text="覆盖救助申请、保障对象动态管理、临时救助、月报表与渐退期管理" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
                                     <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="SocialAssistance"/>
                                 </Grid>
                             </Border>

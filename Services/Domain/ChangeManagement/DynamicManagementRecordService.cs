@@ -414,8 +414,8 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
                 return Result.Failure<string>(pdfResult.ErrorCode ?? ErrorCodes.DOCUMENT_GENERATION_FAILED,
                     $"档案 {id} 渲染失败: {pdfResult.Message}");
             pdfs.Add(pdfResult.Value);
-            LogInfo($"批量渲染 {pdfs.Count}/{ids.Count}: ApplicationId={id}");
         }
+        LogInfo($"批量渲染完成: {pdfs.Count}/{ids.Count} 份（批量 {batchNo}）");
 
         var merged = pdfs.Count == 1 ? pdfs[0] : MergePdfBytes(pdfs);
         var path = OutputPathHelper.GetFilePath(OutputCategory, "变更人群批量",

@@ -8,6 +8,7 @@ using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.AssetVerification;
+using NewCosmos.Services.Domain.ChangeManagement;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.Domain.Printing;
 using NewCosmos.Services.Domain.Recovery;
@@ -33,6 +34,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private readonly IFileService _fileService = null!;
     private readonly IPdfVerificationService _pdfVerificationService = null!;
     private readonly IBusinessTimelineService _timelineService = null!;
+    private readonly IAssetVerificationService _assetVerificationService = null!;
+    private readonly IChangeService _changeService = null!;
 
     /// <summary>
     /// 由 Page 注入：WebView2 打印 PDF 的回调（pdfPath → Task）。用于核查报告等非 Office/WPS 格式打印。
@@ -53,7 +56,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         IPrinterService printerService,
         IFileService fileService,
         IPdfVerificationService pdfVerificationService,
-        IBusinessTimelineService timelineService)
+        IBusinessTimelineService timelineService,
+        IAssetVerificationService assetVerificationService,
+        IChangeService changeService)
     {
         _serviceProvider = serviceProvider;
         _templateService = templateService;
@@ -65,6 +70,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         _fileService = fileService;
         _pdfVerificationService = pdfVerificationService;
         _timelineService = timelineService;
+        _assetVerificationService = assetVerificationService;
+        _changeService = changeService;
     }
 
     #region 基础实现
@@ -78,6 +85,42 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
     [ObservableProperty]
     private TemplateSelectItem _selectedPreviewTemplate = null!;
+
+    /// <summary>
+    /// 仅出文书模式（PrintNavigationData.TemplateFilter 非空）：
+    /// 模板列表已收窄，隐藏「完成归档」——渐退草稿/仅出文书不得 CompleteArchiveAsync。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTemplateFilterMode;
+
+    /// <summary>
+    /// 文书直出文档模式（OutputCategories/OperationOverride/Prefilter 任一非空且非过滤模式）：
+    /// 同样隐藏「完成归档」——渐退/户主死亡 Draft 不得被 CompleteArchiveAsync 误置 Approved。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDocumentMode;
+
+    /// <summary>「完成归档」按钮可见：既非过滤模式也非文档模式</summary>
+    public bool IsCompleteArchiveVisible => !IsTemplateFilterMode && !IsDocumentMode;
+
+    /// <summary>「完成工单」按钮可见：与「完成归档」互斥（文档/过滤模式下替代留痕办理完成）</summary>
+    public bool IsWorkOrderCompleteVisible => IsTemplateFilterMode || IsDocumentMode;
+
+    partial void OnIsTemplateFilterModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsCompleteArchiveVisible));
+        OnPropertyChanged(nameof(IsWorkOrderCompleteVisible));
+    }
+
+    partial void OnIsDocumentModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsCompleteArchiveVisible));
+        OnPropertyChanged(nameof(IsWorkOrderCompleteVisible));
+    }
+
+    /// <summary>工单已办理完成（会话内状态：按钮置灰防重复提交）</summary>
+    [ObservableProperty]
+    private bool _isWorkOrderCompleted;
 
     // ---- 输出文件 ----
     [ObservableProperty]
@@ -177,14 +220,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 return null;
             if (string.IsNullOrWhiteSpace(idCard)) return null;
 
-            var db = _serviceProvider.GetRequiredService<Services.Database.IDatabaseService>();
-            var result = await db.QuerySingleAsync<long?>(
-                @"SELECT ac.id FROM nc_biz_asset_checks ac
-                  WHERE ac.applicant_id_card = $1 AND ac.deleted_at IS NULL
-                  ORDER BY ac.created_at DESC LIMIT 1",
-                ct, idCard);
+            var result = await _assetVerificationService.GetLatestIdByIdCardAsync(idCard, ct);
             if (result.IsSuccess && result.Value.HasValue)
-                return result.Value.Value;
+                return result.Value;
         }
         catch (Exception ex)
         {
@@ -205,11 +243,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         if (applicationId is not > 0) return false;
         try
         {
-            var db = _serviceProvider.GetRequiredService<Services.Database.IDatabaseService>();
-            var result = await db.ExecuteScalarAsync<bool>(
-                "SELECT EXISTS(SELECT 1 FROM nc_biz_change_records WHERE (application_id = $1 OR new_application_id = $1) AND triggered_stop = true AND change_type = 'CategoryStop' AND new_classification = ANY($2::text[]) AND deleted_at IS NULL)",
-                CancellationToken, applicationId.Value, ClassificationConstants.StopCategoryCodes);
-            return result.IsSuccess && result.Value == true;
+            var result = await _changeService.HasTriggeredCategoryStopAsync(
+                applicationId.Value, ClassificationConstants.StopCategoryCodes, CancellationToken);
+            return result.IsSuccess && result.Value;
         }
         catch (Exception ex)
         {
@@ -223,12 +259,24 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         Title = "档案输出";
         _batchNo = Guid.NewGuid().ToString("N").ToUpper();
 
-        var categories = GetCategoriesByBusinessType(PrintNavigationData.BusinessType);
+        var categories = PrintNavigationData.OutputCategories is { Length: > 0 } outCats
+            ? outCats
+            : GetCategoriesByBusinessType(PrintNavigationData.BusinessType);
         var classification = PrintNavigationData.Classification;
+        var templateFilter = PrintNavigationData.TemplateFilter;
+        var preselect = PrintNavigationData.PrefilterTemplateNames;
+        IsTemplateFilterMode = templateFilter is { Length: > 0 };
+        IsDocumentMode = !IsTemplateFilterMode
+            && (PrintNavigationData.OutputCategories is { Length: > 0 }
+                || PrintNavigationData.OperationOverride != null
+                || preselect is { Length: > 0 });
+        var isDocumentMode = IsDocumentMode;
         _logger.LogBusiness("加载打印模板",
             ("BusinessType", PrintNavigationData.BusinessType),
             ("Categories", string.Join(",", categories)),
-            ("Classification", classification));
+            ("Classification", classification),
+            ("TemplateFilter", templateFilter == null ? "(整档)" : string.Join("|", templateFilter)),
+            ("Prefilter", preselect == null ? "(无)" : string.Join("|", preselect)));
 
         try
         {
@@ -240,6 +288,10 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
             foreach (var t in templates)
             {
+                // 仅出文书：分类模板先按白名单收窄
+                if (IsTemplateFilterMode && !templateFilter!.Contains(t.Name, StringComparer.Ordinal))
+                    continue;
+
                 var config = await LoadTemplateConfigAsync(t.Id, classification);
                 var item = new TemplateSelectItem
                 {
@@ -325,8 +377,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 }
             }
 
-            // 资产核查档/低收入人口家庭认定等救助申请档案：在列表末尾添加核查报告条目
-            if (PrintNavigationData.BusinessType is "AssetVerification" or "FamilyApplication")
+            // 资产核查档/低收入人口家庭认定等救助申请档案：在列表末尾添加核查报告条目（仅出文书模式不追加）
+            if (!IsTemplateFilterMode
+                && PrintNavigationData.BusinessType is "AssetVerification" or "FamilyApplication")
             {
                 var checkId = await ResolveCheckIdAsync(CancellationToken);
                 if (checkId.HasValue)
@@ -350,10 +403,16 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 停保/停保变更档案（含经济复核/成员变更停保流）：额外加载"档案_变更告知书"模板（其 categories 仅含停发/不符合分类码）
             // 仅"实际停保"（复核/成员变更收入超标）追加，排除户主死亡与降档；
             // 不按加载档案的 Status 判断：成员变更输出的是停旧建新后的 Draft 新档案，停保事实由变更记录承载
-            if ((PrintNavigationData.BusinessType is "FamilyApplication" or "EconomicReview")
-                && await IsIncomeStopChangeAsync(PrintNavigationData.BusinessId))
+            // 单人保不产生停保，排除其变更告知书
+            // 仅出文书模式：告知书若在白名单内则无条件追加（用户主动选择，不走停保三重门）
+            var noticeAllowed = !IsTemplateFilterMode
+                || templateFilter!.Contains(DocumentTemplateNames.ChangeNotice, StringComparer.Ordinal);
+            if (noticeAllowed
+                && (PrintNavigationData.BusinessType is "FamilyApplication" or "EconomicReview")
+                && !ClassificationConstants.IsCodeSingleRescue(classification)
+                && (IsTemplateFilterMode || await IsIncomeStopChangeAsync(PrintNavigationData.BusinessId)))
             {
-                var changeNotice = await _templateService.GetByNameAsync("档案_变更告知书");
+                var changeNotice = await _templateService.GetByNameAsync(DocumentTemplateNames.ChangeNotice);
                 if (changeNotice != null && !Templates.Any(t => t.TemplateId == changeNotice.Id))
                 {
                     var config = await LoadTemplateConfigAsync(changeNotice.Id, classification);
@@ -369,19 +428,46 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 }
             }
 
+            // 白名单外的模板（核查报告等）一律剔除
+            if (IsTemplateFilterMode)
+            {
+                var allowed = new HashSet<string>(templateFilter!, StringComparer.Ordinal);
+                var extra = Templates.Where(t => !allowed.Contains(t.Name)).ToList();
+                foreach (var x in extra) Templates.Remove(x);
+            }
+
+            // 输出文书预勾选：列表仍展示分类内模板，仅按名单控制勾选状态
+            // 告知书若在列表中恒勾（业务必选）
+            if (!IsTemplateFilterMode && preselect is { Length: > 0 })
+            {
+                var pre = new HashSet<string>(preselect, StringComparer.Ordinal);
+                foreach (var t in Templates)
+                    t.IsSelected = pre.Contains(t.Name);
+                var notice = Templates.FirstOrDefault(t => t.Name == DocumentTemplateNames.ChangeNotice);
+                if (notice != null) notice.IsSelected = true;
+            }
+
             if (Templates.Count > 0)
             {
-                SelectedPreviewTemplate = Templates[0];
+                SelectedPreviewTemplate = Templates.FirstOrDefault(t => t.IsSelected) ?? Templates[0];
                 var totalBaseCopies = Templates.Where(x => x.IsSelected).Sum(x => x.BaseCopies);
                 var dirCount = directoryTemplates.Count;
-                StatusText = dirCount > 0
-                    ? $"找到 {Templates.Count} 个模板（含{dirCount}个目录），总打印份数合计 {totalBaseCopies}"
-                    : $"找到 {Templates.Count} 个模板，总打印份数合计 {totalBaseCopies}";
+                StatusText = IsTemplateFilterMode
+                    ? $"仅出文书：{Templates.Count} 个模板"
+                    : isDocumentMode
+                        ? $"输出文书：{Templates.Count} 个模板，已勾选 {Templates.Count(x => x.IsSelected)} 个"
+                        : dirCount > 0
+                            ? $"找到 {Templates.Count} 个模板（含{dirCount}个目录），总打印份数合计 {totalBaseCopies}"
+                            : $"找到 {Templates.Count} 个模板，总打印份数合计 {totalBaseCopies}";
             }
             else
             {
-                StatusText = "未找到匹配模板";
-                await _dialogService.DisplayAlertAsync("提示", "未找到匹配的打印模板", "确定");
+                var missing = IsTemplateFilterMode
+                    ? $"模板未上传：{string.Join("、", templateFilter!)}"
+                    : "未找到匹配模板";
+                StatusText = missing;
+                await _dialogService.DisplayAlertAsync("提示",
+                    IsTemplateFilterMode ? missing : "未找到匹配的打印模板", "确定");
             }
 
             LoadPrinterList();
@@ -1150,9 +1236,66 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     //  完成归档 / 返回
     // ========================
 
+    /// <summary>
+    /// 完成工单：打印→保存→完成 流的「完成」动作。
+    /// 仅记录办理完成留痕（本批打印追痕 remark + 业务日志），不改档案状态、不导航；
+    /// 文档/过滤模式下替代被隐藏的「完成归档」。
+    /// </summary>
+    [RelayCommand]
+    private async Task CompleteWorkOrderAsync()
+    {
+        if (IsWorkOrderCompleted) return;
+
+        if (OutputFiles.Count == 0 || !OutputFiles.Any(f => f.IsCompleted))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请至少生成一个输出文件", "确定");
+            return;
+        }
+
+        var confirm = await _dialogService.DisplayAlertAsync(
+            "确认", "确认完成该文书办理工单？\n仅记录办理完成，不影响档案状态。", "确认", "取消");
+        if (!confirm) return;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(_batchNo))
+            {
+                var remark = $"工单办理完成 {DateTime.Now:yyyy-MM-dd HH:mm}";
+                var markResult = await _printRecordService.MarkBatchWorkOrderCompletedAsync(
+                    _batchNo, remark, CancellationToken.None);
+                if (markResult.IsFailure)
+                {
+                    await _dialogService.DisplayAlertAsync("错误", $"工单完成留痕失败: {markResult.Message}", "确定");
+                    return;
+                }
+            }
+
+            _logger.LogBusiness("文书工单完成",
+                ("BusinessType", PrintNavigationData.BusinessType),
+                ("BusinessId", PrintNavigationData.BusinessId?.ToString() ?? ""),
+                ("BatchNo", _batchNo),
+                ("FileCount", OutputFiles.Count));
+
+            IsWorkOrderCompleted = true;
+            StatusText = "工单已完成";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "完成工单失败");
+            await _dialogService.DisplayAlertAsync("错误", $"完成工单失败: {ex.Message}", "确定");
+        }
+    }
+
     [RelayCommand]
     private async Task CompleteAsync()
     {
+        // 仅出文书/文书直出文档模式：禁止完成归档（会把渐退草稿 Draft 强行置 Approved/step6）
+        if (IsTemplateFilterMode || IsDocumentMode)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "仅出文书模式不支持完成归档", "确定");
+            return;
+        }
+
         if (OutputFiles.Count == 0 || !OutputFiles.Any(f => f.IsCompleted))
         {
             await _dialogService.DisplayAlertAsync("提示", "请至少生成一个输出文件", "确定");
@@ -1371,7 +1514,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
     /// <summary>按业务类型解析档案模板分类（统一走 ArchiveCategoryResolver，补打中心同源）</summary>
     private string[] GetCategoriesByBusinessType(string businessType)
-        => ArchiveCategoryResolver.GetRecordCategories(businessType, PrintNavigationData.Classification);
+        => ArchiveCategoryResolver.GetRecordCategories(
+            businessType, PrintNavigationData.Classification, PrintNavigationData.OperationOverride);
 
     // ========================
     //  保存文件
@@ -1585,7 +1729,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         var appDateRaw = fieldData.TryGetValue(FieldKeys.APPLICATION_DATE, out var d) ? d : DateTime.Now.ToString("yyyy-MM-dd");
         var appDate = NormalizeDirectoryDate(appDateRaw);
 
-        // 页号累计（沿用 DirectoryGenerator 约定：首文档从第1页起）
+        // 页号累计（首文档从第1页起）
         var currentPage = 1;
 
         // 静态预填条目（无模板，仅在目录中列出），责任人 = 申请人姓名

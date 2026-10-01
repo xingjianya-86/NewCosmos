@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -39,12 +39,13 @@ public class StatisticsService : BaseService, IStatisticsService
         var startDate = new DateTime(year, month, 1);
         var endDate = startDate.AddMonths(1);
 
-        // 月度归档看真实归档表 nc_biz_archives（ArchiveService 写入），
-        // 而非导入镜像表 nc_biz_low_income_archives（其 created_at 是导入时间）
-        var sql = @"SELECT COUNT(*) FROM nc_biz_archives
-                    WHERE created_at >= $1 AND created_at < $2 AND deleted_at IS NULL";
+        // 当月归档 = 当前库本月完成归档（first_approved_at 由「完成归档」首次写入，COALESCE 只写一次）。
+        // 历史导入库无归档时间概念，不计入；不查 nc_biz_archives（唯一写入方是冷门流程，实测 0 行）。
+        var sql = @"SELECT COUNT(*) FROM nc_biz_applications
+                    WHERE current_step = $3 AND deleted_at IS NULL
+                      AND first_approved_at >= $1 AND first_approved_at < $2";
 
-        var result = await _dbService.ExecuteScalarAsync(sql, ct, startDate, endDate);
+        var result = await _dbService.ExecuteScalarAsync(sql, ct, startDate, endDate, WorkflowSteps.ARCHIVED);
 
         if (result.IsSuccess)
         {
@@ -104,9 +105,9 @@ public class StatisticsService : BaseService, IStatisticsService
 
             // 单条 SQL 合并 4 项统计：同表计数用 COUNT(*) FILTER 聚合，不同表用子查询交叉连接一次取回。
             // 口径（2026-08 与用户确认，依托 B 线业务时间轴）：
-            // - 本月总新增 = nc_biz_applications 中 status='Approved' 且 first_approved_at∈B线周期（月报"新增救助明细"口径；
+            // - 本月总新增 = nc_biz_applications 中 status=ApplicationStatusCodes.APPROVED 且 first_approved_at∈B线周期（月报"新增救助明细"口径；
             //   用不可变的首次审批时间，避免任何一次编辑/变更把老档案重算成"本月新增"）
-            // - 本月总退出 = status='Stopped' 且 stop_date∈B线周期（月报"停保汇总"口径）
+            // - 本月总退出 = status=ApplicationStatusCodes.STOPPED 且 stop_date∈B线周期（月报"停保汇总"口径）
             // - 新申请资产核查 = nc_biz_asset_checks 中 status='0'（已申请未出授权报告）且 application_date∈B线周期
             // - 本月新增高龄老人 = nc_biz_elderly_applications 中 status∈(Confirmed,Stopped) 且 apply_date∈当月自然月
             // B 线周期日期运算统一引用 BusinessCycleHelper（唯一事实来源，与 GetCycleRangeAsync 同源）。
@@ -225,7 +226,7 @@ public class StatisticsService : BaseService, IStatisticsService
         try
         {
             // 口径与 GetDashboardStatisticsAsync 的 MonthlyNewElderly 一致：
-            // - 在享领取人数 = 当前库 status='Confirmed' 且未死亡（death_date IS NULL）
+            // - 在享领取人数 = 当前库 status=ApplicationStatusCodes.CONFIRMED 且未死亡（death_date IS NULL）
             //   + 导入库 nc_biz_elderly_subsidy_history 中尚未在当前库建档（身份证不在当前库未删记录）
             //   且未登记死亡（不在 nc_biz_death_records.member_id_card）的记录数。
             // - 本月新增登记 = status∈(Confirmed,Stopped) 且 apply_date∈当月自然月
@@ -405,7 +406,9 @@ public class StatisticsService : BaseService, IStatisticsService
                     COUNT(*) FILTER (WHERE change_date >= $1::date AND change_date < $2::date) AS monthly_changes,
                     COUNT(*) FILTER (WHERE change_date >= $3::date AND change_date < $2::date) AS year_changes
                 FROM nc_biz_change_records
-                WHERE deleted_at IS NULL";
+                WHERE deleted_at IS NULL
+                  -- M3：排除户主死亡附属的分类施保减除记录，避免一次事件计 2 次
+                  AND change_type <> '{DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE}'";
 
             var result = await _dbService.QuerySingleAsync<ChangeStats>(sql, ct, mStart, mEnd, yStart);
 
@@ -432,9 +435,18 @@ public class StatisticsService : BaseService, IStatisticsService
 
         try
         {
-            const string sql = @"SELECT COUNT(*) AS total_archives FROM nc_biz_archives WHERE deleted_at IS NULL";
+            // 归档总数 = 当前库已归档（current_step=6）+ 5 张历史导入库户数（无 deleted_at 软删列）。
+            // 不查 nc_biz_archives：唯一写入方是「一事一议申报表生成」冷门流程，主归档链路从不写入，实测 0 行。
+            const string sql = @"SELECT (
+                        (SELECT COUNT(*) FROM nc_biz_applications WHERE current_step = $1 AND deleted_at IS NULL)
+                      + (SELECT COUNT(*) FROM nc_biz_rural_subsistence_families)
+                      + (SELECT COUNT(*) FROM nc_biz_urban_subsistence_families)
+                      + (SELECT COUNT(*) FROM nc_biz_low_income_edge_families)
+                      + (SELECT COUNT(*) FROM nc_biz_destitute_families)
+                      + (SELECT COUNT(*) FROM nc_biz_rigid_expenditure_families)
+                    ) AS total_archives";
 
-            var result = await _dbService.QuerySingleAsync<ArchiveStats>(sql, ct);
+            var result = await _dbService.QuerySingleAsync<ArchiveStats>(sql, ct, WorkflowSteps.ARCHIVED);
 
             if (result.IsFailure || result.Value is null)
             {

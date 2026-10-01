@@ -4,7 +4,7 @@ using NewCosmos.ViewModels.Recovery;
 
 namespace NewCosmos.Pages.Recovery;
 
-public partial class RecoveryFormPage : ContentPage, IParameterizedPage<StoppedPersonDto>
+public partial class RecoveryFormPage : ContentPage, IParameterizedPage<StoppedPersonDto>, IParameterizedPage<RecoveryRecord>
 {
     private readonly RecoveryFormViewModel _viewModel;
 
@@ -21,6 +21,13 @@ public partial class RecoveryFormPage : ContentPage, IParameterizedPage<StoppedP
         {
             _viewModel.LoadPersonInfo(parameter);
         }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>编辑草稿：参数化入口（仅经 NavigateToPageAsync 单一通道调用）</summary>
+    Task IParameterizedPage<RecoveryRecord>.SetParameterAsync(RecoveryRecord record)
+    {
+        _viewModel.LoadRecord(record);
         return Task.CompletedTask;
     }
 

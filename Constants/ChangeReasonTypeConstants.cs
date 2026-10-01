@@ -13,4 +13,7 @@ public static class ChangeReasonTypeConstants
 
     /// <summary>家庭成员变更：增员/减员导致的重新认定（停旧建新）</summary>
     public const string MemberChange = "成员变更";
+
+    /// <summary>跨大类转入（接续链 Step5 分类判定补写 CategoryAdd 时，非死亡/成员变更链的兜底原因类型）</summary>
+    public const string CrossCategoryTransfer = "跨大类转入";
 }

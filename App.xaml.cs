@@ -1,7 +1,9 @@
 ﻿using Microsoft.Maui;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Options;
+using NewCosmos.Models.Session;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Pages.Auth;
 using System.Threading;
 
@@ -67,6 +69,7 @@ public partial class App : Application
                 Serilog.Log.Information("[APP] 应用程序已存在，尝试激活现有窗口");
                 _singleInstanceMutex.Dispose();
                 _singleInstanceMutex = null;
+#if WINDOWS
                 var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
                 var processes = System.Diagnostics.Process.GetProcessesByName(currentProcess.ProcessName);
                 foreach (var process in processes)
@@ -77,6 +80,7 @@ public partial class App : Application
                         break;
                     }
                 }
+#endif
                 Environment.Exit(0);
             }
             Serilog.Log.Information("[APP] 首次实例通过");
@@ -105,6 +109,16 @@ public partial class App : Application
 
     private static void LogCrashException(Exception ex, string source)
     {
+        // 直接写文件——Serilog 异步 sink 在进程退出时丢失未落盘日志
+        try
+        {
+            var crashLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}]\n{ex}\n\n";
+            var dir = Path.Combine(FileSystem.AppDataDirectory, "..", "crash");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, $"crash_{DateTime.Now:yyyyMMdd}.log"), crashLog);
+        }
+        catch { }
+
         try
         {
             if (Services != null)
@@ -119,7 +133,6 @@ public partial class App : Application
         }
         catch
         {
-            // logger 不可用，fallback 到 Console
         }
 
         Console.WriteLine($"[CRITICAL] [{source}] {ex}");
@@ -155,21 +168,89 @@ public partial class App : Application
             var appOptions = configService.GetAppOptions();
             // B 线统计周期结算日注入（默认 15；上级业务截止 20 号时 app.ini 配 20）
             Helpers.BusinessCycleHelper.Configure(appOptions.BCycleSettleDay);
-            Serilog.Log.Information("[APP] 应用配置加载完成，版本: {Version}，B线结算日: {SettleDay}",
+            Serilog.Log.Information("[APP] 应用配置加载完成，版本: {Version}, B线结算日: {SettleDay}",
                 appOptions.Version, BusinessCycleHelper.SettleDay);
+
+            var windowTitleService = Services.GetRequiredService<IWindowTitleService>();
+
+            // 尝试恢复持久化会话（SecureStorage 同步阻塞读取，避开 UI 同步上下文）
+            ISessionStore? sessionStore = null;
+            UserSession? session = null;
+            try
+            {
+                sessionStore = Services.GetRequiredService<ISessionStore>();
+                session = Task.Run(() => sessionStore.LoadAsync()).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "[APP] 读取会话失败，转登录页");
+            }
+
+            if (session != null)
+            {
+                // 校验用户仍存在且启用；失败则清会话回登录页
+                try
+                {
+                    var userService = Services.GetRequiredService<Services.Domain.UserManagement.IUserService>();
+                    var userResult = Task.Run(() => userService.GetByIdAsync(session.UserId)).GetAwaiter().GetResult();
+                    if (userResult.IsSuccess && userResult.Value != null && userResult.Value.IsActive)
+                    {
+                        ApplySession(session);
+                        Serilog.Log.Information("[APP] 会话已恢复: UserId={UserId}", session.UserId);
+
+                        Page mainPage;
+                        if (DeviceInfo.Platform == DevicePlatform.Android)
+                        {
+                            var mobileType = typeof(Pages.Main.MainPage).Assembly.GetType("NewCosmos.Pages.Mobile.MobileMainPage");
+                            mainPage = mobileType != null
+                                ? (Services.GetService(mobileType) as Page) ?? Services.GetRequiredService<Pages.Main.MainPage>()
+                                : Services.GetRequiredService<Pages.Main.MainPage>();
+                        }
+                        else
+                        {
+                            mainPage = Services.GetRequiredService<Pages.Main.MainPage>();
+                        }
+
+                        windowTitleService.Register(mainPage);
+                        var mainWindow = new Window(new NavigationPage(mainPage))
+                        {
+                            Title = appOptions.WindowTitle
+                        };
+                        if (DeviceInfo.Platform != DevicePlatform.Android)
+                        {
+                            mainWindow.Width = 1920;
+                            mainWindow.Height = 1080;
+                            mainWindow.X = 0;
+                            mainWindow.Y = 0;
+                        }
+                        Serilog.Log.Information("[APP] CreateWindow 结束（会话恢复）");
+                        return mainWindow;
+                    }
+
+                    Serilog.Log.Warning("[APP] 会话用户无效，清除并转登录页");
+                    ClearSession();
+                    if (sessionStore != null)
+                        _ = sessionStore.ClearAsync();
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "[APP] 会话校验失败，转登录页");
+                    ClearSession();
+                }
+            }
 
             var loginPage = Services.GetRequiredService<LoginPage>();
             // root 页也注册标题跟随：pop/系统返回回登录页时窗口标题按其 Page.Title 恢复
-            Services.GetRequiredService<IWindowTitleService>().Register(loginPage);
+            windowTitleService.Register(loginPage);
             var navigationPage = new NavigationPage(loginPage);
             var loginWindow = new Window(navigationPage) { Title = $"登录 - {appOptions.WindowTitle}" };
-            
+
             // 设置窗口全屏
             loginWindow.Width = 1920;
             loginWindow.Height = 1080;
             loginWindow.X = 0;
             loginWindow.Y = 0;
-            
+
             Serilog.Log.Information("[APP] CreateWindow 结束");
             return loginWindow;
         }
@@ -210,6 +291,31 @@ public partial class App : Application
     public static void ClearCurrentUserId()
     {
         CurrentUserId = 0;
+    }
+
+    /// <summary>将持久化会话回填到静态上下文（不含密码）。</summary>
+    public static void ApplySession(UserSession session)
+    {
+        SetCurrentUserId(session.UserId);
+        SetCurrentUser(session.UserName, session.FullName, session.Phone, session.OrganizationId);
+        SetCurrentUserAddress(session.OrgName, session.CityName, session.CountyName,
+            session.TownName, session.VillageName, session.OrgAddress);
+    }
+
+    /// <summary>清空静态会话上下文（登出/失效）。持久化清除由调用方处理 ISessionStore.ClearAsync。</summary>
+    public static void ClearSession()
+    {
+        ClearCurrentUserId();
+        CurrentUserName = string.Empty;
+        CurrentUserFullName = string.Empty;
+        CurrentUserPhone = string.Empty;
+        CurrentUserOrganizationId = null;
+        CurrentUserOrgName = null;
+        CurrentUserCityName = null;
+        CurrentUserCountyName = null;
+        CurrentUserTownName = null;
+        CurrentUserVillageName = null;
+        CurrentUserOrgAddress = null;
     }
 }
 

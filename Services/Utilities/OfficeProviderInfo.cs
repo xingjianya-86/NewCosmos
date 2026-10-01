@@ -1,4 +1,5 @@
-﻿namespace NewCosmos.Services.Utilities;
+﻿#if WINDOWS
+namespace NewCosmos.Services.Utilities;
 
 /// <summary>
 /// 办公软件提供    /// </summary>
@@ -22,3 +23,4 @@ public class OfficeProviderInfo
     public bool HasWord => !string.IsNullOrEmpty(WordProgId);
     public bool HasExcel => !string.IsNullOrEmpty(ExcelProgId);
 }
+#endif

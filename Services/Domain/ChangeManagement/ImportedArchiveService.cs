@@ -518,7 +518,7 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
                      created_by, updated_by, created_at, updated_at, bank_name, bank_account)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                         $16, $17, $18, $19, $20,
-                        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, 'Draft', 1,
+                        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $38, $39,
                         'ImportedArchive', $32, $33, 'ImportedArchive', $34, $34, $35, $35, $36, $37)
                 RETURNING id
                 """, ct,
@@ -533,7 +533,8 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
                 supportModeCode, classificationCode, isEligible,
                 f.SourceTable, f.SourceId,
                 operatorName, archivedAt,
-                f.BankName ?? string.Empty, f.BankAccount ?? string.Empty);
+                f.BankName ?? string.Empty, f.BankAccount ?? string.Empty,
+                ApplicationStatusCodes.DRAFT, WorkflowSteps.ENTRY_START);
 
             if (insertResult.IsFailure || insertResult.Value is not > 0)
                 return Result.Failure<ImportedMigrationResult>(

@@ -26,6 +26,9 @@ public static class ElderlyBenefitConstants
     /// <summary>状态：已停发</summary>
     public const string StatusStopped = "Stopped";
 
+    /// <summary>状态：发放中（nc_biz_elderly_subsidy_history.status 在发记录）</summary>
+    public const string StatusActive = "Active";
+
     /// <summary>下月待办类型：待新增</summary>
     public const string PendingTypeNew = "New";
 

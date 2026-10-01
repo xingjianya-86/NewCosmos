@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 
 namespace NewCosmos.ViewModels.Base;
 
@@ -14,6 +15,7 @@ public abstract class ModuleHomeViewModelBase : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly IWindowTitleService _windowTitleService;
     private bool _initialized;
+    private bool _permissionsLoaded;
 
     /// <summary>统计加载失败时的占位显示（降级不阻塞页面）</summary>
     protected const string StatNA = "—";
@@ -56,17 +58,28 @@ public abstract class ModuleHomeViewModelBase : ViewModelBase
     }
 
     /// <summary>
-    /// 页面 OnAppearing 调用；重活（权限 + 统计）只执行一次
+    /// 页面 OnAppearing 调用。权限未成功加载前不锁定，允许下次进入重试；
+    /// 成功后（含统计失败仅降级）只执行一次。
     /// </summary>
-    public Task InitializeAsync()
+    public async Task InitializeAsync()
     {
-        if (_initialized)
-            return Task.CompletedTask;
-        _initialized = true;
-        return LoadDataAsync();
+        if (_initialized && _permissionsLoaded)
+            return;
+
+        await LoadDataAsync();
+
+        // 权限成功标记由子类在 LoadDataAsync 内调用 MarkPermissionsLoaded()
+        if (_permissionsLoaded)
+            _initialized = true;
     }
 
-    /// <summary>子类实现：批量加载权限与模块统计数据</summary>
+    /// <summary>子类在权限成功应用后调用，允许基类锁定初始化（失败则下次 OnAppearing 重试）。</summary>
+    protected void MarkPermissionsLoaded() => _permissionsLoaded = true;
+
+    /// <summary>
+    /// 子类实现：批量加载权限与模块统计数据。
+    /// 权限成功时须调用 <see cref="MarkPermissionsLoaded"/>；失败不得清零已有 CanAccess*。
+    /// </summary>
     protected abstract Task LoadDataAsync();
 
     /// <summary>
@@ -88,11 +101,17 @@ public abstract class ModuleHomeViewModelBase : ViewModelBase
 
         try
         {
-            var page = _serviceProvider.GetRequiredService<TPage>();
-            page.Title = windowTitle;
-            _windowTitleService.Register(page);
-            configure?.Invoke(page);
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
+            var resolvedPage = ResolvePage<TPage>();
+            // Android 手机页与桌面页为兄弟类型，安全 cast 后再调用 configure；
+            // 标题与注册统一用基类 Page，避免兄弟类型转换异常
+            resolvedPage.Title = windowTitle;
+            _windowTitleService.Register(resolvedPage);
+            // configure 仅在类型匹配时调用
+            if (resolvedPage is TPage page && configure != null)
+            {
+                configure(page);
+            }
+            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(resolvedPage);
         }
         catch (Exception ex)
         {

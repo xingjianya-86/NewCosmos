@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.SocialAssistance.FormSteps.MobileApplicationFormStep1View"
+             x:DataType="ApplicationFormViewModel">
+
+    <!-- Step1（手机版）：基本信息 — 单列堆叠，字段绑定与桌面版一致 -->
+    <VerticalStackLayout Spacing="14" IsEnabled="{Binding IsStep1Editable}">
+
+        <!-- 户籍所在地 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="🏠 户籍所在地" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <Label Text="从当前用户组织机构自动获取，不可修改" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding HukouProvince}" IsReadOnly="True"
+                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding HukouCity}" IsReadOnly="True"
+                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding HukouDistrict}" IsReadOnly="True"
+                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="乡镇" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding HukouTown}" IsReadOnly="True"
+                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 申请人所在地址 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="📍 申请人所在地址" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding ProvinceOptions}" SelectedItem="{Binding SelectedProvince}"
+                            Style="{StaticResource FormFieldPickerStyle}" IsEnabled="False"
+                            BackgroundColor="{StaticResource Gray100}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding CityOptions}" SelectedItem="{Binding SelectedCity}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding DistrictOptions}" SelectedItem="{Binding SelectedDistrict}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="乡镇社区" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding TownOptions}" SelectedItem="{Binding SelectedTown}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding VillageOptions}" SelectedItem="{Binding SelectedVillage}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="详细地址" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding Address}" Placeholder="请输入详细地址（如：XX路XX号）"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 申请人信息 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="👤 申请人信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding ApplicantName}" Placeholder="{Binding ApplicantNameField.Placeholder}"
+                           IsReadOnly="{Binding IsApplicantIdentityLocked}"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding ApplicantIdCard}" Placeholder="{Binding ApplicantIdCardField.Placeholder}"
+                           IsReadOnly="{Binding IsApplicantIdentityLocked}"
+                           Style="{StaticResource FormFieldEntryStyle}" MaxLength="18"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="残疾证号（后两位）" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding DisabilityCardNo}" Placeholder="后两位用于计算" MaxLength="2"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Entry Text="{Binding DetectedGender}" IsReadOnly="True"
+                               BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Entry Text="{Binding DetectedAgeDisplay}" IsReadOnly="True"
+                               BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    </VerticalStackLayout>
+                </Grid>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="联系方式" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding ApplicantPhone}" Placeholder="{Binding PhoneField.Placeholder}"
+                           Style="{StaticResource FormFieldEntryStyle}" Keyboard="Telephone" MaxLength="11"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="民族" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding EthnicityOptions}" SelectedItem="{Binding SelectedEthnicity}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="婚姻状况" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding MaritalStatusOptions}" SelectedItem="{Binding SelectedMaritalStatus}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="户口性质" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding HukouTypeOptions}" SelectedItem="{Binding HukouType}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="文化程度" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding EducationLevelOptions}" SelectedItem="{Binding SelectedEducationLevel}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="政治面貌" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding PoliticalStatusOptions}" SelectedItem="{Binding SelectedPoliticalStatus}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding BankName}" Placeholder="银行卡开户行（导入建档自动带出，可修改）"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding BankAccount}" Placeholder="银行卡号（导入建档自动带出，可修改）"
+                           Style="{StaticResource FormFieldEntryStyle}" Keyboard="Numeric"/>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 健康与残疾信息 -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="🏥 健康与残疾信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="身体状况" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Entry Text="{Binding SelectedHealthStatusObj.Display}" IsReadOnly="True"
+                               BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                        <Label Text="残疾类型" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Entry Text="{Binding SelectedDisabilityTypeObj.Display}" IsReadOnly="True"
+                               BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    </VerticalStackLayout>
+                </Grid>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="残疾等级" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding SelectedDisabilityLevelObj.Display}" IsReadOnly="True"
+                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <HorizontalStackLayout Spacing="8">
+                    <CheckBox IsChecked="{Binding IsSevereDisease}" VerticalOptions="Center"/>
+                    <Label Text="是否重病" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="疾病编码（ICD-10）" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding DiseaseCode}" TextChanged="OnApplicantDiseaseCodeChanged"
+                           Placeholder="如 A00.900，输入后自动带出疾病"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="一级疾病" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding DiseaseCategoryOptions}" SelectedItem="{Binding SelectedDiseaseCategoryObj}"
+                            ItemDisplayBinding="{Binding Display}" Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="二级疾病" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding DiseaseNameText}" Placeholder="输入疾病编码自动带出，可手工修改"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+    </VerticalStackLayout>
+
+</ContentView>

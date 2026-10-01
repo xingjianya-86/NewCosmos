@@ -7,7 +7,7 @@ public enum TimelineType
     /// <summary>A线：经济核查（每月10号结算，上月11日~本月10日）</summary>
     EconomicReview,
 
-    /// <summary>B线：业务线（每月15号结算，受理窗口上月15日~本月15日）</summary>
+    /// <summary>B线：业务线（结算日由 app.ini BCycleSettleDay 配置，默认20号；受理窗口上月(结算日+1)~本月(结算日+1)）</summary>
     BusinessProcess,
 
     /// <summary>

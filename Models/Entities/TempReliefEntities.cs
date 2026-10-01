@@ -313,6 +313,15 @@ public class TempReliefCandidate
 
     /// <summary>当年是否已申请（禁选标记）</summary>
     public bool HasAppliedThisYear { get; set; }
+
+    /// <summary>命中成员提示（按家庭成员姓名/身份证检索命中户主时展示，如 命中成员：张三（儿子））</summary>
+    public string MatchedPersonInfo { get; set; } = string.Empty;
+
+    /// <summary>命中成员身份证（预选救助对象用；直查命中为空）</summary>
+    public string MatchedMemberIdCard { get; set; } = string.Empty;
+
+    /// <summary>是否有命中成员提示（XAML IsVisible 绑定）</summary>
+    public bool HasMatchedPersonInfo => !string.IsNullOrEmpty(MatchedPersonInfo);
 }
 
 /// <summary>
@@ -466,7 +475,7 @@ public partial class TempReliefEducation : ObservableObject
     /// <summary>学制显示文本（Picker 双向绑定用，落库存数值）</summary>
     public string SchoolDurationDisplay
     {
-        get => _schoolDuration switch
+        get => SchoolDuration switch
         {
             3 => "三年制",
             4 => "四年制",
@@ -475,7 +484,7 @@ public partial class TempReliefEducation : ObservableObject
         };
         set
         {
-            _schoolDuration = value switch
+            SchoolDuration = value switch
             {
                 "三年制" => 3,
                 "四年制" => 4,

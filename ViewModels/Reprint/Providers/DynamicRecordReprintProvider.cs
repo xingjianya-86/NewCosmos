@@ -4,6 +4,7 @@ using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ChangeManagement;
+using NewCosmos.Services.Domain.Printing;
 using NewCosmos.Services.Domain.SocialAssistance;
 
 namespace NewCosmos.ViewModels.Reprint.Providers;
@@ -17,20 +18,20 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
 {
     private readonly IDynamicManagementRecordService _recordService;
     private readonly IApplicationService _applicationService;
-    private readonly Services.Database.IDatabaseService _db;
+    private readonly IPrintRecordService _printRecordService;
     private readonly StorageOptions _storageOptions;
     private readonly ILoggerService _logger;
 
     public DynamicRecordReprintProvider(
         IDynamicManagementRecordService recordService,
         IApplicationService applicationService,
-        Services.Database.IDatabaseService db,
+        IPrintRecordService printRecordService,
         StorageOptions storageOptions,
         ILoggerService logger)
     {
         _recordService = recordService;
         _applicationService = applicationService;
-        _db = db;
+        _printRecordService = printRecordService;
         _storageOptions = storageOptions;
         _logger = logger;
     }
@@ -38,6 +39,7 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
     public string DomainKey => DynamicManagementRecordService.BusinessTypeKey;
     public string DisplayName => "动态管理档案";
     public ReprintDomainMode Mode => ReprintDomainMode.DynamicRecord;
+    public ReprintMonthWindow MonthWindow => ReprintMonthWindow.BusinessProcess;
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByPersonAsync(string keyword, int limit = 20, CancellationToken ct = default)
     {
@@ -110,22 +112,14 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
     {
         try
         {
-            // 直接查留痕表（含 pdf_data 大小与 pdf_path，原样补打判定用）
-            var result = await _db.QueryAsync<PrintHistoryRow>(
-                @"SELECT id, template_name, created_at, operator_name, status,
-                         COALESCE(remark, '') AS remark,
-                         COALESCE(OCTET_LENGTH(pdf_data), 0) AS pdf_size,
-                         COALESCE(pdf_path, '') AS pdf_path
-                  FROM nc_biz_print_records
-                  WHERE business_type = $1 AND business_id = $2
-                  ORDER BY created_at DESC
-                  LIMIT 50",
-                ct, DynamicManagementRecordService.BusinessTypeKey, applicationId);
+            // 留痕表（含 pdf 实际大小与 pdf_path，原样补打判定用）
+            var result = await _printRecordService.GetRecentByBusinessAsync(
+                DynamicManagementRecordService.BusinessTypeKey, applicationId, 50, ct);
             if (result.IsFailure)
                 return Result.Failure<List<DynamicPrintHistoryItem>>(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     result.Message ?? "打印留痕查询失败");
 
-            var items = (result.Value ?? new List<PrintHistoryRow>()).Select(r => new DynamicPrintHistoryItem(
+            var items = (result.Value ?? new List<PrintRecord>()).Select(r => new DynamicPrintHistoryItem(
                 r.Id,
                 r.TemplateName,
                 r.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
@@ -147,13 +141,11 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
     {
         try
         {
-            var result = await _db.QueryAsync<PrintPdfRow>(
-                "SELECT pdf_data, COALESCE(pdf_path, '') AS pdf_path FROM nc_biz_print_records WHERE id = $1",
-                ct, printRecordId);
-            if (result.IsFailure || result.Value == null || result.Value.Count == 0)
+            var result = await _printRecordService.GetPdfContentByIdAsync(printRecordId, ct);
+            if (result.IsFailure || result.Value == null)
                 return Result.Failure<string>(ErrorCodes.NOT_FOUND, "留痕记录不存在");
 
-            var row = result.Value[0];
+            var row = result.Value;
 
             // 优先用留痕存的 PDF 字节（不依赖输出文件是否仍存在）
             if (row.PdfData is { Length: > 0 })
@@ -215,23 +207,5 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
         long applicationId, string printerName, int copies, CancellationToken ct = default)
     {
         return _recordService.PrintAsync(new[] { applicationId }, printerName, copies, null, ct);
-    }
-
-    private sealed class PrintHistoryRow
-    {
-        public long Id { get; set; }
-        public string TemplateName { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public string OperatorName { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public string Remark { get; set; } = string.Empty;
-        public long PdfSize { get; set; }
-        public string PdfPath { get; set; } = string.Empty;
-    }
-
-    private sealed class PrintPdfRow
-    {
-        public byte[]? PdfData { get; set; }
-        public string PdfPath { get; set; } = string.Empty;
     }
 }

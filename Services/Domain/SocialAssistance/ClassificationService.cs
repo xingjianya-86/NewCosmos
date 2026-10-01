@@ -1,4 +1,5 @@
 ﻿using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -640,12 +641,14 @@ public class ClassificationService : BaseService, IClassificationService
     private static FamilyMember BuildHeadSingleRescueMember(ApplicationEntity application, int headAge)
     {
         var levelKey = application.DisabilityLevel ?? "";
+        var idCard = application.ApplicantIdCard ?? "";
         return new FamilyMember
         {
             Name = application.ApplicantName ?? "",
-            IdCard = application.ApplicantIdCard ?? "",
+            IdCard = idCard,
             Gender = application.Gender ?? "",
             Age = headAge > 0 ? headAge : (int?)null,
+            BirthDate = IdCardValidator.ExtractBirthDate(idCard) ?? default,
             Ethnicity = application.Ethnicity ?? "",
             Phone = application.ApplicantPhone ?? "",
             MaritalStatus = application.MaritalStatus ?? "",
@@ -662,6 +665,25 @@ public class ClassificationService : BaseService, IClassificationService
             IsDisabled = !string.IsNullOrEmpty(application.DisabilityType),
             IsSevereDisability = ClassificationConstants.DisabilityLevel.IsSevereForAssistance(
                 levelKey, application.DisabilityType),
+            // 户籍信息
+            HukouType = application.HukouType ?? "",
+            HukouAddress = application.HukouAddress ?? "",
+            HukouProvince = application.HukouAddressInfo?.Province ?? "",
+            HukouCity = application.HukouAddressInfo?.City ?? "",
+            HukouDistrict = application.HukouAddressInfo?.District ?? "",
+            HukouTown = application.HukouAddressInfo?.Town ?? "",
+            // 家庭住址
+            HomeProvince = application.Province ?? "",
+            HomeCity = application.City ?? "",
+            HomeDistrict = application.District ?? "",
+            HomeTown = application.Town ?? "",
+            HomeVillage = application.Village ?? "",
+            HomeAddress = application.Address ?? "",
+            // 就业/收入
+            EmploymentStatus = application.EmploymentStatus ?? "",
+            WorkUnit = application.WorkUnit ?? "",
+            MainIncomeSource = application.IncomeSource ?? "",
+            // 关系
             RelationshipToHead = "本人/户主",
             IsHouseholdHead = true,
             MemberCategory = MemberCategoryConstants.HOUSEHOLD_HEAD

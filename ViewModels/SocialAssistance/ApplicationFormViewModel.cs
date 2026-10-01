@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -6,6 +6,7 @@ using NewCosmos.Models;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Exceptions;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -20,7 +21,6 @@ using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ChangeManagement;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 
 using Application = NewCosmos.Models.Entities.Application;
 
@@ -46,8 +46,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private readonly IStandardConfigService _standardConfigService;
     private readonly IEconomicDetailService _economicDetailService;
     private readonly IImportedArchiveService _importedArchiveService;
-    private readonly IDatabaseService _db;
+    private readonly ISupporterService _supporterService;
+    private readonly ICaregiverService _caregiverService;
+    private readonly IHouseholdSurveyService _householdSurveyService;
+    private readonly IChangeService _changeService;
     private readonly ILoggerService _logger;
+
+    /// <summary>文书装配串行闸（静态跨实例）：ArchiveProductionViewModel 实例状态不可并发（原 DocumentSheetService 语义）。</summary>
+    private static readonly SemaphoreSlim _documentBuildGate = new(1, 1);
 
     private long _applicationId;
     private bool _isLoadingDefaults;
@@ -58,6 +64,26 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 保存时随实体传给 UpdateAsync（WHERE updated_at 守卫），null 表示尚未加载（跳过检查）。
     /// </summary>
     private DateTime? _loadedUpdatedAt;
+
+    /// <summary>
+    /// 加载时数据库中的 current_step。
+    /// 变更流程模式（复核/家庭修正/编辑家庭信息/成员变更）的 UI 步骤被强制归位（3/1/2），
+    /// 不代表档案真实进度，保存时必须回写加载值，否则会把已归档的 step=6 冲成 UI 步数，
+    /// 档案从「已完结档案」掉进「已建档未提交」。0 = 尚未加载（新建）。
+    /// </summary>
+    private int _loadedCurrentStep;
+
+    /// <summary>
+    /// 加载时数据库中的分类结果（覆写前真旧值）。
+    /// Step5「分类判定」会先落库覆写 classification_result/total_guarantee_amount，
+    /// 变更流程（经济复核/成员变更）的"新旧对比"必须用此处捕获的值，否则恒判"无变化"。
+    /// </summary>
+    private string? _loadedClassification;
+
+    /// <summary>
+    /// 加载时数据库中的保障金合计（户月 + 分类施保 + 照料费，覆写前真旧值）。同上。
+    /// </summary>
+    private decimal? _loadedTotalGuaranteeAmount;
 
     /// <summary>成员变更模式：加载时的家庭人数（变更前口径，Before 快照用）</summary>
     private int _loadedFamilySize;
@@ -117,15 +143,6 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [ObservableProperty]
     private bool _isSearchPopupVisible;
-
-    partial void OnIsSearchPopupVisibleChanging(bool oldValue, bool newValue)
-    {
-        _logger.Info($"[SEARCH_POPUP] IsSearchPopupVisible 变更: {oldValue} → {newValue}");
-        if (oldValue && !newValue)
-        {
-            _logger.Info($"[SEARCH_POPUP] 弹窗被关闭，调用堆栈:\n{Environment.StackTrace}");
-        }
-    }
 
     #region 基本信息属性
 
@@ -286,7 +303,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     #region 户籍所在地属性
 
     [ObservableProperty]
-    private string _hukouProvince = "黑龙江省";
+    private string _hukouProvince = DefaultValuesConstants.HOME_PROVINCE;
 
     [ObservableProperty]
     private string _hukouCity = string.Empty;
@@ -399,7 +416,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     #region 表单字段 ViewModel
 
-    public FormFieldViewModel ApplicantNameField { get; } = new()
+    public FormFieldDescriptor ApplicantNameField { get; } = new()
     {
         Label = "姓名",
         Placeholder = "请输入姓名",
@@ -408,7 +425,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         MaxLength = 20
     };
 
-    public FormFieldViewModel ApplicantIdCardField { get; } = new()
+    public FormFieldDescriptor ApplicantIdCardField { get; } = new()
     {
         Label = "身份证号",
         Placeholder = "请输入18位身份证号",
@@ -416,13 +433,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         ValidationPattern = @"^\d{17}[\dXx]$"
     };
 
-    public FormFieldViewModel DisabilityCardNoField { get; } = new()
+    public FormFieldDescriptor DisabilityCardNoField { get; } = new()
     {
         Label = "残疾证号",
         Placeholder = "请输入残疾证号"
     };
 
-    public FormFieldViewModel PhoneField { get; } = new()
+    public FormFieldDescriptor PhoneField { get; } = new()
     {
         Label = "联系方式",
         Placeholder = "请输入手机号",
@@ -430,7 +447,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         ValidationPattern = @"^1\d{10}$"
     };
 
-    public FormFieldViewModel HukouAddressField { get; } = new()
+    public FormFieldDescriptor HukouAddressField { get; } = new()
     {
         Label = "户籍地址",
         Placeholder = "请输入户籍地址",
@@ -681,6 +698,22 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 变更链上游档案的原分类结果（仅内存承载，用于渐退期"低保→低收入"判定）
     /// </summary>
     private string? _originalClassificationContext;
+
+    /// <summary>
+    /// 变更链上游档案的原月保障金额（户主死亡等停旧建新：渐退封顶比较用"原有享受额度"）
+    /// </summary>
+    private decimal? _originalGuaranteeContext;
+
+    /// <summary>
+    /// 渐退期内实际应发月保障金（原额超户口类型上限时已封顶；null=未封顶/未进渐退）
+    /// </summary>
+    [ObservableProperty]
+    private decimal? _graceGrantAmount;
+
+    /// <summary>
+    /// 本会话是否已写入过渐退超限 FundChange（防重复写月报减发）
+    /// </summary>
+    private bool _graceFundChangeRecorded;
 
     /// <summary>
     /// 渐退期状态文本（供 Step5 判定结果展示）
@@ -1056,19 +1089,19 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 有内容时始终返回最大高度（560），避免删除项后父 ScrollView 内容高度骤减
     /// 导致滚动位置重置到页面顶部（"回弹"问题）。仅清空时缩至最小高度。
     /// </summary>
-    public double SubsidyListHeight => Subsidies.Count > 0 ? 560 : 40;
+    public double SubsidyListHeight => Subsidies.Count > 0 ? UIConstants.SUBSIDY_LIST_MAX_HEIGHT : UIConstants.LIST_MIN_HEIGHT;
 
     /// <summary>
     /// 刚性支出列表高度（2 列网格，每行约 150px）。
     /// 有内容时恒为最大高度（600），避免删除回弹。清空时缩至最小。
     /// </summary>
-    public double RigidExpenditureListHeight => RigidExpenditures.Count > 0 ? 600 : 40;
+    public double RigidExpenditureListHeight => RigidExpenditures.Count > 0 ? UIConstants.RIGID_EXPENDITURE_LIST_MAX_HEIGHT : UIConstants.LIST_MIN_HEIGHT;
 
     /// <summary>
     /// 赡养人列表高度（2 列网格，每行约 260px）。
     /// 有内容时恒为最大高度（780），避免删除回弹。清空时缩至最小。
     /// </summary>
-    public double SupporterListHeight => Supporters.Count > 0 ? 780 : 40;
+    public double SupporterListHeight => Supporters.Count > 0 ? UIConstants.SUPPORTER_LIST_MAX_HEIGHT : UIConstants.LIST_MIN_HEIGHT;
 
     #endregion
 
@@ -1130,13 +1163,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     #region 土地收入单价（默认值，后续从配置读取）
 
     [ObservableProperty]
-    private decimal _selfFarmUnitPrice = 700;
+    private decimal _selfFarmUnitPrice = IncomeTypeConstants.LandUnitPrice.SELF_FARM;
 
     [ObservableProperty]
-    private decimal _subleaseUnitPrice = 400;
+    private decimal _subleaseUnitPrice = IncomeTypeConstants.LandUnitPrice.SUBLEASE;
 
     [ObservableProperty]
-    private decimal _contractUnitPrice = 600;
+    private decimal _contractUnitPrice = IncomeTypeConstants.LandUnitPrice.CONTRACT;
 
     #endregion
 
@@ -1261,6 +1294,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [ObservableProperty]
     private bool _isInitialized;
+    /// <summary>
+    /// 本次会话是否已判定/加载过渐退期状态（M1）：
+    /// 仅在 load GetActiveAsync 或分类判定赋值后为 true。
+    /// 为 false 时保存不得 ClearAsync——内存默认 false 会误清服务端活动记录（含户主死亡新建档渐退期）。
+    /// </summary>
+    private bool _gracePeriodEvaluated;
 
     #endregion
 
@@ -1447,7 +1486,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             }
 
             field.IsFilled = true;
-            _logger.LogBusiness("填充字段", ("Field", field.DisplayName), ("Value", field.Value));
+            var maskedFieldValue = field.TargetProperty switch
+            {
+                nameof(ApplicantIdCard) => DataMasker.MaskIdCard(field.Value),
+                nameof(ApplicantPhone) => DataMasker.MaskPhone(field.Value),
+                nameof(ApplicantName) => DataMasker.MaskName(field.Value),
+                _ => field.Value
+            };
+            _logger.LogBusiness("填充字段", ("Field", field.DisplayName), ("Value", maskedFieldValue));
         }
         catch (Exception ex)
         {
@@ -1601,20 +1647,20 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     PoliticalStatus = DefaultValuesConstants.POLITICAL_STATUS_KEY,
                     HealthStatus = DefaultValuesConstants.HEALTH_STATUS_KEY,
                     DiseaseCategory = DefaultValuesConstants.DISEASE_CATEGORY_KEY,
-                    HomeProvince = "黑龙江省",
+                    HomeProvince = DefaultValuesConstants.HOME_PROVINCE,
                     HomeCity = SelectedCity ?? string.Empty,
                     HomeDistrict = SelectedDistrict ?? string.Empty,
                     HomeTown = SelectedTown ?? string.Empty,
                     HomeVillage = SelectedVillage ?? string.Empty,
                     HomeAddress = Address ?? string.Empty,
-                    HukouProvince = "黑龙江省",
+                    HukouProvince = DefaultValuesConstants.HOME_PROVINCE,
                     HukouCity = SelectedCity ?? string.Empty,
                     HukouDistrict = SelectedDistrict ?? string.Empty,
                     HukouTown = SelectedTown ?? string.Empty,
                     HukouAddress = HukouAddress,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 };
-                member.SetServiceProvider(_serviceProvider);
+                member.SetRegionService(_regionService);
                 await member.LoadInitialAddressOptionsAsync(SelectedCity, SelectedDistrict, SelectedTown);
                 SyncMemberDictOptions(member);
                 FamilyMembers.Add(member);
@@ -1656,7 +1702,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         IStandardConfigService standardConfigService,
         IEconomicDetailService economicDetailService,
         IImportedArchiveService importedArchiveService,
-        IDatabaseService db,
+        ISupporterService supporterService,
+        ICaregiverService caregiverService,
+        IHouseholdSurveyService householdSurveyService,
+        IChangeService changeService,
         ILoggerService logger)
     {
         _serviceProvider = serviceProvider;
@@ -1677,7 +1726,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         _standardConfigService = standardConfigService;
         _economicDetailService = economicDetailService;
         _importedArchiveService = importedArchiveService;
-        _db = db;
+        _supporterService = supporterService;
+        _caregiverService = caregiverService;
+        _householdSurveyService = householdSurveyService;
+        _changeService = changeService;
         _logger = logger;
 
         TotalSteps = 5;
@@ -2094,19 +2146,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             // 加载调查员所属机构
             await LoadSurveyorOrganizationAsync();
 
-            // 加载系统配置
-            await LoadSystemConfigStandardsAsync();
-
-            // 加载收入标准
-            await UpdateIncomeStandardsAsync();
-
-            // 加载分类施保标准
-            await UpdateClassifiedSubsidyStandardsAsync();
-
             IsInitialized = true;
             _logger.LogBusiness("初始化完成");
 
-            // 同步字段值到 FormFieldViewModel 并触发验证
+            // 同步字段值到 FormFieldDescriptor 并触发验证
             ApplicantNameField.Value = ApplicantName;
             ApplicantIdCardField.Value = ApplicantIdCard;
             PhoneField.Value = ApplicantPhone;
@@ -2162,6 +2205,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 {
                     target.Add(new DictItemOption { Key = item.ItemKey, Display = item.ItemValue });
                 }
+            }
+            else
+            {
+                _logger.Warn($"加载字典数据失败 [{category}]: {result.Message}");
             }
         }
         catch (Exception ex)
@@ -2323,9 +2370,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         try
         {
             ProvinceOptions.Clear();
-            ProvinceOptions.Add("黑龙江省");
+            ProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
             if (string.IsNullOrEmpty(SelectedProvince))
-                SelectedProvince = "黑龙江省";
+                SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
 
             var citiesResult = await _regionService.GetCitiesAsync();
             _logger.Info($"城市数据加载结果: IsSuccess={citiesResult.IsSuccess}, Count={citiesResult.Value?.Count ?? 0}");
@@ -2427,7 +2474,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             }
 
             // 5. 同步设置户籍地址（与申请人地址一致）
-            HukouProvince = "黑龙江省";
+            HukouProvince = DefaultValuesConstants.HOME_PROVINCE;
             HukouCity = SelectedCity;
             HukouDistrict = SelectedDistrict;
             HukouTown = SelectedTown;
@@ -2446,15 +2493,6 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         }
     }
 
-    /// <summary>
-    /// 加载系统配置标准
-    /// </summary>
-    private async Task LoadSystemConfigStandardsAsync()
-    {
-        // TODO: 从配置服务加载标准
-        await Task.CompletedTask;
-    }
-
     private async Task LoadSurveyorOrganizationAsync()
     {
         try
@@ -2470,24 +2508,6 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         {
             _logger.Error($"加载调查员机构失败: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// 更新收入标准
-    /// </summary>
-    private async Task UpdateIncomeStandardsAsync()
-    {
-        // TODO: 从收入标准服务加载
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// 更新分类施保标准
-    /// </summary>
-    private async Task UpdateClassifiedSubsidyStandardsAsync()
-    {
-        // TODO: 从分类施保标准服务加载
-        await Task.CompletedTask;
     }
 
     public async Task LoadApplicationAsync(long applicationId)
@@ -2510,6 +2530,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 var app = result.Value;
                 // 记录乐观并发令牌（加载时的 updated_at），保存时随实体传回做并发守卫
                 _loadedUpdatedAt = app.UpdatedAt == default ? null : app.UpdatedAt;
+                // 记录库中真实步骤：变更流程模式保存时回写，防止 UI 归位步数冲掉 current_step
+                _loadedCurrentStep = app.CurrentStep;
+                // 覆写前真旧值：Step5 分类判定会覆写 classification_result/total_guarantee_amount，
+                // 变更流程的新旧对比必须用此处捕获值，否则恒判"无变化"
+                _loadedClassification = app.ClassificationResult;
+                _loadedTotalGuaranteeAmount = app.TotalGuaranteeAmount;
                 ApplicantName = app.ApplicantName;
                 ApplicantIdCard = app.ApplicantIdCard;
                 Gender = app.Gender ?? string.Empty;
@@ -2665,6 +2691,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     GracePeriodEndDate = graceRes.Value.EndDate;
                     OriginalClassificationResult = graceRes.Value.OriginalClassification ?? string.Empty;
                     OriginalGuaranteeAmount = graceRes.Value.OriginalGuaranteeAmount;
+                    GraceGrantAmount = graceRes.Value.GraceGrantAmount;
+                    _gracePeriodEvaluated = true;
                 }
                 else
                 {
@@ -2674,17 +2702,21 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     GracePeriodEndDate = null;
                     OriginalClassificationResult = string.Empty;
                     OriginalGuaranteeAmount = 0;
+                    GraceGrantAmount = null;
+                    _gracePeriodEvaluated = true;
                 }
 
                 // 变更链新建档案（户主死亡停旧建新等）：取上游档案原分类，
                 // 供渐退期判定"低保→低收入"识别渐变前原分类（主表列已删，仅内存承载）
                 _originalClassificationContext = null;
+                _originalGuaranteeContext = null;
                 if (app.OriginalApplicationId > 0)
                 {
                     var oldAppRes = await _applicationService.GetByIdAsync(app.OriginalApplicationId, ct);
                     if (oldAppRes.IsSuccess && oldAppRes.Value != null)
                     {
                         _originalClassificationContext = oldAppRes.Value.ClassificationResult;
+                        _originalGuaranteeContext = oldAppRes.Value.TotalGuaranteeAmount;
                     }
                 }
 
@@ -2752,14 +2784,18 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     : (app.CurrentStep > 0 ? app.CurrentStep : 1);
 
                 // 加载家庭成员
-                var familyMemberService = _serviceProvider.GetRequiredService<IFamilyMemberService>();
-                var membersResult = await familyMemberService.GetByApplicationIdAsync(applicationId, ct);
-                if (membersResult.IsSuccess && membersResult.Value?.Count > 0)
+                var membersResult = await _familyMemberService.GetByApplicationIdAsync(applicationId, ct);
+                if (membersResult.IsFailure)
+                {
+                    _logger.Error($"家庭成员加载失败: {membersResult.Message}");
+                    throw new BusinessException(ErrorCodes.DB_QUERY_ERROR, "家庭成员加载失败，已中止操作以避免保存时覆盖数据");
+                }
+                if (membersResult.Value?.Count > 0)
                 {
                     FamilyMembers.Clear();
                     foreach (var member in membersResult.Value)
                     {
-                        member.SetServiceProvider(_serviceProvider);
+                        member.SetRegionService(_regionService);
                         await member.LoadInitialAddressOptionsAsync(
                             member.HomeCity, member.HomeDistrict, member.HomeTown);
                         SyncMemberDictOptions(member);
@@ -2783,9 +2819,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 _removedMemberEntries.Clear();
 
                 // 加载赡养人
-                var supporterService = _serviceProvider.GetRequiredService<ISupporterService>();
+                var supporterService = _supporterService;
                 var supportersResult = await supporterService.GetByApplicationIdAsync(applicationId, ct);
-                if (supportersResult.IsSuccess && supportersResult.Value?.Count > 0)
+                if (supportersResult.IsFailure)
+                {
+                    _logger.Error($"赡养人加载失败: {supportersResult.Message}");
+                    throw new BusinessException(ErrorCodes.DB_QUERY_ERROR, "赡养人加载失败，已中止操作以避免保存时覆盖数据");
+                }
+                if (supportersResult.Value?.Count > 0)
                 {
                     Supporters.Clear();
                     foreach (var supporter in supportersResult.Value)
@@ -2805,9 +2846,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 }
 
                 // 加载照料人
-                var caregiverService = _serviceProvider.GetRequiredService<ICaregiverService>();
+                var caregiverService = _caregiverService;
                 var caregiversResult = await caregiverService.GetByApplicationIdAsync(applicationId, ct);
-                if (caregiversResult.IsSuccess && caregiversResult.Value?.Count > 0)
+                if (caregiversResult.IsFailure)
+                {
+                    _logger.Error($"照料人加载失败: {caregiversResult.Message}");
+                    throw new BusinessException(ErrorCodes.DB_QUERY_ERROR, "照料人加载失败，已中止操作以避免保存时覆盖数据");
+                }
+                if (caregiversResult.Value?.Count > 0)
                 {
                     Caregivers.Clear();
                     foreach (var caregiver in caregiversResult.Value)
@@ -2825,9 +2871,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 }
 
                 // 加载入户调查
-                var surveyService = _serviceProvider.GetRequiredService<IHouseholdSurveyService>();
+                var surveyService = _householdSurveyService;
                 var surveyResult = await surveyService.GetByApplicationIdAsync(applicationId, ct);
-                if (surveyResult.IsSuccess && surveyResult.Value != null)
+                if (surveyResult.IsFailure)
+                {
+                    _logger.Error($"入户调查加载失败: {surveyResult.Message}");
+                }
+                if (surveyResult.Value != null)
                 {
                     var survey = surveyResult.Value;
                     SurveyDate = survey.SurveyDate;
@@ -3011,7 +3061,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         await EnsureRegionOptionsLoadedAsync();
 
         var member = CreateDefaultFamilyMember(MemberCategoryConstants.SUPPORT);
-        member.HukouProvince = "黑龙江省";
+        member.HukouProvince = DefaultValuesConstants.HOME_PROVINCE;
         member.HukouCity = SelectedCity ?? string.Empty;
         member.HukouDistrict = SelectedDistrict ?? string.Empty;
         member.HukouTown = SelectedTown ?? string.Empty;
@@ -3032,7 +3082,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         var popup = _serviceProvider.GetRequiredService<Pages.ChangeManagement.MemberChangeReasonPopup>();
         popup.Initialize(isRemove, member);
 
-        var navigation = Helpers.WindowNavigator.CurrentPage!.Navigation;
+        var navigation = Helpers.WindowNavigator.CurrentPage?.Navigation;
+        if (navigation == null)
+        {
+            _logger.Warn("当前页面为空，无法弹出成员变更登记弹窗");
+            return null;
+        }
         await navigation.PushModalAsync(popup);
         var result = await popup.Result;
         if (navigation.ModalStack.Contains(popup))
@@ -3058,18 +3113,18 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             PoliticalStatus = GetDefaultKey(PoliticalStatusOptions, DefaultValuesConstants.POLITICAL_STATUS_KEY),
             HealthStatus = GetDefaultKey(HealthStatusOptions, DefaultValuesConstants.HEALTH_STATUS_KEY),
             DiseaseCategory = GetDefaultKey(DiseaseCategoryOptions, DefaultValuesConstants.DISEASE_CATEGORY_KEY),
-            HomeProvince = "黑龙江省",
+            HomeProvince = DefaultValuesConstants.HOME_PROVINCE,
             HomeCity = SelectedCity ?? string.Empty,
             HomeDistrict = SelectedDistrict ?? string.Empty,
             HomeTown = SelectedTown ?? string.Empty,
             HomeVillage = SelectedVillage ?? string.Empty,
             HomeAddress = Address ?? string.Empty,
             HukouAddress = HukouAddress,
-            HukouProvince = "黑龙江省",
-            CreatedAt = DateTime.UtcNow
+            HukouProvince = DefaultValuesConstants.HOME_PROVINCE,
+            CreatedAt = DateTime.Now
         };
 
-        member.SetServiceProvider(_serviceProvider);
+        member.SetRegionService(_regionService);
         _ = member.LoadInitialAddressOptionsAsync(SelectedCity, SelectedDistrict, SelectedTown);
         SyncMemberDictOptions(member);
 
@@ -3201,19 +3256,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         try
         {
-            var sql = "SELECT applicant_id_card, classification_result FROM nc_biz_applications WHERE applicant_id_card = ANY($1::text[]) AND deleted_at IS NULL";
-            var result = await _db.QueryAsync<(string? IdCard, string? Classification)>(sql, CancellationToken, new object[] { idCards.ToArray() });
+            var result = await _applicationService.GetClassificationsByIdCardsAsync(idCards, CancellationToken);
             if (result.IsSuccess && result.Value != null)
-            {
-                foreach (var row in result.Value)
-                {
-                    if (!string.IsNullOrWhiteSpace(row.IdCard) && !string.IsNullOrWhiteSpace(row.Classification))
-                    {
-                        // 同一身份证可能有多条档案，取最新的（第一条）
-                        map.TryAdd(row.IdCard.Trim(), row.Classification);
-                    }
-                }
-            }
+                return result.Value;
+            _logger.Warn($"批量查询赡养人档案失败: {result.Message}");
         }
         catch (Exception ex)
         {
@@ -3237,7 +3283,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         }
 
         // 规则2：年龄判定（< 18岁 或 > 70岁 均无赡养能力）
-        if (member.Age.HasValue && (member.Age < 18 || member.Age > 70))
+        if (member.Age.HasValue && (member.Age < ClassificationConstants.SUPPORT_ABILITY_MIN_AGE || member.Age > ClassificationConstants.SUPPORT_ABILITY_MAX_AGE))
         {
             return false;
         }
@@ -3327,7 +3373,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         if (missing.Count == 0) return;
 
         decimal subsistenceStandard = await GetCachedSubsistenceStandardAsync();
-        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * 0.20m, 2);
+        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * IncomeTypeConstants.DEFAULT_SUPPORT_FEE_RATIO, 2);
 
         var idCards = missing.Select(m => m.IdCard!.Trim()).Distinct().ToList();
         var classificationMap = await BatchGetClassificationByIdCardsAsync(idCards);
@@ -3389,7 +3435,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         // 低保标准：优先用缓存，避免每次添加都查 DB
         decimal subsistenceStandard = await GetCachedSubsistenceStandardAsync();
-        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * 0.20m, 2);
+        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * IncomeTypeConstants.DEFAULT_SUPPORT_FEE_RATIO, 2);
         decimal defaultAnnualFee = defaultMonthlyFee * 12;
 
         var supporter = new Supporter
@@ -3423,7 +3469,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     {
         if (supporter == null) return;
 
-        _logger.LogBusiness("删除赡养人", ("Name", supporter.Name));
+        _logger.LogBusiness("删除赡养人", ("Name", DataMasker.MaskName(supporter.Name)));
 
         _supporterFeeBackup.Remove(supporter);
         Supporters.Remove(supporter);
@@ -3435,7 +3481,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 综合判定赡养人是否有赡养能力（基于 FamilyMember 数据）
     /// 规则：
     /// 1. 重病/重残（含三级智力、三级精神）→ 无赡养能力
-    /// 2. 年龄 < 18 或 > 70 → 无赡养能力
+    /// 2. 年龄 &lt; 18 或 &gt; 70 → 无赡养能力
     /// 3. 本身是低保/低收入 → 无赡养能力
     /// </summary>
     private async Task<bool> DetermineSupportAbilityFromMemberAsync(FamilyMember member)
@@ -3446,14 +3492,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             || ClassificationConstants.DisabilityLevel.IsSevereForAssistance(
                 member.DisabilityLevelKeyResolved, member.DisabilityType))
         {
-            _logger.Info($"赡养人{member.Name}因健康状况或残疾等级判定为无赡养能力");
+            _logger.Info($"赡养人{DataMasker.MaskName(member.Name)}因健康状况或残疾等级判定为无赡养能力");
             return false;
         }
 
         // 规则2：年龄判定（< 18岁 或 > 70岁 均无赡养能力）
-        if (member.Age.HasValue && (member.Age < 18 || member.Age > 70))
+        if (member.Age.HasValue && (member.Age < ClassificationConstants.SUPPORT_ABILITY_MIN_AGE || member.Age > ClassificationConstants.SUPPORT_ABILITY_MAX_AGE))
         {
-            _logger.Info($"赡养人{member.Name}因年龄({member.Age})判定为无赡养能力");
+            _logger.Info($"赡养人{DataMasker.MaskName(member.Name)}因年龄({member.Age})判定为无赡养能力");
             return false;
         }
 
@@ -3474,7 +3520,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                         if (!string.IsNullOrEmpty(classification) &&
                             (classification.Contains("Subsistence") || classification.Contains("LowIncome")))
                         {
-                            _logger.Info($"赡养人{member.Name}因是低保/低收入({classification})判定为无赡养能力");
+                            _logger.Info($"赡养人{DataMasker.MaskName(member.Name)}因是低保/低收入({classification})判定为无赡养能力");
                             return false;
                         }
                     }
@@ -3505,7 +3551,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         // 低保标准：优先用缓存，避免每次导入都查 DB
         decimal subsistenceStandard = await GetCachedSubsistenceStandardAsync();
-        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * 0.20m, 2);
+        decimal defaultMonthlyFee = Math.Round(subsistenceStandard * IncomeTypeConstants.DEFAULT_SUPPORT_FEE_RATIO, 2);
 
         // 批量查询赡养人关联的档案（替代 N+1 逐人查询）
         var idCards = supportMembers
@@ -3559,7 +3605,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             EducationLevel = GetDefaultKey(EducationLevelOptions, DefaultValuesConstants.EDUCATION_LEVEL_KEY),
             PoliticalStatus = GetDefaultKey(PoliticalStatusOptions, DefaultValuesConstants.POLITICAL_STATUS_KEY),
             HealthStatus = GetDefaultKey(HealthStatusOptions, DefaultValuesConstants.HEALTH_STATUS_KEY),
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.Now,
             SelectedEthnicity = EthnicityOptions.FirstOrDefault(o => o.Key == DefaultValuesConstants.ETHNICITY_KEY),
             SelectedMaritalStatus = MaritalStatusOptions.FirstOrDefault(o => o.Key == DefaultValuesConstants.MARITAL_STATUS_KEY),
             SelectedEducationLevel = EducationLevelOptions.FirstOrDefault(o => o.Key == DefaultValuesConstants.EDUCATION_LEVEL_KEY),
@@ -3576,7 +3622,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     {
         if (caregiver == null) return;
 
-        _logger.LogBusiness("删除照料人", ("Name", caregiver.Name));
+        _logger.LogBusiness("删除照料人", ("Name", DataMasker.MaskName(caregiver.Name)));
         Caregivers.Remove(caregiver);
         await Task.CompletedTask;
     }
@@ -3780,7 +3826,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             MemberAge = member.Age ?? 0,
             MonthsWorked = 12,
             SelectedIncomeMember = member,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         }, "务工收入");
     }
 
@@ -3805,7 +3851,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             MemberIdCard = member.IdCard ?? "",
             MemberAge = member.Age ?? 0,
             SelectedIncomeMember = member,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         }, "经营收入");
     }
 
@@ -3831,7 +3877,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddLandRegistrationAsync() =>
-        await AddIncomeItemAsync(LandRegistrations, new LandRegistration { ApplicationId = _applicationId, LandUsage = DictionaryConstants.LandUsage.SELF_FARM, CreatedAt = DateTime.UtcNow }, "土地登记");
+        await AddIncomeItemAsync(LandRegistrations, new LandRegistration { ApplicationId = _applicationId, LandUsage = DictionaryConstants.LandUsage.SELF_FARM, CreatedAt = DateTime.Now }, "土地登记");
 
     [RelayCommand]
     private async Task RemoveLandRegistrationAsync(LandRegistration? registration) =>
@@ -3843,7 +3889,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddSubsidyAsync() =>
-        await AddIncomeItemAsync(Subsidies, new Subsidy { ApplicationId = _applicationId, SubsidyType = DictionaryConstants.SubsidyType.LAND_FERTILITY, Count = 1, RatioFactor = 1, CreatedAt = DateTime.UtcNow }, "农业补贴");
+        await AddIncomeItemAsync(Subsidies, new Subsidy { ApplicationId = _applicationId, SubsidyType = DictionaryConstants.SubsidyType.LAND_FERTILITY, Count = 1, RatioFactor = 1, CreatedAt = DateTime.Now }, "农业补贴");
 
     [RelayCommand]
     private async Task RemoveSubsidyAsync(Subsidy? subsidy) =>
@@ -3866,7 +3912,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             MemberIdCard = member.IdCard ?? "",
             MemberAge = member.Age ?? 0,
             SelectedIncomeMember = member,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         }, "财产净收入");
     }
 
@@ -3892,7 +3938,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             MemberAge = member.Age ?? 0,
             MonthsOrTimes = 12,
             SelectedIncomeMember = member,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         }, "转移净收入");
     }
 
@@ -3906,7 +3952,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddOtherIncomeAsync() =>
-        await AddIncomeItemAsync(OtherIncomes, new OtherIncome { ApplicationId = _applicationId, CreatedAt = DateTime.UtcNow }, "其他收入");
+        await AddIncomeItemAsync(OtherIncomes, new OtherIncome { ApplicationId = _applicationId, CreatedAt = DateTime.Now }, "其他收入");
 
     [RelayCommand]
     private async Task RemoveOtherIncomeAsync(OtherIncome? income) =>
@@ -3950,7 +3996,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddFamilyPropertyAsync() =>
-        await AddIncomeItemAsync(FamilyProperties, new FamilyProperty { ApplicationId = _applicationId, CreatedAt = DateTime.UtcNow }, "房产");
+        await AddIncomeItemAsync(FamilyProperties, new FamilyProperty { ApplicationId = _applicationId, CreatedAt = DateTime.Now }, "房产");
 
     [RelayCommand]
     private async Task RemoveFamilyPropertyAsync(FamilyProperty? property) =>
@@ -3958,7 +4004,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddVehicleAsync() =>
-        await AddIncomeItemAsync(Vehicles, new Vehicle { ApplicationId = _applicationId, CreatedAt = DateTime.UtcNow }, "车辆");
+        await AddIncomeItemAsync(Vehicles, new Vehicle { ApplicationId = _applicationId, CreatedAt = DateTime.Now }, "车辆");
 
     [RelayCommand]
     private async Task RemoveVehicleAsync(Vehicle? vehicle) =>
@@ -3966,7 +4012,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [RelayCommand]
     private async Task AddMachineryAsync() =>
-        await AddIncomeItemAsync(Machineries, new Machinery { ApplicationId = _applicationId, Quantity = 1, CreatedAt = DateTime.UtcNow }, "农机具");
+        await AddIncomeItemAsync(Machineries, new Machinery { ApplicationId = _applicationId, Quantity = 1, CreatedAt = DateTime.Now }, "农机具");
 
     [RelayCommand]
     private async Task RemoveMachineryAsync(Machinery? machinery) =>
@@ -4046,7 +4092,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                         Area = area,
                         MemberName = record.Name,
                         MemberIdCard = record.IdCard,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now
                     };
                     Subsidies.Add(subsidy);
                 }
@@ -4235,6 +4281,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 ClassificationDescription = classification.Description;
                 IsEligible = classification.IsEligible;
                 IneligibleReason = classification.IneligibleReason;
+                var priorGuaranteeForGrace = GuaranteeAmount;
                 GuaranteeAmount = classification.GuaranteeAmount;
 
                 // 分类施保
@@ -4244,28 +4291,44 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     ClassifiedSubsidyAmount = classification.ClassifiedSubsidy.TotalAmount;
                 }
 
-                // 渐退期
+                // 渐退期（1B：判定命中先弹确认页，确认后才应用；取消则本次不进渐退、可改数据再判定）
                 if (classification.GracePeriod != null && classification.GracePeriod.IsEligible)
                 {
-                    IsInGracePeriod = true;
-                    GracePeriodMonths = classification.GracePeriod.Months;
-                    GracePeriodStartDate = classification.GracePeriod.StartDate;
-                    GracePeriodEndDate = classification.GracePeriod.EndDate;
-                    OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
-                    OriginalGuaranteeAmount = GuaranteeAmount;
+                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, ct);
+                    if (selectedMonths is int months && GracePeriodConstants.IsValidMonths(months))
+                    {
+                        IsInGracePeriod = true;
+                        GracePeriodMonths = months;
+                        GracePeriodStartDate = classification.GracePeriod.StartDate;
+                        GracePeriodEndDate = classification.GracePeriod.StartDate.AddMonths(months).AddDays(-1);
+                        OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
+                        await ApplyGraceCapAsync(priorGuaranteeForGrace, ct);
+                    }
+                    else
+                    {
+                        IsInGracePeriod = false;
+                        GraceGrantAmount = null;
+                    }
                 }
                 else
                 {
                     IsInGracePeriod = false;
+                    GraceGrantAmount = null;
                 }
+                _gracePeriodEvaluated = true;
 
                 // 特困：自动计算照料护理费（集中供养不发钱，护理费为 0；仅分散供养按能力鉴定计算）
+                // 非特困：清零旧照料费（H2——分类离开特困后禁止沿用旧值进总额）
                 if (ClassificationConstants.IsCodeDestitute(ClassificationResult))
                 {
                     CaregiverSubsidyAmount = IsCentralizedSupport
                         ? 0
                         : await _classificationService.CalculateCareAllowanceAsync(
                             _applicationId, ct);
+                }
+                else
+                {
+                    CaregiverSubsidyAmount = 0;
                 }
 
                 // 计算保障金总额
@@ -4327,6 +4390,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             RecalculateIncome();
 
             var application = BuildApplication(ApplicationStatusCodes.DRAFT);
+            // 变更链（户主死亡停旧建新等）：带上上游原分类，否则渐退期"低保→低收入"判不出
+            application.OriginalClassificationResult =
+                _originalClassificationContext ?? application.OriginalClassificationResult;
 
             var result = await _classificationService.DetermineClassificationAsync(
                 application,
@@ -4344,6 +4410,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 ClassificationDescription = classification.Description;
                 IsEligible = classification.IsEligible;
                 IneligibleReason = classification.IneligibleReason;
+                var priorGuaranteeForGrace = GuaranteeAmount;
                 GuaranteeAmount = classification.GuaranteeAmount;
                 DeterminationBasis = classification.DeterminationBasis;
 
@@ -4362,28 +4429,44 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     ClassifiedSubsidyAmount = classification.ClassifiedSubsidy.TotalAmount;
                 }
 
-                // 渐退期
+                // 渐退期（1B：判定命中先弹确认页，确认后才应用；取消则本次不进渐退、可改数据再判定）
                 if (classification.GracePeriod != null && classification.GracePeriod.IsEligible)
                 {
-                    IsInGracePeriod = true;
-                    GracePeriodMonths = classification.GracePeriod.Months;
-                    GracePeriodStartDate = classification.GracePeriod.StartDate;
-                    GracePeriodEndDate = classification.GracePeriod.EndDate;
-                    OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
-                    OriginalGuaranteeAmount = GuaranteeAmount;
+                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, CancellationToken.None);
+                    if (selectedMonths is int months && GracePeriodConstants.IsValidMonths(months))
+                    {
+                        IsInGracePeriod = true;
+                        GracePeriodMonths = months;
+                        GracePeriodStartDate = classification.GracePeriod.StartDate;
+                        GracePeriodEndDate = classification.GracePeriod.StartDate.AddMonths(months).AddDays(-1);
+                        OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
+                        await ApplyGraceCapAsync(priorGuaranteeForGrace, CancellationToken.None);
+                    }
+                    else
+                    {
+                        IsInGracePeriod = false;
+                        GraceGrantAmount = null;
+                    }
                 }
                 else
                 {
                     IsInGracePeriod = false;
+                    GraceGrantAmount = null;
                 }
+                _gracePeriodEvaluated = true;
 
                 // 特困：自动计算照料护理费（集中供养不发钱，护理费为 0；仅分散供养按能力鉴定计算）
+                // 非特困：清零旧照料费（H2——分类离开特困后禁止沿用旧值进总额）
                 if (ClassificationConstants.IsCodeDestitute(ClassificationResult))
                 {
                     CaregiverSubsidyAmount = IsCentralizedSupport
                         ? 0
                         : await _classificationService.CalculateCareAllowanceAsync(
                             _applicationId, CancellationToken.None);
+                }
+                else
+                {
+                    CaregiverSubsidyAmount = 0;
                 }
 
                 TotalGuaranteeAmount = _guaranteeAmountService.CalculateTotalGuaranteeAmount(
@@ -4433,6 +4516,71 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         finally
         {
             IsDetermining = false;
+        }
+    }
+
+    /// <summary>
+    /// 弹出渐退期确认页（modal，模式与 MemberChangeReasonPopup 一致）：
+    /// 确认 => 所选月数（调用方应用渐退状态并继续保存）；取消/异常 => null（本次不进渐退）。
+    /// </summary>
+    private async Task<int?> ShowGracePeriodConfirmAsync(
+        Services.Domain.SocialAssistance.ClassificationResult classification, CancellationToken ct)
+    {
+        try
+        {
+            var standard = await GetCachedSubsistenceStandardAsync();
+            var grace = classification.GracePeriod;
+            var parameter = new GracePeriodConfirmParameter(
+                ClassificationConstants.ConvertFromCode(grace.OriginalClassification),
+                ClassificationConstants.ConvertFromCode(classification.Classification),
+                standard,
+                PerCapitaIncome,
+                TotalAnnualIncome,
+                FamilySize,
+                classification.GuaranteeAmount,
+                grace.Months,
+                grace.StartDate,
+                grace.EndDate);
+
+            ContentPage popup;
+            Task<GracePeriodConfirmResult> resultTask;
+            if (DeviceInfo.Platform == DevicePlatform.Android)
+            {
+                var mobilePopup = _serviceProvider.GetRequiredService<Pages.Mobile.MobileGracePeriodConfirmPage>();
+                mobilePopup.Initialize(parameter);
+                popup = mobilePopup;
+                resultTask = mobilePopup.Result;
+            }
+            else
+            {
+                var desktopPopup = _serviceProvider.GetRequiredService<Pages.ChangeManagement.GracePeriodConfirmPage>();
+                desktopPopup.Initialize(parameter);
+                popup = desktopPopup;
+                resultTask = desktopPopup.Result;
+            }
+
+            var navigation = Helpers.WindowNavigator.CurrentPage?.Navigation;
+            if (navigation == null)
+            {
+                _logger.Warn("当前页面为空，无法弹出渐退期确认页");
+                return null;
+            }
+            await navigation.PushModalAsync(popup);
+            var result = await resultTask.WaitAsync(ct);
+            if (navigation.ModalStack.Contains(popup))
+            {
+                await navigation.PopModalAsync();
+            }
+            return result.Confirmed ? result.SelectedMonths : null;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"渐退期确认页异常: {ex.Message}");
+            return null;
         }
     }
 
@@ -4550,9 +4698,16 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         try
         {
-            var application = BuildApplication(ApplicationStatusCodes.DRAFT);
+            // 保留原状态（Approved 等）——UpdateAsync 不写 status 列，此处为语义一致；
+            // 新建/普通草稿兜底 Draft
+            var originalStatus = string.IsNullOrEmpty(_originalStatus) ? ApplicationStatusCodes.DRAFT : _originalStatus;
+            var application = BuildApplication(originalStatus);
             application.Id = _applicationId;
-            var updateResult = await _applicationService.UpdateAsync(application, CancellationToken.None, IsCompletionMode || IsEditFamilyInfoMode || IsFamilyCorrectionMode);
+            // 变更流程模式（复核/成员变更等）必须放行非 Draft 档案：
+            // UpdateAsync 默认只允许 Draft（ApplicationStateMachine.IsEditable），
+            // 已归档 Approved 档案在 Step5 判定保存会报"当前状态不允许编辑"
+            var allowNonEditable = IsCompletionMode || IsChangeMode;
+            var updateResult = await _applicationService.UpdateAsync(application, CancellationToken.None, allowNonEditable);
             if (updateResult.IsSuccess)
             {
                 // 本次更新改变了 updated_at，刷新并发令牌，避免后续保存误报冲突
@@ -4563,6 +4718,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 _logger.LogBusiness("分类结果已保存到数据库",
                     ("ApplicationId", _applicationId),
                     ("Classification", ClassificationResult ?? ""));
+
+                // A1：Step5 分类确认即同步渐退行——不依赖完整保存，避免「只出文书不保存」时库里无行
+                if (IsInGracePeriod && GracePeriodMonths > 0)
+                    await SyncGracePeriodRecordAsync(CancellationToken.None);
+
+                // 接续链（户主死亡/成员变更等停旧建新）Step5 判定跨大类时补写 CategoryAdd：
+                // 月报「新增救助明细」跨类新增行与本档变更记录列表依赖此行（服务幂等，失败不阻断分类保存）
+                await EnsureChainCategoryAddAsync(CancellationToken.None);
             }
             else
             {
@@ -4572,6 +4735,36 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         catch (Exception ex)
         {
             _logger.Error($"保存分类结果异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 接续链跨大类 CategoryAdd 同步（服务端幂等：一致跳过/变化更新/回同大类软删）。
+    /// 分类已落库，同步失败仅告警不抛出，避免分类保存被报告类记录拖失败。
+    /// </summary>
+    private async Task EnsureChainCategoryAddAsync(CancellationToken ct)
+    {
+        try
+        {
+            var result = await _changeService.EnsureChainCategoryAddAsync(
+                _applicationId,
+                string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName,
+                ct);
+            if (result.IsSuccess)
+            {
+                if (result.Value is long changeId && changeId > 0)
+                    _logger.LogBusiness("接续链跨类新增CategoryAdd已同步",
+                        ("ApplicationId", _applicationId),
+                        ("ChangeId", changeId));
+            }
+            else
+            {
+                _logger.Warn($"接续链跨类新增CategoryAdd同步失败: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"接续链跨类新增CategoryAdd同步异常: {ex.Message}");
         }
     }
 
@@ -4603,6 +4796,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         GracePeriodEndDate = null;
         OriginalClassificationResult = null;
         OriginalGuaranteeAmount = null;
+        // 重置分类结果 ≠ 结清服务端渐退期：保存前须重新判定，禁止内存默认 false 触发 Clear
+        _gracePeriodEvaluated = false;
         OnPropertyChanged(nameof(IsDestituteClassification));
         _logger.LogBusiness("重置分类判定结果");
     }
@@ -4662,6 +4857,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         GracePeriodMonths = info.GracePeriodMonths;
         GracePeriodStartDate = info.GracePeriodStartDate;
         GracePeriodEndDate = info.GracePeriodEndDate;
+        _gracePeriodEvaluated = true;
 
         _logger.LogBusiness("设置渐退期",
             ("月数", GracePeriodMonths),
@@ -4678,6 +4874,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         GracePeriodEndDate = null;
         OriginalClassificationResult = null;
         OriginalGuaranteeAmount = null;
+        GraceGrantAmount = null;
+        // 用户显式清除 → 允许保存时落库 Clear
+        _gracePeriodEvaluated = true;
 
         _logger.LogBusiness("清除渐退期");
     }
@@ -4744,7 +4943,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 整个保存过程运行在同一个数据库事务中：主表 + 家庭成员 + 赡养人 + 入户调查/照料人 + 经济明细
     /// 任一环节失败即抛 BusinessException → 事务自动回滚，ExecuteAsync 捕获后向用户展示错误
     /// （成功提示只会在本方法无异常返回后出现）。
-    /// 内部各服务通过 shouldManageTransaction = !_db.HasTransaction 自动加入本环境事务。
+    /// 内部各服务通过 BeginTransactionScopeAsync 嵌套加入本环境事务（嵌套作用域提交权归最外层）。
     /// </summary>
     private async Task SaveApplicationInternalAsync(string status, CancellationToken ct)
     {
@@ -4760,89 +4959,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         var wasCreateMode = _applicationId <= 0;
         try
         {
-            await using var tx = await _db.BeginTransactionScopeAsync(ct);
-
-            LoadingMessage = "正在保存申请信息...";
-            if (_applicationId > 0)
-            {
-                // 编辑模式：更新已有记录（携带乐观并发令牌）；补全模式允许更新已建档的 Approved 档案
-                application.Id = _applicationId;
-                var updateResult = await _applicationService.UpdateAsync(application, ct, IsCompletionMode || IsEditFamilyInfoMode || IsFamilyCorrectionMode);
-                if (!updateResult.IsSuccess)
-                {
-                    _logger.Error($"申请保存失败: {updateResult.Message}");
-                    throw new BusinessException(
-                        string.IsNullOrEmpty(updateResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : updateResult.ErrorCode,
-                        updateResult.Message ?? "申请保存失败");
-                }
-            }
-            else
-            {
-                // 新建模式：删除同身份证旧草稿 + 创建新记录
-                var existsResult = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
-                if (existsResult.IsSuccess && existsResult.Value?.Count > 0)
-                {
-                    foreach (var existing in existsResult.Value)
-                    {
-                        if (existing.Status == ApplicationStatusCodes.DRAFT)
-                        {
-                            var deleteResult = await _applicationService.DeleteAsync(existing.Id, ct);
-                            if (!deleteResult.IsSuccess)
-                            {
-                                _logger.Error($"删除旧草稿失败: {deleteResult.Message}");
-                                throw new BusinessException(
-                                    string.IsNullOrEmpty(deleteResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : deleteResult.ErrorCode,
-                                    $"删除旧草稿失败: {deleteResult.Message}");
-                            }
-                            _logger.LogBusiness("已删除旧草稿", ("OldApplicationId", existing.Id));
-                        }
-                    }
-                }
-
-                var createResult = await _applicationService.CreateAsync(application, ct);
-                if (!createResult.IsSuccess)
-                {
-                    _logger.Error($"申请创建失败: {createResult.Message}");
-                    throw new BusinessException(
-                        string.IsNullOrEmpty(createResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : createResult.ErrorCode,
-                        createResult.Message ?? "申请创建失败");
-                }
-                _applicationId = createResult.Value;
-                OperationMode = FormOperationMode.Edit;
-            }
-
-            // 保存家庭成员（失败抛异常），返回 IdCard → 新 ID 映射
-            LoadingMessage = "正在保存家庭成员...";
-            var memberIdCardToNewId = await SaveFamilyMembersAsync(ct);
-
-            // 保存赡养人（失败抛异常），传入新 ID 映射避免 DB 查询
-            LoadingMessage = "正在保存赡养人...";
-            await SaveSupportersAsync(memberIdCardToNewId, ct);
-
-            // 保存入户调查（失败抛异常）
-            LoadingMessage = "正在保存入户调查...";
-            await SaveHouseholdSurveyAsync(ct);
-
-            // 保存经济明细（可能需要较长时间，失败抛异常）
-            LoadingMessage = "正在保存经济明细...";
-            await SaveEconomicDetailsAsync(ct);
-
-            // 同步渐退期记录到独立表 nc_biz_grace_periods（与主表同事务提交）
-            await SyncGracePeriodRecordAsync(ct);
-
-            // 刷新乐观并发令牌：在事务内读取本次写入的 updated_at，
-            // 避免下一次保存因令牌过期而误报并发冲突
-            var refreshedResult = await _applicationService.GetByIdAsync(_applicationId, ct);
-            if (!refreshedResult.IsSuccess)
-            {
-                throw new BusinessException(
-                    string.IsNullOrEmpty(refreshedResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : refreshedResult.ErrorCode,
-                    refreshedResult.Message ?? "读取保存结果失败");
-            }
-            if (refreshedResult.Value != null && refreshedResult.Value.UpdatedAt != default)
-                _loadedUpdatedAt = refreshedResult.Value.UpdatedAt;
-
-            await tx.CommitAsync(ct);
+            await _applicationService.ExecuteInTransactionAsync(
+                transactionCt => SaveApplicationCoreAsync(application, transactionCt), ct);
         }
         catch
         {
@@ -4853,6 +4971,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 _applicationId = 0;
                 OperationMode = FormOperationMode.Create;
                 _loadedUpdatedAt = null;
+                _loadedCurrentStep = 0;
             }
             throw;
         }
@@ -4861,7 +4980,96 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     }
 
     /// <summary>
+    /// 申请保存事务体（主表 + 家庭成员 + 赡养人 + 入户调查 + 经济明细 + 渐退期）。
+    /// 由 <see cref="IApplicationService.ExecuteInTransactionAsync"/> 包裹：正常完成提交，异常回滚。
+    /// </summary>
+    private async Task SaveApplicationCoreAsync(Application application, CancellationToken ct)
+    {
+        LoadingMessage = "正在保存申请信息...";
+        if (_applicationId > 0)
+        {
+            // 编辑模式：更新已有记录（携带乐观并发令牌）；补全模式允许更新已建档的 Approved 档案
+            application.Id = _applicationId;
+            var updateResult = await _applicationService.UpdateAsync(application, ct, IsCompletionMode || IsEditFamilyInfoMode || IsFamilyCorrectionMode);
+            if (!updateResult.IsSuccess)
+            {
+                _logger.Error($"申请保存失败: {updateResult.Message}");
+                throw new BusinessException(
+                    string.IsNullOrEmpty(updateResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : updateResult.ErrorCode,
+                    updateResult.Message ?? "申请保存失败");
+            }
+        }
+        else
+        {
+            // 新建模式：删除同身份证旧草稿 + 创建新记录
+            var existsResult = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
+            if (existsResult.IsSuccess && existsResult.Value?.Count > 0)
+            {
+                foreach (var existing in existsResult.Value)
+                {
+                    if (existing.Status == ApplicationStatusCodes.DRAFT)
+                    {
+                        var deleteResult = await _applicationService.DeleteAsync(existing.Id, ct);
+                        if (!deleteResult.IsSuccess)
+                        {
+                            _logger.Error($"删除旧草稿失败: {deleteResult.Message}");
+                            throw new BusinessException(
+                                string.IsNullOrEmpty(deleteResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : deleteResult.ErrorCode,
+                                $"删除旧草稿失败: {deleteResult.Message}");
+                        }
+                        _logger.LogBusiness("已删除旧草稿", ("OldApplicationId", existing.Id));
+                    }
+                }
+            }
+
+            var createResult = await _applicationService.CreateAsync(application, ct);
+            if (!createResult.IsSuccess)
+            {
+                _logger.Error($"申请创建失败: {createResult.Message}");
+                throw new BusinessException(
+                    string.IsNullOrEmpty(createResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : createResult.ErrorCode,
+                    createResult.Message ?? "申请创建失败");
+            }
+            _applicationId = createResult.Value;
+            OperationMode = FormOperationMode.Edit;
+        }
+
+        // 保存家庭成员（失败抛异常），返回 IdCard → 新 ID 映射
+        LoadingMessage = "正在保存家庭成员...";
+        var memberIdCardToNewId = await SaveFamilyMembersAsync(ct);
+
+        // 保存赡养人（失败抛异常），传入新 ID 映射避免 DB 查询
+        LoadingMessage = "正在保存赡养人...";
+        await SaveSupportersAsync(memberIdCardToNewId, ct);
+
+        // 保存入户调查（失败抛异常）
+        LoadingMessage = "正在保存入户调查...";
+        await SaveHouseholdSurveyAsync(ct);
+
+        // 保存经济明细（可能需要较长时间，失败抛异常）
+        LoadingMessage = "正在保存经济明细...";
+        await SaveEconomicDetailsAsync(ct);
+
+        // 同步渐退期记录到独立表 nc_biz_grace_periods（与主表同事务提交）
+        await SyncGracePeriodRecordAsync(ct);
+
+        // 刷新乐观并发令牌：在事务内读取本次写入的 updated_at，
+        // 避免下一次保存因令牌过期而误报并发冲突
+        var refreshedResult = await _applicationService.GetByIdAsync(_applicationId, ct);
+        if (!refreshedResult.IsSuccess)
+        {
+            throw new BusinessException(
+                string.IsNullOrEmpty(refreshedResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : refreshedResult.ErrorCode,
+                refreshedResult.Message ?? "读取保存结果失败");
+        }
+        if (refreshedResult.Value != null && refreshedResult.Value.UpdatedAt != default)
+            _loadedUpdatedAt = refreshedResult.Value.UpdatedAt;
+    }
+
+    /// <summary>
     /// 同步渐退期记录到独立表 nc_biz_grace_periods（与主表同事务）
+    /// M1：仅当本会话已判定/加载过渐退期状态（_gracePeriodEvaluated）才允许 Clear——
+    /// 内存默认 false 不得误清服务端活动记录（户主死亡新建档等）。
     /// </summary>
     private async Task SyncGracePeriodRecordAsync(CancellationToken ct)
     {
@@ -4874,15 +5082,26 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             var actRes = await _gracePeriodService.ActivateAsync(
                 _applicationId, months, start, end,
                 string.IsNullOrEmpty(OriginalClassificationResult) ? null : OriginalClassificationResult,
-                OriginalGuaranteeAmount > 0 ? OriginalGuaranteeAmount : null, ct);
+                OriginalGuaranteeAmount > 0 ? OriginalGuaranteeAmount : null,
+                GraceGrantAmount,
+                ct);
             if (!actRes.IsSuccess)
             {
                 throw new BusinessException(
                     string.IsNullOrEmpty(actRes.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : actRes.ErrorCode,
                     actRes.Message ?? "渐退期记录保存失败");
             }
+            _gracePeriodEvaluated = true;
+
+            // 超限封顶产生减发 → 补写 FundChange，供月报「保障金减发表」捕获（幂等：同户同额只写一次）
+            if (OriginalGuaranteeAmount is decimal orig && orig > 0
+                && GraceGrantAmount is decimal grant && grant > 0
+                && orig > grant)
+            {
+                await RecordGraceCapFundChangeAsync(orig, grant, ct);
+            }
         }
-        else
+        else if (_gracePeriodEvaluated)
         {
             var clrRes = await _gracePeriodService.ClearAsync(_applicationId, ct);
             if (!clrRes.IsSuccess)
@@ -4899,7 +5118,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     private async Task SaveSupportersAsync(Dictionary<string, long> memberIdCardToNewId, CancellationToken ct)
     {
-        var supporterService = _serviceProvider.GetRequiredService<ISupporterService>();
+        var supporterService = _supporterService;
 
         // 用 SaveFamilyMembersAsync 返回的 IdCard→新ID 映射同步 Supporters 的 ID，
         // 不再查 DB——新 ID 已在内存中，直接使用。
@@ -4939,7 +5158,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         // （此前早退连带跳过照料人，特困申请只填照料人时会静默丢失）
         if (SurveyDate.HasValue || !string.IsNullOrWhiteSpace(SurveyorName))
         {
-            var surveyService = _serviceProvider.GetRequiredService<IHouseholdSurveyService>();
+            var surveyService = _householdSurveyService;
             var survey = new HouseholdSurvey
             {
                 ApplicationId = _applicationId,
@@ -4965,7 +5184,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         }
 
         // 保存照料人
-        var caregiverService = _serviceProvider.GetRequiredService<ICaregiverService>();
+        var caregiverService = _caregiverService;
         var caregiverResult = await caregiverService.SaveAsync(_applicationId, Caregivers.ToList(), ct);
         if (!caregiverResult.IsSuccess)
         {
@@ -5063,15 +5282,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     private async Task<Dictionary<string, long>> SaveFamilyMembersAsync(CancellationToken ct)
     {
-        var familyMemberService = _serviceProvider.GetRequiredService<IFamilyMemberService>();
         var idCardToNewId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         // ── 第1步：先软删该申请的全部现有成员（同事务，失败整体回滚，零数据丢失风险）──
         // 这样做解决"先插后删+AddAsync防重复校验"的逻辑死锁：
         // 先插旧记录未删 → COUNT(*) > 0 → 校验必失败 → 保存必回滚
-        var deleteResult = await _db.ExecuteNonQueryAsync(
-            "UPDATE nc_biz_family_members SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL",
-            ct, _applicationId);
+        var deleteResult = await _familyMemberService.DeleteByApplicationIdAsync(_applicationId, ct);
         if (deleteResult.IsFailure)
         {
             _logger.Error($"删除旧家庭成员失败: {deleteResult.Message}");
@@ -5158,7 +5374,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 IsSupportAbility = member.IsSupportAbility,
             };
 
-            var result = await familyMemberService.AddAsync(request, ct);
+            var result = await _familyMemberService.AddAsync(request, ct);
             if (result.IsSuccess)
             {
                 savedCount++;
@@ -5168,7 +5384,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             }
             else
             {
-                _logger.Error($"保存家庭成员失败: {member.Name}, 错误: {result.Message}");
+                _logger.Error($"保存家庭成员失败: {DataMasker.MaskName(member.Name)}, 错误: {result.Message}");
                 failures.Add($"{member.Name}：{result.Message}");
             }
         }
@@ -5316,9 +5532,17 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     private Result ValidateStep5()
     {
-        // 分类认定验证
+        // 强校验：必须已进行分类判定
         if (string.IsNullOrEmpty(ClassificationResult))
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "请先进行分类判定");
+
+        // 变更流程模式（复核/家庭修正/编辑家庭信息/成员变更）：必须在本次会话点过 Step5「分类判定」。
+        // 分类/保障金只有判定按钮才落库（SaveClassificationResultAsync → UpdateAsync），
+        // 跳过判定直接保存会让复核/变更结果丢失（只留变更记录、分类与保障金不落库），
+        // 且 ChangeService 的"新旧对比"因缺少判定环节而无法判定是否需停旧建新。
+        if (IsChangeMode && !IsClassificationDone)
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                "请在 Step5 点击「分类判定」完成本次认定后再保存（变更流程必须以本次判定结果为准）");
 
         return Result.Success();
     }
@@ -5399,7 +5623,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             GracePeriodMonths = IsInGracePeriod ? GracePeriodMonths : null,
             GracePeriodStartDate = GracePeriodStartDate,
             GracePeriodEndDate = GracePeriodEndDate,
-            OriginalClassificationResult = OriginalClassificationResult,
+            // 变更链上游原分类优先（内存承载，主表列已删）；渐退确认后 VM 属性已有值时用 VM
+            OriginalClassificationResult = _originalClassificationContext ?? OriginalClassificationResult,
             OriginalGuaranteeAmount = OriginalGuaranteeAmount,
             CaregiverType = CaregiverType,
             DestituteSupportType = DestituteSupportType,
@@ -5412,8 +5637,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             PersonCategoryProtectionTotalAmount = _loadedPersonCategoryProtectionTotalAmount,
             IsSpecialApproval = _loadedIsSpecialApproval,
             SpecialApprovalId = _loadedSpecialApprovalId,
-            // 补全模式保存时写回已建档标记（current_step=6），UI 归位5不落库
-            CurrentStep = IsCompletionMode ? 6 : CurrentStep,
+            // 补全模式保存时写回已建档标记（current_step=6），UI 归位5不落库；
+            // 变更流程模式（复核/家庭修正/编辑家庭信息/成员变更）UI 步骤被强制归位（3/1/2），
+            // 不代表档案真实进度 —— 回写加载时的库中步骤，否则已归档的 step=6 会被冲成 5，
+            // 档案从「已完结档案」掉进「已建档未提交」。
+            CurrentStep = IsCompletionMode ? 6
+                : (IsChangeMode && _loadedCurrentStep > 0) ? _loadedCurrentStep
+                : CurrentStep,
             Status = status,
             IsSingleRescue = IsSingleRescueApplication,
             UpdatedBy = "System",
@@ -5431,6 +5661,15 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         var validation = ValidateStep1();
         if (!validation.IsSuccess) return validation;
+
+        // 提交前强制 Step5 已分类判定（补全/成员变更走各自路径，不在这里拦）。
+        // 复核模式必须拦：分类/保障金只有 Step5「分类判定」按钮才落库（SaveClassificationResultAsync），
+        // 跳过判定直接保存会让复核结果丢失（只留变更记录、分类与保障金不落库）。
+        if (!IsCompletionMode && !IsMemberChangeMode)
+        {
+            var step5 = ValidateStep5();
+            if (!step5.IsSuccess) return step5;
+        }
 
         // 补全模式：保存前提示是否仍有未补全的关键字段（不阻断，仅提醒）
         if (IsCompletionMode)
@@ -5475,15 +5714,15 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         {
             try
             {
-                var statusResult = await _assetVerificationService.UpdateCheckStatusAsync(AssetCheckData.Id, "2", CancellationToken.None);
+                var statusResult = await _assetVerificationService.UpdateCheckStatusAsync(AssetCheckData.Id, AssetCheckStatusConstants.INCLUDED, CancellationToken.None);
                 if (statusResult.IsSuccess)
                     _logger.LogBusiness("核查任务状态闭环: 已建档", ("AssetCheckId", AssetCheckData.Id), ("ApplicationId", _applicationId));
                 else
-                    _logger.Error($"回写核查状态'2'失败: {statusResult.Message}");
+                    _logger.Error($"回写核查状态'{AssetCheckStatusConstants.INCLUDED}'失败: {statusResult.Message}");
             }
             catch (Exception ex)
             {
-                _logger.Error($"回写核查状态'2'异常: {ex.Message}");
+                _logger.Error($"回写核查状态'{AssetCheckStatusConstants.INCLUDED}'异常: {ex.Message}");
             }
         }
 
@@ -5503,16 +5742,257 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 if (delResult.IsFailure)
                     _logger.Warn($"删除导入库家庭失败: {delResult.Message}");
 
-                await Helpers.WindowNavigator.CurrentPage!.Navigation.PopAsync();
+                var completionPage = Helpers.WindowNavigator.CurrentPage;
+                if (completionPage != null)
+                    await completionPage.Navigation.PopAsync();
                 RestoreWindowTitleFromNavigation();
+            }
+            else if (IsInGracePeriod)
+            {
+                // 渐退期未满：提醒原/现保障金，然后进档案制作页（输出文书分类+预勾选，不进整档完成归档）
+                await ShowGracePeriodSavedReminderAsync();
             }
             else
             {
+                ClearDocumentOutputContext();
                 await NavigateToArchiveProductionAsync();
             }
         }
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// 渐退封顶：原有享受额度 > 当前户口类型最低保障额×新家庭人数（不含分类施保）时，
+    /// 渐退期内按上限发放；否则继续原额。原额优先取变更链上游档案（户主死亡停旧建新）。
+    /// </summary>
+    private async Task ApplyGraceCapAsync(decimal priorGuarantee, CancellationToken ct)
+    {
+        var original = _originalGuaranteeContext
+            ?? (OriginalGuaranteeAmount is decimal og && og > 0 ? og : (decimal?)null)
+            ?? (priorGuarantee > 0 ? priorGuarantee : (decimal?)null)
+            ?? GuaranteeAmount;
+        OriginalGuaranteeAmount = original;
+
+        var standard = await GetCachedSubsistenceStandardAsync();
+        if (standard <= 0 || FamilySize <= 0)
+        {
+            GraceGrantAmount = original;
+            GuaranteeAmount = original;
+            return;
+        }
+
+        var cap = standard * FamilySize;
+        GraceGrantAmount = original > cap ? cap : original;
+        // 渐退期内按原享受额（封顶后）发放，不按本次补差公式重算
+        GuaranteeAmount = GraceGrantAmount.Value;
+
+        _logger.LogBusiness("渐退封顶",
+            ("原保障金", original),
+            ("上限", cap),
+            ("应发", GraceGrantAmount),
+            ("人数", FamilySize));
+    }
+
+    /// <summary>
+    /// 保存成功且处于渐退期：提醒原/现保障金与减发是否进月报，然后预置输出文书上下文并进档案制作页。
+    /// </summary>
+    private async Task ShowGracePeriodSavedReminderAsync()
+    {
+        var period = GracePeriodEndDate?.ToString("yyyy-MM-dd") ?? "—";
+        var original = OriginalGuaranteeAmount ?? 0;
+        var current = GraceGrantAmount ?? GuaranteeAmount;
+        var reduce = original - current;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"已进入渐退期（{GracePeriodMonths} 个月，至 {period}）");
+        sb.AppendLine($"原保障金：{original:F2} 元/月");
+        if (reduce > 0)
+        {
+            sb.AppendLine($"现保障金：{current:F2} 元/月（超过本户口类型上限，已封顶）");
+            sb.AppendLine($"减发金额：{reduce:F2} 元/月");
+            sb.AppendLine("该减发将计入「保障金减发表」（月报）。");
+        }
+        else
+        {
+            sb.AppendLine($"现保障金：{current:F2} 元/月（与原额一致，无减发）");
+        }
+        sb.AppendLine("档案制作须待渐退期满后办理；可先在制作页「档案输出」打印所需文书。");
+
+        var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+        await dialog.DisplayAlertAsync("渐退期确认", sb.ToString(), "确定");
+        await OpenDocumentProductionAsync();
+    }
+
+    /// <summary>
+    /// 预置输出文书上下文（OutputCategories/Prefilter/OperationOverride）并进档案制作页。
+    /// 用户在制作页点「档案输出」→ Output 按变动分类加载并预勾选。
+    /// 预勾选：告知书必选；有人员变动→增减员表；渐退→渐退审批表；有减发→保障金减少。
+    /// </summary>
+    [RelayCommand]
+    private async Task ShowGraceDocumentSheetAsync()
+    {
+        if (_applicationId <= 0) return;
+        await OpenDocumentProductionAsync();
+    }
+
+    private async Task OpenDocumentProductionAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            LoadingMessage = "正在准备文书输出...";
+
+            // A1+：出文书前再同步一次——「只出文书不保存」也不带病出单
+            if (IsInGracePeriod && GracePeriodMonths > 0)
+                await SyncGracePeriodRecordAsync(CancellationToken.None);
+
+            var preselect = new List<string> { DocumentTemplateNames.ChangeNotice }; // 告知书必选
+
+            // 渐退核定 → 渐退审批表
+            if (IsInGracePeriod)
+                preselect.Add(DocumentTemplateNames.GraceApproval);
+
+            // 有减发 → 保障金减少
+            if (OriginalGuaranteeAmount is decimal og && GraceGrantAmount is decimal gg && og > gg && gg > 0)
+                preselect.Add(DocumentTemplateNames.GrantReduce);
+
+            // 有人员变动 → 增减员表（死亡链/成员增减记录存在）
+            try
+            {
+                var changes = await _changeService.GetMemberChangeRecordsAsync(_applicationId, 5, CancellationToken.None);
+                if (changes.IsSuccess && changes.Value is { Count: > 0 })
+                    preselect.Add(DocumentTemplateNames.MemberChangeTable);
+            }
+            catch
+            {
+                // 取数失败不阻断：仅少预勾一张
+            }
+
+            ApplyDocumentOutputContext(preselect);
+            await NavigateToArchiveProductionAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "打开文书输出失败");
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("错误", $"打开文书输出失败: {ex.Message}", "确定");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>写入输出文书上下文（进 Production 前调用；PrepareAndNavigateAsync 不会清这些字段）</summary>
+    private void ApplyDocumentOutputContext(IEnumerable<string> preselectNames)
+    {
+        ClearDocumentOutputContext();
+        PrintNavigationData.OutputCategories = Helpers.ArchiveCategoryResolver.DocumentOperationCategories;
+        PrintNavigationData.OperationOverride = "人员变更";
+        PrintNavigationData.PrefilterTemplateNames = preselectNames
+            .Distinct(StringComparer.Ordinal).ToArray();
+        PrintNavigationData.TemplateFilter = null; // 分类+预勾选，非强白名单
+    }
+
+    /// <summary>清理输出文书上下文（整档路径进入 Production 前调用）</summary>
+    private void ClearDocumentOutputContext()
+    {
+        PrintNavigationData.OutputCategories = null;
+        PrintNavigationData.OperationOverride = null;
+        PrintNavigationData.PrefilterTemplateNames = null;
+        PrintNavigationData.TemplateFilter = null;
+    }
+
+    /// <summary>
+    /// 装配打印字段并进入档案输出页（保留：强白名单旁路，成员变更等若需直出仍可用）。
+    /// 渐退/Step5 已改为 OpenDocumentProductionAsync → Production → Output。
+    /// </summary>
+    private async Task OpenDocumentOutputAsync(IReadOnlyList<string> templateNames, long applicationId)
+    {
+        if (applicationId <= 0 || templateNames == null || templateNames.Count == 0)
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("错误", "文书直出参数无效", "确定");
+            return;
+        }
+
+        await _documentBuildGate.WaitAsync(CancellationToken.None);
+        try
+        {
+            IsBusy = true;
+            LoadingMessage = "正在装配文书字段...";
+
+            // ArchiveProductionViewModel 为 Transient 且 BuildPrintDataAsync 使用实例内部字段状态（不可并发）——
+            // 每次调用 DI 解析局部实例 + 静态 SemaphoreSlim 串行
+            var production = _serviceProvider.GetRequiredService<ViewModels.ArchiveManagement.ArchiveProductionViewModel>();
+            var printData = await production.BuildPrintDataAsync(applicationId);
+            if (printData == null)
+                throw new InvalidOperationException("文书字段装配失败，请确认档案数据完整");
+
+            PrintNavigationData.BusinessType = string.IsNullOrEmpty(printData.BusinessType)
+                ? "FamilyApplication"
+                : printData.BusinessType;
+            PrintNavigationData.BusinessId = printData.BusinessId ?? applicationId;
+            PrintNavigationData.Classification = printData.Classification;
+            PrintNavigationData.FieldData = new Dictionary<string, string>(printData.FieldData, StringComparer.Ordinal);
+            PrintNavigationData.TableData = printData.TableData?.ToList() ?? new();
+            PrintNavigationData.SupporterTableData = printData.SupporterTableData;
+            PrintNavigationData.Status = ApplicationStatus ?? string.Empty;
+            PrintNavigationData.TemplateFilter = templateNames.ToArray();
+
+            _logger.Info($"文书直出: ApplicationId={applicationId}, 模板={string.Join("|", templateNames)}");
+
+            await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
+        }
+        catch (Exception ex)
+        {
+            // 导航失败时清 PII，避免驻留
+            PrintNavigationData.Clear();
+            _logger.LogError(ex, "文书直出打开档案输出页失败");
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("错误", $"打开文书输出失败: {ex.Message}", "确定");
+        }
+        finally
+        {
+            _documentBuildGate.Release();
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 渐退超限减发：补写 change_type=FundChange（old&gt;new、同分类），供月报保障金减发表捕获。
+    /// 幂等：同户同额已存在则跳过；本会话已写过也跳过。
+    /// </summary>
+    private async Task RecordGraceCapFundChangeAsync(decimal oldAmount, decimal newAmount, CancellationToken ct)
+    {
+        if (_graceFundChangeRecorded) return;
+
+        try
+        {
+            var result = await _changeService.CreateGraceCapFundChangeAsync(
+                _applicationId,
+                ClassificationResult ?? string.Empty,
+                OriginalClassificationResult ?? ClassificationResult ?? string.Empty,
+                oldAmount,
+                newAmount,
+                ct);
+            if (result.IsSuccess)
+            {
+                _graceFundChangeRecorded = true;
+                _logger.LogBusiness("渐退超限减发已记入FundChange",
+                    ("ApplicationId", _applicationId),
+                    ("原保障金", oldAmount),
+                    ("现保障金", newAmount));
+            }
+            else
+            {
+                _logger.Warn($"渐退超限FundChange写入失败: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"渐退超限FundChange写入异常: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -5561,6 +6041,21 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
             _logger.LogBusiness("开始经济状况复核", ("ApplicationId", _applicationId));
 
+            // ── 覆写前捕获变更前旧值 ──
+            // SaveEconomicDetailsAsync 会先把新经济数据写回本档，之后读库拿到的"旧值"已是覆写后值
+            //（Before 快照 / old_per_capita_income / 渐退审批表分项对比都需要真旧值）。
+            // 捕获失败不阻断复核：降级为回退读库（历史行为），分项对比由消费方静默省略。
+            Application? oldSnapshot = null;
+            var oldSnapshotResult = await _applicationService.GetByIdAsync(_applicationId, CancellationToken.None);
+            if (oldSnapshotResult.IsSuccess && oldSnapshotResult.Value != null)
+            {
+                oldSnapshot = oldSnapshotResult.Value;
+            }
+            else
+            {
+                _logger.Warn($"经济复核-覆写前旧值捕获失败: {oldSnapshotResult.Message}");
+            }
+
             // 经济复核模式下 Step3 经济明细可编辑，先持久化用户修改，再执行分类重新判定。
             // 否则用户在复核模式下修改的经济数据（务工/经营/补贴等）不会被保存。
             try
@@ -5575,7 +6070,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 return Result.Failure(ErrorCodes.DB_QUERY_ERROR, $"经济明细保存失败：{ex.Message}");
             }
 
-            var changeService = _serviceProvider.GetRequiredService<IChangeService>();
+            var changeService = _changeService;
             var context = new EconomicReviewContext
             {
                 ApplicationId = _applicationId,
@@ -5587,7 +6082,29 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 NewFamilySize = FamilySize,
                 ReviewReason = ApplicationReasonDetail,
                 OperatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName,
-                IsFamilyCorrection = IsFamilyCorrectionMode
+                IsFamilyCorrection = IsFamilyCorrectionMode,
+                // 覆写前捕获的真旧值（未捕获到为 null，ChangeService 回退读库）
+                OldFamilySize = oldSnapshot?.FamilySize,
+                OldTotalFamilyIncome = oldSnapshot?.TotalFamilyIncome,
+                OldTotalAnnualIncome = oldSnapshot?.TotalAnnualIncome,
+                OldPerCapitaIncome = oldSnapshot?.PerCapitaIncome,
+                OldRigidExpenditure = oldSnapshot?.RigidExpenditure,
+                // 分类/保障金必须用加载时刻的 _loaded*：oldSnapshot 是 Step5 判定落库后才抓的，
+                // 那时 classification_result/total_guarantee_amount 已被覆写，用它会恒判"无变化"
+                OldClassification = _loadedClassification,
+                OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                OldComponents = oldSnapshot == null ? null : new IncomeComponentValues
+                {
+                    WorkIncomeTotal = oldSnapshot.WorkIncomeTotal,
+                    BusinessIncomeTotal = oldSnapshot.BusinessIncomeTotal,
+                    PropertyIncomeTotal = oldSnapshot.PropertyIncomeTotal,
+                    TransferIncomeTotal = oldSnapshot.TransferIncomeTotal,
+                    OtherIncomeTotal = oldSnapshot.OtherIncomeTotal,
+                    RigidExpenditure = oldSnapshot.RigidExpenditure,
+                    AlimonyIncome = oldSnapshot.AlimonyIncome,
+                    LandIncomeTotal = oldSnapshot.LandIncomeTotal,
+                    SubsidyTotal = oldSnapshot.SubsidyTotal
+                }
             };
 
             var result = await changeService.ExecuteEconomicReviewAsync(context, CancellationToken.None);
@@ -5599,7 +6116,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, ErrorMessage);
             }
 
-            // 复核完成后返回变更页，并自动进入经济复核档案输出（用复核后最新数据重建输出档案）
+            // 复核完成后返回变更页，出口三选一：整套档案 / 仅出文书（渐退减发）/ 保持整档
             _logger.LogBusiness("经济状况复核完成",
                 ("ApplicationId", _applicationId),
                 ("OldClassification", result.Value.OldClassification),
@@ -5607,10 +6124,44 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 ("OldAmount", result.Value.OldGuaranteeAmount),
                 ("NewAmount", result.Value.NewGuaranteeAmount));
 
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PopAsync();
+            var reviewPage = Helpers.WindowNavigator.CurrentPage;
+            if (reviewPage != null)
+                await reviewPage.Navigation.PopAsync();
+
+            // 未生成新档案（保障金额/分类/停保三项均未变化）：提示后停在变更页，不进档案制作
+            if (!result.Value.Rebuilt)
+            {
+                await _serviceProvider.GetRequiredService<IDialogService>()
+                    .DisplayAlertAsync("提示", "复核完成，保障金额无变化，未生成新档案", "确定");
+                return Result.Success();
+            }
+
+            // 渐退/超限减发 → 仅出文书（档案制作+输出，预勾选）；否则保持整档 ArchiveProduction
+            var hasGraceReduce = IsInGracePeriod
+                || (OriginalGuaranteeAmount is decimal ro && GraceGrantAmount is decimal rg && ro > rg);
+            if (hasGraceReduce)
+            {
+                var docs = new List<string> { DocumentTemplateNames.ChangeNotice };
+                if (IsInGracePeriod)
+                    docs.Add(DocumentTemplateNames.GraceApproval);
+                if (OriginalGuaranteeAmount is decimal o2 && GraceGrantAmount is decimal g2 && o2 > g2)
+                    docs.Add(DocumentTemplateNames.GrantReduce);
+                try
+                {
+                    ApplyDocumentOutputContext(docs);
+                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                        new ApplicationReviewArchiveParameter(_applicationId, null, "经济复核"));
+                }
+                catch (Exception navEx)
+                {
+                    _logger.Error($"导航到渐退文书输出失败: {navEx.Message}");
+                }
+                return Result.Success();
+            }
 
             try
             {
+                ClearDocumentOutputContext();
                 // 参数先于 Push 注入，替代原"Push 后 InitializeFromApplicationReviewAsync"时序
                 await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(new ApplicationReviewArchiveParameter(_applicationId));
             }
@@ -5754,62 +6305,102 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 Remark = e.Reason.Remark
             }));
 
-            await using var tx = await _db.BeginTransactionScopeAsync(CancellationToken.None);
-
-            // 1) 成员增删/赡养人/经济明细落库（同一环境事务，失败整体回滚）
-            await MergeSupportMembersIntoSupportersAsync();
-            var memberIdCardToNewId = await SaveFamilyMembersAsync(CancellationToken.None);
-            await SaveSupportersAsync(memberIdCardToNewId, CancellationToken.None);
-            await SaveEconomicDetailsAsync(CancellationToken.None);
-
-            // 2) 重新判定分类 + 停旧建新 + 变更记录（含逐人明细/死亡减员联动）
-            var changeService = _serviceProvider.GetRequiredService<IChangeService>();
-            var context = new MemberChangeContext
+            ChangeResult? changeValue = null;
+            var changeResult = await _applicationService.ExecuteInTransactionForResultAsync(async transactionCt =>
             {
-                ApplicationId = _applicationId,
-                ChangeType = changeType,
-                ChangeSummary = changeSummary,
-                ChangeReason = ApplicationReasonDetail,
-                OldFamilySize = _loadedFamilySize,
-                NewTotalFamilyIncome = TotalFamilyIncome,
-                NewPerCapitaIncome = PerCapitaIncome,
-                NewTotalAnnualIncome = TotalAnnualIncome,
-                NewPerCapitaAnnualIncome = PerCapitaAnnualIncome,
-                NewRigidExpenditure = RigidExpenditure,
-                NewFamilySize = FamilySize,
-                Entries = changeEntries,
-                OperatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
-            };
+                // 1) 成员增删/赡养人/经济明细落库（同一环境事务，失败整体回滚）
+                await MergeSupportMembersIntoSupportersAsync();
+                var memberIdCardToNewId = await SaveFamilyMembersAsync(transactionCt);
+                await SaveSupportersAsync(memberIdCardToNewId, transactionCt);
+                await SaveEconomicDetailsAsync(transactionCt);
 
-            var result = await changeService.ExecuteMemberChangeAsync(context, CancellationToken.None);
-            if (result.IsFailure || !result.IsSuccess)
+                // 2) 重新判定分类 + 停旧建新 + 变更记录（含逐人明细/死亡减员联动）
+                var context = new MemberChangeContext
+                {
+                    ApplicationId = _applicationId,
+                    ChangeType = changeType,
+                    ChangeSummary = changeSummary,
+                    ChangeReason = ApplicationReasonDetail,
+                    OldFamilySize = _loadedFamilySize,
+                    OldClassification = _loadedClassification,
+                    OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                    NewTotalFamilyIncome = TotalFamilyIncome,
+                    NewPerCapitaIncome = PerCapitaIncome,
+                    NewTotalAnnualIncome = TotalAnnualIncome,
+                    NewPerCapitaAnnualIncome = PerCapitaAnnualIncome,
+                    NewRigidExpenditure = RigidExpenditure,
+                    NewFamilySize = FamilySize,
+                    Entries = changeEntries,
+                    OperatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
+                };
+
+                var result = await _changeService.ExecuteMemberChangeAsync(context, transactionCt);
+                if (result.IsFailure || !result.IsSuccess)
+                {
+                    ErrorMessage = result.Message ?? "家庭成员变更失败";
+                    return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, ErrorMessage);
+                }
+
+                changeValue = result.Value;
+                return Result.Success();
+            }, CancellationToken.None);
+
+            if (changeResult.IsFailure)
             {
-                ErrorMessage = result.Message ?? "家庭成员变更失败";
                 await _serviceProvider.GetRequiredService<IDialogService>()
-                    .DisplayAlertAsync("提示", ErrorMessage, "确定");
-                return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, ErrorMessage);
+                    .DisplayAlertAsync("提示", ErrorMessage ?? "家庭成员变更失败", "确定");
+                return changeResult;
             }
-
-            await tx.CommitAsync(CancellationToken.None);
 
             _logger.LogBusiness("家庭成员变更完成",
                 ("ApplicationId", _applicationId),
                 ("ChangeType", changeType),
-                ("OldClassification", result.Value.OldClassification),
-                ("NewClassification", result.Value.NewClassification),
-                ("NewApplicationId", result.Value.NewApplicationId));
+                ("OldClassification", changeValue!.OldClassification),
+                ("NewClassification", changeValue.NewClassification),
+                ("NewApplicationId", changeValue.NewApplicationId));
 
-            // 返回变更页，并自动进入档案输出（用变更后新档案数据）
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PopAsync();
+            // 返回变更页，出口三选一：整套档案 / 仅出文书 / 稍后
+            var navigationPage = Helpers.WindowNavigator.CurrentPage;
+            if (navigationPage != null)
+                await navigationPage.Navigation.PopAsync();
 
-            try
+            var choice = await _serviceProvider.GetRequiredService<IDialogService>().DisplayActionSheetAsync(
+                "成员变更完成",
+                "取消",
+                null,
+                "整套档案",
+                "仅出文书",
+                "稍后再说");
+
+            if (choice == "整套档案")
             {
-                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                    new ApplicationReviewArchiveParameter(result.Value.NewApplicationId, _applicationId, "成员变更"));
+                ClearDocumentOutputContext();
+                try
+                {
+                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                        new ApplicationReviewArchiveParameter(changeValue.NewApplicationId, _applicationId, "成员变更"));
+                }
+                catch (Exception navEx)
+                {
+                    _logger.Error($"导航到家庭成员变更档案输出失败: {navEx.Message}\n{navEx.StackTrace}");
+                }
             }
-            catch (Exception navEx)
+            else if (choice == "仅出文书")
             {
-                _logger.Error($"导航到家庭成员变更档案输出失败: {navEx.Message}\n{navEx.StackTrace}");
+                try
+                {
+                    ApplyDocumentOutputContext(new[]
+                    {
+                        DocumentTemplateNames.MemberChangeTable,
+                        DocumentTemplateNames.ChangeNotice
+                    });
+                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                        new ApplicationReviewArchiveParameter(changeValue.NewApplicationId, _applicationId, "成员变更"));
+                }
+                catch (Exception navEx)
+                {
+                    _logger.Error($"导航到成员变更文书输出失败: {navEx.Message}");
+                }
             }
 
             return Result.Success();
@@ -6129,7 +6720,6 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     partial void OnDetectedAgeChanged(int? value)
     {
         DetectedAgeDisplay = value.HasValue ? $"{value.Value}岁" : string.Empty;
-        _logger.Info($"[DEBUG] OnDetectedAgeChanged: value={value}, DetectedAgeDisplay={DetectedAgeDisplay}");
         UpdateDetectedGenderDisplay();
     }
 
@@ -6218,7 +6808,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.SEVERE_DISABILITY);
             else if (hasNonSevereDisability)
                 SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.FAIR_OR_WEAK);
-            else if (age.HasValue && age.Value >= 60)
+            else if (age.HasValue && age.Value >= ClassificationConstants.ELDERLY_AGE)
                 SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.FAIR_OR_WEAK);
             else
                 SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.HEALTHY);
@@ -6343,6 +6933,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     DiseaseCategoryOptions.Add(new DictItemOption { Key = item.ItemKey, Display = item.ItemValue });
                 }
             }
+            else
+            {
+                _logger.Warn($"搜索疾病分类失败: {result.Message}");
+            }
         }
         catch (Exception ex)
         {
@@ -6391,11 +6985,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private async Task SearchByIdCardAsync()
     {
         ApplicantIdCard = ApplicantIdCard?.Trim() ?? string.Empty;
-        Debug.WriteLine($"[ViewModel] SearchByIdCardAsync 被调用! ApplicantIdCard='{ApplicantIdCard}', 长度={ApplicantIdCard?.Length}");
 
         if (string.IsNullOrWhiteSpace(ApplicantIdCard) || ApplicantIdCard.Length != 18)
         {
-            Debug.WriteLine($"[ViewModel] 身份证号格式不正确，无法搜索: '{ApplicantIdCard}'");
             _logger.Warn("身份证号格式不正确，无法搜索");
             return;
         }
@@ -6511,7 +7103,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 if (string.IsNullOrEmpty(member.HomeAddress))
                     member.HomeAddress = Address ?? string.Empty;
                 if (string.IsNullOrEmpty(member.HomeProvince))
-                    member.HomeProvince = "黑龙江省";
+                    member.HomeProvince = DefaultValuesConstants.HOME_PROVINCE;
 
                 // 设置字典默认值（如果为空）
                 if (string.IsNullOrEmpty(member.Ethnicity))
@@ -6533,7 +7125,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 if (member.Age <= 0 && !string.IsNullOrEmpty(member.IdCard))
                     member.Age = Helpers.IdCardValidator.ExtractAgeBasic(member.IdCard);
 
-                member.SetServiceProvider(_serviceProvider);
+                member.SetRegionService(_regionService);
                 await member.LoadInitialAddressOptionsAsync(
                     member.HomeCity, member.HomeDistrict, member.HomeTown);
                 SyncMemberDictOptions(member);

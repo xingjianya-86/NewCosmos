@@ -1,8 +1,9 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Domain.Reporting;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.UserManagement;
@@ -45,7 +46,7 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
 
     #region 模块统计（失败降级显示 StatNA）
 
-    /// <summary>在享保障对象数（status='Approved'）</summary>
+    /// <summary>在享保障对象数（status=ApplicationStatusCodes.APPROVED）</summary>
     [ObservableProperty]
     private string _activeCountText = StatNA;
 
@@ -57,7 +58,7 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
     [ObservableProperty]
     private string _monthlyExitsText = StatNA;
 
-    /// <summary>渐退期 30 天内临期户数（含已到期未处理）</summary>
+    /// <summary>渐退期进行中/已到期户数</summary>
     [ObservableProperty]
     private string _gracePeriodExpiringText = StatNA;
 
@@ -116,10 +117,12 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
             CanAccessSocialAssistanceReport = Has(PermissionCodes.REPORT_VIEW);
             CanAccessTemporaryAssistance = Has(PermissionCodes.TEMP_CREATE);
             CanAccessChange = Has(PermissionCodes.CHANGE_VIEW);
+            MarkPermissionsLoaded();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "模块权限加载失败");
+            // 失败不清零：保留上次状态，基类允许下次 OnAppearing 重试
+            Logger.LogError(ex, "模块权限加载失败（保留上次状态，稍后重试）");
         }
     }
 
@@ -171,7 +174,7 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
     [RelayCommand]
     private Task OpenGracePeriodExpiringAsync() =>
         NavigateToFeatureAsync<Pages.SocialAssistance.GracePeriodExpiringListPage>(
-            true, "渐退期到期处理", "渐退期到期处理");
+            true, "渐退期管理", "渐退期管理");
 
     [RelayCommand]
     private Task OpenRecoveryAsync() =>

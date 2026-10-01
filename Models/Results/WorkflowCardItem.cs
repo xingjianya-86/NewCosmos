@@ -9,7 +9,9 @@ public enum WorkflowCardAction
     /// <summary>资产核查 Tab：档案制作</summary>
     ArchiveProduction = 1,
     /// <summary>申请 Tab：编辑 + 删除</summary>
-    EditDelete = 2
+    EditDelete = 2,
+    /// <summary>已完结 Tab：查看档案（只读）</summary>
+    ViewArchive = 3
 }
 
 /// <summary>
@@ -35,6 +37,11 @@ public class WorkflowCardItem
     /// <summary>是否显示"单人保"徽章</summary>
     public bool ShowSingleRescue { get; init; }
 
+    /// <summary>渐退期注释（草稿/已建档 Tab 有有效渐退期时有值，如"渐退期至 2026-12-31"）</summary>
+    public string GraceNote { get; init; } = string.Empty;
+
+    public bool HasGraceNote => !string.IsNullOrEmpty(GraceNote);
+
     /// <summary>元信息标签（"与户主关系" / "编号"）</summary>
     public string MetaLabel { get; init; } = string.Empty;
 
@@ -56,4 +63,6 @@ public class WorkflowCardItem
     public bool ShowArchiveButton => Action == WorkflowCardAction.ArchiveProduction;
 
     public bool ShowEditButtons => Action == WorkflowCardAction.EditDelete;
+
+    public bool ShowViewArchiveButton => Action == WorkflowCardAction.ViewArchive;
 }

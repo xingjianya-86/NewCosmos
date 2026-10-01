@@ -8,6 +8,7 @@ namespace NewCosmos.ViewModels.Shared;
 /// <summary>
 /// 加载进度弹窗 ViewModel
 /// </summary>
+/// 不继承 ViewModelBase（审计豁免）：弹窗内部 VM，自带 ErrorMessage 语义与 TCS 生命周期，继承需改名冲突成员且无收益。
 public partial class LoadingProgressDialogViewModel : ObservableObject
 {
     private readonly ILoadingProgressService _progressService;

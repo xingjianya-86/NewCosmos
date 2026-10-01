@@ -1,0 +1,12 @@
+# 死亡原因字典（固定 ID）
+# 分类 ID=95，字典项 ID 范围: 95001-95999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 95001, category: "DeathReasons", item_key: "因病自然死亡", item_value: "因病自然死亡", sort_order: 1, is_active: true }
+      - { id: 95002, category: "DeathReasons", item_key: "意外事故", item_value: "意外事故", sort_order: 2, is_active: true }
+      - { id: 95003, category: "DeathReasons", item_key: "自然灾害", item_value: "自然灾害", sort_order: 3, is_active: true }
+      - { id: 95004, category: "DeathReasons", item_key: "其他", item_value: "其他", sort_order: 4, is_active: true }

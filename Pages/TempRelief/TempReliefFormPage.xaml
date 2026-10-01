@@ -249,6 +249,8 @@
                                                                    TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                                         </HorizontalStackLayout>
                                                         <Label Text="{Binding IdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                        <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                                               IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
                                                     </VerticalStackLayout>
                                                     <Label Grid.Row="0" Grid.Column="1" Text="{Binding FamilyCategory}"
                                                            FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>

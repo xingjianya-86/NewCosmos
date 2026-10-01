@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileTempReliefFormPage"
+             x:DataType="ViewModels.TempRelief.MobileTempReliefFormViewModel"
+             Title="临时救助申请"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 深色橙色头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardOrangeGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding CancelCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="临时救助申请" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="申请人来源仅限导入台账库与最低生活保障申请库" FontSize="12" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 分区 Tab -->
+        <ScrollView Grid.Row="1" Orientation="Horizontal" BackgroundColor="White" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout Padding="12,10" Spacing="8">
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsSection0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="0"/></Border.GestureRecognizers>
+                    <Label Text="类型与申请人" FontSize="13"
+                           TextColor="{Binding IsSection0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsSection3Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="3"/></Border.GestureRecognizers>
+                    <Label Text="家庭成员" FontSize="13"
+                           TextColor="{Binding IsSection3Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsSection1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="1"/></Border.GestureRecognizers>
+                    <Label Text="申请信息" FontSize="13"
+                           TextColor="{Binding IsSection1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsSection2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#EEF2F7'}">
+                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="2"/></Border.GestureRecognizers>
+                    <Label Text="金额与公示" FontSize="13"
+                           TextColor="{Binding IsSection2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="12" Spacing="12" IsEnabled="{Binding IsEditable}">
+
+                <!-- ══ 分区0：类型与申请人 ══ -->
+                <VerticalStackLayout Spacing="12" IsVisible="{Binding IsSection0Selected}">
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="救助类型 *" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Border StrokeShape="RoundRectangle 10" Padding="14,12"
+                                        BackgroundColor="{Binding IsLargeType, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FDE7D3|#F1F5F9'}"
+                                        StrokeThickness="2" Stroke="{Binding IsLargeType, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#F1F5F9'}">
+                                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SelectLargeTypeCommand}"/></Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="大额救助" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="金额不填写，按程序审批核定" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Grid.Column="1" StrokeShape="RoundRectangle 10" Padding="14,12"
+                                        BackgroundColor="{Binding IsSmallType, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FDE7D3|#F1F5F9'}"
+                                        StrokeThickness="2" Stroke="{Binding IsSmallType, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#EA580C|#F1F5F9'}">
+                                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SelectSmallTypeCommand}"/></Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="小额快速救助" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="定额救助，选择档位锁定金额" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </Grid>
+                            <Label Text="请根据实际救助情形选择类型，审批表将随之区分（大额/小额审批表）。" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="选择申请人" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="来源：导入台账 / 最低生活保障申请" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Entry Grid.Column="0" Text="{Binding SearchKeyword}" Placeholder="输入姓名或身份证号检索..."
+                                       Style="{StaticResource FormFieldEntryStyle}" ReturnCommand="{Binding SearchCandidatesCommand}"/>
+                                <Button Grid.Column="1" Text="检索" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding SearchCandidatesCommand}" HeightRequest="44" Padding="14,0"
+                                        IsEnabled="{Binding IsNotBusy}"/>
+                            </Grid>
+
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Candidates}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="ent:TempReliefCandidate">
+                                        <Border StrokeShape="RoundRectangle 10" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" Padding="10" Margin="0,3">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" RowDefinitions="Auto,Auto">
+                                                <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="2">
+                                                    <HorizontalStackLayout Spacing="8">
+                                                        <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                        <Label Text="{Binding SourceName}" FontSize="12" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                                    </HorizontalStackLayout>
+                                                    <Label Text="{Binding IdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                    <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                                           IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
+                                                </VerticalStackLayout>
+                                                <Button Grid.Row="0" Grid.Column="1" Text="选择" FontSize="12" Padding="10,0" HeightRequest="30" CornerRadius="8"
+                                                        BackgroundColor="{StaticResource Primary}" TextColor="White" VerticalOptions="Center"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=PickCandidateCommand}"
+                                                        CommandParameter="{Binding .}"/>
+                                                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Text="{Binding FamilyAddress}" FontSize="11"
+                                                       TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation" Margin="0,3,0,0"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <Button Text="使用该申请人" Style="{StaticResource ButtonPrimary}" HeightRequest="44"
+                                    Command="{Binding SelectCandidateCommand}"
+                                    IsEnabled="{Binding SelectedCandidate, Converter={StaticResource NullToBoolConverter}}"/>
+
+                            <Border IsVisible="{Binding IsCandidateSelected}" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <Label Text="{Binding CandidateSummary}" FontSize="13" TextColor="{StaticResource PrimaryDark}"/>
+                            </Border>
+
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="申请人姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantName}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="身份证号 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantGender}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantAge, StringFormat='{0} 周岁'}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="联系电话" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantPhone}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="家庭类别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker ItemsSource="{Binding FamilyCategoryOptions}" SelectedItem="{Binding ApplicantFamilyCategory}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantFamilySize, StringFormat='{0} 人'}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding BankName}" Placeholder="银行卡开户行（来源台账自动带出，可修改）" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding BankAccount}" Placeholder="银行卡号/一卡通账号" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+
+                            <Label Text="户籍所在地（从当前登录用户组织机构获取）" FontSize="12" TextColor="{StaticResource TextTertiary}" Margin="0,6,0,0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="省" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding HukouProvince}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="市" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding HukouCity}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="县区" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding HukouDistrict}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="镇社区" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding HukouTown}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <Label Text="家庭住址（省市区县镇社区/村取自来源数据，详细地址可编辑）" FontSize="12" TextColor="{StaticResource TextTertiary}" Margin="0,6,0,0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="省" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantProvince}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="市" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantCity}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="县区" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantDistrict}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="镇社区" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding ApplicantTown}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="村" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantVillage}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="详细地址" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantDetailAddress}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- ══ 分区1：申请信息 ══ -->
+                <VerticalStackLayout Spacing="12" IsVisible="{Binding IsSection1Selected}">
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="选择申请成员（救助对象）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="救助对象 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding BeneficiaryOptions}" SelectedItem="{Binding SelectedBeneficiary}"
+                                        ItemDisplayBinding="{Binding DisplayName}" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="与户主关系" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding BeneficiaryRelation}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <Border IsVisible="{Binding BeneficiaryIdCard, Converter={StaticResource StringNotEmptyConverter}}"
+                                    BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <Label>
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="救助对象：" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                            <Span Text="{Binding BeneficiaryName}" TextColor="{StaticResource PrimaryDark}"/>
+                                            <Span Text="　"/><Span Text="{Binding BeneficiaryIdCard}" TextColor="{StaticResource PrimaryDark}"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                            </Border>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="申请内容" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="申请日期 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <DatePicker Date="{Binding ApplyDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="填报单位" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ReportUnit}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="困难类型" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding DifficultyTypeOptions}" SelectedItem="{Binding DifficultyType}" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+
+                            <!-- 疾病明细 -->
+                            <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsDiseaseType}" Padding="10">
+                                <VerticalStackLayout Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label Text="疾病明细（最多10条）" Style="{StaticResource SectionTitleLabel}" Margin="0" FontSize="14" VerticalOptions="Center"/>
+                                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonSmall}" Command="{Binding AddDiseaseCommand}"/>
+                                    </Grid>
+                                    <HorizontalStackLayout Spacing="6">
+                                        <Label Text="多家医院" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Switch IsToggled="{Binding IsMultiHospitalMode}" IsEnabled="{Binding IsEditable}" OnColor="{StaticResource Primary}"/>
+                                    </HorizontalStackLayout>
+                                    <VerticalStackLayout Spacing="8" IsVisible="{Binding IsMultiHospitalMode, Converter={StaticResource BoolToInverseConverter}}">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="所在医院" Style="{StaticResource FormFieldLabelStyle}"/>
+                                            <Entry Text="{Binding Hospital}" Placeholder="如：县人民医院" Style="{StaticResource FormFieldEntryStyle}"/>
+                                        </VerticalStackLayout>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="4">
+                                                <Label Text="治疗开始" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                <DatePicker Date="{Binding TreatStartDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                <Label Text="治疗结束" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                <DatePicker Date="{Binding TreatEndDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                            <VerticalStackLayout Spacing="4">
+                                                <Label Text="医疗费用总额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                <Entry Text="{Binding MedicalTotal, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                <Label Text="医保/其他报销（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                <Entry Text="{Binding InsurancePaid, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                        <VerticalStackLayout Spacing="4">
+                                            <Label Text="个人自付费用（元）*" Style="{StaticResource FormFieldLabelStyle}"/>
+                                            <Entry Text="{Binding SelfPaid, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                        </VerticalStackLayout>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Diseases}" Spacing="0">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="ent:TempReliefDisease">
+                                                <Border Style="{StaticResource CardBorder}" Padding="10" Margin="0,4">
+                                                    <VerticalStackLayout Spacing="6">
+                                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                            <Label Text="疾病诊断结果" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Button Grid.Column="1" Text="×" FontSize="14" WidthRequest="30" HeightRequest="30" Padding="0"
+                                                                    CornerRadius="15" HorizontalOptions="End"
+                                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=RemoveDiseaseCommand}"
+                                                                    CommandParameter="{Binding .}"/>
+                                                        </Grid>
+                                                        <Entry Text="{Binding DiseaseName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="患病成员" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=MemberNameOptions}"
+                                                                    SelectedItem="{Binding MemberName}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="疾病编码（ICD-10）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Entry Text="{Binding DiseaseCode}" Placeholder="输入编码自动带出名称"
+                                                                   Style="{StaticResource FormFieldEntryStyle}" TextChanged="OnDiseaseCodeTextChanged"/>
+                                                        </VerticalStackLayout>
+                                                        <VerticalStackLayout Spacing="4" IsVisible="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=IsMultiHospitalMode}">
+                                                            <Label Text="所在医院 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Entry Text="{Binding Hospital}" Placeholder="县人民医院" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=IsMultiHospitalMode}">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="开始" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <DatePicker Date="{Binding TreatStartDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="结束" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <DatePicker Date="{Binding TreatEndDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" IsVisible="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=IsMultiHospitalMode}">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="费用总额" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding MedicalTotal, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="报销" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding InsurancePaid, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                                                <Label Text="自付 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding SelfPaid, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- 意外灾害明细 -->
+                            <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsAccidentType}" Padding="10">
+                                <VerticalStackLayout Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label Text="意外灾害明细（最多10条）" Style="{StaticResource SectionTitleLabel}" Margin="0" FontSize="14" VerticalOptions="Center"/>
+                                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonSmall}" Command="{Binding AddAccidentCommand}"/>
+                                    </Grid>
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Accidents}" Spacing="0">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="ent:TempReliefAccident">
+                                                <Border Style="{StaticResource CardBorder}" Padding="10" Margin="0,4">
+                                                    <VerticalStackLayout Spacing="6">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <Label Text="意外灾害明细" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"/>
+                                                            <Button Grid.Column="1" Text="×" FontSize="14" WidthRequest="30" HeightRequest="30" Padding="0" CornerRadius="15"
+                                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=RemoveAccidentCommand}"
+                                                                    CommandParameter="{Binding .}"/>
+                                                        </Grid>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="意外/灾害类型 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=AccidentTypeOptions}"
+                                                                    SelectedItem="{Binding AccidentType}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="受灾成员" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=MemberNameOptions}"
+                                                                    SelectedItem="{Binding MemberName}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="发生时间" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <DatePicker Date="{Binding HappenDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="发生地点" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding HappenPlace}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="人身伤害/伤残情况" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Editor Text="{Binding InjurySituation}" HeightRequest="60" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="财产损失（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding PropertyLoss, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="已获保险/赔偿（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding CompensationPaid, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="责任认定情况" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Entry Text="{Binding ResponsibilityDesc}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                        </VerticalStackLayout>
+                                                        <VerticalStackLayout Spacing="4">
+                                                            <Label Text="佐证材料说明" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                            <Entry Text="{Binding MaterialDesc}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                        </VerticalStackLayout>
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- 教育支出明细 -->
+                            <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsEducationType}" Padding="10">
+                                <VerticalStackLayout Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label Text="教育支出明细（最多10条）" Style="{StaticResource SectionTitleLabel}" Margin="0" FontSize="14" VerticalOptions="Center"/>
+                                        <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonSmall}" Command="{Binding AddEducationCommand}"/>
+                                    </Grid>
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Educations}" Spacing="0">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="ent:TempReliefEducation">
+                                                <Border Style="{StaticResource CardBorder}" Padding="10" Margin="0,4">
+                                                    <VerticalStackLayout Spacing="6">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <Label Text="教育支出明细" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"/>
+                                                            <Button Grid.Column="1" Text="×" FontSize="14" WidthRequest="30" HeightRequest="30" Padding="0" CornerRadius="15"
+                                                                    BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=RemoveEducationCommand}"
+                                                                    CommandParameter="{Binding .}"/>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="学生姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding StudentName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="就学阶段 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=EducationStageOptions}"
+                                                                        SelectedItem="{Binding EducationStage}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="就读学校" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding SchoolName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="学年制" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=SchoolDurationOptions}"
+                                                                        SelectedItem="{Binding SchoolDurationDisplay}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="学费/住宿费（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <Entry Text="{Binding TuitionFee, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                            </VerticalStackLayout>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                                <Label Text="缴费时间" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                                <DatePicker Date="{Binding FeeDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="申请救助原因 / 困难情况 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Editor Text="{Binding DifficultyReason}" HeightRequest="100"
+                                        Placeholder="如：因病、因灾等突发困难，家庭基本生活暂时陷入困境..."/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="享受的政策救助情况" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Editor Text="{Binding PolicyEnjoyed}" HeightRequest="80" Placeholder="如：最低生活保障/特困人员等..."/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="家庭成员状态" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Editor Text="{Binding FamilyMemberStatus}" HeightRequest="80" Placeholder="如：家庭成员健康/患病/劳动能力等情况..."/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- ══ 分区2：金额与公示 ══ -->
+                <VerticalStackLayout Spacing="12" IsVisible="{Binding IsSection2Selected}">
+                    <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsSmallType}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="定额金额（小额快速救助）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="定额档位 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding SmallAmountLevelOptions}" SelectedItem="{Binding SelectedSmallAmountLevel}" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="确定金额" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ConfirmAmountDisplay}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsLargeType}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="大额救助金额" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <Label Text="大额救助金额不在本系统填写，按审批程序核定后确定。" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
+                            </Border>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="入户核实" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="入户核实情况" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Editor Text="{Binding VerifyResult}" HeightRequest="80" Placeholder="入户调查核实情况..."/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="公示开始日期（固定每月10日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <DatePicker Date="{Binding PublicizeStartDateValue}" IsEnabled="False" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="公示结束日期（固定每月12日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <DatePicker Date="{Binding PublicizeEndDateValue}" IsEnabled="False" Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="乡镇验收人" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding AcceptancePerson}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- ══ 分区3：家庭成员 ══ -->
+                <VerticalStackLayout Spacing="12" IsVisible="{Binding IsSection3Selected}">
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="家庭成员（审批表逐行展示）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Button Grid.Column="1" Text="+ 添加" Style="{StaticResource ButtonSmall}" Command="{Binding AddMemberCommand}"/>
+                            </Grid>
+                            <Label Text="选中申请人时已自动带回，可增删调整（最多 5 行）。" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Members}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="ent:TempReliefMember">
+                                        <Border Style="{StaticResource CardBorder}" Padding="10" Margin="0,4">
+                                            <VerticalStackLayout Spacing="6">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <Label Text="家庭成员" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"/>
+                                                    <Button Grid.Column="1" Text="×" FontSize="14" WidthRequest="30" HeightRequest="30" Padding="0" CornerRadius="15"
+                                                            BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.TempRelief.MobileTempReliefFormViewModel}}, Path=RemoveMemberCommand}"
+                                                            CommandParameter="{Binding .}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                    <VerticalStackLayout Spacing="4">
+                                                        <Label Text="姓名 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                        <Entry Text="{Binding MemberName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                    </VerticalStackLayout>
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                        <Label Text="与户主关系" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                        <Entry Text="{Binding Relation}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                    </VerticalStackLayout>
+                                                </Grid>
+                                                <VerticalStackLayout Spacing="4">
+                                                    <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                    <Entry Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                </VerticalStackLayout>
+                                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                    <VerticalStackLayout Spacing="4">
+                                                        <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                        <Entry Text="{Binding Gender}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                    </VerticalStackLayout>
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                                        <Label Text="年收入（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                        <Entry Text="{Binding AnnualIncome, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                    </VerticalStackLayout>
+                                                </Grid>
+                                                <VerticalStackLayout Spacing="4">
+                                                    <Label Text="工作单位" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                    <Entry Text="{Binding WorkUnit}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                </VerticalStackLayout>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部操作栏 -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,10,12,16">
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="上一页" FontSize="13" HeightRequest="46" CornerRadius="10"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding PreviousSectionCommand}" IsEnabled="{Binding CanGoPrevious}"/>
+                <Button Grid.Column="1" Text="下一页" FontSize="13" HeightRequest="46" CornerRadius="10"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding NextSectionCommand}" IsEnabled="{Binding CanGoNext}"/>
+                <Button Grid.Column="2" Text="保存草稿" FontSize="13" HeightRequest="46" CornerRadius="10"
+                        BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
+                        Command="{Binding SaveCommand}" IsVisible="{Binding IsSavable}"/>
+                <Button Grid.Column="3" Text="保存并确认" FontSize="13" HeightRequest="46" CornerRadius="10"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        Command="{Binding SaveAndConfirmCommand}" IsVisible="{Binding IsSaveAndConfirmVisible}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

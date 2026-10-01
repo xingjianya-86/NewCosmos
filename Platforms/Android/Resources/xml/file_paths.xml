@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 推送更新包（APK）FileProvider 可共享路径：应用 files 与 cache 私有目录 -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path name="newcosmos_files" path="." />
+    <cache-path name="newcosmos_cache" path="." />
+</paths>

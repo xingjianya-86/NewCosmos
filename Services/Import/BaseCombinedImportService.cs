@@ -1,8 +1,9 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -10,24 +11,10 @@ namespace NewCosmos.Services.Import;
 
 public abstract class BaseCombinedImportService : BaseService, ICombinedImportService
 {
-    private static readonly HashSet<string> AllowedTableNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "nc_biz_rural_subsistence_families",
-        "nc_biz_rural_subsistence_persons",
-        "nc_biz_urban_subsistence_families",
-        "nc_biz_urban_subsistence_persons",
-        "nc_biz_destitute_families",
-        "nc_biz_destitute_persons",
-        "nc_biz_low_income_edge_families",
-        "nc_biz_low_income_edge_persons",
-        "nc_biz_rigid_expenditure_families",
-        "nc_biz_rigid_expenditure_persons",
-    };
-
+    /// <summary>表名白名单统一走 Helpers.TableNameValidator（原本地白名单为其子集，已删除）。</summary>
     protected static void ValidateTableName(string tableName)
     {
-        if (!AllowedTableNames.Contains(tableName))
-            throw new BusinessException(ErrorCodes.VALIDATION_FAILED, $"不允许的表名: {tableName}");
+        Helpers.TableNameValidator.ValidateOrThrow(tableName);
     }
 
     protected readonly IDatabaseService DatabaseService;
@@ -102,13 +89,16 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
     protected readonly List<string> ImportWarnings = new();
 
     // ── 当前库查重（排除已存在/已死亡）──
-    // 与 RowErrors/ImportWarnings 一致：导入由 UI 串行触发（IsBusy 互斥），实例字段不做并发防护。
+    // 服务注册为 Singleton；并发导入由 _importGate 串行化，实例字段不再被交叉污染。
     private HashSet<string> _existingIdCards = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> _headToMemberCards = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _rejectedHeadCards = new(StringComparer.OrdinalIgnoreCase);
     private int _excludeFamilyCount;
     private int _excludePersonCount;
     private readonly List<string> _excludeSamples = new();
+
+    /// <summary>整合导入互斥锁：串行化并发导入，避免实例状态（查重集/排除计数）互相污染。</summary>
+    private readonly SemaphoreSlim _importGate = new(1, 1);
 
     /// <summary>
     /// 记录一条行级错误（写入 RowErrors 并记日志）。子类的行循环 catch 中必须调用，
@@ -279,6 +269,24 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        await _importGate.WaitAsync(ct);
+        try
+        {
+            return await ImportCombinedCoreAsync(familyFilePath, personFilePath, clearBeforeImport, progress, ct);
+        }
+        finally
+        {
+            _importGate.Release();
+        }
+    }
+
+    private async Task<CombinedImportResult> ImportCombinedCoreAsync(
+        string familyFilePath,
+        string personFilePath,
+        bool clearBeforeImport,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
         var result = new CombinedImportResult();
         var startTime = DateTime.UtcNow;
         RowErrors.Clear();
@@ -292,7 +300,7 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
 
         try
         {
-            await DatabaseService.BeginTransactionAsync();
+            await using var tx = await DatabaseService.BeginTransactionScopeAsync(ct);
             try
             {
                 // 排除当前库已存在/已死亡：加载查重集 + 预读人员文件构建"户主→成员身份证"映射
@@ -354,18 +362,18 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
 
                 if (result.Errors.Count == 0)
                 {
-                    await DatabaseService.CommitTransactionAsync();
+                    await tx.CommitAsync(ct);
                     result.Success = true;
                 }
                 else
                 {
-                    await DatabaseService.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     result.ErrorMessage = $"导入因错误回滚: {string.Join("; ", result.Errors.Take(5))}";
                 }
             }
             catch
             {
-                await DatabaseService.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 throw;
             }
         }
@@ -942,21 +950,19 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
 
     protected static DateTime? GetBirthDateFromIdCard(string idCard)
     {
+        // 结构化解析（TryParseExact）：非数字/非法日期返回 null，不走异常路径
         if (idCard.Length != 18) return null;
-        try
-        {
-            var year = int.Parse(idCard.Substring(6, 4));
-            var month = int.Parse(idCard.Substring(10, 2));
-            var day = int.Parse(idCard.Substring(12, 2));
-            return new DateTime(year, month, day);
-        }
-        catch { return null; }
+        return DateTime.TryParseExact(
+            idCard.Substring(6, 8), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d
+            : null;
     }
 
     protected static string GetGenderFromIdCard(string idCard)
     {
         if (idCard.Length != 18) return "";
-        var genderCode = int.Parse(idCard[16].ToString());
-        return genderCode % 2 == 1 ? "男" : "女";
+        var ch = idCard[16];
+        if (!char.IsDigit(ch)) return "";
+        return (ch - '0') % 2 == 1 ? "男" : "女";
     }
 }

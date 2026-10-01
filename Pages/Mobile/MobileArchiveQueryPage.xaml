@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileArchiveQueryPage"
+             x:DataType="ArchiveQueryViewModel"
+             Title="救助档案管理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+        <!-- 蓝色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="10">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="救助档案管理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="低收入人口历史档案检索查阅" FontSize="13" TextColor="#E6FFFFFF"/>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding TotalArchivesText}" Caption="归档总数（件）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding MonthlyArchivesText}" Caption="当月归档（件）"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 档案搜索 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="档案搜索" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Grid.Column="0" Placeholder="输入姓名或身份证号（当前库+历史库）" Text="{Binding SearchKeyword}"
+                                   HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
+                            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                                    Command="{Binding SearchCommand}"/>
+                        </Grid>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding SearchResults}" Spacing="0"
+                                             IsVisible="{Binding HasSearchResults}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="results:ArchiveSearchResultItem">
+                                    <Border StrokeShape="RoundRectangle 10" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" Padding="12" Margin="0,4">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                                <HorizontalStackLayout Spacing="8">
+                                                    <Label Text="{Binding ApplicantName}" FontSize="15" FontAttributes="Bold"
+                                                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                                    <Border BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center"
+                                                            IsVisible="{Binding IsFromCurrentLibrary}">
+                                                        <Label Text="{Binding SourceDisplay}" FontSize="11" TextColor="{StaticResource PrimaryDark}"/>
+                                                    </Border>
+                                                    <Border BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center"
+                                                            IsVisible="{Binding IsFromImportedLibrary}">
+                                                        <Label Text="{Binding SourceDisplay}" FontSize="11" TextColor="{StaticResource WarningDark}"/>
+                                                    </Border>
+                                                </HorizontalStackLayout>
+                                                <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding Address}" FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                                <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                                       IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="1" Text="选择" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                                                    BackgroundColor="Transparent" TextColor="{StaticResource Primary}"
+                                                    BorderColor="{StaticResource Primary}" BorderWidth="1" VerticalOptions="Center"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveQueryViewModel}}, Path=SelectArchiveCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 选中档案 -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasSelectedArchive}">
+                    <VerticalStackLayout Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding ApplicantName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding SourceDisplay}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4" VerticalOptions="Center">
+                                <Label Text="{Binding ClassificationName}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                            </Border>
+                        </Grid>
+
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                        <Button Text="查看档案信息（只读）" HeightRequest="42" FontSize="14" CornerRadius="10"
+                                BackgroundColor="Transparent" TextColor="{StaticResource Primary}"
+                                BorderColor="{StaticResource Primary}" BorderWidth="1"
+                                Command="{Binding ViewCurrentArchiveCommand}" IsVisible="{Binding IsCurrentLibrary}"/>
+
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding IsImportedLibrary}">
+                            <Label Text="数据摘要（历史库）" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding SummaryFields}" IsVisible="{Binding HasImportedDetail}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="SummaryFieldItem">
+                                        <Grid ColumnDefinitions="110,*" ColumnSpacing="8">
+                                            <Label Text="{Binding Label}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Grid.Column="1" Text="{Binding Value}" FontSize="13" FontAttributes="Bold"
+                                                   TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <Label Text="家庭成员" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                                   Margin="0,6,0,0" IsVisible="{Binding HasImportedDetail}"/>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding MemberItems}" Spacing="0" IsVisible="{Binding HasImportedDetail}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="ImportedMemberDisplayItem">
+                                        <Border StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" Padding="10" Margin="0,3">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                                    <Label Grid.Column="1" Text="{Binding Relationship, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                </Grid>
+                                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                                    <Label Text="{Binding Age}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                    <Label Grid.Column="1" Text="{Binding AnnualIncomeDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                    <Label Grid.Column="2" Text="{Binding ClassifiedSubsidyDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                </Grid>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <Label Text="正在加载档案数据..." FontSize="13" TextColor="{StaticResource TextTertiary}"
+                                   IsVisible="{Binding IsLoadingDetail}" HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+
+                        <!-- 打印证明（手机端推送打印） -->
+                        <Border Style="{StaticResource CardBorder}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="打印证明" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                                <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="证明模板" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker ItemsSource="{Binding ProofTemplateOptions}" SelectedItem="{Binding SelectedProofTemplateOption}"
+                                            ItemDisplayBinding="{Binding DisplayName}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                </VerticalStackLayout>
+
+                                <!-- 通配模板：手工输入目标证明单位 -->
+                                <VerticalStackLayout Spacing="4" IsVisible="{Binding IsGenericTemplateSelected}">
+                                    <Label Text="目标证明单位（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding TargetUnitName}" Placeholder="如：XX市民政局 / XX街道办事处"
+                                           Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+
+                                <!-- 单位专属模板：只读接收单位 -->
+                                <VerticalStackLayout Spacing="4" IsVisible="{Binding IsUnitTemplateSelected}">
+                                    <Label Text="接收单位" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Entry Text="{Binding SelectedProofTemplateOption.UnitName}" IsReadOnly="True"
+                                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                </VerticalStackLayout>
+
+                                <Label Text="{Binding SelectedTemplateName, StringFormat='模板: {0}'}" FontSize="12" TextColor="{StaticResource Primary}"
+                                       IsVisible="{Binding SelectedTemplateName, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                <Label Text="{Binding NoGenericTemplateHint}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding NoGenericTemplateHint, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                <Label Text="{Binding NoUnitTemplatesHint}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding NoUnitTemplatesHint, Converter={StaticResource StringNotEmptyConverter}}"/>
+
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="份数" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                                    <Button Grid.Column="1" Text="−" WidthRequest="36" HeightRequest="34" Padding="0" CornerRadius="8"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
+                                            Command="{Binding DecreaseCopiesCommand}"/>
+                                    <Label Grid.Column="2" Text="{Binding Copies}" FontSize="15" FontAttributes="Bold"
+                                           TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"
+                                           WidthRequest="30" HorizontalTextAlignment="Center"/>
+                                    <Button Grid.Column="3" Text="+" WidthRequest="36" HeightRequest="34" Padding="0" CornerRadius="8"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
+                                            Command="{Binding IncreaseCopiesCommand}"/>
+                                </Grid>
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="双面打印" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+
+                                <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                                    <Label Text="打印由电脑端执行，使用电脑默认打印机；单位专属模板请在电脑端维护。"
+                                           FontSize="12" TextColor="{StaticResource PrimaryDark}"/>
+                                </Border>
+
+                                <Button Text="推送打印" HeightRequest="46" FontSize="15" FontAttributes="Bold" CornerRadius="10"
+                                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                        Command="{Binding PushPrintProofCommand}"
+                                        IsEnabled="{Binding CanPrintProof}"/>
+                                <Label Text="无打印证明权限，请联系管理员。" FontSize="12" TextColor="{StaticResource Error}"
+                                       IsVisible="{Binding CanPrintProof, Converter={StaticResource BoolToInverseConverter}}"/>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 证明开具历史 -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasPrintHistory}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="证明开具历史" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding PrintHistory}" Spacing="0">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="PrintRecordDisplayItem">
+                                    <Border Padding="10" Margin="0,3" StrokeShape="RoundRectangle 8"
+                                            BackgroundColor="{StaticResource Gray50}" StrokeThickness="0">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding TemplateName}" FontSize="13" FontAttributes="Bold"
+                                                       TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                                <Label Grid.Column="1" Text="{Binding DisplayTime}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding PrinterName, StringFormat='打印机: {0}'}" FontSize="12"
+                                                       TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                                <Label Grid.Column="1" Text="{Binding OperatorName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                            </Grid>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="2" BackgroundColor="#80000000"
+                IsVisible="{Binding IsOverallBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsOverallBusy}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

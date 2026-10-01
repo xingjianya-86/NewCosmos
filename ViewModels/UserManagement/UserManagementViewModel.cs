@@ -330,24 +330,16 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
 
         _logger.LogBusiness("开始创建用户");
 
-        UserEditorViewModel = new UserEditorViewModel(_userService,
-            _organizationService,
-            _roleService,
-            _dictionaryService,
-            _permissionService,
-            _dataScopeService,
-            _currentUserId,
-            _logger,
-            _dialogService,
-            _serviceProvider,
-            null,
+        var editor = _serviceProvider.GetRequiredService<UserEditorViewModel>();
+        editor.Initialize(null,
             async () =>
             {
                 IsUserEditorVisible = false;
                 await LoadDataAsync();
             });
+        UserEditorViewModel = editor;
 
-        await UserEditorViewModel.InitializeAsync();
+        await editor.InitializeAsync();
         IsUserEditorVisible = true;
     }
 
@@ -360,24 +352,16 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
         {
             _logger.LogBusiness("编辑用户", ("UserId", user.Id));
 
-        UserEditorViewModel = new UserEditorViewModel(_userService,
-                _organizationService,
-                _roleService,
-                _dictionaryService,
-                _permissionService,
-                _dataScopeService,
-                _currentUserId,
-                _logger,
-                _dialogService,
-                _serviceProvider,
-                user,
+            var editor = _serviceProvider.GetRequiredService<UserEditorViewModel>();
+            editor.Initialize(user,
                 async () =>
                 {
                     IsUserEditorVisible = false;
                     await LoadDataAsync();
                 });
+            UserEditorViewModel = editor;
 
-            await UserEditorViewModel.InitializeAsync();
+            await editor.InitializeAsync();
             IsUserEditorVisible = true;
         }
         catch (Exception ex)
@@ -547,16 +531,14 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
 
         _logger.LogBusiness("开始创建角色");
 
-        RoleEditorViewModel = new RoleEditorViewModel(_roleService,
-            _logger,
-            _dialogService,
-            _serviceProvider,
-            null,
+        var editor = _serviceProvider.GetRequiredService<RoleEditorViewModel>();
+        editor.Initialize(null,
             async () =>
             {
                 IsRoleEditorVisible = false;
                 await LoadRolesAsync();
             });
+        RoleEditorViewModel = editor;
 
         IsRoleEditorVisible = true;
         return Task.CompletedTask;
@@ -569,16 +551,14 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
 
         _logger.LogBusiness("编辑角色", ("RoleId", role.Id));
 
-        RoleEditorViewModel = new RoleEditorViewModel(_roleService,
-            _logger,
-            _dialogService,
-            _serviceProvider,
-            role,
+        var editor = _serviceProvider.GetRequiredService<RoleEditorViewModel>();
+        editor.Initialize(role,
             async () =>
             {
                 IsRoleEditorVisible = false;
                 await LoadRolesAsync();
             });
+        RoleEditorViewModel = editor;
 
         IsRoleEditorVisible = true;
         return Task.CompletedTask;
@@ -733,12 +713,11 @@ public partial class UserEditorViewModel : ViewModelBase
     private readonly IDictionaryService _dictionaryService = null!;
     private readonly INewPermissionService _permissionService = null!;
     private readonly IDataScopeService _dataScopeService = null!;
-    private readonly int _currentUserId;
     private readonly ILoggerService _logger = null!;
     private readonly IDialogService _dialogService = null!;
     private readonly IServiceProvider _serviceProvider = null!;
-    private readonly Func<Task> _onSaved = null!;
-    private readonly User _originalUser = null!;
+    private Func<Task>? _onSaved;
+    private User? _originalUser;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -785,32 +764,11 @@ public partial class UserEditorViewModel : ViewModelBase
 
     public bool IsEditMode => _originalUser != null;
 
-    public UserEditorViewModel(
-        IUserService userService,
-        IOrganizationService organizationService,
-        IRoleService roleService,
-        IDictionaryService dictionaryService,
-        INewPermissionService permissionService,
-        IDataScopeService dataScopeService,
-        int currentUserId,
-        ILoggerService logger,
-        IDialogService dialogService,
-        IServiceProvider serviceProvider,
-        User user,
-        Func<Task> onSaved)
+    /// <summary>从 DI 解析后、绑定前调用：传入本次编辑目标与保存回调（new 的运行期参数改由此承载）</summary>
+    public void Initialize(User? user, Func<Task> onSaved)
     {
-        _userService = userService;
-        _organizationService = organizationService;
-        _roleService = roleService;
-        _dictionaryService = dictionaryService;
-        _permissionService = permissionService;
-        _dataScopeService = dataScopeService;
-        _currentUserId = currentUserId;
-        _logger = logger;
-        _dialogService = dialogService;
-        _serviceProvider = serviceProvider;
-        _onSaved = onSaved;
         _originalUser = user;
+        _onSaved = onSaved;
 
         if (user != null)
         {
@@ -820,6 +778,28 @@ public partial class UserEditorViewModel : ViewModelBase
             IdentityCard = user.IdentityCard ?? string.Empty;
             IsActive = user.IsActive;
         }
+    }
+
+    public UserEditorViewModel(
+        IUserService userService,
+        IOrganizationService organizationService,
+        IRoleService roleService,
+        IDictionaryService dictionaryService,
+        INewPermissionService permissionService,
+        IDataScopeService dataScopeService,
+        ILoggerService logger,
+        IDialogService dialogService,
+        IServiceProvider serviceProvider)
+    {
+        _userService = userService;
+        _organizationService = organizationService;
+        _roleService = roleService;
+        _dictionaryService = dictionaryService;
+        _permissionService = permissionService;
+        _dataScopeService = dataScopeService;
+        _logger = logger;
+        _dialogService = dialogService;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task InitializeAsync()
@@ -877,7 +857,7 @@ public partial class UserEditorViewModel : ViewModelBase
                 List<int> manageableOrgIds;
                 try
                 {
-                    manageableOrgIds = await _dataScopeService.GetManageableOrganizationIdsAsync(_currentUserId);
+                    manageableOrgIds = await _dataScopeService.GetManageableOrganizationIdsAsync(App.CurrentUserId ?? 0);
                 }
                 catch (Exception ex)
                 {
@@ -1022,7 +1002,7 @@ public partial class UserEditorViewModel : ViewModelBase
                         await _dialogService.DisplayAlertAsync("部分操作失败", string.Join("\n", errors), "确定");
                     }
 
-                    await _onSaved();
+                    if (_onSaved != null) await _onSaved();
                     _logger.LogBusiness("用户创建成功", ("UserId", userId), ("RolesAssigned", rolesAssigned));
                 }
                 else
@@ -1110,7 +1090,7 @@ public partial class UserEditorViewModel : ViewModelBase
                         await _dialogService.DisplayAlertAsync("部分操作失败", string.Join("\n", errors), "确定");
                     }
 
-                    await _onSaved();
+                    if (_onSaved != null) await _onSaved();
                     _logger.LogBusiness("用户更新成功", 
                         ("UserId", _originalUser.Id),
                         ("RolesRemoved", rolesRemoved),
@@ -1128,7 +1108,7 @@ public partial class UserEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task CancelAsync()
     {
-        await _onSaved();
+        if (_onSaved != null) await _onSaved();
     }
 }
 
@@ -1138,8 +1118,8 @@ public partial class RoleEditorViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly Func<Task> _onSaved;
-    private readonly RoleEntity _originalRole;
+    private Func<Task>? _onSaved;
+    private RoleEntity? _originalRole;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -1170,20 +1150,11 @@ public partial class RoleEditorViewModel : ViewModelBase
 
     public bool IsEditMode => _originalRole != null;
 
-    public RoleEditorViewModel(
-        IRoleService roleService,
-        ILoggerService logger,
-        IDialogService dialogService,
-        IServiceProvider serviceProvider,
-        RoleEntity role,
-        Func<Task> onSaved)
+    /// <summary>从 DI 解析后、绑定前调用：传入本次编辑目标与保存回调</summary>
+    public void Initialize(RoleEntity? role, Func<Task> onSaved)
     {
-        _roleService = roleService;
-        _logger = logger;
-        _dialogService = dialogService;
-        _serviceProvider = serviceProvider;
-        _onSaved = onSaved;
         _originalRole = role;
+        _onSaved = onSaved;
 
         if (role != null)
         {
@@ -1193,6 +1164,18 @@ public partial class RoleEditorViewModel : ViewModelBase
             RoleLevel = role.Level;
             RoleDataScope = string.IsNullOrWhiteSpace(role.DataScope) ? DataScopeConstants.SELF : role.DataScope;
         }
+    }
+
+    public RoleEditorViewModel(
+        IRoleService roleService,
+        ILoggerService logger,
+        IDialogService dialogService,
+        IServiceProvider serviceProvider)
+    {
+        _roleService = roleService;
+        _logger = logger;
+        _dialogService = dialogService;
+        _serviceProvider = serviceProvider;
     }
 
     partial void OnRoleDataScopeChanged(string value) => OnPropertyChanged(nameof(DataScopeDisplay));
@@ -1232,7 +1215,7 @@ public partial class RoleEditorViewModel : ViewModelBase
 
                 if (result.IsSuccess)
                 {
-                    await _onSaved();
+                    if (_onSaved != null) await _onSaved();
                     _logger.LogBusiness("角色创建成功", ("RoleId", result.Value));
                 }
                 else
@@ -1256,7 +1239,7 @@ public partial class RoleEditorViewModel : ViewModelBase
 
                 if (result.IsSuccess)
                 {
-                    await _onSaved();
+                    if (_onSaved != null) await _onSaved();
                     _logger.LogBusiness("角色更新成功", ("RoleId", _originalRole.Id));
                 }
                 else
@@ -1270,7 +1253,7 @@ public partial class RoleEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task CancelAsync()
     {
-        await _onSaved();
+        if (_onSaved != null) await _onSaved();
     }
 }
 

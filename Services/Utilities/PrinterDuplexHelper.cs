@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿#if WINDOWS
+using System.Runtime.InteropServices;
 
 namespace NewCosmos.Services.Utilities;
 
@@ -167,3 +168,4 @@ internal static class PrinterDuplexHelper
         public int AveragePPM;
     }
 }
+#endif

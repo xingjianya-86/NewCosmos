@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileIdCardScanPage"
+             Title="扫描身份证"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="Black">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- 顶部提示 -->
+        <VerticalStackLayout Grid.Row="0" Padding="20,28,20,12" Spacing="6">
+            <Label Text="扫描身份证" FontSize="20" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+            <Label Text="请将身份证放入框内，保持光线充足、边角对齐"
+                   FontSize="13" TextColor="#CCFFFFFF" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
+        </VerticalStackLayout>
+
+        <!-- 相机原生预览 + 取景框 -->
+        <Grid Grid.Row="1">
+            <controls:CameraPreviewView x:Name="Preview" />
+
+            <!-- 取景框叠加层（不拦截触摸） -->
+            <Grid InputTransparent="True">
+                <Border x:Name="GuideFrame"
+                        Stroke="#FFD24D" StrokeThickness="3"
+                        BackgroundColor="Transparent"
+                        HorizontalOptions="Center" VerticalOptions="Center"
+                        StrokeShape="RoundRectangle 14" />
+                <Label Text="身份证正面" FontSize="13" TextColor="#FFD24D" Rotation="90"
+                       VerticalOptions="Center" HorizontalOptions="Center" />
+            </Grid>
+
+            <!-- 识别中遮罩 -->
+            <Grid x:Name="BusyOverlay" BackgroundColor="#80000000" IsVisible="False" InputTransparent="False">
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                    <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" Color="White"/>
+                    <Label x:Name="BusyLabel" Text="正在识别身份证..." TextColor="White" FontSize="14"/>
+                </VerticalStackLayout>
+            </Grid>
+        </Grid>
+
+        <!-- 底部操作 -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Padding="20,16,20,32">
+            <Button Grid.Column="0" Text="取消" HeightRequest="50" CornerRadius="12" FontSize="16"
+                    BackgroundColor="Transparent" TextColor="White"
+                    BorderColor="#66FFFFFF" BorderWidth="1"
+                    Clicked="OnCancelClicked"/>
+            <Button Grid.Column="1" Text="从相册选择" HeightRequest="50" CornerRadius="12" FontSize="15"
+                    BackgroundColor="Transparent" TextColor="White"
+                    BorderColor="#66FFFFFF" BorderWidth="1"
+                    Clicked="OnPickFromGalleryClicked"/>
+            <Button Grid.Column="2" Text="拍照" HeightRequest="50" CornerRadius="12" FontSize="16" FontAttributes="Bold"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    Clicked="OnCaptureClicked"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

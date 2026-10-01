@@ -202,7 +202,12 @@ public class TemplateFieldBuilder
             if (template == null || string.IsNullOrEmpty(template.ConfigJson)) return null;
             return TemplateConfig.FromJson(template.ConfigJson);
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            // 配置损坏 → 降级为无配置构建（与 PrintService 策略对齐），但必须留 Error 日志便于定位打印缺字段
+            Serilog.Log.Error(ex, "[TemplateFieldBuilder] 模板配置解析失败 TemplateId={TemplateId}", templateId);
+            return null;
+        }
     }
 }
 

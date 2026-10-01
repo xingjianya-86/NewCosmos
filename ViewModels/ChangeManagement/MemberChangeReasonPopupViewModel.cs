@@ -20,6 +20,7 @@ public sealed record MemberChangeReasonResult(string ReasonCode, string ReasonNa
 /// 家庭成员变更登记弹窗 ViewModel（增员/减员共用）：
 /// 结果采用 TaskCompletionSource 模式（与 SelectMembersPopup 一致），弹窗由调用方 Push/Pop。
 /// </summary>
+/// 不继承 ViewModelBase（审计豁免）：纯 TCS 结果弹窗 + 表单字段，无服务调用/异步 IO。
 public partial class MemberChangeReasonPopupViewModel : ObservableObject
 {
     private readonly TaskCompletionSource<MemberChangeReasonResult?> _tcs = new();

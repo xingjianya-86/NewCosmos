@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileElderlyBenefitsHomePage"
+             x:DataType="ElderlyBenefitsHomeViewModel"
+             Title="高龄津贴发放"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
+
+                <!-- 紫色英雄头部 -->
+                <Border Background="{StaticResource StatCardPurpleGradient}" Padding="16,20">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="6">
+                            <HorizontalStackLayout.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                            </HorizontalStackLayout.GestureRecognizers>
+                            <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                            <Label Text="返回工作台" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+
+                        <Label Text="高龄津贴发放" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                        <Label Text="80 周岁以上老年人津贴申请登记 · 停发管理 · 类别复核" FontSize="13" TextColor="#E6FFFFFF"/>
+
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="0,4,0,0">
+                            <components:StatCapsule Grid.Column="0" Value="{Binding ActiveCountText}" Caption="在享领取（人）"/>
+                            <components:StatCapsule Grid.Column="1" Value="{Binding MonthlyNewText}" Caption="本月新增（人）"/>
+                            <components:StatCapsule Grid.Column="2" Value="{Binding PendingNewText}" Caption="待新增（人）"/>
+                            <components:StatCapsule Grid.Column="3" Value="{Binding PendingTransferText}" Caption="需停旧增新（人）"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 功能卡区 -->
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <Label Text="业务办理" FontSize="16" FontAttributes="Bold"
+                           TextColor="{StaticResource TextPrimary}" Margin="4,4,0,4"/>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12"
+                            Opacity="{Binding ElderlyOpacity}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenApplicationListCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#F5F3FF"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="📝" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="津贴申请登记" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="受理登记、审核确认高龄津贴申请" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12"
+                            Opacity="{Binding ElderlyOpacity}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenStopListCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#F5F3FF"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="🛑" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="停发办理" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="死亡、户籍迁出等情形停发处理" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12"
+                            Opacity="{Binding ElderlyOpacity}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenReviewListCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#F5F3FF"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="🔄" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="高龄津贴复核" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="身份/年龄重评，停旧增新" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12"
+                            Opacity="{Binding ElderlyOpacity}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#FFFBEB"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="📅" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="下月待办" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="满80周岁待新增 / 需停旧增新名单" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12"
+                            Opacity="{Binding ElderlyOpacity}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenMonthlyReportCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#F5F3FF"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="📊" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="高龄津贴月报表" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="按月生成、导出发放统计报表" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenRecoveryCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
+                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#FFF3E0"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
+                                <Label Text="💰" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="后补追缴" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="高龄津贴的后补追缴" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

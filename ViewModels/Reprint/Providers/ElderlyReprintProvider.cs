@@ -21,6 +21,7 @@ public class ElderlyReprintProvider : IReprintDomainProvider
     public string DomainKey => "ElderlyBenefits";
     public string DisplayName => "普惠高龄";
     public ReprintDomainMode Mode => ReprintDomainMode.ArchiveSet;
+    public ReprintMonthWindow MonthWindow => ReprintMonthWindow.NaturalMonth;
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByPersonAsync(string keyword, int limit = 20, CancellationToken ct = default)
     {

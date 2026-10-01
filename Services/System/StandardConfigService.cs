@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -473,37 +474,43 @@ public class StandardConfigService : BaseService, IStandardConfigService
         }
         await DelayAfterCompletionAsync();
 
-        await _dbService.BeginTransactionAsync();
+        await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
             await ReportProgressWithDelayAsync(progress, 4, totalSteps, "清空并插入标准配置数据");
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_config_standards", ct);
 
-            const string insertSql = @"
+            if (standards.Count > 0)
+            {
+                var insertHead = @"
                 INSERT INTO nc_config_standards 
                 (standard_type, standard_name, hukou_type, support_mode, standard_value, unit, 
                  effective_start_date, effective_end_date, version, is_active, description)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+                VALUES ";
 
-            foreach (var standard in standards)
-            {
-                await _dbService.ExecuteNonQueryAsync(insertSql, ct,
-                    standard.StandardType,
-                    standard.StandardName,
-                    standard.HukouType,
-                    standard.SupportMode,
-                    standard.StandardValue,
-                    standard.Unit,
-                    standard.EffectiveStartDate,
-                    standard.EffectiveEndDate,
-                    standard.Version,
-                    standard.IsActive,
-                    standard.Description);
+                var (valuesClause, insertArgs) = MultiRowValuesBuilder.Build(standards.Count, 11, i =>
+                {
+                    var standard = standards[i];
+                    return new object?[]
+                    {
+                        standard.StandardType, standard.StandardName, standard.HukouType, standard.SupportMode,
+                        standard.StandardValue, standard.Unit, standard.EffectiveStartDate, standard.EffectiveEndDate,
+                        standard.Version, standard.IsActive, standard.Description
+                    };
+                });
+
+                var insertResult = await _dbService.ExecuteNonQueryAsync(insertHead + valuesClause, ct, insertArgs);
+                if (insertResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    LogError($"写入标准配置失败: {insertResult.Message}");
+                    return Result.Failure(ErrorCodes.DB_QUERY_ERROR, insertResult.Message ?? "写入标准配置失败");
+                }
             }
             await DelayAfterCompletionAsync();
 
             await ReportProgressWithDelayAsync(progress, 5, totalSteps, "提交事务");
-            await _dbService.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
             InvalidateStandardCache();
             Logger.LogBusiness("标准配置初始化完成", ("Count", standards.Count));
 
@@ -511,7 +518,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
         }
         catch (Exception ex)
         {
-            await _dbService.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"操作失败: {ex.Message}");
             return Result.FromException(ex);
         }

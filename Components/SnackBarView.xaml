@@ -30,15 +30,13 @@
             </Style>
 
             <Style x:Key="SnackBarIconStyle" TargetType="Label">
-                <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
                 <Setter Property="FontSize" Value="16"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="VerticalTextAlignment" Value="Center"/>
             </Style>
 
             <Style x:Key="SnackBarCloseButtonStyle" TargetType="Button">
-                <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
-                <Setter Property="Text" Value="&#xE8BB;"/>
+                <Setter Property="Text" Value="✕"/>
                 <Setter Property="FontSize" Value="14"/>
                 <Setter Property="TextColor" Value="White"/>
                 <Setter Property="BackgroundColor" Value="Transparent"/>
@@ -54,7 +52,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto">
             <Label x:Name="IconLabel"
                    Grid.Column="0"
-                   Text="&#xE73E;"
+                   Text="✓"
                    Style="{StaticResource SnackBarIconStyle}"
                    Margin="0,0,12,0"/>
 

@@ -35,6 +35,7 @@ using XmlnsPrefixAttribute = Microsoft.Maui.Controls.XmlnsPrefixAttribute;
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.DatabaseManagement")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.ElderlyBenefits")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Main")]
+[assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Mobile")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Reprint")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Reprint.Providers")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Reporting")]

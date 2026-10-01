@@ -316,10 +316,10 @@
                                             <Picker Grid.Column="3" ItemsSource="{Binding MemberCityOptions}"
                                                     SelectedItem="{Binding HukouCity}" HeightRequest="38" FontSize="16"/>
                                             <Label Grid.Column="4" Text="区县" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
-                                            <Picker Grid.Column="5" ItemsSource="{Binding MemberDistrictOptions}"
+                                            <Picker Grid.Column="5" ItemsSource="{Binding HukouDistrictOptions}"
                                                     SelectedItem="{Binding HukouDistrict}" HeightRequest="38" FontSize="16"/>
                                             <Label Grid.Column="6" Text="乡镇" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
-                                            <Picker Grid.Column="7" ItemsSource="{Binding MemberTownOptions}"
+                                            <Picker Grid.Column="7" ItemsSource="{Binding HukouTownOptions}"
                                                     SelectedItem="{Binding HukouTown}" HeightRequest="38" FontSize="16"/>
                                         </Grid>
                                     </VerticalStackLayout>

@@ -23,4 +23,10 @@ public static class UIConstants
     public const string PROPERTY_DESC_PLACEHOLDER = "财产描述";
     public const string MONTHLY_AMOUNT_PLACEHOLDER = "月金额";
     public const string INCOME_TYPE_PLACEHOLDER = "收入类型";
+
+    // ScrollView 内 CollectionView 固定高度（有内容时取最大高度，避免删除项后回弹到顶部）
+    public const double SUBSIDY_LIST_MAX_HEIGHT = 560;
+    public const double RIGID_EXPENDITURE_LIST_MAX_HEIGHT = 600;
+    public const double SUPPORTER_LIST_MAX_HEIGHT = 780;
+    public const double LIST_MIN_HEIGHT = 40;
 }

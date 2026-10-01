@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
@@ -23,13 +23,54 @@ public class ApplicationService : BaseService, IApplicationService
     private readonly IDatabaseService _db;
     private readonly IPdfVerificationService _pdfVerificationService;
     private readonly IElderlyApplicationService _elderlyApplicationService;
+    private readonly IClassificationService _classificationService;
+    private readonly IGuaranteeAmountService _guaranteeAmountService;
+    private readonly Services.Core.IApplicationStatusService _statusService;
+
+    /// <summary>「已完结档案」状态过滤集（已出草稿态，防 Draft/Refused 异常行混入）</summary>
+    private static readonly List<string> ArchivedStatusFilter = new()
+    {
+        ApplicationStatusCodes.APPROVED,
+        ApplicationStatusCodes.COMPLETED,
+        ApplicationStatusCodes.STOPPED
+    };
 
     public ApplicationService(IDatabaseService db, ILoggerService logger, IPdfVerificationService pdfVerificationService,
-        IElderlyApplicationService elderlyApplicationService) : base(logger)
+        IElderlyApplicationService elderlyApplicationService,
+        IClassificationService classificationService,
+        IGuaranteeAmountService guaranteeAmountService,
+        Services.Core.IApplicationStatusService statusService) : base(logger)
     {
         _db = db;
         _pdfVerificationService = pdfVerificationService;
         _elderlyApplicationService = elderlyApplicationService;
+        _classificationService = classificationService;
+        _guaranteeAmountService = guaranteeAmountService;
+        _statusService = statusService;
+    }
+
+    /// <summary>
+    /// 在数据库事务中执行工作单元：正常完成提交，异常自动回滚。
+    /// 供 ViewModel 编排多服务保存流程使用（子服务经 HasTransaction 自动加入本事务）。
+    /// </summary>
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> work, CancellationToken ct = default)
+    {
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+        await work(ct);
+        await tx.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// 在数据库事务中执行返回 Result 的工作单元：Result 成功才提交，失败回滚并原样返回。
+    /// </summary>
+    public async Task<Result> ExecuteInTransactionForResultAsync(Func<CancellationToken, Task<Result>> work, CancellationToken ct = default)
+    {
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+        var result = await work(ct);
+        if (result.IsFailure)
+            return result;
+        await tx.CommitAsync(ct);
+        return result;
     }
 
     /// <summary>
@@ -65,7 +106,7 @@ public class ApplicationService : BaseService, IApplicationService
     public async Task<Result<ApplicationEntity>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"执行操作");
-        var sql = "SELECT * FROM nc_biz_applications WHERE id = $1 AND deleted_at IS null";
+        var sql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS null";
         return await _db.QuerySingleAsync<ApplicationEntity>(sql, ct, id);
     }
 
@@ -73,8 +114,29 @@ public class ApplicationService : BaseService, IApplicationService
     {
         ValidateNotNullOrEmpty(idCard, nameof(idCard));
         LogInfo($"根据身份证查询: {DataMasker.MaskIdCard(idCard)}");
-        var sql = "SELECT * FROM nc_biz_applications WHERE applicant_id_card = $1 AND deleted_at IS NULL ORDER BY created_at DESC";
+        var sql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE applicant_id_card = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100";
         return await _db.QueryAsync<ApplicationEntity>(sql, ct, idCard);
+    }
+
+    public async Task<Result<Dictionary<string, string>>> GetClassificationsByIdCardsAsync(IReadOnlyCollection<string> idCards, CancellationToken ct = default)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (idCards == null || idCards.Count == 0)
+            return Result.Success(map);
+
+        LogInfo($"批量查询档案分类: 数量={idCards.Count}");
+        var sql = "SELECT applicant_id_card, classification_result FROM nc_biz_applications WHERE applicant_id_card = ANY($1::text[]) AND deleted_at IS NULL";
+        var result = await _db.QueryAsync<(string? IdCard, string? Classification)>(sql, ct, new object[] { idCards.ToArray() });
+        if (result.IsFailure)
+            return Result.Failure<Dictionary<string, string>>(result.ErrorCode!, result.Message!);
+
+        foreach (var row in result.Value ?? new List<(string? IdCard, string? Classification)>())
+        {
+            // 同一身份证可能有多条档案，取先命中行
+            if (!string.IsNullOrWhiteSpace(row.IdCard) && !string.IsNullOrWhiteSpace(row.Classification))
+                map.TryAdd(row.IdCard.Trim(), row.Classification);
+        }
+        return Result.Success(map);
     }
 
     public async Task<Result<PagedResult<ApplicationEntity>>> GetPagedAsync(int pageIndex, int pageSize, string status = null, string keyword = null, CancellationToken ct = default)
@@ -93,7 +155,7 @@ public class ApplicationService : BaseService, IApplicationService
 
         var where = conditions.ToWhereClause();
         var countSql = $"SELECT COUNT(*) FROM nc_biz_applications{where}";
-        var querySql = $"SELECT * FROM nc_biz_applications{where}";
+        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications{where}";
 
         var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
         if (countResult.IsFailure)
@@ -126,7 +188,7 @@ public class ApplicationService : BaseService, IApplicationService
 
         var where = conditions.ToWhereClause();
         var countSql = $"SELECT COUNT(*) FROM nc_biz_applications{where}";
-        var querySql = $"SELECT * FROM nc_biz_applications{where}";
+        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications{where}";
 
         var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
         if (countResult.IsFailure)
@@ -145,13 +207,13 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<PagedResult<ApplicationEntity>>> SearchPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"搜索申请: keyword={keyword}, 第{pageIndex}页");
+        LogInfo($"搜索申请: keywordLength={keyword.Length}, 第{pageIndex}页");
         return await GetPagedAsync(pageIndex, pageSize, null, keyword, ct);
     }
 
     public async Task<Result<PagedResult<ApplicationEntity>>> SearchPagedAsync(string? keyword, string? status, string? role, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo($"搜索申请: keyword={keyword}, status={status}, role={role}, 第{pageIndex}页");
+        LogInfo($"搜索申请: keywordLength={keyword?.Length ?? 0}, status={status}, role={role}, 第{pageIndex}页");
         return await GetPagedAsync(pageIndex, pageSize, status!, keyword!, ct);
     }
 
@@ -163,23 +225,21 @@ public class ApplicationService : BaseService, IApplicationService
 
         LogInfo($"创建申请: {DataMasker.MaskName(request.ApplicantName)}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var existsResult = await CheckIdCardExistsAsync(request.ApplicantIdCard, null, ct);
             if (existsResult.IsSuccess && existsResult.Value)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(ErrorCodes.DUPLICATE_ID_CARD, "该身份证号已存在");
             }
 
             var appNoResult = await GetNextApplicationNoAsync(ct);
             if (appNoResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(appNoResult.ErrorCode!, appNoResult.Message!);
             }
 
@@ -190,7 +250,7 @@ public class ApplicationService : BaseService, IApplicationService
               physical_condition, disease_name, secondary_disease_name, disease_code, is_severe_disease, disability_type, disability_level, health_status,
              employment_status, work_unit, income_source,
              family_size, total_family_income, application_reason, status, created_by, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'Draft', $33, NOW(), NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $34, $33, NOW(), NOW())
             RETURNING id";
 
             var hukouType = request.HukouType ?? "Rural";
@@ -200,16 +260,16 @@ public class ApplicationService : BaseService, IApplicationService
                 request.Province, request.City, request.District, request.Town, request.Community, request.Address,
                 request.PhysicalCondition, request.DiseaseName, request.SecondaryDiseaseName, request.DiseaseCode, request.IsSevereDisease, request.DisabilityType, request.DisabilityLevel, request.HealthStatus,
                 request.EmploymentStatus, request.WorkUnit, request.IncomeSource,
-                request.FamilySize, request.AnnualIncome, request.ApplicationReason, request.CreatedBy);
+                request.FamilySize, request.AnnualIncome, request.ApplicationReason, request.CreatedBy,
+                ApplicationStatusCodes.DRAFT);
 
             if (insertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             Logger.LogBusiness("创建申请", ("ApplicationId", insertResult.Value), ("ApplicantName", DataMasker.MaskName(request.ApplicantName)));
@@ -217,7 +277,7 @@ public class ApplicationService : BaseService, IApplicationService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "创建申请失败");
             return Result.FromException<long>(ex);
         }
@@ -229,23 +289,21 @@ public class ApplicationService : BaseService, IApplicationService
 
         LogInfo($"创建申请(完整): {DataMasker.MaskName(application.ApplicantName)}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var existsResult = await CheckIdCardExistsAsync(application.ApplicantIdCard, null, ct);
             if (existsResult.IsSuccess && existsResult.Value)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(ErrorCodes.DUPLICATE_ID_CARD, "该身份证号已存在");
             }
 
             var appNoResult = await GetNextApplicationNoAsync(ct);
             if (appNoResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(appNoResult.ErrorCode!, appNoResult.Message!);
             }
 
@@ -319,18 +377,17 @@ public class ApplicationService : BaseService, IApplicationService
                 application.IsSpecialApproval, (object?)application.SpecialApprovalId,
                 application.Status ?? "Draft", application.CurrentStep,
                 application.CreatedBy ?? "System",
-                application.CreatedAt == default ? DateTime.UtcNow : application.CreatedAt,
-                DateTime.UtcNow,
+                application.CreatedAt == default ? DateTime.Now : application.CreatedAt,
+                DateTime.Now,
                 application.BankName ?? string.Empty, application.BankAccount ?? string.Empty);
 
             if (insertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             var newId = insertResult.Value;
             LogInfo($"创建申请成功: Id={newId}");
@@ -338,7 +395,7 @@ public class ApplicationService : BaseService, IApplicationService
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogError($"创建申请失败: {ex.Message}");
             return Result.Failure<long>(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }
@@ -350,30 +407,28 @@ public class ApplicationService : BaseService, IApplicationService
 
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var appResult = await GetByIdAsync(request.ApplicationId, ct);
             if (appResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(appResult.ErrorCode!, appResult.Message!);
             }
 
             var app = appResult.Value;
             if (app == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             // 补全模式（allowNonEditable=true）允许更新已建档的 Approved 档案；普通编辑仍只允许草稿
             if (!allowNonEditable && !ApplicationStateMachine.IsEditable(ApplicationStatusExtensions.FromCode(app.Status)))
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.INVALID_TRANSITION, "当前状态不允许编辑");
             }
 
@@ -482,13 +537,13 @@ public class ApplicationService : BaseService, IApplicationService
 
             if (updateResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
             }
 
             if (updateResult.Value == 0)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 // 携带令牌时 0 行 = 并发冲突（前面 GetByIdAsync 已确认记录存在）；
                 // 未携带令牌时 0 行 = 记录已被并发删除
                 return request.LoadedUpdatedAt.HasValue
@@ -496,15 +551,14 @@ public class ApplicationService : BaseService, IApplicationService
                     : Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在或已被删除");
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "更新申请失败");
             return Result.FromException(ex);
         }
@@ -611,10 +665,22 @@ public class ApplicationService : BaseService, IApplicationService
     {
         try
         {
+            // 导入库建档的档案补全即视为"已审批在保"：status=Approved + current_step=6（已归档完结）。
+            // 导入库本就是已在享对象的历史档案，补全只是把导入数据补到当前库，不存在二次审批。
+            // first_approved_at = 纳入时间（ImportedArchiveService 写入 created_at，取自
+            // 导入库 first_receive_month；edge/rigid 库无纳入时间则取建档时刻），
+            // 不用 NOW() —— 否则存量导入户会被月报"新增救助"口径计成当期新增。
+            // COALESCE 保持只写一次语义（与 ApproveAsync/CompleteArchiveAsync 一致）。
             var sql = $@"UPDATE nc_biz_applications SET
-                data_completed_at = NOW(), updated_at = NOW()
+                data_completed_at = NOW(),
+                status = CASE WHEN status = ANY($3) THEN status ELSE $4 END,
+                current_step = $2,
+                first_approved_at = COALESCE(first_approved_at, created_at, NOW()),
+                updated_at = NOW()
                 WHERE id = $1 AND deleted_at IS NULL";
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, id);
+            var result = await _db.ExecuteNonQueryAsync(sql, ct, id, WorkflowSteps.ARCHIVED,
+                new List<string> { ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.COMPLETED },
+                ApplicationStatusCodes.APPROVED);
             if (result.IsFailure)
                 return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     result.Message ?? "标记数据补全完成失败");
@@ -638,29 +704,27 @@ public class ApplicationService : BaseService, IApplicationService
     {
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var appResult = await GetByIdAsync(id, ct);
             if (appResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(appResult.ErrorCode!, appResult.Message!);
             }
 
             var app = appResult.Value;
             if (app == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             if (!ApplicationStateMachine.IsEditable(ApplicationStatusExtensions.FromCode(app.Status)))
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.INVALID_TRANSITION, "当前状态不允许删除");
             }
 
@@ -669,19 +733,18 @@ public class ApplicationService : BaseService, IApplicationService
 
             if (deleteResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "删除申请失败");
             return Result.FromException(ex);
         }
@@ -693,23 +756,21 @@ public class ApplicationService : BaseService, IApplicationService
 
         LogInfo($"执行操作");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var appResult = await GetByIdAsync(request.ApplicationId, ct);
             if (appResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(appResult.ErrorCode!, appResult.Message!);
             }
 
             var app = appResult.Value;
             if (app == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
@@ -717,32 +778,27 @@ public class ApplicationService : BaseService, IApplicationService
             var validateResult = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Submitted);
             if (validateResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.INVALID_TRANSITION, "当前状态不允许提交");
             }
 
-            var sql = $@"UPDATE nc_biz_applications SET 
-            status = $1, submit_at = NOW(), submit_by = $2, updated_at = NOW()
-            WHERE id = $3";
-
-            var submitResult = await _db.ExecuteNonQueryAsync(sql, ct, ApplicationStatus.Submitted.GetCode(), request.SubmittedBy, request.ApplicationId);
+            // 状态写入统一走 ApplicationStatusService（§9 状态机单一权威 + §8 审计留痕）
+            var submitResult = await _statusService.SubmitAsync(request.ApplicationId, request.SubmittedBy, ct);
 
             if (submitResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(submitResult.ErrorCode!, submitResult.Message!);
             }
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
-            Logger.LogBusiness("提交申请", ("ApplicationId", request.ApplicationId), ("SubmittedBy", request.SubmittedBy));
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "提交申请失败");
             return Result.FromException(ex);
         }
@@ -764,23 +820,21 @@ public class ApplicationService : BaseService, IApplicationService
 
         LogInfo($"审批申请: {request.ApplicationId}, 结果: {(request.Approved ? "通过" : "拒绝")}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
             var appResult = await GetByIdAsync(request.ApplicationId, ct);
             if (appResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(appResult.ErrorCode!, appResult.Message!);
             }
 
             var app = appResult.Value;
             if (app == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
@@ -789,22 +843,18 @@ public class ApplicationService : BaseService, IApplicationService
             var validateResult = ApplicationStateMachine.ValidateTransition(currentStatus, targetStatus);
             if (validateResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(ErrorCodes.INVALID_TRANSITION, "当前状态不允许审批");
             }
 
-            var newStatus = targetStatus.GetCode();
-            var sql = $@"UPDATE nc_biz_applications SET 
-            status = $1, updated_by = $2,
-            first_approved_at = CASE WHEN $1 = '{ApplicationStatusCodes.APPROVED}' THEN COALESCE(first_approved_at, NOW()) ELSE first_approved_at END,
-            updated_at = NOW()
-            WHERE id = $3";
-
-            var approveResult = await _db.ExecuteNonQueryAsync(sql, ct, newStatus, request.ApprovedBy, request.ApplicationId);
+            // 状态写入统一走 ApplicationStatusService（§9 状态机单一权威 + §8 审计留痕）
+            var approveResult = request.Approved
+                ? await _statusService.ApproveAsync(request.ApplicationId, request.ApprovedBy, ct)
+                : await _statusService.RefuseAsync(request.ApplicationId, request.ApprovedBy, ct);
 
             if (approveResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure(approveResult.ErrorCode!, approveResult.Message!);
             }
 
@@ -812,16 +862,14 @@ public class ApplicationService : BaseService, IApplicationService
             if (request.Approved)
                 await TryMarkAssetChecksIncludedAsync(app, ct);
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"执行操作");
-            Logger.LogBusiness("审批申请", ("ApplicationId", request.ApplicationId), ("Approved", request.Approved), ("ApprovedBy", request.ApprovedBy));
             return Result.Success();
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "审批申请失败");
             return Result.FromException(ex);
         }
@@ -914,13 +962,13 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<PagedResult<ApplicationEntity>>> GetArchiveBuiltNotSubmittedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo("获取已完成档案建设但未提交的申请（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
+        LogInfo("获取已完成档案建设但未提交的申请（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step = {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
-        var querySql = $"SELECT * FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step = {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
+        var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step = $2 AND deleted_at IS NULL";
+        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND current_step = $2 AND deleted_at IS NULL";
         var conditions = new List<string>();
-        var parameters = new List<object>();
-        var paramIndex = 1;
+        var parameters = new List<object> { ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE };
+        var paramIndex = 3;
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -955,8 +1003,8 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<int>> GetArchiveBuiltNotSubmittedCountAsync(CancellationToken ct = default)
     {
-        var sql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step = {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct);
+        var sql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step = $2 AND deleted_at IS NULL";
+        var result = await _db.ExecuteScalarAsync(sql, ct, ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));
@@ -964,13 +1012,17 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<PagedResult<ApplicationEntity>>> GetArchivedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo("获取已完结档案（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
+        LogInfo("获取已完结档案（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE current_step = {WorkflowSteps.ARCHIVED} AND deleted_at IS NULL";
-        var querySql = $"SELECT * FROM nc_biz_applications WHERE current_step = {WorkflowSteps.ARCHIVED} AND deleted_at IS NULL";
+        // 「已完结档案」= 已归档（current_step=6）且已出草稿态：
+        // 加 status 过滤防止 Draft/Refused 的异常行（如补全模式遗留的 Draft+step6）被当作"已完结"显示
+        var countSql = @"SELECT COUNT(*) FROM nc_biz_applications
+            WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
+        var querySql = $@"SELECT {ApplicationColumns.Full} FROM nc_biz_applications
+            WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
         var conditions = new List<string>();
-        var parameters = new List<object>();
-        var paramIndex = 1;
+        var parameters = new List<object> { WorkflowSteps.ARCHIVED, ArchivedStatusFilter };
+        var paramIndex = 3;
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -1005,8 +1057,10 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<int>> GetArchivedCountAsync(CancellationToken ct = default)
     {
-        var sql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE current_step = {WorkflowSteps.ARCHIVED} AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct);
+        // 与 GetArchivedPagedAsync 同口径：已归档（step=6）且已出草稿态
+        var sql = @"SELECT COUNT(*) FROM nc_biz_applications
+            WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
+        var result = await _db.ExecuteScalarAsync(sql, ct, WorkflowSteps.ARCHIVED, ArchivedStatusFilter);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));
@@ -1014,10 +1068,10 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<PagedResult<ApplicationEntity>>> GetStoppedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo("获取已停保档案（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
+        LogInfo("获取已停保档案（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
         var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
-        var querySql = "SELECT * FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
+        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
         var conditions = new List<string>();
         var parameters = new List<object> { ApplicationStatusCodes.STOPPED };
         var paramIndex = 2;
@@ -1062,34 +1116,15 @@ public class ApplicationService : BaseService, IApplicationService
         return Result.Success(Convert.ToInt32(result.Value));
     }
 
-    public async Task<Result> UpdateCurrentStepAsync(long applicationId, int step, CancellationToken ct = default)
-    {
-        var sql = "UPDATE nc_biz_applications SET current_step = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, step, applicationId);
-        if (result.IsFailure)
-            return Result.Failure(result.ErrorCode!, result.Message!);
-        if (result.Value == 0)
-            return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
-        return Result.Success();
-    }
-
     /// <inheritdoc />
     public async Task<Result> CompleteArchiveAsync(long applicationId, CancellationToken ct = default)
     {
-        // 归档 = 审批通过（系统无独立审批工作流）：current_step 推进到 6 且 status 置 Approved。
-        // 跳过状态机 Draft→Approved 校验（用户确认：无审批流程，点归档即已审批）。
-        // 已 Approved/Completed 的档案仅推进步骤，不改状态（避免降级）。
-        var sql = $@"UPDATE nc_biz_applications SET
-            current_step = {WorkflowSteps.ARCHIVED},
-            status = CASE WHEN status IN ('Approved','Completed') THEN status ELSE 'Approved' END,
-            first_approved_at = COALESCE(first_approved_at, NOW()),
-            updated_at = NOW()
-            WHERE id = $1 AND deleted_at IS NULL";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, applicationId);
+        // 归档 = 审批通过 + 已归档完结：current_step 推进到 6 且 status 置 Approved。
+        // 状态写入统一走 ApplicationStatusService（§9 状态机单一权威 + §8 审计留痕），
+        // 状态机校验、first_approved_at 只写一次、已 Approved/Completed 仅推进步骤均在该服务内处理。
+        var result = await _statusService.CompleteArchiveAsync(applicationId, "System", ct);
         if (result.IsFailure)
-            return Result.Failure(result.ErrorCode!, result.Message!);
-        if (result.Value == 0)
-            return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+            return result;
 
         // 归档即审批通过 → 联动升级资产核查状态（失败不阻断）
         var appResult = await GetByIdAsync(applicationId, ct);
@@ -1131,13 +1166,13 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<PagedResult<ApplicationEntity>>> GetDraftPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
     {
-        LogInfo("获取草稿申请（分页）: keyword=" + keyword + ", 第" + pageIndex + "页");
+        LogInfo("获取草稿申请（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
-        var countSql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step < {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
-        var querySql = $"SELECT * FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step < {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
+        var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step < $2 AND deleted_at IS NULL";
+        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND current_step < $2 AND deleted_at IS NULL";
         var conditions = new List<string>();
-        var parameters = new List<object>();
-        var paramIndex = 1;
+        var parameters = new List<object> { ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE };
+        var paramIndex = 3;
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -1172,8 +1207,8 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<int>> GetDraftCountAsync(CancellationToken ct = default)
     {
-        var sql = $"SELECT COUNT(*) FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.DRAFT}' AND current_step < {WorkflowSteps.PENDING_ARCHIVE} AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct);
+        var sql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step < $2 AND deleted_at IS NULL";
+        var result = await _db.ExecuteScalarAsync(sql, ct, ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));
@@ -1183,9 +1218,7 @@ public class ApplicationService : BaseService, IApplicationService
     {
         LogInfo($"创建单人保草稿: SourceApplicationId={sourceApplicationId}, Member={DataMasker.MaskName(member.Name)}");
 
-        var shouldManageTransaction = !_db.HasTransaction;
-        if (shouldManageTransaction)
-            await _db.BeginTransactionAsync();
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
         {
@@ -1193,7 +1226,7 @@ public class ApplicationService : BaseService, IApplicationService
             var sourceResult = await GetByIdAsync(sourceApplicationId, ct);
             if (sourceResult.IsFailure || sourceResult.Value == null)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(ErrorCodes.APPLICATION_NOT_FOUND, "源申请不存在");
             }
 
@@ -1203,6 +1236,26 @@ public class ApplicationService : BaseService, IApplicationService
             var appNoResult = await GetNextApplicationNoAsync(ct);
             var appNo = appNoResult.IsSuccess ? appNoResult.Value : $"SR-{DateTime.Now:yyyyMMddHHmmss}";
 
+            // ── 计算单人保保障金额 ──
+            var isRural = ClassificationConstants.HukouType.IsHukouRural(source.HukouType);
+            var classificationCode = isRural
+                ? ClassificationConstants.RuralLowIncomeSingle
+                : ClassificationConstants.UrbanLowIncomeSingle;
+
+            // 户月保障金额（单人保固定标准）
+            var guaranteeResult = await _classificationService.CalculateGuaranteeAmountAsync(
+                classificationCode, familySize: 1, isRural,
+                totalFamilyIncome: source.TotalFamilyIncome, ct);
+            var householdMonthly = guaranteeResult.IsSuccess ? guaranteeResult.Value : 0m;
+
+            // 分类施保（重病/重残/高龄/未成年）
+            var subsidyResult = await _classificationService.CalculateClassifiedSubsidyAsync(
+                isRural, source, new List<FamilyMember> { member }, ct);
+
+            // 保障金总额
+            var totalGuarantee = _guaranteeAmountService.CalculateTotalGuaranteeAmount(
+                householdMonthly, subsidyResult.TotalAmount, caregiverSubsidyAmount: 0m);
+
             // 创建新申请（单人保）- 设置 is_single_rescue = true
             var insertSql = @"INSERT INTO nc_biz_applications 
                 (application_no, applicant_name, applicant_id_card, applicant_phone,
@@ -1210,12 +1263,15 @@ public class ApplicationService : BaseService, IApplicationService
                  hukou_address, disability_card_no,
                  province, city, district, town, community, address,
                  health_status, disease_name, disability_type, disability_level,
-                 family_size, is_single_rescue, status, current_step, original_application_id, chain_type,
+                 family_size, is_eligible, is_single_rescue, status, current_step, original_application_id, chain_type,
                  work_income_total, business_income_total, property_income_total, transfer_income_total,
                  other_income_total, total_family_income, per_capita_income, rigid_expenditure,
-                 classification_result, household_monthly_guarantee_amount,
+                 classification_result, classified_subsidy_type, classified_subsidy_amount,
+                 household_monthly_guarantee_amount, total_guarantee_amount,
+                 family_land_area, self_farmed_land_area, subleased_land_area, contracted_land_area,
+                 land_income_total, subsidy_total,
                  created_by, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,'SingleRescue',$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38, NOW(), NOW())
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,'SingleRescue',$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50, NOW(), NOW())
                 RETURNING id";
 
             var insertResult = await _db.ExecuteScalarAsync(insertSql, ct,
@@ -1225,19 +1281,18 @@ public class ApplicationService : BaseService, IApplicationService
                 source.HukouAddress, "",
                 source.Province, source.City, source.District, source.Town, source.Community, source.Address,
                 member.HealthStatus ?? "", member.DiseaseName ?? "", member.DisabilityType ?? "", member.DisabilityLevel ?? "",
-                1, true, "Draft", 1, sourceApplicationId,
+                1, true, true, "Draft", 1, sourceApplicationId,
                 source.WorkIncomeTotal, source.BusinessIncomeTotal, source.PropertyIncomeTotal, source.TransferIncomeTotal,
                 source.OtherIncomeTotal, source.TotalFamilyIncome, source.PerCapitaIncome, source.RigidExpenditure,
-                // 单人保使用农村/城市低收入（单）分类，以便匹配低保档案模板
-                ClassificationConstants.HukouType.IsHukouRural(source.HukouType)
-                    ? ClassificationConstants.RuralLowIncomeSingle
-                    : ClassificationConstants.UrbanLowIncomeSingle,
-                source.HouseholdMonthlyGuaranteeAmount,
+                classificationCode, subsidyResult.Types, subsidyResult.TotalAmount,
+                householdMonthly, totalGuarantee,
+                source.FamilyLandArea, source.SelfFarmedLandArea, source.SubleasedLandArea, source.ContractedLandArea,
+                source.LandIncomeTotal, source.SubsidyTotal,
                 "System");
 
             if (insertResult.IsFailure)
             {
-                if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
             }
 
@@ -1245,33 +1300,46 @@ public class ApplicationService : BaseService, IApplicationService
 
             // 创建户主成员（即该单人保成员）
             var memberInsertSql = @"INSERT INTO nc_biz_family_members 
-                (application_id, name, id_card, is_applicant, gender, age, ethnicity, phone,
-                 marital_status, education_level, political_status, health_status,
-                 relationship_to_head, member_category, is_disabled, disability_type, disability_level,
-                 disease_category, disease_name, disease_code, is_severe_disease,
+                (application_id, name, id_card, is_applicant, gender, birth_date, age, ethnicity, phone,
+                 hukou_type, hukou_address,
+                 marital_status, education_level, political_status, health_status, work_capacity,
+                 relationship_to_head, member_category,
+                 is_disabled, disability_type, disability_level, is_severe_disability, disability_certificate_no,
+                 disease_category, disease_name, secondary_disease, disease_code, is_severe_disease, is_labor_exempt,
+                 home_province, home_city, home_district, home_town, home_village, home_address,
+                 hukou_province, hukou_city, hukou_district, hukou_town,
+                 employment_status, work_unit, main_income_source, annual_income,
+                 annual_support_fee, is_support_ability, monthly_support_fee, support_months, family_size,
+                 person_type, monthly_income_capacity,
                  created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),NOW())";
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,NOW(),NOW())";
 
             // 户主成员插入失败必须让整个单人保创建失败回滚（此前结果被丢弃，产生无成员的孤儿申请）
             await ExecOrThrowAsync(_db, memberInsertSql, ct,
                 newAppId, member.Name, member.IdCard, true,
-                member.Gender ?? "", member.Age, member.Ethnicity ?? "", member.Phone ?? "",
-                member.MaritalStatus ?? "", member.EducationLevel ?? "", member.PoliticalStatus ?? "", member.HealthStatus ?? "",
-                "本人/户主", "SharedLiving", member.IsDisabled, member.DisabilityType ?? "", member.DisabilityLevel ?? "",
-                member.DiseaseCategory ?? "", member.DiseaseName ?? "", member.DiseaseCode ?? "", member.IsSevereDisease);
+                member.Gender ?? "", member.BirthDate, member.Age, member.Ethnicity ?? "", member.Phone ?? "",
+                source.HukouType ?? "", source.HukouAddress ?? "",
+                member.MaritalStatus ?? "", member.EducationLevel ?? "", member.PoliticalStatus ?? "", member.HealthStatus ?? "", member.WorkCapacity ?? "",
+                "本人/户主", "SharedLiving",
+                member.IsDisabled, member.DisabilityType ?? "", member.DisabilityLevel ?? "", member.IsSevereDisability, member.DisabilityCertificateNo ?? "",
+                member.DiseaseCategory ?? "", member.DiseaseName ?? "", member.SecondaryDisease ?? "", member.DiseaseCode ?? "", member.IsSevereDisease, member.IsLaborExempt,
+                member.HomeProvince ?? "", member.HomeCity ?? "", member.HomeDistrict ?? "", member.HomeTown ?? "", member.HomeVillage ?? "", member.HomeAddress ?? "",
+                member.HukouProvince ?? "", member.HukouCity ?? "", member.HukouDistrict ?? "", member.HukouTown ?? "",
+                member.EmploymentStatus ?? "", member.WorkUnit ?? "", member.MainIncomeSource ?? "", member.AnnualIncome,
+                member.AnnualSupportFee, member.IsSupportAbility, member.MonthlySupportFee, member.SupportMonths, member.FamilySize,
+                member.PersonType ?? "", member.MonthlyIncomeCapacity);
 
             // 复制经济信息（务工收入、经营收入等）
             await CopyEconomicDataAsync(sourceApplicationId, newAppId, ct);
 
-            if (shouldManageTransaction)
-                await _db.CommitTransactionAsync();
+            await tx.CommitAsync(ct);
 
             LogInfo($"单人保草稿创建成功: NewApplicationId={newAppId}");
             return Result.Success(newAppId);
         }
         catch (Exception ex)
         {
-            if (shouldManageTransaction) await _db.RollbackTransactionAsync();
+            await tx.RollbackAsync(ct);
             LogException(ex, "创建单人保草稿失败");
             return Result.FromException<long>(ex);
         }

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.MobileElderlyStopPage"
+             x:DataType="ElderlyStopViewModel"
+             Title="高龄津贴停发办理"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+
+        <!-- 紫色英雄头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="高龄津贴停发办理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="停发后自动生成《取消备案表》" FontSize="13" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="12" Spacing="12">
+
+                <!-- 人员信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="👤 人员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicantName}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding Gender}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding AgeDisplay}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="申请编号" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding ApplicationNo}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="身份证号码" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="享受类别" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding CategoryName}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="计发年月" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding IssueStartMonth}" IsReadOnly="True"
+                                       BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="计发金额" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding IssueAmount, StringFormat='{0:F2} 元/月'}" IsReadOnly="True"
+                                   BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 停发信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="🛑 停发信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="应停发时间 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <DatePicker Date="{Binding DueStopDate}" Format="yyyy-MM-dd" HeightRequest="48"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="停发原因 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding StopReasonOptions}" SelectedItem="{Binding SelectedStopReason}"
+                                    ItemDisplayBinding="{Binding Value}" Style="{StaticResource FormFieldPickerStyle}"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding IsDeathDateVisible}">
+                            <Label Text="死亡日期 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <DatePicker Date="{Binding DeathDate}" Format="yyyy-MM-dd" HeightRequest="48"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding IsOtherReasonVisible}">
+                            <Label Text="其他原因说明 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding OtherReasonText}" Placeholder="请说明具体停发原因..."
+                                   Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 追缴信息 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="💰 追缴信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <CheckBox Grid.Column="0" IsChecked="{Binding IsRecover}" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="需要追缴（多发的高龄津贴需返还）" FontSize="13"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        </Grid>
+                        <VerticalStackLayout IsVisible="{Binding IsRecover}" Spacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴起算月 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
+                                    <Picker Grid.Column="0" ItemsSource="{Binding RecoverStartYearOptions}"
+                                            SelectedItem="{Binding RecoverStartYear}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="1" Text="年" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker Grid.Column="2" ItemsSource="{Binding RecoverStartMonthOptions}"
+                                            SelectedItem="{Binding RecoverStartMonth}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="3" Text="月" Style="{StaticResource FormFieldLabelStyle}"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴止算月 *" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
+                                    <Picker Grid.Column="0" ItemsSource="{Binding RecoverEndYearOptions}"
+                                            SelectedItem="{Binding RecoverEndYear}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="1" Text="年" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker Grid.Column="2" ItemsSource="{Binding RecoverEndMonthOptions}"
+                                            SelectedItem="{Binding RecoverEndMonth}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <Label Grid.Column="3" Text="月" Style="{StaticResource FormFieldLabelStyle}"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="追缴金额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding RecoverAmountText}" Keyboard="Numeric" Placeholder="如：50.00"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="备注" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Editor Text="{Binding Remark}" Placeholder="备注说明..." HeightRequest="70"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent">
+                    <Label Text="停发后实际停发时间取系统当前时间，自动生成《取消备案表》"
+                           FontSize="13" TextColor="{StaticResource PrimaryDark}"/>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部按钮栏 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="取消" HeightRequest="46" CornerRadius="10" FontSize="15"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding CancelCommand}"/>
+                <Button Grid.Column="1" Text="确认停发" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                        BackgroundColor="{StaticResource Error}" TextColor="White"
+                        Command="{Binding ConfirmStopCommand}" IsEnabled="{Binding CanConfirm}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="3" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

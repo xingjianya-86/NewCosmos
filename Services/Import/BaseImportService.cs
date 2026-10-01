@@ -45,7 +45,23 @@ public abstract class BaseImportService : BaseService, IImportService
         return await ImportAsync(filePaths, progress, ct);
     }
 
+    /// <summary>导入互斥锁：服务注册为 Singleton，串行化并发导入，避免子类实例字段（_dataYear/_subsidyType 等）互相污染。</summary>
+    private readonly SemaphoreSlim _importGate = new(1, 1);
+
     public virtual async Task<ImportResult> ImportAsync(IEnumerable<string> filePaths, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        await _importGate.WaitAsync(ct);
+        try
+        {
+            return await ImportCoreAsync(filePaths, progress, ct);
+        }
+        finally
+        {
+            _importGate.Release();
+        }
+    }
+
+    private async Task<ImportResult> ImportCoreAsync(IEnumerable<string> filePaths, IProgress<string>? progress, CancellationToken ct)
     {
         var result = new ImportResult { ImportType = ImportTypeName };
         var startTime = DateTime.UtcNow;
@@ -118,25 +134,25 @@ public abstract class BaseImportService : BaseService, IImportService
                 return ImportResult.Failed("工作表为空");
             }
 
-            await DatabaseService.BeginTransactionAsync();
+            await using var tx = await DatabaseService.BeginTransactionScopeAsync(ct);
             try
             {
                 await ProcessWorksheetAsync(reader, result, progress, ct);
 
                 if (result.ErrorCount == 0)
                 {
-                    await DatabaseService.CommitTransactionAsync();
+                    await tx.CommitAsync(ct);
                     result.Success = true;
                 }
                 else
                 {
-                    await DatabaseService.RollbackTransactionAsync();
+                    await tx.RollbackAsync(ct);
                     LogWarn($"导入发现{result.ErrorCount}个错误，已回滚");
                 }
             }
             catch
             {
-                await DatabaseService.RollbackTransactionAsync();
+                await tx.RollbackAsync(ct);
                 throw;
             }
         }

@@ -13,8 +13,6 @@ public partial class LandContractImportService : BaseImportService
     protected override string ServiceName => ImportTypeName;
     public override string ImportTypeName => ImportTypeCodes.LAND_CONTRACT;
 
-    private int _dataYear;
-
     private static readonly char[] ColonSeparators = { '：', ':' };
 
     private readonly IPinyinConverter _pinyinConverter;
@@ -99,17 +97,16 @@ public partial class LandContractImportService : BaseImportService
         }
     }
 
-    protected override async Task<ImportResult> ImportSingleFileAsync(string filePath, IProgress<string> progress = null, CancellationToken ct = default)
+    /// <summary>按文件名派生数据年度。</summary>
+    private static int DeriveDataYear(string filePath)
     {
-        _dataYear = DateTime.Now.Year;
-
+        var dataYear = DateTime.Now.Year;
         var yearMatch = YearRegex().Match(Path.GetFileName(filePath));
         if (yearMatch.Success && int.TryParse(yearMatch.Value, out var year))
         {
-            _dataYear = year;
+            dataYear = year;
         }
-
-        return await base.ImportSingleFileAsync(filePath, progress, ct);
+        return dataYear;
     }
 
     [GeneratedRegex(@"20\d{2}")]
@@ -117,6 +114,8 @@ public partial class LandContractImportService : BaseImportService
 
     protected override async Task ProcessWorksheetAsync(IExcelSheetReader reader, ImportResult result, IProgress<string>? progress, CancellationToken ct)
     {
+        // 数据年度由文件名派生（原 Singleton 实例字段存在并发导入交错写错风险）
+        var dataYear = DeriveDataYear(result.FilePath);
         progress?.Report("开始解析...");
 
         var (contractors, parseErrors) = ParseWorksheetData(reader, progress!, ct);
@@ -164,7 +163,7 @@ public partial class LandContractImportService : BaseImportService
 
             try
             {
-                var (contrCount, plotCount) = await ProcessBatchAsync(batchContractors, ct);
+                var (contrCount, plotCount) = await ProcessBatchAsync(batchContractors, dataYear, ct);
                 successCount += contrCount;
             }
             catch (Exception ex)
@@ -348,14 +347,14 @@ public partial class LandContractImportService : BaseImportService
 
     #region 批量入库
 
-    private async Task<(int contractorCount, int plotCount)> ProcessBatchAsync(List<ContractorData> batchContractors, CancellationToken ct)
+    private async Task<(int contractorCount, int plotCount)> ProcessBatchAsync(List<ContractorData> batchContractors, int dataYear, CancellationToken ct)
     {
         var contractorCount = 0;
         var plotsToInsert = new List<PlotData>();
 
         foreach (var contractor in batchContractors)
         {
-            var id = await InsertContractorAsync(contractor, ct);
+            var id = await InsertContractorAsync(contractor, dataYear, ct);
 
             if (id <= 0)
             {
@@ -383,7 +382,7 @@ public partial class LandContractImportService : BaseImportService
         return (contractorCount, plotCount);
     }
 
-    private async Task<int> InsertContractorAsync(ContractorData contractor, CancellationToken ct)
+    private async Task<int> InsertContractorAsync(ContractorData contractor, int dataYear, CancellationToken ct)
     {
         var sql = @"
             INSERT INTO nc_biz_land_contract_contractor 
@@ -393,10 +392,10 @@ public partial class LandContractImportService : BaseImportService
 
         await DatabaseService.ExecuteNonQueryAsync(
             "DELETE FROM nc_biz_land_contract_contractor WHERE contractor_name = $1 AND employer_name = $2 AND data_year = $3",
-            ct, contractor.Name, contractor.Employer, _dataYear);
+            ct, contractor.Name, contractor.Employer, dataYear);
         var result = await DatabaseService.ExecuteScalarAsync(sql, ct,
             contractor.Name, contractor.Pinyin, contractor.Employer,
-            contractor.TotalContractArea, contractor.TotalMeasuredArea, _dataYear);
+            contractor.TotalContractArea, contractor.TotalMeasuredArea, dataYear);
 
         return result.IsSuccess && result.Value > 0 ? (int)result.Value : -1;
     }

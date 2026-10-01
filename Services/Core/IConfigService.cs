@@ -84,4 +84,9 @@ public interface IConfigService
     /// 已存在的文件不覆盖；返回本次实际生成的文件名列表
     /// </summary>
     List<string> GenerateDefaultConfigFiles();
+
+    /// <summary>
+    /// 保存数据库配置（写回 database.ini），用于 Android 首次配置向导
+    /// </summary>
+    void SaveDatabaseOptions(DatabaseOptions options);
 }

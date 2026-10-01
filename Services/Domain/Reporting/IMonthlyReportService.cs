@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Domain.SocialAssistance;
 
@@ -75,7 +75,7 @@ public interface IMonthlyReportService
     Task<Result<List<MonthlyAddedRow>>> GetAddedRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 停保汇总（status='Stopped' 且 stop_date∈周期的申请）
+    /// 停保汇总（status=ApplicationStatusCodes.STOPPED 且 stop_date∈周期的申请）
     /// </summary>
     Task<Result<List<MonthlyStoppedRow>>> GetStoppedRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
@@ -121,7 +121,7 @@ public interface IMonthlyReportService
     Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, CancellationToken ct = default);
 
     /// <summary>
-    /// 临时救助新增汇总（status='Confirmed' 且 confirmed_at∈周期的临时救助申请，户级名单）
+    /// 临时救助新增汇总（status=ApplicationStatusCodes.CONFIRMED 且 confirmed_at∈周期的临时救助申请，户级名单）
     /// </summary>
     Task<Result<List<MonthlyTempReliefRow>>> GetTempReliefSummaryRowsAsync(int year, int month, string town, CancellationToken ct = default);
 

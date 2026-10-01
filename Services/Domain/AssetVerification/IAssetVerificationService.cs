@@ -70,6 +70,11 @@ public interface IAssetVerificationService
     Task<Result<List<AssetVerificationTask>>> GetFamilyMembersAsync(string headIdCard, CancellationToken ct = default);
 
     /// <summary>
+    /// 按申请人身份证查询最新核查记录 ID（档案输出解析 check_id 用；无记录返回 null）
+    /// </summary>
+    Task<Result<long?>> GetLatestIdByIdCardAsync(string idCard, CancellationToken ct = default);
+
+    /// <summary>
     /// 按 batch_id 查询同批所有成员
     /// </summary>
     Task<Result<List<AssetVerificationTask>>> GetFamilyMembersByBatchIdAsync(string batchId, CancellationToken ct = default);
@@ -146,11 +151,12 @@ public interface IAssetVerificationService
     /// </summary>
     /// <param name="year">年份</param>
     /// <param name="month">月份</param>
-    /// <param name="statusFilter>状态过 "0"=尚未完成, "1"=已完成、有报告", null=全部</param>
+    /// <param name="statusFilter">状态过滤："0"=尚未完成, "1"=已完成/有报告, null=全部</param>
     Task<Result<byte[]>> ExportMonthlyListToExcelAsync(int year, int month, string statusFilter, CancellationToken ct = default);
 
     /// <summary>
-    /// 获取历史统计数据（按年月分组    /// </summary>
+    /// 获取历史统计数据（按年月分组）
+    /// </summary>
     Task<Result<List<MonthlyVerificationStats>>> GetHistoryStatsAsync(int? year, CancellationToken ct = default);
 
     /// <summary>
