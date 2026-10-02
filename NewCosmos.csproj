@@ -146,6 +146,13 @@
 		<AndroidAsset Include="Resources\Ocr\**\*.onnx" Link="Ocr\%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- Android AOT：NPOI.Core/OOXML 的元数据引用 SkiaSharp，但该传递依赖未进入 Android
+	     发布输入集，AOT 编译 NPOI.OOXML 时报 "Could not load ... 'SkiaSharp'"。
+	     显式引用 SkiaSharp，确保其 Android 资产被纳入发布与 AOT 输入。仅 Android。 -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<PackageReference Include="SkiaSharp" Version="3.119.2" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<MauiXaml Update="Pages\UserManagement\OrganizationImportPage.xaml" />
 	</ItemGroup>

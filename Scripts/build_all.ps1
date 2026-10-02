@@ -32,6 +32,7 @@ param(
     [switch]$RunAOT,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
     [string]$AndroidSdkDirectory = "$env:LOCALAPPDATA\Android\Sdk",
+    [string]$AsciiTempDir = "C:\bt",
     [string]$IsccPath = "",
     [string]$SigningKey = "$env:USERPROFILE\.newcosmos\update_signing_key.pem",
     [switch]$DryRun
@@ -134,8 +135,15 @@ if (-not $SkipAndroid) {
     if (-not (Test-Path -LiteralPath $AndroidSdkDirectory)) { throw "未找到 Android SDK: $AndroidSdkDirectory（用 -AndroidSdkDirectory 指定）" }
 
     $oldJava = $env:JAVA_HOME; $oldAndroid = $env:ANDROID_HOME
+    $oldTmp = $env:TMP; $oldTemp = $env:TEMP
     $env:JAVA_HOME = $JavaSdkDirectory
     $env:ANDROID_HOME = $AndroidSdkDirectory
+    # AOT 交叉编译器 mono-aot-cross 在非 ASCII 的 TEMP 下无法读取 temp.rsp
+    #（报 "The specified response file can not be read"）。Windows 用户名含中文时 %TEMP% 非 ASCII，
+    # 故发布期间强制使用纯 ASCII 临时目录（仅影响本进程与其子进程）。
+    New-Item -ItemType Directory -Force -Path $AsciiTempDir | Out-Null
+    $env:TMP = $AsciiTempDir
+    $env:TEMP = $AsciiTempDir
     try {
         $aotArg = if ($RunAOT) { "true" } else { "false" }
         & dotnet publish "NewCosmos.csproj" -f net10.0-android36.0 -c Release -r android-arm64 `
@@ -145,6 +153,8 @@ if (-not $SkipAndroid) {
     finally {
         if ($null -eq $oldJava) { Remove-Item Env:\JAVA_HOME -ErrorAction SilentlyContinue } else { $env:JAVA_HOME = $oldJava }
         if ($null -eq $oldAndroid) { Remove-Item Env:\ANDROID_HOME -ErrorAction SilentlyContinue } else { $env:ANDROID_HOME = $oldAndroid }
+        if ($null -eq $oldTmp) { Remove-Item Env:\TMP -ErrorAction SilentlyContinue } else { $env:TMP = $oldTmp }
+        if ($null -eq $oldTemp) { Remove-Item Env:\TEMP -ErrorAction SilentlyContinue } else { $env:TEMP = $oldTemp }
     }
 
     $apkPubDir = Join-Path $Repo "bin\Release\net10.0-android36.0\android-arm64\publish"
