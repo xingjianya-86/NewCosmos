@@ -87,8 +87,12 @@ config/update.ini
 # 本地代理连接信息（含内网主机/凭据，不入公开库）
 AGENTS.local.md
 
-# 一次性运维脚本（含内网地址与历史凭据；如需公开请先脱敏）
-Scripts/
+# 运维脚本（已纳入版本管理）；本地部署覆盖含内网地址，严禁入库
+Scripts/*.local.ps1
+Scripts/**/bin/
+Scripts/**/obj/
+__pycache__/
+*.pyc
 
 # Android 发布签名密钥与凭据（严禁入库）
 keystore/

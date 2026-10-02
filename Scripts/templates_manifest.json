@@ -1,0 +1,42 @@
+[
+  {
+    "name": "档案_定期复核审批表",
+    "file": "Templates_NEW/档案_定期复核审批表.xlsx",
+    "configFile": "Templates_NEW/档案_定期复核审批表.config.json",
+    "categories": ["经济复核", "档案_定期复核审批表"],
+    "sortOrder": 0
+  },
+  {
+    "name": "档案_增员减员调整表",
+    "file": "Templates_NEW/档案_增员减员调整表.xlsx",
+    "configFile": "Templates_NEW/档案_增员减员调整表.config.json",
+    "categories": ["档案_增员减员调整表"],
+    "sortOrder": 0
+  },
+  {
+    "name": "普惠高龄津贴调整备案表",
+    "file": "Templates_NEW/普惠高龄津贴调整备案表.xlsx",
+    "categories": ["普惠高龄/变更"],
+    "sortOrder": 0
+  },
+  {
+    "name": "模板_政务值班表",
+    "file": "Resources/Templates/模板_政务值班表.xlsx",
+    "categories": ["值班管理"],
+    "sortOrder": 0
+  },
+  {
+    "name": "04申请社会救助对象不予确认告知书",
+    "file": "Templates_NEW/04申请社会救助对象不予确认告知书.docx",
+    "categories": [],
+    "sortOrder": 0,
+    "note": "库中无同名模板；导入前请按实际填写 categories"
+  },
+  {
+    "name": "07社会救助调整（终止）告知书",
+    "file": "Templates_NEW/07社会救助调整（终止）告知书.docx",
+    "categories": [],
+    "sortOrder": 0,
+    "note": "库中无同名模板；导入前请按实际填写 categories"
+  }
+]
