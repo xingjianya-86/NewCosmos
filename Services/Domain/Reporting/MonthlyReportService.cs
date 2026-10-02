@@ -2262,7 +2262,11 @@ public class MonthlyReportService : BaseService, IMonthlyReportService
         foreach (var a in accidents)
         {
             var typeText = string.IsNullOrWhiteSpace(a.AccidentType) ? "意外灾害" : a.AccidentType.Trim();
-            var clauses = new List<string> { $"因{typeText}" };
+            // 类型值可能自带"因"前缀，重复前置会拼出"因因…"（与 FamilySituationTextBuilder 同类防护）
+            var clauses = new List<string>
+            {
+                typeText.StartsWith("因", StringComparison.Ordinal) ? typeText : $"因{typeText}"
+            };
             if (a.HappenDate != DateTime.MinValue) clauses.Add($"发生于{a.HappenDate:yyyy年M月d日}");
             if (!string.IsNullOrWhiteSpace(a.HappenPlace)) clauses.Add($"地点{a.HappenPlace.Trim()}");
 

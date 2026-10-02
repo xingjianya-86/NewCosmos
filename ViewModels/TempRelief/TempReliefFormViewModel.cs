@@ -1724,8 +1724,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
             return seg;
         }).ToList();
 
+        // 事件描述可能自带"因"前缀，重复前置会拼出"因因…"（与 FamilySituationTextBuilder 同类防护）
         var body = items.Count == 1
-            ? $"因{items[0]}"
+            ? (items[0].StartsWith("因", StringComparison.Ordinal) ? items[0] : $"因{items[0]}")
             : "因发生以下意外灾害：" + string.Join("；", items.Select((s, i) => $"{i + 1}、{s}"));
 
         return $"{head}{body}，家庭基本生活暂时陷入困境，特申请临时救助。";

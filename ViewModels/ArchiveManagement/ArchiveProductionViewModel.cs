@@ -1123,7 +1123,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
                 .ToList();
             _logger.Info($"共同生活成员数: {sharedMembers.Count}");
 
-            // 户主（申请人本人）始终作为家庭成员索引第 1 位（模板1授权承诺书/模板15/16/74）
+            // 户主（申请人本人）索引：只写模板1/15/16/74 的专用字段
+            //（SHARED_MEMBER_* 三表——定期复核/入户调查/特困入户调查——不含户主，成员从第 1 行起）
             var headGender = AddressResolver.ExtractGenderFromIdCard(app.ApplicantIdCard);
             var headAge = AddressResolver.ExtractAgeFromIdCard(app.ApplicantIdCard);
             var headBirthDate = IdCardValidator.ExtractBirthDate(app.ApplicantIdCard)?.ToString("yyyy-MM-dd") ?? "";
@@ -1131,12 +1132,6 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             var headEmploymentDisplay = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, app.EmploymentStatus ?? "");
             var headHukouDisplay = _dictCacheService.GetValue(DictionaryTypeCodes.HukouTypes, app.HukouType ?? "");
             var headIncomeAnnual = app.TotalAnnualIncome > 0 ? FormatDecimal(app.TotalAnnualIncome) : "";
-
-            _fieldData[$"{FieldKeys.SHARED_MEMBER_NAME}_1"] = app.ApplicantName;
-            _fieldData[$"{FieldKeys.SHARED_MEMBER_GENDER}_1"] = headGender;
-            _fieldData[$"{FieldKeys.SHARED_MEMBER_AGE}_1"] = headAge;
-            _fieldData[$"{FieldKeys.SHARED_MEMBER_RELATION}_1"] = "本人/户主";
-            _fieldData[$"{FieldKeys.SHARED_MEMBER_EMPLOYMENT}_1"] = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, app.EmploymentStatus ?? "");
 
             // 模板15（分类施保调整表）户主索引
             _fieldData["FAMILY_MEMBER_NAME_1"] = app.ApplicantName;
@@ -1164,45 +1159,51 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             _fieldData["SHARED_ADDRESS_1"] = "-";
             _fieldData["SHARED_RELATION_1"] = "本人/户主";
 
-            // 共同生活成员从第 2 位起填充（第 1 位已被户主占用，最多 5 人）
-            for (int i = 0; i < sharedMembers.Count && i < 5; i++)
+            // 共同生活成员：SHARED_MEMBER_*（定期复核/入户调查/特困入户调查三表）不含户主，从第 1 位起最多 6 人；
+            // FAMILY_MEMBER_*/SHARED_*（模板1/15/16/74）第 1 位是户主，成员仍从第 2 位起最多 5 人（i<5 守卫，容量与既往一致）
+            for (int i = 0; i < sharedMembers.Count && i < 6; i++)
             {
                 var m = sharedMembers[i];
-                var suffix = i + 2;
-                _fieldData[$"{FieldKeys.SHARED_MEMBER_NAME}_{suffix}"] = m.Name;
-                _fieldData[$"{FieldKeys.SHARED_MEMBER_GENDER}_{suffix}"] = m.Gender ?? "";
-                _fieldData[$"{FieldKeys.SHARED_MEMBER_AGE}_{suffix}"] = m.Age?.ToString() ?? "";
-                _fieldData[$"{FieldKeys.SHARED_MEMBER_RELATION}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
-                _fieldData[$"{FieldKeys.SHARED_MEMBER_EMPLOYMENT}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, m.EmploymentStatus ?? "");
+                var sharedIdx = i + 1;
+                _fieldData[$"{FieldKeys.SHARED_MEMBER_NAME}_{sharedIdx}"] = m.Name;
+                _fieldData[$"{FieldKeys.SHARED_MEMBER_GENDER}_{sharedIdx}"] = m.Gender ?? "";
+                _fieldData[$"{FieldKeys.SHARED_MEMBER_AGE}_{sharedIdx}"] = m.Age?.ToString() ?? "";
+                _fieldData[$"{FieldKeys.SHARED_MEMBER_RELATION}_{sharedIdx}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
+                _fieldData[$"{FieldKeys.SHARED_MEMBER_EMPLOYMENT}_{sharedIdx}"] = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, m.EmploymentStatus ?? "");
 
-                // 模板15（分类施保调整表）家庭成员索引
-                _fieldData[$"FAMILY_MEMBER_NAME_{suffix}"] = m.Name;
-                _fieldData[$"FAMILY_MEMBER_GENDER_{suffix}"] = m.Gender ?? "";
-                _fieldData[$"FAMILY_MEMBER_BIRTH_DATE_{suffix}"] = IdCardValidator.ExtractBirthDate(m.IdCard)?.ToString("yyyy-MM-dd") ?? "";
-                _fieldData[$"FAMILY_MEMBER_RELATION_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
-                _fieldData[$"FAMILY_MEMBER_HEALTH_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HealthStatuses, m.HealthStatus ?? "");
-                _fieldData[$"FAMILY_MEMBER_INCOME_{suffix}"] = m.AnnualIncome > 0 ? FormatDecimal(m.AnnualIncome) : "";
+                if (i < 5)
+                {
+                    var suffix = i + 2;
 
-                // 模板74（低收入审核确认表）成员索引
-                _fieldData[$"{FieldKeys.FAMILY_MEMBER_AGE}_{suffix}"] = m.Age?.ToString() ?? "";
-                _fieldData[$"{FieldKeys.FAMILY_MEMBER_HUKOU}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HukouTypes, m.HukouType ?? "");
-                _fieldData[$"{FieldKeys.FAMILY_MEMBER_EMPLOYMENT}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, m.EmploymentStatus ?? "");
+                    // 模板15（分类施保调整表）家庭成员索引
+                    _fieldData[$"FAMILY_MEMBER_NAME_{suffix}"] = m.Name;
+                    _fieldData[$"FAMILY_MEMBER_GENDER_{suffix}"] = m.Gender ?? "";
+                    _fieldData[$"FAMILY_MEMBER_BIRTH_DATE_{suffix}"] = IdCardValidator.ExtractBirthDate(m.IdCard)?.ToString("yyyy-MM-dd") ?? "";
+                    _fieldData[$"FAMILY_MEMBER_RELATION_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
+                    _fieldData[$"FAMILY_MEMBER_HEALTH_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HealthStatuses, m.HealthStatus ?? "");
+                    _fieldData[$"FAMILY_MEMBER_INCOME_{suffix}"] = m.AnnualIncome > 0 ? FormatDecimal(m.AnnualIncome) : "";
 
-                // 模板1（授权承诺书）家庭成员索引
-                _fieldData[$"FAMILY_MEMBER_ID_CARD_{suffix}"] = m.IdCard ?? "";
-                _fieldData[$"FAMILY_MEMBER_CERT_TYPE_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.IdTypes, "ResidentIdCard");
+                    // 模板74（低收入审核确认表）成员索引
+                    _fieldData[$"{FieldKeys.FAMILY_MEMBER_AGE}_{suffix}"] = m.Age?.ToString() ?? "";
+                    _fieldData[$"{FieldKeys.FAMILY_MEMBER_HUKOU}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HukouTypes, m.HukouType ?? "");
+                    _fieldData[$"{FieldKeys.FAMILY_MEMBER_EMPLOYMENT}_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.EmploymentStatuses, m.EmploymentStatus ?? "");
 
-                // 模板16（经济财产声明书）共同生活成员索引
-                _fieldData[$"SHARED_NAME_{suffix}"] = m.Name;
-                _fieldData[$"SHARED_GENDER_{suffix}"] = m.Gender ?? "";
-                _fieldData[$"SHARED_NATIONALITY_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.Ethnicities, m.Ethnicity ?? "");
-                _fieldData[$"SHARED_MARITAL_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.MaritalStatuses, m.MaritalStatus ?? "");
-                _fieldData[$"SHARED_HEALTH_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HealthStatuses, m.HealthStatus ?? "");
-                _fieldData[$"SHARED_ADDRESS_{suffix}"] = "-";
-                _fieldData[$"SHARED_RELATION_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
+                    // 模板1（授权承诺书）家庭成员索引
+                    _fieldData[$"FAMILY_MEMBER_ID_CARD_{suffix}"] = m.IdCard ?? "";
+                    _fieldData[$"FAMILY_MEMBER_CERT_TYPE_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.IdTypes, "ResidentIdCard");
 
-// 同时添加到 _tableData
-                _tableData.Add(BuildMemberEntry(m.Name, m.IdCard ?? "", m.RelationshipToHead, fullAddress, app.ApplicantIdCard));
+                    // 模板16（经济财产声明书）共同生活成员索引
+                    _fieldData[$"SHARED_NAME_{suffix}"] = m.Name;
+                    _fieldData[$"SHARED_GENDER_{suffix}"] = m.Gender ?? "";
+                    _fieldData[$"SHARED_NATIONALITY_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.Ethnicities, m.Ethnicity ?? "");
+                    _fieldData[$"SHARED_MARITAL_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.MaritalStatuses, m.MaritalStatus ?? "");
+                    _fieldData[$"SHARED_HEALTH_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.HealthStatuses, m.HealthStatus ?? "");
+                    _fieldData[$"SHARED_ADDRESS_{suffix}"] = "-";
+                    _fieldData[$"SHARED_RELATION_{suffix}"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, m.RelationshipToHead);
+
+                    // 同时添加到 _tableData
+                    _tableData.Add(BuildMemberEntry(m.Name, m.IdCard ?? "", m.RelationshipToHead, fullAddress, app.ApplicantIdCard));
+                }
             }
 
             // 模板15（分类施保调整表）家庭成员索引：不含户主本人（户主信息已在上方单独填写），从第 1 位起，最多 6 人
@@ -2788,10 +2789,10 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
     }
 
     /// <summary>
-    /// 待遇变化句：返回 {待遇变化分类} 动作词 + {待遇变化金额} 句尾（以「，」起头）。
-    /// 户主死亡流程只留两个金额（原户主金额停发 + 本档案现保障金）——姓名在「户主姓名」与「定期复核情况」里已有，
-    /// 类别在「保障类型」里已有，句尾不再重复；死亡记录的旧→新描述的是旧档停保，现保障金必须取被打印档案。
-    /// 经济复核等按旧→新金额写增发/减发/保持/认定/停发。
+    /// 待遇变化句：返回 {待遇变化分类} 动作词 + {待遇金额变化} 句尾（以「，」起头，2026-10 起仅含类别变化）。
+    /// 金额句已整体删除（避免"停发待遇…停止发放"等同义重复）：原/现月保障金对比统一写入
+    /// {定期复核情况} 变化情况段（BuildReviewChangeDetailAsync），决定句只表达「自X日起 + 动作 + 类别变化」。
+    /// 户主死亡流程同理只留动作词；类别在「保障类型」里已有，死亡分支不再追加类别句（历史行为保持）。
     /// </summary>
     private (string Action, string AmountTail) BuildReviewAmountChange(ApplicationEntity app, ReviewChangeRecord rv)
     {
@@ -2802,48 +2803,39 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
 
         if (rv.ChangeType == "HouseholdDeath" || rv.ChangeReasonType == "户主死亡")
         {
-            var tail = oldAmt.HasValue ? $"，原户主{FormatDecimal(oldAmt.Value)}元停发" : "，原户主待遇停发";
-            if (!ClassificationConstants.IsCodeStop(app.ClassificationResult ?? ""))
-            {
-                tail += $"，现保障金{FormatDecimal(app.HouseholdMonthlyGuaranteeAmount)}元";
-            }
-            return ("停发", tail);
+            return ("停发", "");
         }
 
         string action;
-        string amountTail;
         if (ClassificationConstants.IsCodeStop(rv.NewClassification ?? ""))
         {
             action = "停发";
-            amountTail = oldAmt.HasValue ? $"，原月保障金{FormatDecimal(oldAmt.Value)}元自该月起停止发放" : "";
         }
         else if (oldAmt.HasValue && newAmt.HasValue && newAmt.Value > oldAmt.Value)
         {
             action = "增发";
-            amountTail = $"，月保障金由{FormatDecimal(oldAmt.Value)}元调整为{FormatDecimal(newAmt.Value)}元（增发{FormatDecimal(newAmt.Value - oldAmt.Value)}元）";
         }
         else if (oldAmt.HasValue && newAmt.HasValue && newAmt.Value < oldAmt.Value)
         {
             action = "减发";
-            amountTail = $"，月保障金由{FormatDecimal(oldAmt.Value)}元调整为{FormatDecimal(newAmt.Value)}元（减发{FormatDecimal(oldAmt.Value - newAmt.Value)}元）";
         }
         else if (oldAmt.HasValue && newAmt.HasValue)
         {
             action = "保持";
-            amountTail = $"，月保障金维持{FormatDecimal(newAmt.Value)}元";
         }
         else if (newAmt.HasValue)
         {
             // 类别增类（停旧与建新各一条记录，本条只带新档金额）
             action = "认定";
-            amountTail = $"，月保障金{FormatDecimal(newAmt.Value)}元";
         }
         else
         {
             _logger.Warn($"待遇变化句缺值降级: ApplicationId={app.Id}, ChangeType={rv.ChangeType}, OldAmt={(oldAmt.HasValue ? oldAmt.Value.ToString() : "null")}, NewAmt={(newAmt.HasValue ? newAmt.Value.ToString() : "null")}");
             action = "保持";
-            amountTail = "，不增不减";
         }
+
+        // 金额句已移至{定期复核情况}，此处只留类别变化
+        var amountTail = "";
 
         if (!string.IsNullOrEmpty(oldClsFull) && !string.IsNullOrEmpty(newClsFull) && oldClsFull != newClsFull)
         {
@@ -2951,13 +2943,27 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
     }
 
     /// <summary>
-    /// 定期复核审批表：变化内容拼句 = 复核原因。变化情况：人口/月人均收入/类别（只列变化项，全无变化则"无明显变化"）。
-    /// 快照挂 change_record.application_id：停旧建新链在旧档（OriginalApplicationId），同档复核在本档；收入对比双挂新旧档。
+    /// 定期复核审批表：变化内容拼句 = 短原因。变化情况：人口/死亡/月人均收入/月保障金/类别（只列变化项，全无变化则"无明显变化"）。
+    /// 原因整段是家庭情况说明长文，本表只保留到「…基本生活出现严重困难。」（找不到该句则保留原文）。
+    /// 过去收入锚定本次复核记录 old_per_capita_income：NULL=无历史收入记录按 0.00 元显示
+    ///（复核向导先改数后抓快照，历史真值可能缺失——贺满程单复核周期即此情形）。
+    /// 快照挂 change_record.application_id：停旧建新链在旧档（OriginalApplicationId），同档复核在本档。
     /// 查询失败显式降级为原因原文并记业务日志（不吞异常、不返回空串）。
     /// </summary>
     private async Task<string> BuildReviewChangeDetailAsync(ApplicationEntity app, ReviewChangeRecord review)
     {
         var reason = string.IsNullOrWhiteSpace(review.ChangeReason) ? "定期复核" : review.ChangeReason;
+        const string reasonEnding = "基本生活出现严重困难。";
+        var reasonEndIdx = reason.IndexOf(reasonEnding, StringComparison.Ordinal);
+        if (reasonEndIdx >= 0)
+        {
+            reason = reason.Substring(0, reasonEndIdx + reasonEnding.Length);
+        }
+        // 句号统一由 core 补一个（存量 change_reason 多以句号结尾，直接拼会得到"。。"）
+        if (reason.EndsWith("。"))
+        {
+            reason = reason.Substring(0, reason.Length - 1);
+        }
         var parts = new List<string>();
         string core;
 
@@ -3012,15 +3018,19 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
                 }
             }
 
-            var compRes = await _changeService.GetLatestIncomeComparisonAsync(app.Id, CancellationToken.None);
-            if (compRes.IsFailure)
+            // 过去收入：锚定本次复核记录，NULL=无历史收入记录按 0.00 元显示；新值取本档案人均月收入
+            var oldIncome = review.OldPerCapitaIncome ?? 0m;
+            if (app.PerCapitaIncome != oldIncome)
             {
-                _logger.LogBusiness("定期复核变化内容-收入对比查询失败降级", ("ApplicationId", app.Id.ToString()), ("ErrorCode", compRes.ErrorCode ?? ""));
+                parts.Add($"月人均收入由{FormatDecimal(oldIncome)}元变为{FormatDecimal(app.PerCapitaIncome)}元");
             }
-            else if (compRes.Value is { } comp && comp.OldPerCapitaIncome.HasValue && comp.NewPerCapitaIncome.HasValue
-                     && comp.OldPerCapitaIncome.Value != comp.NewPerCapitaIncome.Value)
+
+            // 月保障金对比（决定句已删金额句，原/现保障金信息统一在此承载）
+            var oldGuarantee = review.OldGuaranteeAmount;
+            var newGuarantee = review.NewGuaranteeAmount ?? app.HouseholdMonthlyGuaranteeAmount;
+            if (oldGuarantee.HasValue && oldGuarantee.Value != newGuarantee)
             {
-                parts.Add($"月人均收入由{FormatDecimal(comp.OldPerCapitaIncome.Value)}元变为{FormatDecimal(comp.NewPerCapitaIncome.Value)}元");
+                parts.Add($"月保障金由{FormatDecimal(oldGuarantee.Value)}元变为{FormatDecimal(newGuarantee)}元");
             }
 
             var oldCls = ClassificationConstants.ConvertToFullName(review.OldClassification ?? "");
@@ -3049,45 +3059,28 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
     }
 
     /// <summary>
-    /// 定期复核审批表：核算过程（年值口径单点展示，只展示不重算——保障金属审批结果，见 AGENTS §7.5）。
+    /// 定期复核审批表：核算过程只留结论句（2026-10 整改：删口径括号、等式推导与低保补差算式——
+    /// 只展示不重算，保障金属审批结果，见 AGENTS §7.5）。
     /// 低保标准单点读 IStandardConfigService；缺失/无效时 LogWarn 并省略该子句，禁止硬编码回退值。
-    /// 补差算式仅在现类别为低保（Subsistence）时展示（标准×人数−月收入 进一取整，与 ClassificationService 同式），
-    /// 与现保障金不等时标注"经审批核定"；低保边缘/特困等类别只展示标准与现保障金，避免出现自相矛盾的算式。
     /// </summary>
     private async Task<string> BuildReviewCalculationAsync(ApplicationEntity app)
     {
         try
         {
-            var familySize = app.FamilySize > 0 ? app.FamilySize : 1;
             var isRural = ClassificationConstants.HukouType.IsHukouRural(app.HukouType);
             var currentCls = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
-            var sb = new StringBuilder(256);
+            var sb = new StringBuilder(160);
 
-            sb.Append($"核算过程：家庭年收入{FormatDecimal(app.TotalAnnualIncome)}元"
-                + "（务工/经营/财产/转移/其他按月×12，赡养、土地、补贴按年，减刚性支出×12），"
-                + $"人均年收入{FormatDecimal(app.PerCapitaAnnualIncome)}元＝{FormatDecimal(app.TotalAnnualIncome)}÷{familySize}人，"
-                + $"折人均月收入{FormatDecimal(app.PerCapitaIncome)}元；");
+            sb.Append($"核算过程：家庭年收入{FormatDecimal(app.TotalAnnualIncome)}元，"
+                + $"人均年收入{FormatDecimal(app.PerCapitaAnnualIncome)}元，"
+                + $"人均月收入{FormatDecimal(app.PerCapitaIncome)}元；");
 
             var stdType = isRural ? "RuralSubsistenceStandard" : "UrbanSubsistenceStandard";
             var stdHukou = isRural ? "Rural" : "Urban";
             var stdResult = await _standardConfigService.GetStandardValueAsync(stdType, stdHukou);
             if (stdResult.IsSuccess && stdResult.Value > 0)
             {
-                var standard = stdResult.Value;
-                var threshold = standard * ClassificationConstants.LowIncomeMultiplier;
-                sb.Append($"{(isRural ? "农村" : "城市")}低保标准{FormatDecimal(standard)}元/月"
-                    + $"（低收入认定为其1.5倍{FormatDecimal(threshold)}元）；");
-
-                if (ClassificationConstants.IsCodeSubsistence(app.ClassificationResult ?? ""))
-                {
-                    var gap = Math.Ceiling(standard * familySize - app.TotalFamilyIncome);
-                    var guarantee = app.HouseholdMonthlyGuaranteeAmount;
-                    sb.Append($"按低保标准×家庭人数−家庭月收入＝{FormatDecimal(standard)}×{familySize}−{FormatDecimal(app.TotalFamilyIncome)}"
-                        + $"＝{FormatDecimal(gap)}元（进一取整到元），");
-                    sb.Append(guarantee == gap
-                        ? $"核定月保障金{FormatDecimal(guarantee)}元；"
-                        : $"经审批核定月保障金{FormatDecimal(guarantee)}元；");
-                }
+                sb.Append($"{(isRural ? "农村" : "城市")}低保标准{FormatDecimal(stdResult.Value)}元/月；");
             }
             else
             {

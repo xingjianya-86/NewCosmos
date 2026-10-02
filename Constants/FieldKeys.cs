@@ -728,7 +728,7 @@ public static class FieldKeys
     public const string REVIEW_SITUATION = "REVIEW_SITUATION";                          // 定期复核情况（最近一次经济复核原因）
     public const string REVIEW_TIME = "REVIEW_TIME";                                    // 复核时间
     public const string REVIEW_CLASSIFICATION_CHANGE = "REVIEW_CLASSIFICATION_CHANGE";  // 待遇变化分类（保持/增发/减发/停发）
-    public const string REVIEW_AMOUNT_CHANGE = "REVIEW_AMOUNT_CHANGE";                  // 待遇金额变化（句尾：增减=，月保障金由X元调整为Y元（增发/减发Z元）；死亡=，原户主X元停发，现保障金Y元）
+    public const string REVIEW_AMOUNT_CHANGE = "REVIEW_AMOUNT_CHANGE";                  // 决定句句尾（2026-10 起金额句已移至{定期复核情况}，此处仅类别变化：，享受类别由X调整为Y / ，类别认定为Y）
     public const string REVIEW_EFFECTIVE_DATE = "REVIEW_EFFECTIVE_DATE";                // 审核次月日期（M月d日，仅本表）
     public const string CLASSIFICATION_MAJOR = "CLASSIFICATION_MAJOR";                  // 享受类别缩写（低保/低保边缘/特困/刚性支出）
     public const string ARCHIVE_CLASS = "ARCHIVE_CLASS";                                // 档案分类 A类/B类

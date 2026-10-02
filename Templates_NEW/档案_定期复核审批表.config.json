@@ -13,7 +13,7 @@
     { "fieldKey": "CONTACT_PHONE", "description": "户主联系方式", "placeholder": "{户主联系方式}" },
     { "fieldKey": "LAND_INCOME_SITUATION_V2", "description": "土地收入情况（无本人申请段）", "placeholder": "{土地收入情况}" },
 
-    { "fieldKey": "SHARED_MEMBER_NAME_1", "description": "共同生活姓名1（户主）", "placeholder": "{共同生活姓名1}" },
+    { "fieldKey": "SHARED_MEMBER_NAME_1", "description": "共同生活姓名1", "placeholder": "{共同生活姓名1}" },
     { "fieldKey": "SHARED_MEMBER_GENDER_1", "description": "共同生活性别1", "placeholder": "{共同生活性别1}" },
     { "fieldKey": "SHARED_MEMBER_AGE_1", "description": "共同生活年龄1", "placeholder": "{共同生活年龄1}" },
     { "fieldKey": "SHARED_MEMBER_RELATION_1", "description": "共同生活关系1", "placeholder": "{共同生活关系1}" },

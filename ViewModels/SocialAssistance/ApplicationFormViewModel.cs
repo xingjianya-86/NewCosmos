@@ -85,6 +85,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     private decimal? _loadedTotalGuaranteeAmount;
 
+    /// <summary>
+    /// 向导入口（LoadApplicationAsync）固化的复核前主表快照（真旧值）。
+    /// Step5 分类判定与 SaveEconomicDetailsAsync（步骤保存/复核保存）随后都会覆写本档收入列，
+    /// 保存时再读库拿到的"旧值"已是覆写后值（Before 快照 / old_per_capita_income 失真）——
+    /// 经济复核/成员变更 context.Old* 必须优先用本快照；null（未走加载路径）时消费端回退读库。
+    /// </summary>
+    private Application? _entryApplicationSnapshot;
+
     /// <summary>成员变更模式：加载时的家庭人数（变更前口径，Before 快照用）</summary>
     private int _loadedFamilySize;
 
@@ -2528,6 +2536,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var app = result.Value;
+                // 向导入口固化复核前快照：Step5 判定与 SaveEconomicDetailsAsync 随后会覆写本档，
+                // 此后读库不再是复核前状态（真旧值口径与 _loadedClassification 一致）
+                _entryApplicationSnapshot = app;
                 // 记录乐观并发令牌（加载时的 updated_at），保存时随实体传回做并发守卫
                 _loadedUpdatedAt = app.UpdatedAt == default ? null : app.UpdatedAt;
                 // 记录库中真实步骤：变更流程模式保存时回写，防止 UI 归位步数冲掉 current_step
@@ -6041,19 +6052,22 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
             _logger.LogBusiness("开始经济状况复核", ("ApplicationId", _applicationId));
 
-            // ── 覆写前捕获变更前旧值 ──
-            // SaveEconomicDetailsAsync 会先把新经济数据写回本档，之后读库拿到的"旧值"已是覆写后值
-            //（Before 快照 / old_per_capita_income / 渐退审批表分项对比都需要真旧值）。
-            // 捕获失败不阻断复核：降级为回退读库（历史行为），分项对比由消费方静默省略。
-            Application? oldSnapshot = null;
-            var oldSnapshotResult = await _applicationService.GetByIdAsync(_applicationId, CancellationToken.None);
-            if (oldSnapshotResult.IsSuccess && oldSnapshotResult.Value != null)
+            // ── 覆写前旧值：优先用向导入口固化的复核前快照 ──
+            // 步骤保存/Step5 判定落库在进入本方法前已把新数据写回本档，此时再读库
+            // 拿到的"旧值"已是覆写后值（Before 快照 / old_per_capita_income 失真）。
+            // 入口快照缺失（未走加载路径的异常场景）才回退保存时读库（历史行为），并记 Warn。
+            Application? oldSnapshot = _entryApplicationSnapshot;
+            if (oldSnapshot == null)
             {
-                oldSnapshot = oldSnapshotResult.Value;
-            }
-            else
-            {
-                _logger.Warn($"经济复核-覆写前旧值捕获失败: {oldSnapshotResult.Message}");
+                var oldSnapshotResult = await _applicationService.GetByIdAsync(_applicationId, CancellationToken.None);
+                if (oldSnapshotResult.IsSuccess && oldSnapshotResult.Value != null)
+                {
+                    oldSnapshot = oldSnapshotResult.Value;
+                }
+                else
+                {
+                    _logger.Warn($"经济复核-覆写前旧值捕获失败: {oldSnapshotResult.Message}");
+                }
             }
 
             // 经济复核模式下 Step3 经济明细可编辑，先持久化用户修改，再执行分类重新判定。
@@ -6089,8 +6103,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 OldTotalAnnualIncome = oldSnapshot?.TotalAnnualIncome,
                 OldPerCapitaIncome = oldSnapshot?.PerCapitaIncome,
                 OldRigidExpenditure = oldSnapshot?.RigidExpenditure,
-                // 分类/保障金必须用加载时刻的 _loaded*：oldSnapshot 是 Step5 判定落库后才抓的，
-                // 那时 classification_result/total_guarantee_amount 已被覆写，用它会恒判"无变化"
+                // 分类/保障金用加载时刻的 _loaded*（与入口快照同一时刻捕获，口径一致；
+                // Step5 判定落库会覆写 classification_result/total_guarantee_amount，读库会恒判"无变化"）
                 OldClassification = _loadedClassification,
                 OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
                 OldComponents = oldSnapshot == null ? null : new IncomeComponentValues
@@ -6324,6 +6338,11 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     OldFamilySize = _loadedFamilySize,
                     OldClassification = _loadedClassification,
                     OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                    // 复核前真旧值（入口快照）：本事务 SaveEconomicDetailsAsync 已先写回新收入，
+                    // 读库拿到的是覆写后值（Before 快照 / old_per_capita_income 失真）；null 回退读库
+                    OldTotalFamilyIncome = _entryApplicationSnapshot?.TotalFamilyIncome,
+                    OldPerCapitaIncome = _entryApplicationSnapshot?.PerCapitaIncome,
+                    OldRigidExpenditure = _entryApplicationSnapshot?.RigidExpenditure,
                     NewTotalFamilyIncome = TotalFamilyIncome,
                     NewPerCapitaIncome = PerCapitaIncome,
                     NewTotalAnnualIncome = TotalAnnualIncome,

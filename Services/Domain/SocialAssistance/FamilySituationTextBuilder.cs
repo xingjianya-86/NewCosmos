@@ -51,7 +51,10 @@ public static class FamilySituationTextBuilder
             sb.Append($"家庭成员中{details}，");
         }
 
-        sb.Append($"因{c.Reason}，导致家庭经济收入明显下降，基本生活出现严重困难。");
+        // 原因值可能自带"因"前缀（如"因学"、"因病"），重复前置会拼出"因因学"
+        var reason = (c.Reason ?? string.Empty).Trim();
+        var reasonLead = reason.StartsWith("因", StringComparison.Ordinal) ? "" : "因";
+        sb.Append($"{reasonLead}{reason}，导致家庭经济收入明显下降，基本生活出现严重困难。");
 
         // 收入来源（月收入分类标注，某分类为0则省略）
         var incomeSources = new List<string>();

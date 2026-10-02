@@ -53,9 +53,10 @@ public class EconomicReviewContext
     public bool IsFamilyCorrection { get; set; }
 
     // ── 覆写前捕获的变更前旧值 ──
-    // 经济复核入口（表单 ExecuteReviewSaveAsync）在调用本方法前已 SaveEconomicDetailsAsync
-    // 把新经济数据写回本档，此后读库拿到的"旧值"实为覆写后值（Before 快照 / old_per_capita_income 失真）。
-    // 真旧值只能由调用方在覆写前捕获填充；任一未提供时回退读 application（与历史行为一致）。
+    // 经济复核入口（表单 ExecuteReviewSaveAsync）优先传向导入口（LoadApplicationAsync）固化的快照
+    //（_entryApplicationSnapshot）：步骤保存/Step5 判定落库已把新经济数据写回本档，
+    // 此后读库拿到的"旧值"实为覆写后值（Before 快照 / old_per_capita_income 失真）。
+    // 任一未提供时回退读 application（与历史行为一致）。
 
     /// <summary>覆写前的家庭人数</summary>
     public int? OldFamilySize { get; set; }
@@ -136,6 +137,15 @@ public class MemberChangeContext
 
     /// <summary>覆写前的保障金合计（户月 + 分类施保 + 照料费）。同上必须在判定落库前捕获。</summary>
     public decimal? OldGuaranteeAmount { get; set; }
+
+    /// <summary>覆写前的家庭月总收入（表单入口快照；null 回退读库——本事务 SaveEconomicDetailsAsync 已先写回）</summary>
+    public decimal? OldTotalFamilyIncome { get; set; }
+
+    /// <summary>覆写前的月人均收入（同上；写入 Before 快照与 nc_biz_change_records.old_per_capita_income）</summary>
+    public decimal? OldPerCapitaIncome { get; set; }
+
+    /// <summary>覆写前的刚性支出（同上）</summary>
+    public decimal? OldRigidExpenditure { get; set; }
 
     public decimal NewTotalFamilyIncome { get; set; }
     public decimal NewPerCapitaIncome { get; set; }
@@ -539,6 +549,8 @@ public class ReviewChangeRecord
     public string? NewClassification { get; set; }
     public decimal? OldGuaranteeAmount { get; set; }
     public decimal? NewGuaranteeAmount { get; set; }
+    // 复核前人均月收入（NULL=无历史收入记录，打印端按 0 显示，见 ArchiveProductionViewModel.BuildReviewChangeDetailAsync）
+    public decimal? OldPerCapitaIncome { get; set; }
 }
 
 /// <summary>
@@ -1715,10 +1727,12 @@ public class ChangeService : BaseService, IChangeService
                 }
             }
 
-            // 变更前值必须在改写 application 之前落到局部变量（Before 快照用）
-            var oldTotalIncome = application.TotalFamilyIncome;
-            var oldPerCapitaIncome = application.PerCapitaIncome;
-            var oldRigidExpenditure = application.RigidExpenditure;
+            // 变更前值必须在改写 application 之前落到局部变量（Before 快照用）；
+            // 收入三项优先取表单入口（LoadApplicationAsync）固化的复核前快照——
+            // 本事务 SaveEconomicDetailsAsync 已先写回新收入，读库是覆写后值；null 回退读库
+            var oldTotalIncome = context.OldTotalFamilyIncome ?? application.TotalFamilyIncome;
+            var oldPerCapitaIncome = context.OldPerCapitaIncome ?? application.PerCapitaIncome;
+            var oldRigidExpenditure = context.OldRigidExpenditure ?? application.RigidExpenditure;
             var oldFamilySize = context.OldFamilySize > 0 ? context.OldFamilySize : application.FamilySize;
 
             // 2. 家庭成员（表单已保存增删结果；查询失败不能按"空成员"继续，否则漏算成员型补贴）
@@ -3562,7 +3576,8 @@ public class ChangeService : BaseService, IChangeService
     {
         var sql = @"SELECT id, change_date, change_reason, change_reason_type, change_type,
                            old_classification, new_classification,
-                           old_guarantee_amount, new_guarantee_amount
+                           old_guarantee_amount, new_guarantee_amount,
+                           old_per_capita_income
                     FROM nc_biz_change_records
                     WHERE (application_id = $1 OR new_application_id = $1)
                       AND deleted_at IS NULL
