@@ -3,11 +3,11 @@
 #   Windows 安装包 + Android(AOT) APK → 签名 → 上传 → 回环下载校验 → GitHub
 #
 # 用法：
-#   .\Scripts\publish_all.ps1                      # 版本取 csproj；默认强制升级、无补丁
-#   .\Scripts\publish_all.ps1 -Version 1.1.20261010
-#   .\Scripts\publish_all.ps1 -Version 1.1.20261010 -WithPatch      # 生成上一版→本版增量补丁
-#   .\Scripts\publish_all.ps1 -Version 1.1.20261010 -SoftUpdate     # 非强制升级（minSupported=上一版）
-#   .\Scripts\publish_all.ps1 -MinSupported 1.1.20261004            # 显式指定最低支持版本
+#   .\deploy\publish_all.ps1                      # 版本取 csproj；默认强制升级、无补丁
+#   .\deploy\publish_all.ps1 -Version 1.1.20261010
+#   .\deploy\publish_all.ps1 -Version 1.1.20261010 -WithPatch      # 生成上一版→本版增量补丁
+#   .\deploy\publish_all.ps1 -Version 1.1.20261010 -SoftUpdate     # 非强制升级（minSupported=上一版）
+#   .\deploy\publish_all.ps1 -MinSupported 1.1.20261004            # 显式指定最低支持版本
 #
 # 开关：
 #   -WithPatch          生成增量补丁（Windows exe + Android apk，需能取到上一版包），清单 schema=2
@@ -18,7 +18,7 @@
 #   -SkipWindows / -SkipAndroid / -SkipGit / -SkipDownloadVerify
 #
 # 依赖：.NET 10 SDK + maui；Inno Setup 6；JDK17 + Android SDK；keystore\keystore.props。
-# 内网地址来自 Scripts\deploy.local.ps1（gitignored）；上一版查询/入库需环境变量 NEWCOSMOS_DB_PASSWORD。
+# 内网地址来自 deploy\deploy.local.ps1（gitignored）；上一版查询/入库需环境变量 NEWCOSMOS_DB_PASSWORD。
 # ============================================================================
 [CmdletBinding()]
 param(
@@ -33,6 +33,7 @@ param(
     [switch]$SkipAndroid,
     [switch]$SkipGit,
     [switch]$SkipDownloadVerify,
+    [switch]$NonInteractive,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
     [string]$AndroidSdkDirectory = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$AsciiTempDir = "C:\bt",
@@ -65,6 +66,32 @@ if ($Version -eq "") {
     $m = [regex]::Match([IO.File]::ReadAllText($csprojPath), '<ApplicationDisplayVersion>([^<]+)</ApplicationDisplayVersion>')
     if (-not $m.Success) { throw "无法从 csproj 读取版本号，请用 -Version 指定" }
     $Version = $m.Groups[1].Value.Trim()
+}
+
+# ── 交互向导（运行后按 Y/F 选择；已显式传入的参数不再询问；自动化用 -NonInteractive 关闭）──
+if (-not $NonInteractive) {
+    Write-Host ""
+    Write-Host "===== 发布向导（回车=默认；Y=是，F/N=否）=====" -ForegroundColor Cyan
+    if (-not $PSBoundParameters.ContainsKey('Version')) {
+        $v = Read-Host "版本号 [默认 $Version]"
+        if (-not [string]::IsNullOrWhiteSpace($v)) { $Version = $v.Trim() }
+    }
+    if (-not $PSBoundParameters.ContainsKey('WithPatch')) {
+        $a = Read-Host "生成增量补丁（上一版→本版）? Y/F [回车=F]"
+        if ($a -match '^(y|Y)$') { $WithPatch = $true }
+    }
+    if (-not $PSBoundParameters.ContainsKey('SoftUpdate')) {
+        $a = Read-Host "非强制升级（最低支持=上一版）? Y/F [回车=F]"
+        if ($a -match '^(y|Y)$') { $SoftUpdate = $true }
+    }
+    if (-not $PSBoundParameters.ContainsKey('SkipGit')) {
+        $a = Read-Host "发布后推送 GitHub? Y/F [回车=Y]"
+        if ($a -match '^(f|F|n|N)$') { $SkipGit = $true }
+    }
+    if (-not $PSBoundParameters.ContainsKey('SkipDownloadVerify')) {
+        $a = Read-Host "回环下载校验（会下载两端安装包）? Y/F [回车=Y]"
+        if ($a -match '^(f|F|n|N)$') { $SkipDownloadVerify = $true }
+    }
 }
 
 # ── 上一版（补丁基线 / SoftUpdate）解析 ──
@@ -131,7 +158,7 @@ else { Write-Host "跳过 Windows" -ForegroundColor Yellow }
 
 # ── 2. Android（AOT）──
 if (-not $SkipAndroid) {
-    if (-not $ServerHost) { throw "未配置 ServerHost：请设置 Scripts\deploy.local.ps1 的 `$LocalServerHost" }
+    if (-not $ServerHost) { throw "未配置 ServerHost：请设置 deploy\deploy.local.ps1 的 `$LocalServerHost" }
     if (-not (Test-Path -LiteralPath $JavaSdkDirectory)) { throw "未找到 JDK: $JavaSdkDirectory" }
     if (-not (Test-Path -LiteralPath $AndroidSdkDirectory)) { throw "未找到 Android SDK: $AndroidSdkDirectory" }
 

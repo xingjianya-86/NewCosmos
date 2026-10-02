@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.1.20261004</ApplicationDisplayVersion>
-		<ApplicationVersion>20261004</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.20261008</ApplicationDisplayVersion>
+		<ApplicationVersion>20261008</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -81,6 +81,7 @@
 		<Compile Remove="backups\**" />
 		<Compile Remove="backup\**" />
 		<Compile Remove="Scripts\**" />
+		<Compile Remove="deploy\**" />
 		<MauiXaml Remove="backups\**" />
 		<MauiXaml Remove="backup\**" />
 		<None Remove="backups\**" />

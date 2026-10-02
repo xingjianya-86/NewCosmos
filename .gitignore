@@ -88,9 +88,11 @@ config/update.ini
 AGENTS.local.md
 
 # 运维脚本（已纳入版本管理）；本地部署覆盖含内网地址，严禁入库
-Scripts/*.local.ps1
+*.local.ps1
 Scripts/**/bin/
 Scripts/**/obj/
+deploy/**/bin/
+deploy/**/obj/
 __pycache__/
 *.pyc
 

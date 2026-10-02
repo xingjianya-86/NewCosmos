@@ -2,19 +2,19 @@
 # 在线更新发布脚本：版本号同步 → dotnet publish → Inno 安装包 → 清单签名 → 上传
 #
 # 用法（示例）：
-#   .\Scripts\publish_release.ps1 -Version 1.1.20260918 -Notes "修复XXX"
-#   .\Scripts\publish_release.ps1 -Version 1.1.20260918 -MinSupported 1.1.20260910 -Force
+#   .\deploy\publish_release.ps1 -Version 1.1.20260918 -Notes "修复XXX"
+#   .\deploy\publish_release.ps1 -Version 1.1.20260918 -MinSupported 1.1.20260910 -Force
 #
 # 前置：
-#   1) 签名私钥已生成：  .\Scripts\generate_update_signing_key.ps1
+#   1) 签名私钥已生成：  .\deploy\generate_update_signing_key.ps1
 #   2) 部署 SSH 密钥已加入服务器（一次性）：%USERPROFILE%\.ssh\id_ed25519_newcosmos
 #
 # 说明：脚本会同步三处版本号（NewCosmos.csproj / config\app.ini / installer\NewCosmosSetup.iss），
 #       并生成带 RSA-SHA256 签名的 update.json 后上传到宝塔站点更新目录。
 #
-# 依赖（均在 Scripts\ 下，勿删）：
-#   Scripts\PatchTool           生成增量补丁（BsDiff）
-#   Scripts\UpdateSigningTool   清单 RSA-SHA256 签名
+# 依赖（均在 deploy\ 下，勿删）：
+#   deploy\PatchTool           生成增量补丁（BsDiff）
+#   deploy\UpdateSigningTool   清单 RSA-SHA256 签名
 # ============================================================================
 param(
     [Parameter(Mandatory = $true)][string]$Version,
@@ -43,15 +43,15 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
 
-# ── 本地部署配置（gitignored）：Scripts\deploy.local.ps1 提供内网地址 ──
+# ── 本地部署配置（gitignored）：deploy\deploy.local.ps1 提供内网地址 ──
 $deployLocal = Join-Path $PSScriptRoot "deploy.local.ps1"
 if (Test-Path -LiteralPath $deployLocal) { . $deployLocal }
 if ($ServerHost -eq "" -and (Get-Variable LocalServerHost -ErrorAction SilentlyContinue)) { $ServerHost = $LocalServerHost }
 if ($ServerRoot -eq "" -and (Get-Variable LocalServerRoot -ErrorAction SilentlyContinue)) { $ServerRoot = $LocalServerRoot }
 if ($VerifyUrl  -eq "" -and (Get-Variable LocalVerifyUrl  -ErrorAction SilentlyContinue)) { $VerifyUrl  = $LocalVerifyUrl }
 if ($DbHost     -eq "" -and (Get-Variable LocalDbHost     -ErrorAction SilentlyContinue)) { $DbHost     = $LocalDbHost }
-if ($ServerHost -eq "") { throw "未配置 ServerHost：请在 Scripts\deploy.local.ps1 设置 `$LocalServerHost，或用 -ServerHost 传入" }
-if ($ServerRoot -eq "") { throw "未配置 ServerRoot：请在 Scripts\deploy.local.ps1 设置 `$LocalServerRoot，或用 -ServerRoot 传入" }
+if ($ServerHost -eq "") { throw "未配置 ServerHost：请在 deploy\deploy.local.ps1 设置 `$LocalServerHost，或用 -ServerHost 传入" }
+if ($ServerRoot -eq "") { throw "未配置 ServerRoot：请在 deploy\deploy.local.ps1 设置 `$LocalServerRoot，或用 -ServerRoot 传入" }
 if ($DbHost -eq "") { $DbHost = $ServerHost }
 
 if ($MinSupported -eq "") { $MinSupported = $Version }
@@ -151,7 +151,7 @@ if (-not $SkipPatch) {
         if (Test-Path -LiteralPath $prevInstaller) {
             $patchName = "NewCosmosPatch_${prevVersion}_${Version}.bin"
             $patchPath = Join-Path $releaseDir $patchName
-            $patchToolProj = Join-Path $repo "Scripts\PatchTool\PatchTool.csproj"
+            $patchToolProj = Join-Path $repo "deploy\PatchTool\PatchTool.csproj"
             & dotnet run --project $patchToolProj -- create --old $prevInstaller --new $setupPath --out $patchPath
             if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $patchPath)) {
                 $patchSize = (Get-Item -LiteralPath $patchPath).Length
@@ -194,12 +194,12 @@ if ($patchInfo) { $canonical += "|$($patchInfo.sha256)|$($patchInfo.baseVersion)
 $canonicalFile = Join-Path $releaseDir "canonical.txt"
 [IO.File]::WriteAllText($canonicalFile, $canonical, (New-Object System.Text.UTF8Encoding($false)))
 
-if (-not (Test-Path -LiteralPath $SigningKey)) { throw "未找到签名私钥: $SigningKey（先运行 Scripts\generate_update_signing_key.ps1）" }
+if (-not (Test-Path -LiteralPath $SigningKey)) { throw "未找到签名私钥: $SigningKey（先运行 deploy\generate_update_signing_key.ps1）" }
 
-$toolProj = Join-Path $repo "Scripts\UpdateSigningTool\UpdateSigningTool.csproj"
+$toolProj = Join-Path $repo "deploy\UpdateSigningTool\UpdateSigningTool.csproj"
 & dotnet build $toolProj -c Release -v q -nologo
 if ($LASTEXITCODE -ne 0) { throw "签名工具编译失败" }
-$toolDll = Join-Path $repo "Scripts\UpdateSigningTool\bin\Release\net10.0\UpdateSigningTool.dll"
+$toolDll = Join-Path $repo "deploy\UpdateSigningTool\bin\Release\net10.0\UpdateSigningTool.dll"
 
 $sigFile = Join-Path $releaseDir "update.sig"
 & dotnet $toolDll sign --key $SigningKey --canonical $canonicalFile --out $sigFile | Out-Null

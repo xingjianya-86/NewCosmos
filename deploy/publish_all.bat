@@ -13,7 +13,7 @@ rem    publish_all.bat -SkipDownloadVerify                  (skip big download)
 rem    publish_all.bat -SkipGit
 rem
 rem  Set env NEWCOSMOS_DB_PASSWORD for release history / prev-version lookup.
-rem  Internal host comes from Scripts\deploy.local.ps1 (gitignored).
+rem  Internal host comes from deploy\deploy.local.ps1 (gitignored).
 rem ============================================================================
 setlocal
 if "%~1"=="" (

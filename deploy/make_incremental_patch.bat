@@ -6,7 +6,7 @@ rem  installer and the current one, re-signs update.json with schema=2 (patch
 rem  block), and optionally uploads both to the update server.
 rem
 rem  Run:  just double-click, or from a cmd prompt:
-rem        C:\NewCosmosCode\Scripts\make_incremental_patch.bat
+rem        C:\NewCosmosCode\deploy\make_incremental_patch.bat
 rem
 rem  The heavy PatchTool (BsDiff on ~400MB installers) may take many minutes.
 rem  Keep the window open.
@@ -21,12 +21,12 @@ try {
 $Version    = '1.1.20261004'                       # new version to release
 $Prev       = '1.1.20261003'                       # base version the patch applies to
 $Channel    = 'stable'
-$ServerHost = ''                                   # ? Scripts\deploy.local.ps1 ? $LocalServerHost
+$ServerHost = ''                                   # ? deploy\deploy.local.ps1 ? $LocalServerHost
 $ServerUser = 'root'
-$ServerRoot = ''                                   # ? Scripts\deploy.local.ps1 ? $LocalServerRoot
+$ServerRoot = ''                                   # ? deploy\deploy.local.ps1 ? $LocalServerRoot
 $SshKey     = Join-Path $env:USERPROFILE '.ssh\id_ed25519_newcosmos'
 $SignKey    = Join-Path $env:USERPROFILE '.newcosmos\update_signing_key.pem'
-$VerifyUrl  = ''                                   # ? Scripts\deploy.local.ps1 ? $LocalVerifyUrl
+$VerifyUrl  = ''                                   # ? deploy\deploy.local.ps1 ? $LocalVerifyUrl
 # -----------------------------------------------------------------------------
 
 if ($env:PATCH_VALIDATE -eq '1') { Write-Host 'BAT/PS body parsed OK'; exit 0 }
@@ -36,7 +36,7 @@ function Step([string]$t) { Write-Host ''; Write-Host "== $t ==" -ForegroundColo
 $ScriptsDir = ($args[0]).TrimEnd('\')
 $Repo       = Split-Path -Parent $ScriptsDir
 
-# local deploy config (gitignored): Scripts\deploy.local.ps1 provides internal addresses
+# local deploy config (gitignored): deploy\deploy.local.ps1 provides internal addresses
 $deployLocal = Join-Path $ScriptsDir 'deploy.local.ps1'
 if (Test-Path -LiteralPath $deployLocal) { . $deployLocal }
 if (-not $ServerHost -and $LocalServerHost) { $ServerHost = $LocalServerHost }
@@ -169,7 +169,7 @@ if ($ServerHost -and (Test-Path -LiteralPath $SshKey)) {
         Write-Host $manual
     }
 } else {
-    Write-Host "ServerHost not configured (Scripts\deploy.local.ps1) or SSH key missing; upload manually:" -ForegroundColor Yellow
+    Write-Host "ServerHost not configured (deploy\deploy.local.ps1) or SSH key missing; upload manually:" -ForegroundColor Yellow
     Write-Host $manual
 }
 

@@ -4,14 +4,14 @@
 # 流程：拉取 update.json → 校验渠道 → 用编译进 App 的公钥对清单 RSA 验签
 #       → 解析包地址 → 下载（重试）→ 校验 SHA256 → 落盘
 #
-# 用法（双击 Scripts\download_update.bat 亦可）：
-#   .\Scripts\download_update.ps1 -Platform windows
-#   .\Scripts\download_update.ps1 -Platform android
-#   .\Scripts\download_update.ps1 -Platform windows -OutputDir D:\updates -SkipSignature
+# 用法（双击 deploy\download_update.bat 亦可）：
+#   .\deploy\download_update.ps1 -Platform windows
+#   .\deploy\download_update.ps1 -Platform android
+#   .\deploy\download_update.ps1 -Platform windows -OutputDir D:\updates -SkipSignature
 #
-# 说明：清单地址默认取 Scripts\deploy.local.ps1 的 $LocalVerifyUrl（stable），
+# 说明：清单地址默认取 deploy\deploy.local.ps1 的 $LocalVerifyUrl（stable），
 #       Android 用其 /stable/→/android/ 推导；也可用 -ManifestUrl 直接指定。
-#       验签用 Scripts\UpdateSigningTool（公钥取自 Constants\UpdateSignatureConstants.cs，公开）。
+#       验签用 deploy\UpdateSigningTool（公钥取自 Constants\UpdateSignatureConstants.cs，公开）。
 # ============================================================================
 [CmdletBinding()]
 param(
@@ -32,7 +32,7 @@ function Write-Step([string]$t) { Write-Host ""; Write-Host "== $t ==" -Foregrou
 $deployLocal = Join-Path $ScriptsDir "deploy.local.ps1"
 if (Test-Path -LiteralPath $deployLocal) { . $deployLocal }
 if (-not $ManifestUrl) { $ManifestUrl = $LocalVerifyUrl }
-if (-not $ManifestUrl) { throw "未配置清单地址：请设置 Scripts\deploy.local.ps1 的 `$LocalVerifyUrl，或用 -ManifestUrl 指定" }
+if (-not $ManifestUrl) { throw "未配置清单地址：请设置 deploy\deploy.local.ps1 的 `$LocalVerifyUrl，或用 -ManifestUrl 指定" }
 if ($Platform -eq 'android') { $ManifestUrl = $ManifestUrl -replace '/stable/', '/android/' }
 if (-not $OutputDir) { $OutputDir = Join-Path $Repo "downloads" }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null

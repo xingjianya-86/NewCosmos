@@ -9,10 +9,10 @@
 #   Debug 可运行版 : bin\Debug\net10.0-windows10.0.19041.0\win-x64\NewCosmos.exe（直接双击运行）
 #
 # 用法：
-#   .\Scripts\build_all.ps1                       # 用 csproj 当前版本，全量构建
-#   .\Scripts\build_all.ps1 -Version 1.1.20261005 # 指定版本（同步 csproj/app.ini/iss 三处）
-#   .\Scripts\build_all.ps1 -SkipAndroid -SkipPatch
-#   .\Scripts\build_all.ps1 -DryRun               # 只打印计划，不实际构建
+#   .\deploy\build_all.ps1                       # 用 csproj 当前版本，全量构建
+#   .\deploy\build_all.ps1 -Version 1.1.20261005 # 指定版本（同步 csproj/app.ini/iss 三处）
+#   .\deploy\build_all.ps1 -SkipAndroid -SkipPatch
+#   .\deploy\build_all.ps1 -DryRun               # 只打印计划，不实际构建
 #
 # 依赖：.NET 10 SDK + maui-windows/maui-android；Inno Setup 6；JDK 17 + Android SDK（Android 端）。
 #       Android 发布签名由 keystore\keystore.props 提供（已被 .gitignore 忽略）。
