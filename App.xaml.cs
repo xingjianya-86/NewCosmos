@@ -107,7 +107,7 @@ public partial class App : Application
         };
     }
 
-    private static void LogCrashException(Exception ex, string source)
+    internal static void LogCrashException(Exception ex, string source)
     {
         // 直接写文件——Serilog 异步 sink 在进程退出时丢失未落盘日志
         try
