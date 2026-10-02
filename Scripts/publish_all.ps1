@@ -23,6 +23,7 @@ param(
     [switch]$SkipWindows,
     [switch]$SkipAndroid,
     [switch]$SkipGit,
+    [switch]$SkipDownloadVerify,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
     [string]$AndroidSdkDirectory = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$AsciiTempDir = "C:\bt",
@@ -150,7 +151,22 @@ if (-not $SkipAndroid) {
 }
 else { Write-Host "跳过 Android" -ForegroundColor Yellow }
 
-# ── 3. GitHub ──
+# ── 3. 回环校验：从服务器下载更新包并验签/校验 SHA256 ──
+if ((-not $SkipDownloadVerify) -and (-not $SkipWindows -or -not $SkipAndroid)) {
+    Write-Step "回环校验：从服务器下载最新包（验签 + SHA256）"
+    $dl = Join-Path $ScriptsDir "download_update.ps1"
+    if (-not $SkipWindows) {
+        & $dl -Platform windows
+        if ($LASTEXITCODE -ne 0) { throw "Windows 下载回环校验失败" }
+    }
+    if (-not $SkipAndroid) {
+        & $dl -Platform android
+        if ($LASTEXITCODE -ne 0) { throw "Android 下载回环校验失败" }
+    }
+}
+else { Write-Host "跳过回环下载校验" -ForegroundColor Yellow }
+
+# ── 4. GitHub ──
 if (-not $SkipGit) {
     Write-Step "GitHub：提交版本号并推送"
     & git add NewCosmos.csproj config/app.ini installer/NewCosmosSetup.iss
