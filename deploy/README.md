@@ -14,9 +14,7 @@
 |---|---|---|
 | **publish_all.ps1 / .bat** | **一条龙发布**：Windows 安装包 + Android(AOT) APK → 签名 → 上传服务器 → **回环下载校验** → GitHub 提交推送 | 双击 `publish_all.bat` |
 | publish_release.ps1 | **仅 Windows** 发布：版本同步 → `dotnet publish` → Inno 安装包 → 增量补丁 → 清单签名 → 上传 → 入库 → 校验（被 `publish_all` 调用，亦可单独用） | `.\publish_release.ps1 -Version x` |
-| build_all.ps1 / .bat | **本地构建（不上传）**：Windows 安装包 + Android(AOT) APK + 增量补丁 + **可直接运行的 Debug 版** | 双击 `build_all.bat` |
 | download_update.ps1 / .bat | 从更新服务器**下载最新包**：拉清单 → 验签 → 下载 → 校验 SHA256 | `download_update.bat -Platform android` |
-| make_incremental_patch.bat | 为已发布版本**补生成 Windows 增量补丁**并重签 schema=2 清单 | 双击运行（改脚本内 `$Version`/`$Prev`） |
 | `PatchTool/` | 增量补丁工具（BsDiff 差分/应用），被发布脚本调用 | — |
 | `UpdateSigningTool/` | 清单签名工具：`keygen` / `sign` / `verify`（RSA-2048-SHA256） | — |
 | `deploy.sample.ps1` | 内网地址配置样例（复制为 `deploy.local.ps1`） | — |
@@ -74,9 +72,7 @@
 | 日常发新版（如 10 号） | `publish_all.bat` → 版本号填 `1.1.20261010` → 其余回车 |
 | 带增量补丁发布 | 向导"生成增量补丁"选 `Y`（需能取到上一版包） |
 | 只提示不强更 | 向导"非强制升级"选 `Y`（或在命令行 `-SoftUpdate`） |
-| 只构建不上传 | `build_all.bat`（产物在 `publish\`；Debug 版在 `bin\Debug\...\win-x64\NewCosmos.exe`） |
 | 只想下载最新包 | `download_update.bat -Platform android`（或 `windows`） |
-| 给某版本补增量补丁 | 改 `make_incremental_patch.bat` 顶部 `$Version`/`$Prev` 后双击 |
 
 ---
 
