@@ -164,9 +164,9 @@ function Ensure-Tool([string]$dll, [string]$proj) {
 if (-not $SkipWindows) {
     Write-Step "Windows：publish_release.ps1"
     $pr = Join-Path $ScriptsDir "publish_release.ps1"
-    $prArgs = @('-Version', $Version, '-MinSupported', $MinSupported, '-Channel', $Channel)
-    if (-not $WithPatch) { $prArgs += '-SkipPatch' }
-    if ($Force) { $prArgs += '-Force' }
+    $prArgs = @{ Version = $Version; MinSupported = $MinSupported; Channel = $Channel }
+    if (-not $WithPatch) { $prArgs['SkipPatch'] = $true }
+    if ($Force) { $prArgs['Force'] = $true }
     & $pr @prArgs
     if ($LASTEXITCODE -ne 0) { throw "Windows 发布失败（退出码 $LASTEXITCODE）" }
 }
