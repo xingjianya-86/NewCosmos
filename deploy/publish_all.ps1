@@ -34,6 +34,7 @@ param(
     [switch]$SkipGit,
     [switch]$SkipDownloadVerify,
     [switch]$NonInteractive,
+    [switch]$DryRun,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
     [string]$AndroidSdkDirectory = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$AsciiTempDir = "C:\bt",
@@ -129,6 +130,21 @@ if (-not $MinSupported) {
 if ($SoftUpdate -and -not $prevResolved) { Write-Host "警告：未能解析上一版，-SoftUpdate 退化为强制（minSupported=版本号）" -ForegroundColor Yellow }
 Write-Host "发布版本: $Version（最低支持 $MinSupported，渠道 $Channel，强制=$([bool]$Force)，增量补丁=$([bool]$WithPatch)）"
 
+if ($DryRun) {
+    Write-Host ""
+    Write-Host "===== DRY RUN（不构建/不上传/不推 GitHub）=====" -ForegroundColor Yellow
+    $winFlags = @()
+    if (-not $WithPatch) { $winFlags += '-SkipPatch' }
+    if ($Force) { $winFlags += '-Force' }
+    Write-Host ("  Windows : publish_release.ps1 -Version {0} -MinSupported {1} -Channel {2} {3}" -f $Version, $MinSupported, $Channel, ($winFlags -join ' '))
+    Write-Host ("  Android : dotnet publish -f net10.0-android36.0 -c Release -r android-arm64 -p:RunAOTCompilation=true" + $(if ($WithPatch) { "（并生成增量补丁）" } else { "" }))
+    Write-Host ("  上一版  : {0}" -f $(if ($prevResolved) { $prevResolved } else { "（未解析到）" }))
+    Write-Host ("  回环校验: {0}" -f $(if ($SkipDownloadVerify) { "跳过" } else { "执行（下载两端安装包）" }))
+    Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
+    Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
+    return
+}
+
 $releaseDir = Join-Path $Repo "publish\release\$Version"
 $apkName    = "NewCosmosSetup_$Version.apk"
 $apkPath    = Join-Path $Repo "publish\$apkName"
@@ -151,7 +167,7 @@ if (-not $SkipWindows) {
     $prArgs = @('-Version', $Version, '-MinSupported', $MinSupported, '-Channel', $Channel)
     if (-not $WithPatch) { $prArgs += '-SkipPatch' }
     if ($Force) { $prArgs += '-Force' }
-    & $pr $prArgs
+    & $pr @prArgs
     if ($LASTEXITCODE -ne 0) { throw "Windows 发布失败（退出码 $LASTEXITCODE）" }
 }
 else { Write-Host "跳过 Windows" -ForegroundColor Yellow }
