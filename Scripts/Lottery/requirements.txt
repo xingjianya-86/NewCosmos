@@ -1,0 +1,9 @@
+# 彩票预测 Python 依赖（随 python-embed 预置；本文件用于环境核对/重建）
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# 网络请求（历史开奖抓取用）
+requests>=2.31.0
+beautifulsoup4>=4.12.0

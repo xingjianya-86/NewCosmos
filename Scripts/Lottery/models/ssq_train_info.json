@@ -1,0 +1,17 @@
+{
+  "lottery_type": "ssq",
+  "train_date": "2026-09-04T20:38:55.002117",
+  "total_records": 2060,
+  "seq_length": 30,
+  "epochs_run": 12,
+  "final_loss": 0.3970775604248047,
+  "final_val_loss": 0.3965940773487091,
+  "final_accuracy": 0.027246376499533653,
+  "config": {
+    "name": "双色球",
+    "red_count": 6,
+    "blue_count": 1,
+    "red_max": 33,
+    "blue_max": 16
+  }
+}
