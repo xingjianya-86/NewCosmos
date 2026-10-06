@@ -46,7 +46,8 @@ Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cre
 ; 在线更新配置：仅首次安装写入，升级不覆盖本机修改
 Source: "{#SrcDir}\config\update.ini"; DestDir: "{app}\config"; Flags: onlyifdoesntexist
 ; 彩票预训练模型：新装机随包分发（免重新训练）；升级时 onlyifdoesntexist 保留用户已重训的模型
-Source: "{#SrcDir}\Scripts\Lottery\models\*"; DestDir: "{app}\Scripts\Lottery\models"; Flags: ignoreversion onlyifdoesntexist
+; （注：Scripts\Lottery 已从仓库移除；skipifsourcedoesntexist 使缺失时编译不中止）
+Source: "{#SrcDir}\Scripts\Lottery\models\*"; DestDir: "{app}\Scripts\Lottery\models"; Flags: ignoreversion onlyifdoesntexist skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
