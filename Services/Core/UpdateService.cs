@@ -175,7 +175,7 @@ public class UpdateService : BaseService, IUpdateService
             patchSize = patchEl.TryGetProperty("size", out var pSizeEl) && pSizeEl.TryGetInt64(out var pSize) ? pSize : 0;
         }
 
-        // 签名字段串（与 Scripts/publish_release.ps1 / UpdateSigningTool 保持一致）
+        // 签名字段串（与 deploy/publish_release.ps1 / UpdateSigningTool 保持一致）
         var canonical = BuildCanonicalString(schema, channel, latest, minSupported, force, publishedAt, pkgUrl, pkgSize, pkgSha, patchSha, patchBase);
         if (!VerifyManifestSignature(canonical, signature!))
         {
@@ -204,7 +204,7 @@ public class UpdateService : BaseService, IUpdateService
     }
 
     /// <summary>
-    /// 签名字段串（与 Scripts/publish_release.ps1 / UpdateSigningTool 保持一致）：
+    /// 签名字段串（与 deploy/publish_release.ps1 / UpdateSigningTool 保持一致）：
     /// schema=1: schema|channel|latest|minSupported|force|publishedAt|pkgUrl|pkgSize|pkgSha
     /// schema=2: ...+patchSha|patchBase
     /// </summary>

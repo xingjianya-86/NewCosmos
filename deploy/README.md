@@ -26,7 +26,7 @@
 
 ## 二、一条龙：`publish_all`
 
-双击 `publish_all.bat`（或 `.	\publish_all.ps1`）后，会先进入**交互向导**（见下表），再依次执行：
+双击 `publish_all.bat`（或 `.\publish_all.ps1`）后，会先进入**交互向导**（见下表），再依次执行：
 
 ```
 1) Windows : 同步版本号(3处) → dotnet publish → Inno 安装包 → 生成补丁(可选)

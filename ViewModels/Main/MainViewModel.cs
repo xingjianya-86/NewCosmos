@@ -972,7 +972,7 @@ public partial class MainViewModel : ViewModelBase
                 _logger.Warn($"清除会话存储失败: {ex.Message}");
             }
             // 回到登录页（镜像 App.CreateWindow 的启动结构）。
-            // 原先解析 AppShell 会抛 InvalidOperationException——AppShell 从未注册进 DI，退出登录必崩。
+            // 历史上解析 AppShell 会抛 InvalidOperationException（它从未注册进 DI）；AppShell 已删除，现只经 NavigationService 导航。
             // 登出后导航栈整体替换，root 登录页同样注册标题跟随（SetRootAsync 内部完成）
             await _navigationService.SetRootAsync(NavigationKeys.Login);
             _windowTitleService.SetPageTitle(null);

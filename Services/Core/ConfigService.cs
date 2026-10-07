@@ -102,7 +102,7 @@ public class ConfigService : IConfigService
         // 优先选择真正包含 database.ini 的目录：
         // - 部署机：exe 旁 config/ 内有向导生成的 database.ini → 用它
         // - 开发机：从输出目录逐级向上探测项目 config/（MAUI 输出含 RID 段，
-        //   深度为 bin/Debug/net9.0-.../win10-x64 共 4 级，固定"../../../"会探空）
+        //   深度为 bin/Debug/net10.0-.../win-x64 共 4 级，固定"../../../"会探空）
         if (File.Exists(Path.Combine(productionConfigPath, "database.ini")))
             return Path.GetFullPath(productionConfigPath);
 

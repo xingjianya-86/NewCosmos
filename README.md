@@ -1,6 +1,6 @@
 # NewCosmos（帝皇权杖δ-me13）
 
-民政社会救助管理系统 —— 面向乡镇/街道民政业务的一体化 Windows 桌面应用，覆盖低收入人口认定、特困供养、高龄津贴、临时救助、资产核查、变更管理、档案制作与统计月报。
+民政社会救助管理系统 —— 面向乡镇/街道民政业务的一体化应用，桌面端为 Windows 桌面应用（另有 Android 数据录入端），覆盖低收入人口认定、特困供养、高龄津贴、临时救助、资产核查、变更管理、档案制作与统计月报。
 
 ## 功能概览
 
@@ -15,7 +15,7 @@
 
 | 层 | 技术 |
 |---|---|
-| UI | .NET 10 MAUI（WinUI 3，未打包 `WindowsPackageType=None`） |
+| UI | .NET 10 MAUI（Windows：WinUI 3，未打包 `WindowsPackageType=None`；Android：数据录入端） |
 | MVVM | CommunityToolkit.Mvvm 8.x |
 | 数据库 | PostgreSQL（Npgsql，自研 `IDatabaseService`，手写 SQL，无 EF/Dapper） |
 | Schema | `Resources\Schema/**/*.yaml`（`SchemaService` 幂等建表/补索引/补外键） |
@@ -67,6 +67,9 @@ NewCosmos/
 │   ├── System/      地区、字典、标准配置
 │   └── Templates/   Excel/Word 模板引擎
 ├── Resources/       Schema（YAML）、Seed、样式、Icd10、PdfJs 等
+├── deploy/          发布与在线更新脚本（publish_all / publish_release / PatchTool / UpdateSigningTool）
+├── Scripts/         彩票模块 Python 脚本与预训练模型、模板导入脚本（随包分发）
+├── Navigation/      导航服务 NavigationService、导航键、窗口标题跟随
 ├── config/          运行配置（database.ini 不入库）
 ├── installer/       Inno Setup 安装包脚本
 └── docs/            业务与迁移文档
@@ -81,7 +84,7 @@ NewCosmos/
 | `Resources\PostgreSQL\` | 备份/恢复功能所需 `pg_dump` 等客户端二进制（从 PostgreSQL 官方获取） |
 | `Resources\ZeroTier\` | 网络接入功能所需 ZeroTier One 安装包（可选） |
 | `公文字体\` | 公文排版字体（商用授权限制，请自备合法授权字体） |
-| `python-embed\`、`Scripts\` | 本地实验/一次性运维脚本，不参与应用构建 |
+| `python-embed\` | 彩票模块所需的嵌入式 Python 运行时与依赖（随发布包分发，本体不入库） |
 
 ## 参与开发
 
