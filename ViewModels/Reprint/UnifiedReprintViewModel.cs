@@ -1117,7 +1117,7 @@ public partial class UnifiedReprintViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            var result = await AssetCapability!.PrintSingleAsync(SelectedRecord.BusinessId, SelectedAssetTemplate, IsGeneratePdf, CancellationToken);
+            var result = await AssetCapability!.PrintSingleAsync(SelectedRecord.BusinessId, SelectedAssetTemplate, IsGeneratePdf, printToPrinter: true, CancellationToken);
             if (result.IsSuccess)
             {
                 await _dialogService.DisplayAlertAsync("打印完成", $"已发送到打印机: {SelectedAssetTemplate.Name}", "确定");
@@ -1125,6 +1125,37 @@ public partial class UnifiedReprintViewModel : ViewModelBase
             else
             {
                 await _dialogService.DisplayAlertAsync("错误", result.Message ?? "打印失败", "确定");
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>核查直打域「保存」：仅生成落盘到输出根（源文件+PDF），不调打印机</summary>
+    [RelayCommand]
+    private async Task SaveAssetAsync()
+    {
+        if (SelectedRecord == null || SelectedAssetTemplate == null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择核查记录与模板", "确定");
+            return;
+        }
+        try
+        {
+            IsBusy = true;
+            // 保存恒生成 PDF（打印域的 IsGeneratePdf 开关只作用于真打印）
+            var result = await AssetCapability!.PrintSingleAsync(SelectedRecord.BusinessId, SelectedAssetTemplate, generatePdf: true, printToPrinter: false, CancellationToken);
+            if (result.IsSuccess)
+            {
+                await _dialogService.DisplayAlertAsync("保存完成",
+                    $"已生成到输出目录: {SelectedAssetTemplate.Name}", "确定");
+                TryOpenFolder(Helpers.OutputPathHelper.OutputRoot);
+            }
+            else
+            {
+                await _dialogService.DisplayAlertAsync("错误", result.Message ?? "保存失败", "确定");
             }
         }
         finally

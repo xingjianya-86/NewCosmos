@@ -34,7 +34,7 @@
 
         <!-- 工具栏 -->
         <Border Grid.Row="1" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                 <Label Text="预览模板:" VerticalOptions="Center" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                 <Picker Grid.Column="1"
                         ItemsSource="{Binding Templates}"
@@ -58,6 +58,14 @@
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="4"
+                        Text="{Binding SaveActionText, StringFormat='&#xE792; {0}'}"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding SaveCommand}"
+                        IsEnabled="{Binding IsNotBusy}"
+                        Style="{StaticResource ButtonSuccess}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="5"
                         Text="{Binding OpenOutputFolderActionText, StringFormat='&#xE8B7; {0}'}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding OpenOutputFolderCommand}"

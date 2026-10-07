@@ -260,14 +260,20 @@
                                         HorizontalOptions="Start" VerticalOptions="Center"/>
                             </Grid>
 
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                <Button Grid.Column="0" Text="{Binding PreviewActionText}" Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding PreviewCommand}"
                                         IsEnabled="{Binding IsNotBusy}"/>
-                                <Button Grid.Column="1" Text="打印" Style="{StaticResource ButtonPrimary}"
+                                <Button Grid.Column="1" Text="{Binding PrintActionText}" Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding PrintCommand}"
                                         IsEnabled="{Binding IsNotBusy}"/>
+                                <Button Grid.Column="2" Text="{Binding SaveActionText}" Style="{StaticResource ButtonSuccess}"
+                                        Command="{Binding SaveCommand}"
+                                        IsEnabled="{Binding IsNotBusy}"/>
                             </Grid>
+                            <Button Text="{Binding OpenOutputFolderActionText}" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenOutputFolderCommand}"
+                                    FontSize="13" HeightRequest="34"/>
                         </VerticalStackLayout>
                     </Border>
 

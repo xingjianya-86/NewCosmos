@@ -641,6 +641,18 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         await PrintCoreAsync(SelectedPreviewTemplate, interactive: true);
     }
 
+    /// <summary>「保存」（单模板，F1 工具栏 / F3 补打面板）：当前选择模板仅生成落盘，不打印</summary>
+    [RelayCommand]
+    private async Task SaveAsync()
+    {
+        if (SelectedPreviewTemplate == null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择一个模板", "确定");
+            return;
+        }
+        await PrintCoreAsync(SelectedPreviewTemplate, interactive: true, printToPrinter: false);
+    }
+
     /// <summary>
     /// 单模板打印/生成核心（interactive=false 供统一补打中心批量静默调用：无封面确认/失败弹窗，仅记录状态）。
     /// 直接以传入 template 打印，不依赖 SelectedPreviewTemplate，避免批量时报"请先选择一个模板"。

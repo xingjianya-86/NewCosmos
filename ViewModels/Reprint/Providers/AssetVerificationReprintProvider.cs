@@ -161,7 +161,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         }
     }
 
-    public async Task<Result<string>> PrintSingleAsync(long recordId, TemplateSelectItem template, bool generatePdf, CancellationToken ct = default)
+    public async Task<Result<string>> PrintSingleAsync(long recordId, TemplateSelectItem template, bool generatePdf, bool printToPrinter = true, CancellationToken ct = default)
     {
         var record = await LoadRecordAsync(recordId, ct);
         if (record == null)
@@ -180,7 +180,8 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                 return Result.Failure<string>("ARCHIVE_DATA_INCOMPLETE", "构建打印数据失败");
 
             await engine.SaveToFileAsync(sourceFilePath, ct);
-            await engine.PrintFromFileAsync(sourceFilePath, 1, ct);
+            if (printToPrinter)
+                await engine.PrintFromFileAsync(sourceFilePath, 1, ct);
 
             var pdfPath = "";
             if (generatePdf)
@@ -190,7 +191,8 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             }
 
             await WritePrintRecordAsync(record, template, sourceFilePath, pdfPath, $"DMR核查{DateTime.Now:yyyyMMddHHmmssfff}-{record.Id}", ct);
-            _logger.LogBusiness("补打打印完成", ("Template", template.Name), ("File", sourceFilePath));
+            _logger.LogBusiness(printToPrinter ? "补打打印完成" : "补打生成完成(未打印)",
+                ("Template", template.Name), ("File", sourceFilePath));
             return Result.Success(sourceFilePath);
         }
         catch (Exception ex)

@@ -916,10 +916,18 @@ public partial class ArchiveQueryViewModel : ViewModelBase
 
     /// <summary>打印证明文件（统一留痕 + PDF 导出，权限 PRINT_LOWINCOMEPROOF）</summary>
     [RelayCommand]
-    private async Task PrintAsync()
+    private Task PrintAsync() => ExecuteProofActionAsync(printToPrinter: true);
+
+    /// <summary>保存证明文件（四件套之「保存」：仅生成落盘到输出根，不打印）</summary>
+    [RelayCommand]
+    private Task SaveAsync() => ExecuteProofActionAsync(printToPrinter: false);
+
+    /// <summary>打印/保存共用链：生成 + 留痕记录；printToPrinter=false 时不调打印机</summary>
+    private async Task ExecuteProofActionAsync(bool printToPrinter)
     {
         if (!EnsureCanProceed()) return;
 
+        var action = printToPrinter ? "打印" : "保存";
         var option = SelectedProofTemplateOption!;
         var unitName = EffectiveUnitName;
         var fields = BuildProofFieldsWithUnit(unitName);
@@ -938,25 +946,25 @@ public partial class ArchiveQueryViewModel : ViewModelBase
                 null,
                 ApplicantName,
                 ApplicantIdCard,
-                SelectedPrinter ?? string.Empty,
+                printToPrinter ? SelectedPrinter ?? string.Empty : null!,
                 Math.Max(1, Copies),
                 IsDuplex,
-                printToPrinter: true,
+                printToPrinter: printToPrinter,
                 CancellationToken);
 
             if (result.IsFailure)
             {
-                await ShowTipAsync($"打印失败: {result.Message}");
+                await ShowTipAsync($"{action}失败: {result.Message}");
                 return;
             }
 
-            await ShowTipAsync($"证明文件打印完成（单位：{unitName}）");
+            await ShowTipAsync($"证明文件{action}完成（单位：{unitName}）");
             await LoadPrintHistoryAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "打印证明文件失败");
-            await ShowTipAsync($"打印失败: {ex.Message}");
+            _logger.LogError(ex, $"证明文件{action}失败");
+            await ShowTipAsync($"{action}失败: {ex.Message}");
         }
         finally
         {

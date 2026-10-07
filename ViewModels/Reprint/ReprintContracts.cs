@@ -151,8 +151,8 @@ public interface IAssetVerificationReprintCapability
     /// <summary>渲染预览 PDF，返回临时文件路径</summary>
     Task<Result<string>> RenderPreviewAsync(long recordId, TemplateSelectItem template, CancellationToken ct = default);
 
-    /// <summary>单户直打（保存文件→送打印机；generatePdf 时另存 PDF）</summary>
-    Task<Result<string>> PrintSingleAsync(long recordId, TemplateSelectItem template, bool generatePdf, CancellationToken ct = default);
+    /// <summary>单户直打（保存文件→送打印机；generatePdf 时另存 PDF；printToPrinter=false 为四件套「保存」：仅生成落盘）</summary>
+    Task<Result<string>> PrintSingleAsync(long recordId, TemplateSelectItem template, bool generatePdf, bool printToPrinter = true, CancellationToken ct = default);
 
     /// <summary>跨户批量直打（进度回调：当前/总数/户名），返回 (成功数, 失败明细)</summary>
     Task<Result<(int SuccessCount, List<(string Name, string Error)> Failed)>> BatchPrintAsync(

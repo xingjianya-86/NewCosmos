@@ -230,15 +230,20 @@
                                     ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
                                     HeightRequest="40"/>
                             <HorizontalStackLayout Spacing="12">
-                                <Button Text="预览" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
+                                <Button Text="{Binding PreviewActionText}" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
                                         Command="{Binding PreviewAssetCommand}"/>
-                                <Button Text="打印" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
+                                <Button Text="{Binding PrintActionText}" Style="{StaticResource ButtonPrimary}" HeightRequest="36" Padding="20,0"
                                         Command="{Binding PrintAssetCommand}"/>
+                                <Button Text="{Binding SaveActionText}" Style="{StaticResource ButtonSuccess}" HeightRequest="36" Padding="20,0"
+                                        Command="{Binding SaveAssetCommand}"/>
                                 <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
                                     <Label Text="生成PDF" FontSize="13"/>
                                     <Switch IsToggled="{Binding IsGeneratePdf}" OnColor="{StaticResource Primary}"/>
                                 </HorizontalStackLayout>
                             </HorizontalStackLayout>
+                            <Button Text="{Binding OpenOutputFolderActionText}" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenOutputFolderCommand}"
+                                    FontSize="13" HeightRequest="34"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -267,22 +272,28 @@
                                     <Switch IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}"/>
                                 </HorizontalStackLayout>
                             </Grid>
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                                <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <Button Grid.Column="0" Text="{Binding Output.PreviewActionText}" Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding Output.PreviewCommand}"
                                         IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
-                                <Button Grid.Column="1" Text="打印" Style="{StaticResource ButtonPrimary}"
+                                <Button Grid.Column="1" Text="{Binding Output.PrintActionText}" Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding Output.PrintCommand}"
+                                        IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                                <Button Grid.Column="2" Text="{Binding Output.SaveActionText}" Style="{StaticResource ButtonSuccess}"
+                                        Command="{Binding Output.SaveCommand}"
                                         IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
                             </Grid>
                             <VerticalStackLayout Spacing="4" IsVisible="{Binding Output.IsGenerating}">
                                 <Label Text="{Binding Output.ProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                                 <ProgressBar Progress="{Binding Output.Progress}" ProgressColor="{StaticResource Primary}" HeightRequest="6"/>
                             </VerticalStackLayout>
-                            <Button Text="一键打印全部模板" Style="{StaticResource ButtonPrimary}"
+                            <Button Text="{Binding Output.PrintSelectedActionText}" Style="{StaticResource ButtonPrimary}"
                                     BackgroundColor="{StaticResource WarningDark}"
                                     Command="{Binding Output.PrintAllCommand}"
                                     IsEnabled="{Binding Output.IsBusy, Converter={StaticResource BoolToInverseConverter}}"/>
+                            <Button Text="{Binding Output.OpenOutputFolderActionText}" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding Output.OpenOutputFolderCommand}"
+                                    FontSize="13" HeightRequest="34"/>
                             <Button Text="完成工单" Style="{StaticResource ButtonSecondary}"
                                     Command="{Binding Output.CompleteWorkOrderCommand}">
                                 <Button.Triggers>
