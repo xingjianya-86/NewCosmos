@@ -164,9 +164,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         string printerName = null,
         int copies = 1,
         bool isDuplex = false,
+        bool printToPrinter = true,
         CancellationToken ct = default)
     {
-        LogInfo($"执行打印: Template={templateName}");
+        LogInfo(printToPrinter ? $"执行打印: Template={templateName}" : $"执行生成(不打印): Template={templateName}");
 
         var currentUserId = App.CurrentUserId;
         if (!currentUserId.HasValue)
@@ -244,7 +245,9 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     await spEngine.SaveToFileAsync(supporterFilePath, ct);
 
                     // 打印本份文档（原实现漏掉了这一步：只生成文件不打印，却仍返回 Success）
-                    await spEngine.PrintFromFileAsync(supporterFilePath, copies, ct);
+                    // printToPrinter=false 为「保存」动作：仅生成落盘，不调打印机
+                    if (printToPrinter)
+                        await spEngine.PrintFromFileAsync(supporterFilePath, copies, ct);
 
                     var supporterPdfBytes = await spEngine.ExportPdfFromFileAsync(supporterFilePath, supporterPdfPath, ct);
                     if (supporterPdfBytes != null) allPdfBytes.Add(supporterPdfBytes);
@@ -350,9 +353,12 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 await engine.SaveToFileAsync(chunkSourcePath, ct);
                 LogInfo($"执行操作");
 
-                LogInfo($"开始打印源文档: Template={templateName}");
-                await engine.PrintFromFileAsync(chunkSourcePath, copies, ct);
-                LogInfo($"打印命令已发出");
+                if (printToPrinter)
+                {
+                    LogInfo($"开始打印源文档: Template={templateName}");
+                    await engine.PrintFromFileAsync(chunkSourcePath, copies, ct);
+                    LogInfo($"打印命令已发出");
+                }
 
                 LogInfo($"执行操作");
                 var pdfBytes = await engine.ExportPdfFromFileAsync(chunkSourcePath, chunkPdfPath, ct);
@@ -403,7 +409,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 LogError($"操作失败");
             }
 
-            LogInfo($"打印完成: Template={templateName}");
+            LogInfo(printToPrinter ? $"打印完成: Template={templateName}" : $"生成完成(未打印): Template={templateName}");
             return Result.Success(record);
         }
         catch (OperationCanceledException)

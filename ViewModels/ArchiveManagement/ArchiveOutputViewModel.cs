@@ -149,18 +149,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDuplex = true;
 
-    [ObservableProperty]
-    private bool _generatePdf;
-
     // ---- 预览 ----
     [ObservableProperty]
     private string _pdfFilePath = string.Empty;
 
     [ObservableProperty]
     private bool _hasPdf;
-
-    [ObservableProperty]
-    private bool _hasPrinted;
 
     [ObservableProperty]
     private string _statusText = string.Empty;
@@ -609,32 +603,11 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 PdfFilePath = tempPath;
                 HasPdf = true;
                 StatusText = "预览已生成";
-                HasPrinted = true;
                 _logger.LogBusiness("生成预览成功",
                     ("Template", SelectedPreviewTemplate.Name),
                     ("BatchNo", _batchNo));
-
-                var existingFile = OutputFiles.FirstOrDefault(f => f.TemplateId == SelectedPreviewTemplate.TemplateId);
-                if (existingFile != null)
-                {
-                    existingFile.Status = "已生成";
-                    existingFile.IsCompleted = true;
-                    existingFile.FilePath = tempPath;
-                }
-                else
-                {
-                    OutputFiles.Add(new OutputFileItem
-                    {
-                        TemplateId = SelectedPreviewTemplate.TemplateId,
-                        FileName = $"{SelectedPreviewTemplate.Name}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
-                        FileType = "PDF",
-                        Status = "已生成",
-                        IsCompleted = true,
-                        FilePath = tempPath,
-                        BaseCopies = SelectedPreviewTemplate.BaseCopies,
-                        TemplateName = SelectedPreviewTemplate.Name
-                    });
-                }
+                // 预览只是临时 PDF（落 {输出根}/temp，会被清理），不进「输出文件」列表——
+                // 列表只收录真正落盘的产物；「保存」动作才走生成不打印的正式路径。
             }
             else
             {
@@ -669,11 +642,13 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 单模板打印核心（interactive=false 供统一补打中心批量静默调用：无封面确认/失败弹窗，仅记录状态）。
+    /// 单模板打印/生成核心（interactive=false 供统一补打中心批量静默调用：无封面确认/失败弹窗，仅记录状态）。
     /// 直接以传入 template 打印，不依赖 SelectedPreviewTemplate，避免批量时报"请先选择一个模板"。
+    /// printToPrinter=false 为「保存」动作：同一条生成链路但不调打印机（四件套语义见 DocumentActionText）。
     /// </summary>
-    public async Task<bool> PrintCoreAsync(TemplateSelectItem template, bool interactive)
+    public async Task<bool> PrintCoreAsync(TemplateSelectItem template, bool interactive, bool printToPrinter = true)
     {
+        var action = printToPrinter ? "打印" : "保存";
         if (template == null || PrintNavigationData.FieldData == null)
         {
             if (interactive)
@@ -683,8 +658,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             return false;
         }
 
-        // 封面模板打印前确认：需先插入牛皮纸（批量静默模式跳过）
-        if (interactive && template.Name.Contains("封面"))
+        // 封面模板打印前确认：需先插入牛皮纸（批量静默模式与「保存」跳过——保存不调打印机）
+        if (interactive && printToPrinter && template.Name.Contains("封面"))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -697,7 +672,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            StatusText = "正在打印...";
+            StatusText = $"正在{action}...";
 
             var fields = new Dictionary<string, string>(PrintNavigationData.FieldData, StringComparer.Ordinal);
             var tableRows = PrintNavigationData.TableData ?? new();
@@ -725,7 +700,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             applicantIdCard = applicantIdCard.Length > 6 ? applicantIdCard : "000000000000000000";
 
             var actualCopies = template.BaseCopies * Copies;
-            _logger.Info($"打印: 模板={template.Name}");
+            _logger.Info($"{action}: 模板={template.Name}");
 
             var result = await _printExecuteService.ExecutePrintAsync(
                 template.TemplateId,
@@ -737,34 +712,34 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows,
                 applicantName,
                 applicantIdCard,
-                SelectedPrinter,
+                printToPrinter ? SelectedPrinter : null!,
                 actualCopies,
                 IsDuplex,
+                printToPrinter: printToPrinter,
                 CancellationToken);
 
             if (result.IsSuccess)
             {
-                _logger.LogBusiness("打印完成",
+                _logger.LogBusiness($"{action}完成",
                     ("Template", template.Name),
                     ("BatchNo", _batchNo),
                     ("RecordId", result.Value.Id));
-                StatusText = "打印完成";
-                HasPrinted = true;
-                AddOutputFiles(template, result.Value.FilePath, result.Value.PdfPath);
+                StatusText = $"{action}完成";
+                AddOutputFiles(template.TemplateId, template.Name, result.Value.FilePath, result.Value.PdfPath);
                 return true;
             }
 
-            StatusText = $"打印失败: {result.Message}";
+            StatusText = $"{action}失败: {result.Message}";
             if (interactive)
-                await _dialogService.DisplayAlertAsync("错误", $"打印失败: {result.Message}", "确定");
+                await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {result.Message}", "确定");
             return false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "失败");
-            StatusText = $"打印异常: {ex.Message}";
+            StatusText = $"{action}异常: {ex.Message}";
             if (interactive)
-                await _dialogService.DisplayAlertAsync("错误", $"打印异常: {ex.Message}", "确定");
+                await _dialogService.DisplayAlertAsync("错误", $"{action}异常: {ex.Message}", "确定");
             return false;
         }
         finally
@@ -773,8 +748,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
     }
 
-    /// <summary>把打印产物（源文件/PDF）加入输出列表（供 PrintCoreAsync 复用）</summary>
-    private void AddOutputFiles(TemplateSelectItem template, string? sourceFilePath, string? pdfPath)
+    /// <summary>把生成产物（源文件/PDF）加入输出列表（打印与保存共用）</summary>
+    private void AddOutputFiles(long templateId, string templateName, string? sourceFilePath, string? pdfPath)
     {
         // 将源文件（Excel/Word）加入输出列表
         if (!string.IsNullOrEmpty(sourceFilePath) && _fileService.FileExists(sourceFilePath))
@@ -788,13 +763,13 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             };
             OutputFiles.Add(new OutputFileItem
             {
-                TemplateId = template.TemplateId,
+                TemplateId = templateId,
                 FileName = Path.GetFileName(sourceFilePath),
                 FileType = sourceType,
                 Status = "已生成",
                 IsCompleted = true,
                 FilePath = sourceFilePath,
-                TemplateName = template.Name
+                TemplateName = templateName
             });
         }
 
@@ -803,19 +778,19 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         {
             OutputFiles.Add(new OutputFileItem
             {
-                TemplateId = template.TemplateId,
+                TemplateId = templateId,
                 FileName = Path.GetFileName(pdfPath),
                 FileType = "PDF",
                 Status = "已生成",
                 IsCompleted = true,
                 FilePath = pdfPath,
-                TemplateName = template.Name
+                TemplateName = templateName
             });
         }
     }
 
     // ========================
-    //  一键打印
+    //  批量（打印选中 / 全部保存）
     // ========================
 
     [RelayCommand]
@@ -837,12 +812,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 一键打印核心（可编程调用）：打印全部勾选模板（封面先行）。
+    /// 一键打印/全部保存核心（可编程调用）：处理全部勾选模板（封面先行）。
     /// interactive=true 保持原有交互确认（牛皮纸提示/核查报告跳过/结果弹窗）；
     /// interactive=false 供统一补打页批量模式逐户静默调用（封面直接打印、失败仅记录不弹窗）。
+    /// printToPrinter=false 为「全部保存」：同一批模板全部仅生成落盘、不调打印机。
     /// </summary>
-    public async Task PrintAllCoreAsync(bool interactive = true)
+    public async Task PrintAllCoreAsync(bool interactive = true, bool printToPrinter = true)
     {
+        var action = printToPrinter ? "打印" : "保存";
         var selectedTemplates = Templates.Where(t => t.IsSelected && t.IsApplicable).ToList();
         if (selectedTemplates.Count == 0)
         {
@@ -883,7 +860,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     // 核查报告未勾选：提示用户（批量静默模式直接跳过）
                     var skipReport = interactive
                         ? await _dialogService.DisplayAlertAsync("提示",
-                            "核查报告未勾选，是否跳过核查报告打印？", "跳过", "取消打印")
+                            $"核查报告未勾选，是否跳过核查报告{action}？", "跳过", $"取消{action}")
                         : true;
                     if (!skipReport) return;
                 }
@@ -898,11 +875,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         {
             IsGenerating = true;
             Progress = 0;
-            ProgressText = "准备打印...";
+            ProgressText = $"准备{action}...";
 
             if (coverTemplate != null)
             {
-                var confirmed = !interactive || await _dialogService.DisplayAlertAsync(
+                // 封面牛皮纸确认只在真打印时弹出（保存不调打印机，无需插纸）
+                var confirmed = !interactive || !printToPrinter || await _dialogService.DisplayAlertAsync(
                     "打印确认",
                     "请确认已插入牛皮纸，是否开始打印封面？",
                     "继续",
@@ -915,8 +893,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 }
 
                 CancellationToken.ThrowIfCancellationRequested();
-                ProgressText = $"执行打印: {coverTemplate.Name}";
-                var coverResult = await PrintSingleTemplateAsync(coverTemplate, failedItems);
+                ProgressText = $"执行{action}: {coverTemplate.Name}";
+                var coverResult = await PrintSingleTemplateAsync(coverTemplate, failedItems, printToPrinter);
                 if (coverResult)
                 {
                     successCount++;
@@ -926,14 +904,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 {
                     // 封面打印失败：中止整个批量，后续页面不打印
                     Progress = 1;
-                    StatusText = $"批量打印中止: 封面打印失败 ({failedItems[^1].Message})";
-                    _logger.LogBusiness("批量打印中止: 封面失败",
+                    StatusText = $"批量{action}中止: 封面{action}失败 ({failedItems[^1].Message})";
+                    _logger.LogBusiness($"批量{action}中止: 封面失败",
                         ("BatchNo", _batchNo), ("Message", failedItems[^1].Message));
                     if (interactive)
                     {
                         await _dialogService.DisplayAlertAsync(
-                            "打印失败",
-                            $"封面打印失败：{failedItems[^1].Message}\n已中止批量打印，请处理后再试。",
+                            $"{action}失败",
+                            $"封面{action}失败：{failedItems[^1].Message}\n已中止批量{action}，请处理后再试。",
                             "确定");
                     }
                     IsGenerating = false;
@@ -950,69 +928,64 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
                 currentStep++;
                 Progress = (double)currentStep / totalSteps;
-                ProgressText = $"执行打印: {template.Name}";
+                ProgressText = $"执行{action}: {template.Name}";
 
                 // 核查报告走浏览器打印路径
                 if (template.IsVerificationReport)
                 {
-                    var reportPrinted = await PrintVerificationReportAsync(template, failedItems);
+                    var reportPrinted = await PrintVerificationReportAsync(template, failedItems, printToPrinter);
                     if (reportPrinted) successCount++;
                     continue;
                 }
 
-                if (await PrintSingleTemplateAsync(template, failedItems))
+                if (await PrintSingleTemplateAsync(template, failedItems, printToPrinter))
                     successCount++;
             }
 
             Progress = 1;
-            StatusText = $"批量打印完成: 成功 {successCount} 个" + (failedItems.Count > 0 ? $", 失败 {failedItems.Count} 个" : "");
-            _logger.LogBusiness("批量打印完成", ("BatchNo", _batchNo), ("Success", successCount), ("Failed", failedItems.Count));
-
-            if (successCount > 0)
-            {
-                HasPrinted = true;
-            }
+            StatusText = $"批量{action}完成: 成功 {successCount} 个" + (failedItems.Count > 0 ? $", 失败 {failedItems.Count} 个" : "");
+            _logger.LogBusiness($"批量{action}完成", ("BatchNo", _batchNo), ("Success", successCount), ("Failed", failedItems.Count));
 
             if (!interactive)
             {
                 // 批量静默模式：结果仅体现在状态文本，由调用方汇总展示
                 ProgressText = failedItems.Count == 0
-                    ? $"批量打印完成，共 {successCount} 个模板"
-                    : $"批量打印: 成功 {successCount} 个 失败 {failedItems.Count} 个";
+                    ? $"批量{action}完成，共 {successCount} 个模板"
+                    : $"批量{action}: 成功 {successCount} 个 失败 {failedItems.Count} 个";
                 return;
             }
 
             if (failedItems.Count == 0)
             {
-                ProgressText = $"批量打印完成，共 {successCount} 个模板";
+                ProgressText = $"批量{action}完成，共 {successCount} 个模板";
             }
             else if (successCount > 0)
             {
-                ProgressText = $"批量打印: 成功 {successCount} 个 失败 {failedItems.Count} 个";
+                ProgressText = $"批量{action}: 成功 {successCount} 个 失败 {failedItems.Count} 个";
                 var failedList = failedItems.Select(f => $"{f.Name}: {f.Message}").Take(3);
                 var moreCount = failedItems.Count > 3 ? failedItems.Count - 3 : 0;
                 var message = $"成功: {successCount} 个\n失败: {failedItems.Count} 个\n\n失败详情:\n{string.Join("\n", failedList)}";
                 if (moreCount > 0) message += $"\n...还有 {moreCount} 个失败";
-                await _dialogService.DisplayAlertAsync("打印结果", message, "确定");
+                await _dialogService.DisplayAlertAsync($"{action}结果", message, "确定");
             }
             else
             {
-                ProgressText = $"批量打印失败: {failedItems.Count} 个";
+                ProgressText = $"批量{action}失败: {failedItems.Count} 个";
                 var failedList = failedItems.Select(f => $"{f.Name}: {f.Message}").Take(5);
                 var moreCount = failedItems.Count > 5 ? failedItems.Count - 5 : 0;
-                var message = $"全部打印失败 ({failedItems.Count} 个)\n\n失败详情:\n{string.Join("\n", failedList)}";
+                var message = $"全部{action}失败 ({failedItems.Count} 个)\n\n失败详情:\n{string.Join("\n", failedList)}";
                 if (moreCount > 0) message += $"\n...还有 {moreCount} 个失败";
-                await _dialogService.DisplayAlertAsync("打印失败", message, "确定");
+                await _dialogService.DisplayAlertAsync($"{action}失败", message, "确定");
             }
         }
         catch (OperationCanceledException)
         {
-            ProgressText = "打印已取消";
+            ProgressText = $"{action}已取消";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "失败");
-            await _dialogService.DisplayAlertAsync("错误", $"批量打印失败: {ex.Message}", "确定");
+            await _dialogService.DisplayAlertAsync("错误", $"批量{action}失败: {ex.Message}", "确定");
         }
         finally
         {
@@ -1023,8 +996,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     /// <summary>
     /// 执行单个模板打印（含字段/行数据构建，成功时收集输出文件）
     /// </summary>
-    private async Task<bool> PrintSingleTemplateAsync(TemplateSelectItem template, List<(string Name, string Message)> failedItems)
+    private async Task<bool> PrintSingleTemplateAsync(TemplateSelectItem template, List<(string Name, string Message)> failedItems, bool printToPrinter = true)
     {
+        var action = printToPrinter ? "打印" : "保存";
         var fields = new Dictionary<string, string>(PrintNavigationData.FieldData!, StringComparer.Ordinal);
         var tableRows = PrintNavigationData.TableData ?? new();
 
@@ -1040,13 +1014,18 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         {
             tableRows = PrintNavigationData.SupporterTableData ?? new();
         }
+        // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
+        else if (template.Name.Contains("近亲属"))
+        {
+            tableRows = PrintNavigationData.NearRelativePairs ?? new();
+        }
 
         var applicantName = fields.TryGetValue("APPLICANT_NAME", out var name) ? name : "未知";
         var applicantIdCard = fields.TryGetValue("APPLICANT_ID_CARD", out var idCard) ? idCard : "000000000000000000";
         applicantIdCard = applicantIdCard.Length > 6 ? applicantIdCard : "000000000000000000";
 
         var actualCopies = template.BaseCopies * Copies;
-        _logger.Info($"批量打印: 模板={template.Name}");
+        _logger.Info($"批量{action}: 模板={template.Name}");
 
         var result = await _printExecuteService.ExecutePrintAsync(
             template.TemplateId,
@@ -1058,56 +1037,21 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             tableRows,
             applicantName,
             applicantIdCard,
-            SelectedPrinter,
+            printToPrinter ? SelectedPrinter : null!,
             actualCopies,
             IsDuplex,
+            printToPrinter: printToPrinter,
             CancellationToken);
 
         if (result.IsSuccess)
         {
-            // 将源文件（Excel/Word）加入输出列表
-            if (!string.IsNullOrEmpty(result.Value.FilePath) && _fileService.FileExists(result.Value.FilePath))
-            {
-                var sourceExt = Path.GetExtension(result.Value.FilePath);
-                var sourceType = sourceExt.ToLowerInvariant() switch
-                {
-                    ".xlsx" => "Excel",
-                    ".docx" => "Word",
-                    _ => "文件"
-                };
-                OutputFiles.Add(new OutputFileItem
-                {
-                    TemplateId = template.TemplateId,
-                    FileName = Path.GetFileName(result.Value.FilePath),
-                    FileType = sourceType,
-                    Status = "已生成",
-                    IsCompleted = true,
-                    FilePath = result.Value.FilePath,
-                    TemplateName = template.Name
-                });
-            }
-
-            // 将PDF也加入输出列表
-            if (!string.IsNullOrEmpty(result.Value.PdfPath) && _fileService.FileExists(result.Value.PdfPath))
-            {
-                OutputFiles.Add(new OutputFileItem
-                {
-                    TemplateId = template.TemplateId,
-                    FileName = Path.GetFileName(result.Value.PdfPath),
-                    FileType = "PDF",
-                    Status = "已生成",
-                    IsCompleted = true,
-                    FilePath = result.Value.PdfPath,
-                    TemplateName = template.Name
-                });
-            }
-
+            AddOutputFiles(template.TemplateId, template.Name, result.Value.FilePath, result.Value.PdfPath);
             return true;
         }
         else
         {
             failedItems.Add((template.Name, result.Message ?? "未知错误"));
-            _logger.Warn("批量打印失败");
+            _logger.Warn($"批量{action}失败");
             return false;
         }
     }
@@ -1125,6 +1069,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             return;
         }
 
+        if (!file.IsPdf)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "仅 PDF 文件可在页面内预览", "确定");
+            return;
+        }
+
         try
         {
             PdfFilePath = file.FilePath;
@@ -1138,12 +1088,38 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
     }
 
+    /// <summary>行内「打印」：该文件对应模板重新生成并调打印机</summary>
     [RelayCommand]
-    private async Task PrintFileAsync(OutputFileItem file)
+    private Task PrintFileAsync(OutputFileItem file) => ExecuteFileActionAsync(file, printToPrinter: true);
+
+    /// <summary>
+    /// 行内动作公共链（打印/保存共用）：按模板重新生成该文件；
+    /// printToPrinter=false 即四件套里的「保存」——生成落盘到输出根、不调打印机。
+    /// </summary>
+    private async Task ExecuteFileActionAsync(OutputFileItem? file, bool printToPrinter)
     {
+        var action = printToPrinter ? "打印" : "保存";
         if (file == null)
         {
-            await _dialogService.DisplayAlertAsync("提示", "请选择要打印的文件", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "请选择要操作的文件", "确定");
+            return;
+        }
+
+        // 无模板产物（核查报告等）：文件已在输出根，无需重新生成
+        if (file.TemplateId <= 0)
+        {
+            if (printToPrinter)
+            {
+                if (WebViewPrintPdfFunc != null)
+                    await WebViewPrintPdfFunc(file.FilePath);
+                else
+                    ShellOpenPdf(file.FilePath);
+                StatusText = $"已发送打印: {file.FileName}";
+            }
+            else
+            {
+                StatusText = $"{file.FileName} 已在输出目录";
+            }
             return;
         }
 
@@ -1153,8 +1129,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             return;
         }
 
-        // 封面模板打印前确认：需先插入牛皮纸
-        if (file.TemplateName.Contains("封面"))
+        // 封面模板打印前确认：需先插入牛皮纸（保存不调打印机，跳过）
+        if (printToPrinter && file.TemplateName.Contains("封面"))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -1167,7 +1143,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            StatusText = $"正在打印: {file.FileName}";
+            StatusText = $"正在{action}: {file.FileName}";
 
             var fields = new Dictionary<string, string>(PrintNavigationData.FieldData, StringComparer.Ordinal);
             var tableRows = PrintNavigationData.TableData ?? new();
@@ -1183,6 +1159,11 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             else if (file.TemplateName.Contains("赡养费承诺书"))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
+            }
+            // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
+            else if (file.TemplateName.Contains("近亲属"))
+            {
+                tableRows = PrintNavigationData.NearRelativePairs ?? new();
             }
 
             var applicantName = fields.TryGetValue("APPLICANT_NAME", out var name) ? name : "未知";
@@ -1201,30 +1182,32 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows,
                 applicantName,
                 applicantIdCard,
-                SelectedPrinter,
+                printToPrinter ? SelectedPrinter : null!,
                 actualCopies,
                 IsDuplex,
+                printToPrinter: printToPrinter,
                 CancellationToken);
 
             if (result.IsSuccess)
             {
-                _logger.LogBusiness("单文件打印完成",
+                _logger.LogBusiness($"单文件{action}完成",
                     ("Template", file.TemplateName),
                     ("BatchNo", _batchNo),
                     ("Copies", actualCopies));
-                StatusText = "打印完成";
+                StatusText = $"{action}完成";
+                AddOutputFiles(file.TemplateId, file.TemplateName, result.Value.FilePath, result.Value.PdfPath);
             }
             else
             {
-                StatusText = $"打印失败: {result.Message}";
-                await _dialogService.DisplayAlertAsync("错误", $"打印失败: {result.Message}", "确定");
+                StatusText = $"{action}失败: {result.Message}";
+                await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {result.Message}", "确定");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "失败");
-            StatusText = $"打印异常: {ex.Message}";
-            await _dialogService.DisplayAlertAsync("错误", $"打印异常: {ex.Message}", "确定");
+            StatusText = $"{action}异常: {ex.Message}";
+            await _dialogService.DisplayAlertAsync("错误", $"{action}异常: {ex.Message}", "确定");
         }
         finally
         {
@@ -1424,9 +1407,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 打印核查报告（通过浏览器执行）
+    /// 生成核查报告（PDF 落输出根/核查报告/；printToPrinter=true 时再经浏览器/WebView2 执行打印）
     /// </summary>
-    private async Task<bool> PrintVerificationReportAsync(TemplateSelectItem reportItem, List<(string Name, string Message)> failedItems)
+    private async Task<bool> PrintVerificationReportAsync(TemplateSelectItem reportItem, List<(string Name, string Message)> failedItems, bool printToPrinter = true)
     {
         try
         {
@@ -1438,34 +1421,37 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 return false;
             }
 
-            var reportPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"check_report_{Guid.NewGuid():N}.pdf");
+            // 报告是正式产物，与四件套口径一致：落输出根（不再进会被清理的 temp）
+            var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
+            Directory.CreateDirectory(reportDir);
+            var reportName = $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}.pdf";
+            var reportPath = Path.Combine(reportDir, reportName);
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, CancellationToken);
 
-            // 添加到输出文件列表
-            OutputFiles.Add(new OutputFileItem
-            {
-                TemplateId = 0,
-                FileName = $"核查报告_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
-                FileType = "PDF",
-                Status = "已生成",
-                IsCompleted = true,
-                FilePath = reportPath,
-                TemplateName = "核查报告"
-            });
+            AddOutputFiles(0, "核查报告", null, reportPath);
 
-            // 通过 WebView2 打印（复用 PdfJs 渲染 + 系统打印对话框，不依赖默认 PDF 关联）
-            if (WebViewPrintPdfFunc != null)
+            if (printToPrinter)
             {
-                await WebViewPrintPdfFunc(reportPath);
+                // 通过 WebView2 打印（复用 PdfJs 渲染 + 系统打印对话框，不依赖默认 PDF 关联）
+                if (WebViewPrintPdfFunc != null)
+                {
+                    await WebViewPrintPdfFunc(reportPath);
+                }
+                else
+                {
+                    // 回退：仅打开预览（无打印）
+                    ShellOpenPdf(reportPath);
+                }
+                _logger.LogBusiness("核查报告已发送打印",
+                    ("CheckId", reportItem.CheckId.ToString()),
+                    ("BatchNo", _batchNo));
             }
             else
             {
-                // 回退：仅打开预览（无打印）
-                ShellOpenPdf(reportPath);
+                _logger.LogBusiness("核查报告已生成(未打印)",
+                    ("CheckId", reportItem.CheckId.ToString()),
+                    ("BatchNo", _batchNo));
             }
-            _logger.LogBusiness("核查报告已发送打印",
-                ("CheckId", reportItem.CheckId.ToString()),
-                ("BatchNo", _batchNo));
             return true;
         }
         catch (Exception ex)
@@ -1518,116 +1504,37 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             businessType, PrintNavigationData.Classification, PrintNavigationData.OperationOverride);
 
     // ========================
-    //  保存文件
+    //  保存（四件套：仅生成落盘，不打印）
     // ========================
 
+    /// <summary>行内「保存」：按模板重新生成该文件到输出根，不调打印机</summary>
     [RelayCommand]
-    private async Task SaveFileAsync(OutputFileItem file)
-    {
-        if (file == null || string.IsNullOrEmpty(file.FilePath))
-        {
-            await _dialogService.DisplayAlertAsync("提示", "文件信息无效", "确定");
-            return;
-        }
+    private Task SaveFileAsync(OutputFileItem file) => ExecuteFileActionAsync(file, printToPrinter: false);
 
-        if (!_fileService.FileExists(file.FilePath))
-        {
-            await _dialogService.DisplayAlertAsync("提示", "文件不存在，请重新生成", "确定");
-            return;
-        }
+    /// <summary>「保存选中」：勾选模板全部仅生成落盘（不打印）</summary>
+    [RelayCommand]
+    private async Task SaveSelectedAsync()
+        => await PrintAllCoreAsync(interactive: true, printToPrinter: false);
 
-        try
-        {
-            var folderPath = await PickExportFolderAsync("选择保存目录");
-            if (string.IsNullOrEmpty(folderPath))
-                return;
-
-            var targetPath = Path.Combine(folderPath, file.FileName);
-            var isOverwrite = _fileService.FileExists(targetPath);
-
-            _fileService.CopyFile(file.FilePath, targetPath, overwrite: true);
-
-            _logger.LogBusiness("保存文件成功",
-                ("FileName", file.FileName),
-                ("TargetPath", targetPath),
-                ("IsOverwrite", isOverwrite));
-
-            StatusText = $"文件已保存: {file.FileName}";
-            await ShowExportSuccessAsync(folderPath, new[] { file.FileName });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "失败");
-            await _dialogService.DisplayAlertAsync("错误", $"保存失败: {ex.Message}", "确定");
-        }
-    }
-
+    /// <summary>
+    /// 「全部保存」：全部适用模板仅生成落盘（不打印）。
+    /// 输出已固定到 config\document_output.yaml 的 output.base_directory，不再弹目录选择。
+    /// </summary>
     [RelayCommand]
     private async Task SaveAllFilesAsync()
     {
-        var completedFiles = OutputFiles.Where(f => f.IsCompleted).ToList();
-        if (completedFiles.Count == 0)
+        var applicable = Templates.Where(t => t.IsApplicable).ToList();
+        if (applicable.Count == 0)
         {
-            await _dialogService.DisplayAlertAsync("提示", "没有可保存的文件", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "没有可用模板", "确定");
             return;
         }
 
-        try
-        {
-            var folderPath = await PickExportFolderAsync("选择批量保存目录");
-            if (string.IsNullOrEmpty(folderPath))
-                return;
+        foreach (var t in applicable)
+            t.IsSelected = true;
 
-            var successCount = 0;
-            var failedItems = new List<(string FileName, string Error)>();
-
-            foreach (var file in completedFiles)
-            {
-                if (!_fileService.FileExists(file.FilePath))
-                {
-                    failedItems.Add((file.FileName, "源文件不存在"));
-                    continue;
-                }
-
-                try
-                {
-                    var targetPath = Path.Combine(folderPath, file.FileName);
-                    var isOverwrite = _fileService.FileExists(targetPath);
-
-                    _fileService.CopyFile(file.FilePath, targetPath, overwrite: true);
-                    successCount++;
-
-                    _logger.LogBusiness("保存文件成功",
-                        ("FileName", file.FileName),
-                        ("TargetPath", targetPath),
-                        ("IsOverwrite", isOverwrite));
-                }
-                catch (Exception ex)
-                {
-                    failedItems.Add((file.FileName, ex.Message));
-                    _logger.LogError(ex, "执行失败");
-                }
-            }
-
-            TryOpenFolder(folderPath);
-
-            var message = $"成功保存 {successCount} 个文件";
-            if (failedItems.Count > 0)
-            {
-                message += $"\n失败 {failedItems.Count} 个\n";
-                message += string.Join("\n", failedItems.Take(3).Select(f => $"- {f.FileName}: {f.Error}"));
-                if (failedItems.Count > 3)
-                    message += $"\n...还有 {failedItems.Count - 3} 个";
-            }
-
-            StatusText = $"批量保存完成: 成功 {successCount} 个";
-            await _dialogService.DisplayAlertAsync("保存结果", message, "确定");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "失败");
-            await _dialogService.DisplayAlertAsync("错误", $"批量保存失败: {ex.Message}", "确定");
-        }
+        await PrintAllCoreAsync(interactive: true, printToPrinter: false);
+        TryOpenFolder(OutputPathHelper.OutputRoot);
     }
 
     // ========================
@@ -2000,4 +1907,7 @@ public partial class OutputFileItem : ObservableObject
 
     [ObservableProperty]
     private string _templateName = string.Empty;
+
+    /// <summary>是否 PDF 行（仅 PDF 可页面内预览）；构造时 FileType 即定，无需变更通知</summary>
+    public bool IsPdf => string.Equals(FileType, "PDF", System.StringComparison.OrdinalIgnoreCase);
 }

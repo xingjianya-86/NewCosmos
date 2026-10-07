@@ -266,10 +266,6 @@
                                     <Label Text="双面打印" VerticalOptions="Center"/>
                                     <Switch IsToggled="{Binding Output.IsDuplex}" OnColor="{StaticResource Primary}"/>
                                 </HorizontalStackLayout>
-                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
-                                    <Label Text="生成PDF" VerticalOptions="Center"/>
-                                    <Switch IsToggled="{Binding Output.GeneratePdf}" OnColor="{StaticResource Primary}"/>
-                                </HorizontalStackLayout>
                             </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                                 <Button Grid.Column="0" Text="预览" Style="{StaticResource ButtonPrimary}"

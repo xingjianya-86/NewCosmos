@@ -24,5 +24,6 @@ public interface IPrintExecuteService
         string printerName = null,
         int copies = 1,
         bool isDuplex = false,
+        bool printToPrinter = true,
         CancellationToken ct = default);
 }

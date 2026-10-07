@@ -34,7 +34,7 @@
 
         <!-- 工具栏 -->
         <Border Grid.Row="1" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                 <Label Text="预览模板:" VerticalOptions="Center" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                 <Picker Grid.Column="1"
                         ItemsSource="{Binding Templates}"
@@ -42,7 +42,7 @@
                         ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
                         VerticalOptions="Center"/>
                 <Button Grid.Column="2"
-                        Text="&#xE8BD; 生成预览"
+                        Text="{Binding PreviewActionText, StringFormat='&#xE8BD; {0}'}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding PreviewCommand}"
                         IsEnabled="{Binding IsNotBusy}"
@@ -50,11 +50,18 @@
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="3"
-                        Text="&#xE7A7; 打印"
+                        Text="{Binding PrintActionText, StringFormat='&#xE7A7; {0}'}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding PrintCommand}"
-                        IsEnabled="{Binding HasPdf}"
+                        IsEnabled="{Binding IsNotBusy}"
                         Style="{StaticResource WarningButton}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="4"
+                        Text="{Binding OpenOutputFolderActionText, StringFormat='&#xE8B7; {0}'}"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding OpenOutputFolderCommand}"
+                        Style="{StaticResource ButtonOutline}"
                         FontSize="13"
                         HeightRequest="38"/>
             </Grid>
@@ -79,7 +86,7 @@
                                                      Spacing="10">
                                     <Label Text="&#xE894;" FontFamily="Segoe MDL2 Assets" FontSize="48"
                                            TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                                    <Label Text="点击「生成预览」查看PDF" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
+                                    <Label Text="{Binding PreviewActionText, StringFormat='点击「{0}」查看PDF'}" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                                 </VerticalStackLayout>
                             </Grid>
                         </Grid>
@@ -157,26 +164,33 @@
                                     <Label Text="双面打印" VerticalOptions="Center"/>
                                     <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
                                 </HorizontalStackLayout>
-                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
-                                    <Label Text="生成PDF" VerticalOptions="Center"/>
-                                    <Switch IsToggled="{Binding GeneratePdf}" OnColor="{StaticResource Primary}"/>
-                                </HorizontalStackLayout>
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
 
                     <Border Style="{StaticResource CardBorder}"
-                            Grid.Column="1" Grid.Row="2"
-                            IsVisible="{Binding HasPdf}">
+                            Grid.Column="1" Grid.Row="2">
                         <VerticalStackLayout Spacing="8">
                             <Label Text="输出文件" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <CollectionView ItemsSource="{Binding OutputFiles}" SelectionMode="None" MaximumHeightRequest="150">
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="OutputFileItem">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="4,6" Style="{StaticResource TableRowInteractive}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8" Padding="4,6" Style="{StaticResource TableRowInteractive}">
                                             <Label Text="✓" TextColor="{StaticResource Secondary}" FontSize="16" VerticalOptions="Center"/>
                                             <Label Grid.Column="1" Text="{Binding FileName}" VerticalOptions="Center" FontSize="12" LineBreakMode="TailTruncation"/>
-                                            <Button Grid.Column="2" Text="&#xE741; 保存"
+                                            <Button Grid.Column="2" Text="&#xE8BD; 预览"
+                                                    FontFamily="Segoe MDL2 Assets"
+                                                    FontSize="12" Padding="8,0" HeightRequest="30"
+                                                    IsEnabled="{Binding IsPdf}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PreviewFileCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            <Button Grid.Column="3" Text="&#xE7A7; 打印"
+                                                    FontFamily="Segoe MDL2 Assets"
+                                                    Style="{StaticResource WarningButton}"
+                                                    FontSize="12" Padding="8,0" HeightRequest="30"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PrintFileCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                            <Button Grid.Column="4" Text="&#xE741; 保存"
                                                     FontFamily="Segoe MDL2 Assets"
                                                     Style="{StaticResource ButtonSuccess}"
                                                     FontSize="12" Padding="8,0" HeightRequest="30"
@@ -185,6 +199,9 @@
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="暂无输出文件，先生成（保存）再预览/打印" Style="{StaticResource EmptyStateLabel}"/>
+                                </CollectionView.EmptyView>
                             </CollectionView>
                         </VerticalStackLayout>
                     </Border>
@@ -207,7 +224,7 @@
         </Border>
 
         <Border Grid.Row="3" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                 <Button Text="&#xE72B; 返回"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding GoBackCommand}"
@@ -215,21 +232,27 @@
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="1"
-                        Text="&#xE792; 全部保存"
+                        Text="{Binding SaveSelectedActionText, StringFormat='&#xE792; {0}'}"
                         FontFamily="Segoe MDL2 Assets"
-                        Command="{Binding SaveAllFilesCommand}"
-                        IsEnabled="{Binding HasPrinted}"
+                        Command="{Binding SaveSelectedCommand}"
                         Style="{StaticResource ButtonSuccess}"
                         FontSize="13"
                         HeightRequest="38"/>
-                <Button Grid.Column="3"
-                        Text="&#xE7A7; 一键打印"
+                <Button Grid.Column="2"
+                        Text="{Binding SaveAllActionText, StringFormat='&#xE792; {0}'}"
+                        FontFamily="Segoe MDL2 Assets"
+                        Command="{Binding SaveAllFilesCommand}"
+                        Style="{StaticResource ButtonSuccess}"
+                        FontSize="13"
+                        HeightRequest="38"/>
+                <Button Grid.Column="4"
+                        Text="{Binding PrintSelectedActionText, StringFormat='&#xE7A7; {0}'}"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding PrintAllCommand}"
                         Style="{StaticResource ButtonPrimary}"
                         FontSize="13"
                         HeightRequest="38"/>
-                <Button Grid.Column="4"
+                <Button Grid.Column="5"
                         Text="&#xE73E; 完成工单"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding CompleteWorkOrderCommand}"
@@ -244,7 +267,7 @@
                         </DataTrigger>
                     </Button.Triggers>
                 </Button>
-                <Button Grid.Column="5"
+                <Button Grid.Column="6"
                         Text="&#xE73E; 完成归档"
                         FontFamily="Segoe MDL2 Assets"
                         Command="{Binding CompleteCommand}"

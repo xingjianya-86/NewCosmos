@@ -523,7 +523,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
                 var printResult = await _printExecuteService.ExecutePrintAsync(
                     templateIdResult.Value, TemplateName, BusinessTypeKey, latestId, batchNo,
                     fieldsResult.Value, new List<Dictionary<string, string>>(),
-                    name, idCard, printerName, Math.Max(1, copies), false, ct);
+                    name, idCard, printerName, Math.Max(1, copies), false, printToPrinter: true, ct);
 
                 if (printResult.IsSuccess) successCount++;
                 else failed.Add((string.IsNullOrEmpty(name) ? latestId.ToString(CultureInfo.InvariantCulture) : name,

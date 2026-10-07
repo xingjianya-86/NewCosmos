@@ -685,6 +685,52 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     #endregion
 
+    #region 文档动作四件套（预览/打印/保存/全部保存）
+
+    // 按钮文案统一取自 Constants\DocumentActionText（XAML 无法直接 x:Static，经基类属性中转）；
+    // 语义与产物路径见 docs\20261007_文档动作与输出路径统一规范.md。
+    /// <summary>生成临时 PDF 并在页面内预览</summary>
+    public string PreviewActionText => DocumentActionText.Preview;
+
+    /// <summary>预览当前勾选项（多选列表页）</summary>
+    public string PreviewSelectedActionText => DocumentActionText.PreviewSelected;
+
+    /// <summary>生成 + 落盘固定输出根 + 调打印机</summary>
+    public string PrintActionText => DocumentActionText.Print;
+
+    /// <summary>打印当前勾选项（多选列表页）</summary>
+    public string PrintSelectedActionText => DocumentActionText.PrintSelected;
+
+    /// <summary>仅生成落盘到固定输出根，不打印</summary>
+    public string SaveActionText => DocumentActionText.Save;
+
+    /// <summary>仅生成勾选项落盘（多选列表页），不打印</summary>
+    public string SaveSelectedActionText => DocumentActionText.SaveSelected;
+
+    /// <summary>仅生成全部落盘，不打印</summary>
+    public string SaveAllActionText => DocumentActionText.SaveAll;
+
+    /// <summary>打开固定输出根目录</summary>
+    public string OpenOutputFolderActionText => DocumentActionText.OpenOutputFolder;
+
+    /// <summary>打开固定输出根（不存在时先创建）——四件套的「输出去哪了」入口</summary>
+    [RelayCommand]
+    private void OpenOutputFolder()
+    {
+        var root = Helpers.OutputPathHelper.OutputRoot;
+        try
+        {
+            Directory.CreateDirectory(root);
+        }
+        catch
+        {
+            // 目录创建失败时交由 TryOpenFolder 静默处理
+        }
+        TryOpenFolder(root);
+    }
+
+    #endregion
+
     #region SafeFireAndForget
 
     /// <summary>

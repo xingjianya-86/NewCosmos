@@ -941,6 +941,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
                 SelectedPrinter ?? string.Empty,
                 Math.Max(1, Copies),
                 IsDuplex,
+                printToPrinter: true,
                 CancellationToken);
 
             if (result.IsFailure)
