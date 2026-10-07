@@ -433,4 +433,13 @@ public partial class ClassificationViewModel : ViewModelBase
     {
         await Task.CompletedTask;
     }
+
+    /// <summary>
+    /// 「输出档案」：进入档案制作输出页（四件套动作集中地）
+    /// </summary>
+    [RelayCommand]
+    private async Task GoOutputAsync()
+    {
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
+    }
 }

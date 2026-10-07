@@ -60,7 +60,7 @@
         </ScrollView>
         <Grid Grid.Row="2" BackgroundColor="{StaticResource White}" Padding="20,12" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
             <Button Grid.Column="1" Text="保存认定" Command="{Binding SaveCommand}" Style="{StaticResource ButtonPrimary}" MinimumWidthRequest="120"/>
-            <Button Grid.Column="2" Text="输出档案" Style="{StaticResource ButtonSecondary}" MinimumWidthRequest="120"/>
+            <Button Grid.Column="2" Text="输出档案" Command="{Binding GoOutputCommand}" Style="{StaticResource ButtonSecondary}" MinimumWidthRequest="120"/>
         </Grid>
     </Grid>
 </ContentPage>

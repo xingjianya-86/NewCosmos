@@ -486,35 +486,6 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task OpenPdfAsync()
-    {
-        if (string.IsNullOrEmpty(PdfPreviewUrl) || !File.Exists(PdfPreviewUrl))
-        {
-            await _dialogService.DisplayAlertAsync("提示", "PDF文件不存在", "确定");
-            return;
-        }
-
-        try
-        {
-            var process = new System.Diagnostics.Process
-            {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = PdfPreviewUrl,
-                    UseShellExecute = true
-                }
-            };
-            process.Start();
-            Logger.Debug($"打开PDF文件: {PdfPreviewUrl}");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "打开PDF文件失败");
-            await _dialogService.DisplayAlertAsync("错误", $"无法打开PDF文件: {ex.Message}", "确定");
-        }
-    }
-
-    [RelayCommand]
     private void SelectMatchTask(AssetVerificationTask task)
     {
         if (task == null) return;
@@ -617,7 +588,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
     /// <summary>
     /// 打印选中人员的已上传核查报告（nc_biz_asset_check_reports 中的 PDF）。
-    /// 取报告数据 → 写入临时文件 → 系统默认 PDF 应用（verb=print）打印。
+    /// 报告先落输出根 {输出根}\核查报告\（打印=生成+落盘+调打印，与四件套口径一致），再走系统默认 PDF 应用（verb=print）打印。
     /// 选中人员必已上传报告（右侧有 PDF 预览）；无报告时兜底提示。
     /// </summary>
     [RelayCommand]
@@ -633,15 +604,8 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
         await ExecuteAsync(async ct =>
         {
-            var reportResult = await _pdfVerificationService.GetReportDataByCheckIdAsync(task.Id, ct);
-            if (reportResult.IsFailure || reportResult.Value is not { Length: > 0 })
-            {
-                await _dialogService.DisplayAlertAsync("提示", reportResult.Message ?? "该人员暂无已上传的核查报告", "确定");
-                return;
-            }
-
-            var reportPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"check_report_{Guid.NewGuid():N}.pdf");
-            await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
+            var reportPath = await CreateReportFileAsync(task, ct);
+            if (reportPath == null) return;
 
             await ShellPrintPdfAsync(reportPath);
 
@@ -649,6 +613,52 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                 ("CheckId", task.Id),
                 ("Name", DataMasker.MaskName(task.ArchiveName)));
         });
+    }
+
+    /// <summary>
+    /// 「保存」：取选中人员的已上传核查报告，落 {输出根}\核查报告\（不打印），完成后打开目录。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanPrintReport))]
+    private async Task SaveReportAsync()
+    {
+        if (SelectedMatchTask == null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择待核查人员", "确定");
+            return;
+        }
+
+        var task = SelectedMatchTask;
+
+        await ExecuteAsync(async ct =>
+        {
+            var reportPath = await CreateReportFileAsync(task, ct);
+            if (reportPath == null) return;
+
+            await ShowExportSuccessAsync(Path.GetDirectoryName(reportPath)!, new[] { Path.GetFileName(reportPath) });
+
+            Logger.LogBusiness("保存核查报告",
+                ("CheckId", task.Id),
+                ("Name", DataMasker.MaskName(task.ArchiveName)));
+        });
+    }
+
+    /// <summary>
+    /// 取选中人员的核查报告并落 {输出根}\核查报告\；无报告时弹提示并返回 null（打印/保存共用）。
+    /// </summary>
+    private async Task<string?> CreateReportFileAsync(AssetVerificationTask task, CancellationToken ct)
+    {
+        var reportResult = await _pdfVerificationService.GetReportDataByCheckIdAsync(task.Id, ct);
+        if (reportResult.IsFailure || reportResult.Value is not { Length: > 0 })
+        {
+            await _dialogService.DisplayAlertAsync("提示", reportResult.Message ?? "该人员暂无已上传的核查报告", "确定");
+            return null;
+        }
+
+        var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
+        Directory.CreateDirectory(reportDir);
+        var reportPath = Path.Combine(reportDir, $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}.pdf");
+        await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
+        return reportPath;
     }
 
     /// <summary>

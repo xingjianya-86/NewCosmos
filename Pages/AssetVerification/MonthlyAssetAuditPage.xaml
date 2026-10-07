@@ -97,25 +97,33 @@
                     <!-- 待核对人员 -->
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="8">
-                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                                 <Label Grid.Column="0" Text="待核对人员" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                                 <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                     <Label Text="{Binding MatchTasks.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold" VerticalOptions="Center"/>
                                 </Border>
-                                <Button Grid.Column="2" Text="打印报告" FontSize="13" Padding="10,2" HeightRequest="30"
+                                <Button Grid.Column="2" Text="保存报告" FontSize="13" Padding="10,2" HeightRequest="30"
+                                        BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource Success}" CornerRadius="6"
+                                        VerticalOptions="Center"
+                                        Command="{Binding SaveReportCommand}"
+                                        IsEnabled="{Binding CanPrintReport}"/>
+                                <Button Grid.Column="3" Text="打印报告" FontSize="13" Padding="10,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}" CornerRadius="6"
                                         VerticalOptions="Center"
                                         Command="{Binding PrintSelectedCommand}"
                                         IsEnabled="{Binding CanPrintReport}"/>
                             </Grid>
                             <!-- 人员名单搜索：姓名/身份证号关键字 -->
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                 <Entry Grid.Column="0" Placeholder="搜索姓名/身份证号" Text="{Binding SearchKeyword}"
                                        HeightRequest="36" FontSize="14" IsTextPredictionEnabled="False"
                                        Completed="OnSearchEntryCompleted"/>
                                 <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="36"
                                         BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
                                         Command="{Binding SearchCommand}"/>
+                                <Button Grid.Column="2" Text="打开输出目录" FontSize="12" Padding="10,0" HeightRequest="36"
+                                        BackgroundColor="Transparent" TextColor="{StaticResource PrimaryDark}"
+                                        Command="{Binding OpenOutputFolderCommand}"/>
                             </Grid>
                             <CollectionView ItemsSource="{Binding MatchTasks}" HeightRequest="180" SelectionMode="Single" SelectedItem="{Binding SelectedMatchTask}">
                                 <CollectionView.ItemTemplate>

@@ -276,4 +276,5 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 身份证校验 | `Helpers\IdCardValidator.cs` | |
 | 彩票奖级与金额 | `Helpers\LotteryPrizeResolver.cs`、`Services\Lottery\*`、`Scripts\Lottery\` | |
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
+| 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照见该文档 |
 | 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |
