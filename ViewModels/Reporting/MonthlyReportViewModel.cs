@@ -181,7 +181,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                 {
                     PreviewSelectedCommand.NotifyCanExecuteChanged();
                     PrintSelectedCommand.NotifyCanExecuteChanged();
-                    ExportSelectedCommand.NotifyCanExecuteChanged();
+                    SaveSelectedCommand.NotifyCanExecuteChanged();
                 }
             };
             Forms.Add(option);
@@ -436,16 +436,26 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 导出勾选表单的源文件（xlsx/docx）+ PDF 到所选目录，完成后打开目录
+    /// 「保存选中」：勾选表单的源文件（xlsx/docx）+ PDF 落固定输出根（不打印）
     /// </summary>
     [RelayCommand(CanExecute = nameof(HasSelectedForms))]
-    private async Task ExportSelectedAsync()
+    private Task SaveSelectedAsync() => SaveFormsAsync(all: false);
+
+    /// <summary>
+    /// 「全部保存」：全部表单落固定输出根（不打印，不依赖勾选）
+    /// </summary>
+    [RelayCommand]
+    private Task SaveAllAsync() => SaveFormsAsync(all: true);
+
+    private async Task SaveFormsAsync(bool all)
     {
         var town = SelectedTown == "全部" ? "" : SelectedTown;
-        var keys = Forms.Where(f => f.IsSelected).Select(f => f.FormKey).ToList();
+        var keys = (all
+            ? Forms.Select(f => f.FormKey)
+            : Forms.Where(f => f.IsSelected).Select(f => f.FormKey)).ToList();
         if (keys.Count == 0)
         {
-            await ShowErrorAsync("请先勾选要导出的报表表单");
+            await ShowErrorAsync(all ? "没有可保存的报表表单" : "请先勾选要保存的报表表单");
             return;
         }
 
@@ -456,13 +466,14 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             if (!proceed || IsAttendancePopupVisible)
             {
                 if (IsAttendancePopupVisible)
-                    _pendingAction = ExportSelectedAsync;
+                    _pendingAction = () => SaveFormsAsync(all);
                 return;
             }
         }
 
-        var folder = await PickExportFolderAsync("选择报表导出目录");
-        if (string.IsNullOrWhiteSpace(folder)) return;
+        // 输出固定到 config\document_output.yaml 的 output.base_directory（不再弹目录选择）
+        var folder = Path.Combine(OutputPathHelper.OutputRoot, "月报表", $"{SelectedYear:D4}{SelectedMonth:D2}");
+        Directory.CreateDirectory(folder);
 
         var savedFiles = new List<string>();
         var skipped = new List<string>();
@@ -480,7 +491,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                         skipped.Add(key);
                         continue;
                     }
-                    await ShowErrorAsync($"导出失败（{key}）：{sourceResult.Message}");
+                    await ShowErrorAsync($"保存失败（{key}）：{sourceResult.Message}");
                     return;
                 }
                 foreach (var file in sourceResult.Value)
@@ -494,14 +505,14 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                 var pdfResult = await _printService.RenderMonthlyFormAsync(SelectedYear, SelectedMonth, key, town, ct);
                 if (pdfResult.IsFailure)
                 {
-                    await ShowErrorAsync($"导出失败（{key}）：{pdfResult.Message}");
+                    await ShowErrorAsync($"保存失败（{key}）：{pdfResult.Message}");
                     return;
                 }
                 var pdfPath = Path.Combine(folder, $"{SelectedYear:D4}{SelectedMonth:D2}_{key}.pdf");
                 await File.WriteAllBytesAsync(pdfPath, pdfResult.Value, ct);
                 savedFiles.Add(Path.GetFileName(pdfPath));
             }
-        }, "正在导出...");
+        }, "正在生成...");
 
         if (savedFiles.Count > 0)
         {
@@ -510,7 +521,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         }
         else if (skipped.Count > 0)
         {
-            await _dialogService.DisplayAlertAsync("提示", $"所选表单均无数据，未导出文件：{string.Join("、", skipped)}", "确定");
+            await _dialogService.DisplayAlertAsync("提示", $"所选表单均无数据，未生成文件：{string.Join("、", skipped)}", "确定");
         }
     }
 

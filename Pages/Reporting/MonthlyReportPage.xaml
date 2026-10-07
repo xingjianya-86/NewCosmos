@@ -133,9 +133,13 @@
                                 <Label Text="打印份数" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Entry Grid.Column="1" Text="{Binding Copies}" Keyboard="Numeric" WidthRequest="70" HeightRequest="34" HorizontalTextAlignment="Center"/>
                             </Grid>
-                            <Button Text="预览选中表单" Command="{Binding PreviewSelectedCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
-                            <Button Text="打印选中表单（默认打印机）" Command="{Binding PrintSelectedCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
-                            <Button Text="导出选中表单（源文件+PDF）" Command="{Binding ExportSelectedCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <Button Text="{Binding PreviewSelectedActionText}" Command="{Binding PreviewSelectedCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
+                            <Button Text="{Binding PrintSelectedActionText}" Command="{Binding PrintSelectedCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Text="{Binding SaveSelectedActionText}" Command="{Binding SaveSelectedCommand}" Style="{StaticResource ButtonSuccess}" HeightRequest="38"/>
+                                <Button Grid.Column="1" Text="{Binding SaveAllActionText}" Command="{Binding SaveAllCommand}" Style="{StaticResource ButtonSuccess}" HeightRequest="38"/>
+                            </Grid>
+                            <Button Text="{Binding OpenOutputFolderActionText}" Command="{Binding OpenOutputFolderCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="36" FontSize="13"/>
                         </VerticalStackLayout>
                     </Border>
 
