@@ -18,6 +18,7 @@ dotnet build NewCosmos.csproj -f net10.0-windows10.0.19041.0     # Windows
 
 - **没有测试项目**。验证 = 编译零错误 + 启动冒烟（登录→列表→表单保存→导入→打印预览）。
 - 发版入口：`deploy\publish_all.bat`（先用 `-DryRun` 体检），见 §2。
+- 本地可再生占用（`bin\ obj\ publish\`，≈9 GB）可整删重建，维护见 §2。
 - 改数据库 / 改金额 / 改日志，动手前分别看 §8、§9、§10。
 
 **动手前三件事**：① 查 §5 禁止表；② 走 §13 工作流程（先出计划→备份→不盲替换）；③ 分层与 DI 见 §6。
@@ -72,8 +73,14 @@ deploy\publish_release.ps1 -Version 1.1.yyyyMMdd [-MinSupported 1.1.xxx] [-Force
 
 **git 与备份**
 
-- 已启用 git（2026-09 开源初始化）。实际忽略规则：`config\database.ini|network.ini|update.ini`（`*.example` 例外）、`AGENTS.local.md`、`*.local.ps1`、`publish/`、`backup/`、`python-embed/`、`*.log`、各项目 `bin|obj`。
+- 已启用 git（2026-09 开源初始化）。忽略规则分四类（完整列表以 `.gitignore` 为准）：
+  **凭据**：`config\database.ini|network.ini|update.ini`（`*.example` 例外）、`AGENTS.local.md`、`*.local.ps1`；
+  **本地大体积/私有资产**：`publish/`、`python-embed/`、`公文字体/`、`keystore/`、`Resources\PostgreSQL|ZeroTier/`、`backup/`；
+  **构建产物与运行残留**：`bin/`、`obj/`、`deploy/**/bin,obj/`、`*.log`、`输出/`、`Logs/`；
+  **内网文档**：`docs\20260918_*.md`（两份，见 §2 末）。
+  核对任意路径：`git check-ignore -v <路径>`；盘点被忽略项：`git status --ignored=matching`。
 - 改文件前按相对路径复制到 `backup\<yyyyMMdd_HHmmss>_<用途>\`（便于回滚与对比）。
+- **本地磁盘维护**：`bin\ obj\ publish\ deploy\**\bin,obj\ *.log` 全属可再生（一次 build/发版即回），磁盘紧张时可整删（2026-10-07 实测释放 8.8 GB，删后 build 零错误）；`python-embed\`（≈1.8 GB，彩票运行时依赖）与 `公文字体\`（打印依赖）**勿删**。
 
 **数据库连接信息**：公开仓库不含任何内部主机/账号/密码；本地开发填 `config\database.ini`（按 `database.ini.example`）；含凭据的本机细节写在 `AGENTS.local.md`（已忽略，不入库）。
 
@@ -130,7 +137,7 @@ NewCosmos/
 ├── Scripts/        Lottery\（彩票 Python 脚本与预训练模型，随包分发）、import_templates.ps1|.bat、
 │                   templates_manifest.json；脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
 ├── python-embed/   嵌入式 Python（彩票训练/预测用，不入库）
-├── Templates_NEW/、公文字体/、keystore/   模板、字体、签名密钥资源
+├── Templates_NEW/   模板资源（入库 7 文件）；公文字体/、keystore/ 为本机资产，**不入库**（§2）
 ├── publish/        发布产物（不入库）
 ├── docs/           业务文档 + migrations/（权威事实来源索引见 §14）
 └── AGENTS.md（本文件）、AGENTS.local.md（本机凭据，不入库）、opencode.json（instructions 指回本文件）、
