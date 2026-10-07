@@ -59,7 +59,7 @@ deploy\publish_all.ps1 -NonInteractive -Version 1.1.yyyyMMdd [-SkipWindows|-Skip
 deploy\publish_release.ps1 -Version 1.1.yyyyMMdd [-MinSupported 1.1.xxx] [-Force] [-NotesFile notes.md]   # 单平台底层
 ```
 
-- 流程：版本三处同步 → Release 自包含发布 → Inno 安装包（`installer\NewCosmosSetup.iss`，产物 `publish\NewCosmosSetup_*.exe`）→ 清单签名 → 上传服务器 → 回环下载校验。详见 `docs\20260918_在线更新系统.md`、`deploy\README.md`。
+- 流程：版本三处同步 → Release 自包含发布 → Inno 安装包（`installer\NewCosmosSetup.iss`，产物 `publish\NewCosmosSetup_*.exe`）→ 清单签名 → 上传服务器 → 回环下载校验。公开库权威文档：`deploy\README.md`（另有本机 `docs\20260918_在线更新系统.md`，因含内网地址被 `.gitignore` 排除，不在仓库内）。
 - 配套工具：`deploy\PatchTool`（增量补丁）、`deploy\UpdateSigningTool`（更新签名）、`deploy\download_update.ps1` / `download_update.bat`（回环校验）。
 - 本机服务器参数写 `deploy\deploy.local.ps1`（`*.local.ps1` 已忽略，样例 `deploy.sample.ps1`）。
 - **失败排查**：窗口保持不退（`pause`），报错同时转录到 `deploy\publish_all.last.log`（`*.log` 已忽略）。
@@ -148,7 +148,7 @@ NewCosmos/
 | 异步方法 | `{动词}{名词}Async` | `GetPagedAsync` |
 | 数据库表 | 前缀分域：`nc_biz_`（业务）`nc_sys_`（系统）`nc_config_`（配置）`nc_dict_`（字典）`nc_perm_`（权限）`nc_regions_`（地区） | `nc_biz_applications` |
 | 数据库列 | snake_case（映射层自动转 PascalCase 属性） | `applicant_id_card` → `ApplicantIdCard` |
-| 文档 | `docs/YYYYMMDD_功能名称.md` | `docs\20260918_在线更新系统.md` |
+| 文档 | `docs/YYYYMMDD_功能名称.md` | `docs\20260924_业务节点文书直出规范.md` |
 
 ## §5 禁止事项速查
 
@@ -269,4 +269,4 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 身份证校验 | `Helpers\IdCardValidator.cs` | |
 | 彩票奖级与金额 | `Helpers\LotteryPrizeResolver.cs`、`Services\Lottery\*`、`Scripts\Lottery\` | |
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
-| 在线更新与增量补丁 | `docs\20260918_在线更新系统.md`、`deploy\README.md`、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2 |
+| 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |
