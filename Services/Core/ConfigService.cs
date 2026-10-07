@@ -1,6 +1,8 @@
 using NewCosmos.Constants;
 using NewCosmos.Models.Exceptions;
 using NewCosmos.Models.Options;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace NewCosmos.Services.Core;
 
@@ -27,6 +29,7 @@ public class ConfigService : IConfigService
     private SchemaOptions _schemaOptions = null!;
     private NetworkOptions _networkOptions = null!;
     private UpdateOptions _updateOptions = null!;
+    private DocumentOutputOptions? _documentOutputOptions;
 
     /// <summary>INI 文件内容缓存：app.ini 会被 4 个 Get*Options 各读一遍，缓存后进程内只读一次磁盘</summary>
     private readonly Dictionary<string, string[]> _iniLinesCache = new(StringComparer.OrdinalIgnoreCase);
@@ -1238,6 +1241,88 @@ public class ConfigService : IConfigService
         }
 
         Serilog.Log.Information("[ConfigService] 数据库配置已保存: Host={Host}", options.Host);
+    }
+
+    /// <summary>document_output.yaml 反序列化 DTO（YamlDotNet 下划线命名约定映射）</summary>
+    private sealed class DocumentOutputYamlDto
+    {
+        public DocumentOutputSectionDto? Output { get; set; }
+    }
+
+    private sealed class DocumentOutputSectionDto
+    {
+        public string? BaseDirectory { get; set; }
+        public DocumentOutputSubdirectoriesDto? Subdirectories { get; set; }
+        public DocumentOutputCleanupDto? Cleanup { get; set; }
+    }
+
+    private sealed class DocumentOutputSubdirectoriesDto
+    {
+        public string? Temp { get; set; }
+    }
+
+    private sealed class DocumentOutputCleanupDto
+    {
+        public int? TempFileRetentionHours { get; set; }
+        public int? MaxTempFiles { get; set; }
+    }
+
+    public DocumentOutputOptions GetDocumentOutputOptions()
+    {
+        if (_documentOutputOptions != null)
+            return _documentOutputOptions;
+
+        var options = new DocumentOutputOptions();
+        var filePath = Path.Combine(_configDirectory, "document_output.yaml");
+
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                var deserializer = new DeserializerBuilder()
+                    .WithNamingConvention(UnderscoredNamingConvention.Instance)
+                    .IgnoreUnmatchedProperties()
+                    .Build();
+                var dto = deserializer.Deserialize<DocumentOutputYamlDto>(File.ReadAllText(filePath));
+
+                var raw = dto?.Output?.BaseDirectory?.Trim();
+                if (!string.IsNullOrWhiteSpace(raw))
+                    options.BaseDirectory = ResolveOutputPlaceholders(raw);
+
+                var tempDir = dto?.Output?.Subdirectories?.Temp?.Trim();
+                if (!string.IsNullOrWhiteSpace(tempDir))
+                    options.TempSubdirectory = tempDir;
+
+                if (dto?.Output?.Cleanup?.TempFileRetentionHours > 0)
+                    options.TempFileRetentionHours = dto.Output.Cleanup.TempFileRetentionHours.Value;
+                if (dto?.Output?.Cleanup?.MaxTempFiles > 0)
+                    options.MaxTempFiles = dto.Output.Cleanup.MaxTempFiles.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[ConfigService] 解析 document_output.yaml 失败，回退历史输出目录");
+        }
+
+        // 回退口径：yaml 缺失/损坏时保持历史行为（相对"输出"目录），不阻断启动
+        if (string.IsNullOrWhiteSpace(options.BaseDirectory))
+            options.BaseDirectory = Path.GetFullPath("输出");
+        else
+            options.BaseDirectory = Path.GetFullPath(options.BaseDirectory);
+
+        Serilog.Log.Information("[ConfigService] 文档输出根: {Root}, 预览临时目录: {Temp}",
+            options.BaseDirectory, Path.Combine(options.BaseDirectory, options.TempSubdirectory));
+
+        _documentOutputOptions = options;
+        return options;
+    }
+
+    /// <summary>展开输出根占位符：{AppData} → 应用数据目录（跨平台 MAUI API）</summary>
+    private static string ResolveOutputPlaceholders(string raw)
+    {
+        return raw
+            .Replace("{AppData}", FileSystem.AppDataDirectory, StringComparison.OrdinalIgnoreCase)
+            .Replace("{appdata}", FileSystem.AppDataDirectory, StringComparison.OrdinalIgnoreCase);
     }
 
 }

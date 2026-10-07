@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -894,7 +894,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             }
 
             // 写入临时文件供 WebView2 预览
-            var tempPath = Path.Combine(Path.GetTempPath(), $"nc_proof_{DateTime.Now:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.pdf");
+            var tempPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"nc_proof_{DateTime.Now:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.pdf");
             await File.WriteAllBytesAsync(tempPath, result.Value, CancellationToken);
 
             PdfFilePath = tempPath;

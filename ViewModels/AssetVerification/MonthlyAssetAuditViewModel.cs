@@ -576,7 +576,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                 Logger.Debug($"找到报告数据，大小={result.Value.Length}字节");
 
                 // 存储到应用临时目录（避免污染桌面）
-                var previewDir = Path.Combine(AppContext.BaseDirectory, "Temp", "PdfPreview");
+                var previewDir = OutputPathHelper.GetTempDirectory();
                 Directory.CreateDirectory(previewDir);
 
                 // 清理前一天的旧预览文件
@@ -640,7 +640,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                 return;
             }
 
-            var reportPath = Path.Combine(Path.GetTempPath(), $"check_report_{Guid.NewGuid():N}.pdf");
+            var reportPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"check_report_{Guid.NewGuid():N}.pdf");
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
 
             await ShellPrintPdfAsync(reportPath);

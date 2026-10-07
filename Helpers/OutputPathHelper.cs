@@ -1,15 +1,51 @@
 namespace NewCosmos.Helpers;
 
 /// <summary>
-/// 通用输出路径生成    /// 目录结构: 输出/{分类}/{日期}/{主体名_主体ID}/{文件类型_时间戳}.{扩展名}
+/// 通用输出路径生成。
+/// 目录结构: {输出根}/{分类}/{日期}/{主体名_主体ID}/{文件类型_时间戳}.{扩展名}
+/// 输出根由 config/document_output.yaml 的 output.base_directory 决定（App 启动时 Configure 注入）；
+/// 未 Configure 时回退历史相对目录"输出"，保持旧行为。
+/// 预览临时文件统一落 {输出根}/{temp 子目录}（清理规则见 yaml 的 cleanup 节）。
 /// </summary>
 public static class OutputPathHelper
 {
-    private static readonly string OUTPUT_ROOT = "输出";
+    /// <summary>历史相对输出根：Configure 缺省时的回退值，同时是迁移源目录</summary>
+    public const string LegacyOutputRoot = "输出";
+
+    private static string? _outputRoot;
+    private static string _tempSubdirectory = "temp";
+
+    /// <summary>
+    /// 启动时注入输出根与预览临时子目录（App.CreateWindow 调用，见 IConfigService.GetDocumentOutputOptions）
+    /// </summary>
+    public static void Configure(string outputRoot, string tempSubdirectory = "temp")
+    {
+        if (!string.IsNullOrWhiteSpace(outputRoot))
+            _outputRoot = Path.GetFullPath(outputRoot);
+        if (!string.IsNullOrWhiteSpace(tempSubdirectory))
+            _tempSubdirectory = tempSubdirectory;
+    }
+
+    /// <summary>当前输出根（绝对路径；未 Configure 时回退相对"输出"）</summary>
+    public static string OutputRoot => _outputRoot ?? Path.GetFullPath(LegacyOutputRoot);
+
+    /// <summary>历史输出根（绝对路径），供一次性迁移定位旧文件</summary>
+    public static string LegacyRoot => Path.GetFullPath(LegacyOutputRoot);
+
+    /// <summary>
+    /// 预览临时目录（{输出根}/{temp 子目录}），不存在时自动创建。
+    /// 预览 PDF 落这里，由启动清理按 yaml cleanup 规则回收。
+    /// </summary>
+    public static string GetTempDirectory()
+    {
+        var dir = Path.Combine(OutputRoot, _tempSubdirectory);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
 
     /// <summary>
     /// 获取完整输出文件路径
-    /// 输出/{category}/{date}/{subjectName_subjectId}/{fileType}_{timestamp}.{extension}
+    /// {输出根}/{category}/{date}/{subjectName_subjectId}/{fileType}_{timestamp}.{extension}
     /// </summary>
     public static string GetFilePath(
         string category,
@@ -30,8 +66,8 @@ public static class OutputPathHelper
         var subjectDir = $"{subjectName}_{subjectId}";
         var fileName = $"{fileType}_{effectiveTimestamp}{extension}";
 
-        var relativePath = Path.Combine(OUTPUT_ROOT, category, dateStr, subjectDir, fileName);
-        return Path.GetFullPath(relativePath);
+        var fullPath = Path.Combine(OutputRoot, category, dateStr, subjectDir, fileName);
+        return Path.GetFullPath(fullPath);
     }
 
     /// <summary>
@@ -57,7 +93,7 @@ public static class OutputPathHelper
         var dateStr = effectiveDate.ToString("yyyy-MM-dd");
         var subjectDir = $"{subjectName}_{subjectId}";
 
-        var dirPath = Path.Combine(OUTPUT_ROOT, category, dateStr, subjectDir);
+        var dirPath = Path.Combine(OutputRoot, category, dateStr, subjectDir);
         var fullPath = Path.GetFullPath(dirPath);
 
         if (!Directory.Exists(fullPath))
@@ -80,8 +116,8 @@ public static class OutputPathHelper
         var dateStr = effectiveDate.ToString("yyyy-MM-dd");
         var subjectDir = $"{subjectName}_{subjectId}";
 
-        var relativePath = Path.Combine(OUTPUT_ROOT, category, dateStr, subjectDir);
-        return Path.GetFullPath(relativePath);
+        var fullPath = Path.Combine(OutputRoot, category, dateStr, subjectDir);
+        return Path.GetFullPath(fullPath);
     }
 
     /// <summary>

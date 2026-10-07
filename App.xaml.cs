@@ -171,6 +171,24 @@ public partial class App : Application
             Serilog.Log.Information("[APP] 应用配置加载完成，版本: {Version}, B线结算日: {SettleDay}",
                 appOptions.Version, BusinessCycleHelper.SettleDay);
 
+            // 文档输出根统一（config/document_output.yaml）：注入输出根与预览临时目录；
+            // 历史"输出"目录一次性迁移与临时文件清理放后台，不阻断启动
+            var documentOutputOptions = configService.GetDocumentOutputOptions();
+            Helpers.OutputPathHelper.Configure(documentOutputOptions.BaseDirectory, documentOutputOptions.TempSubdirectory);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var outputMigrator = Services.GetRequiredService<Services.Core.IOutputRootMigrationService>();
+                    outputMigrator.CleanupTempDirectory();
+                    await outputMigrator.MigrateLegacyOutputAsync();
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "[APP] 输出根迁移/预览临时目录清理失败");
+                }
+            });
+
             var windowTitleService = Services.GetRequiredService<IWindowTitleService>();
 
             // 尝试恢复持久化会话（SecureStorage 同步阻塞读取，避开 UI 同步上下文）

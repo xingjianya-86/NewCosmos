@@ -11,6 +11,8 @@ using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
+using NewCosmos.Helpers;
+
 namespace NewCosmos.ViewModels.Reporting;
 
 /// <summary>
@@ -362,7 +364,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             }
 
             var filePath = Path.Combine(
-                Path.GetTempPath(),
+                OutputPathHelper.GetTempDirectory(),
                 $"monthly_{SelectedYear}{SelectedMonth:D2}_selected.pdf");
             // 先清空再赋值，强制 PdfPreviewView 重新加载（同路径时值不变不会触发刷新）
             PdfPreviewUrl = "";

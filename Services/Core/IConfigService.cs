@@ -52,6 +52,12 @@ public interface IConfigService
     UpdateOptions GetUpdateOptions();
 
     /// <summary>
+    /// 获取文档输出配置（config/document_output.yaml）；
+    /// 解析失败时回退历史相对目录"输出"，不抛异常
+    /// </summary>
+    DocumentOutputOptions GetDocumentOutputOptions();
+
+    /// <summary>
     /// 保存网络接入配置（写回 network.ini）
     /// </summary>
     void SaveNetworkOptions(NetworkOptions options);

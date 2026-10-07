@@ -603,7 +603,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             {
                 _currentPdfData = pdfResult.Value;
                 TryDeleteFile(_currentTempPreviewPath);
-                var tempPath = Path.Combine(Path.GetTempPath(), $"preview_{Guid.NewGuid()}.pdf");
+                var tempPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"preview_{Guid.NewGuid()}.pdf");
                 await _fileService.WriteAllBytesAsync(tempPath, pdfResult.Value, CancellationToken);
                 _currentTempPreviewPath = tempPath;
                 PdfFilePath = tempPath;
@@ -1438,7 +1438,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 return false;
             }
 
-            var reportPath = Path.Combine(Path.GetTempPath(), $"check_report_{Guid.NewGuid():N}.pdf");
+            var reportPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"check_report_{Guid.NewGuid():N}.pdf");
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, CancellationToken);
 
             // 添加到输出文件列表
@@ -1495,7 +1495,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 return;
             }
 
-            var reportPath = Path.Combine(Path.GetTempPath(), $"check_report_preview_{Guid.NewGuid():N}.pdf");
+            var reportPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"check_report_preview_{Guid.NewGuid():N}.pdf");
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, CancellationToken);
 
             // 通过浏览器打开预览

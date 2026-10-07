@@ -240,7 +240,7 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
 
     /// <summary>
     /// 按村生成每月公示名单文档（模板：公共_每月公示名单，每页固定 22 行，单页一个文件）。
-    /// 输出目录：输出\公示文件\{yyyy-MM}\
+    /// 输出目录：{输出根}\公示文件\{yyyy-MM}\（输出根见 config/document_output.yaml）
     /// </summary>
     public async Task<Result<PublicityGenerateResult>> GeneratePublicityFilesAsync(int year, int month, CancellationToken ct = default)
     {
@@ -281,7 +281,7 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             var publicityPeriod = $"{year}年{month}月1日至{year}年{month}月{daysInMonth}日";
 
             var groups = GroupByVillage(families);
-            var outputDir = Path.GetFullPath(Path.Combine("输出", "公示文件", $"{year:D4}-{month:D2}"));
+            var outputDir = Path.GetFullPath(Path.Combine(OutputPathHelper.OutputRoot, "公示文件", $"{year:D4}-{month:D2}"));
             Directory.CreateDirectory(outputDir);
 
             var result = new PublicityGenerateResult { OutputDirectory = outputDir, VillageCount = groups.Count };

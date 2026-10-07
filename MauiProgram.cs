@@ -82,6 +82,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<INavigationService, Navigation.NavigationService>();
         builder.Services.AddSingleton<ILoadingProgressRunner, Navigation.LoadingProgressRunner>();
         builder.Services.AddSingleton<IInitializationService, InitializationService>();
+        builder.Services.AddSingleton<IOutputRootMigrationService, OutputRootMigrationService>();
         builder.Services.AddSingleton<ISystemService, SystemService>();
         builder.Services.AddSingleton<IBackgroundLoaderService, BackgroundLoaderService>();
         builder.Services.AddSingleton<Helpers.IPinyinConverter, Helpers.PinyinConverter>();
