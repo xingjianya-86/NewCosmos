@@ -540,7 +540,11 @@ public partial class ArchiveOutputViewModel
                     if (recoveryResult.IsSuccess)
                         _logger.LogBusiness("追缴记录归档完成，状态置已打印", ("RecoveryId", PrintNavigationData.BusinessId.Value));
                     else
+                    {
                         _logger.Error($"追缴记录归档完成但更新状态失败: {recoveryResult.Message}");
+                        await _dialogService.DisplayAlertAsync("错误",
+                            $"文书已生成，但追缴记录状态更新失败：{recoveryResult.Message}", "确定");
+                    }
                 }
                 else
                 {
@@ -550,7 +554,13 @@ public partial class ArchiveOutputViewModel
                     if (stepResult.IsSuccess)
                         _logger.LogBusiness("归档完成，current_step=6 且已置已审批", ("ApplicationId", PrintNavigationData.BusinessId.Value));
                     else
+                    {
+                        // 失败必须显式失败（AGENTS §7）：旧实现只写日志，文书照出、状态不动，
+                        // 用户以为归档成功，档案卡在「已建档未提交」里永远进不了「已完结」。
                         _logger.Error($"归档完成但更新状态失败: {stepResult.Message}");
+                        await _dialogService.DisplayAlertAsync("错误",
+                            $"文书已生成，但档案状态更新失败：{stepResult.Message}", "确定");
+                    }
                 }
             }
             catch (Exception ex)
