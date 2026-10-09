@@ -23,6 +23,7 @@ public partial class MonthlyReportPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.OnDisappearing();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 

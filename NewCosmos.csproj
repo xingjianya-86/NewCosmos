@@ -71,6 +71,13 @@
 		<WindowsAppSDKSelfContained Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">true</WindowsAppSDKSelfContained>
 	</PropertyGroup>
 
+	<!-- 开发调试（Debug）：不做打包压缩与发布优化，构建速度优先；体积增大仅影响 Debug，Release 发布不受影响 -->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<!-- Android：跳过程序集 LZ4 压缩（默认开启，对应 Xamarin.Android.Common.targets 的 _CompressAssemblies），
+		     省去逐程序集压缩与 APK 回写，缩短 Debug 打包/部署时间 -->
+		<AndroidEnableAssemblyCompression>false</AndroidEnableAssemblyCompression>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.png" />
 	</ItemGroup>
@@ -176,9 +183,9 @@
 		<Content Include="Resources\Seed\**\*.csv" Condition="'$(TargetPlatformIdentifier)' != 'android'">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<None Include="Resources\Seed\**\*.csv" Condition="'$(TargetPlatformIdentifier)' == 'android'">
-			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
-		</None>
+		<!-- Android 无输出目录复制机制：CSV 改嵌入程序集（与 yaml 同通道），
+		     RegionService.LoadVillagesFromCsv 文件缺失时回退 GetManifestResourceStream 读取 -->
+		<EmbeddedResource Include="Resources\Seed\**\*.csv" Condition="'$(TargetPlatformIdentifier)' == 'android'" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -233,13 +240,16 @@
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 	</PropertyGroup>
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<!-- PreserveNewest：python-embed 共 2.5 万文件 / 1.8GB，占输出文件数约 98%。
+		     此前 Always 每次构建全量回拷 1.8GB，是 Debug 增量构建的最大耗时项；
+		     改为仅源文件更新时才拷贝（源不变 → 全部跳过）。运行期新增文件（如 __pycache__）不受影响。 -->
 		<None Include="python-embed\**\*">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
 		</None>
 		<!-- 显式声明 .css（sklearn 数据文件等）：与 EnableDefaultCssItems=false 配合保证 python-embed 下的 css 按普通文件复制 -->
 		<None Include="python-embed\**\*.css">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
 		</None>
 	</ItemGroup>

@@ -37,55 +37,36 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
 
         try
         {
-            var status = new DatabaseStatus();
+            // 单条 SQL 取回全部状态（旧实现是 version/current_database/pg_stat_activity/表大小 4 条串行往返，
+            // 跨网络部署时单次往返 0.5-1.2s，进页面要白等 3 轮）
+            var yamlTables = _schemaService.GetAllYamlTableNames().ToArray();
+            var sql = @"
+                SELECT version() AS version,
+                       current_database() AS db_name,
+                       (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()) AS active_connections,
+                       (SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0)::bigint
+                          FROM pg_class c
+                          JOIN pg_namespace n ON n.oid = c.relnamespace
+                         WHERE n.nspname = 'public' AND c.relkind = 'r'
+                           AND c.relname = ANY($1)) AS size_bytes";
 
-            var versionSql = "SELECT version()";
-            var versionResult = await _dbService.QuerySingleAsync<string>(versionSql, ct);
-            if (versionResult.IsSuccess && versionResult.Value != null)
+            var row = await _dbService.QuerySingleAsync<DatabaseStatusRow>(sql, ct, new object[] { yamlTables });
+            if (row.IsFailure || row.Value == null)
             {
-                status.IsConnected = true;
-                status.Version = versionResult.Value;
+                return Result.Failure<DatabaseStatus>(row.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    row.Message ?? "获取数据库状态失败");
             }
 
-            var dbNameSql = "SELECT current_database()";
-            var dbNameResult = await _dbService.QuerySingleAsync<string>(dbNameSql, ct);
-            if (dbNameResult.IsSuccess && dbNameResult.Value != null)
+            var status = new DatabaseStatus
             {
-                status.DatabaseName = dbNameResult.Value;
-            }
-
-            var connSql = "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()";
-            var connResult = await _dbService.ExecuteScalarAsync(connSql, ct);
-            if (connResult.IsSuccess)
-            {
-                status.ActiveConnections = Convert.ToInt32(connResult.Value);
-            }
-
-            var yamlTables = _schemaService.GetAllYamlTableNames();
-            if (yamlTables.Count > 0)
-            {
-                var yamlTablesParam = string.Join(", ", yamlTables.Select((_, i) => $"${i + 1}"));
-                var sizeSql = $@"
-                    SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0)
-                    FROM pg_class c
-                    INNER JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE n.nspname = 'public' AND c.relkind = 'r'
-                      AND c.relname IN ({yamlTablesParam})";
-
-                var sizeResult = await _dbService.ExecuteScalarAsync(sizeSql, ct, yamlTables.Cast<object>().ToArray());
-                if (sizeResult.IsSuccess)
-                {
-                    status.DatabaseSizeBytes = Convert.ToInt64(sizeResult.Value);
-                    status.DatabaseSizeFormatted = FormatSize(status.DatabaseSizeBytes);
-                }
-            }
-            else
-            {
-                status.DatabaseSizeBytes = 0;
-                status.DatabaseSizeFormatted = "0 B";
-            }
-
-            status.CheckedAt = DateTime.Now;
+                IsConnected = true,
+                Version = row.Value.Version,
+                DatabaseName = row.Value.DbName,
+                ActiveConnections = Convert.ToInt32(row.Value.ActiveConnections),
+                DatabaseSizeBytes = row.Value.SizeBytes,
+                DatabaseSizeFormatted = FormatSize(row.Value.SizeBytes),
+                CheckedAt = DateTime.Now
+            };
 
             LogInfo($"数据库状态检查完成: {status.DatabaseName}");
             return Result.Success(status);
@@ -97,53 +78,52 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         }
     }
 
+    /// <summary>状态检查单查询投影（列名 snake_case，映射层自动转 PascalCase 属性）</summary>
+    private sealed class DatabaseStatusRow
+    {
+        public string Version { get; set; } = string.Empty;
+        public string DbName { get; set; } = string.Empty;
+        public long ActiveConnections { get; set; }
+        public long SizeBytes { get; set; }
+    }
+
     public async Task<Result<DatabaseStatistics>> GetDatabaseStatisticsAsync(CancellationToken ct = default)
     {
         LogInfo("获取数据库统计信息");
 
         try
         {
-            var stats = new DatabaseStatistics();
-            var yamlTables = _schemaService.GetAllYamlTableNames();
-            stats.TotalTables = yamlTables.Count;
+            var yamlTables = _schemaService.GetAllYamlTableNames().ToArray();
 
-            if (yamlTables.Count > 0)
+            // 单条 SQL 取回全部统计（旧实现 reltuples/表大小/活跃用户 3 条串行往返）
+            var sql = @"
+                SELECT (SELECT COALESCE(SUM(c.reltuples), 0)::bigint
+                          FROM pg_class c
+                          JOIN pg_namespace n ON n.oid = c.relnamespace
+                         WHERE n.nspname = 'public' AND c.relkind = 'r'
+                           AND c.relname = ANY($1)) AS total_records,
+                       (SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0)::bigint
+                          FROM pg_class c
+                          JOIN pg_namespace n ON n.oid = c.relnamespace
+                         WHERE n.nspname = 'public' AND c.relkind = 'r'
+                           AND c.relname = ANY($1)) AS size_bytes,
+                       (SELECT COUNT(*) FROM nc_sys_users WHERE is_active = true) AS active_users";
+
+            var row = await _dbService.QuerySingleAsync<DatabaseStatisticsRow>(sql, ct, new object[] { yamlTables });
+            if (row.IsFailure || row.Value == null)
             {
-                var yamlTablesParam = string.Join(", ", yamlTables.Select((_, i) => $"${i + 1}"));
-                var recordsSql = $@"
-                    SELECT COALESCE(SUM(c.reltuples::bigint), 0)
-                    FROM pg_class c
-                    INNER JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE n.nspname = 'public' AND c.relkind = 'r'
-                      AND c.relname IN ({yamlTablesParam})";
-
-                var recordsResult = await _dbService.ExecuteScalarAsync(recordsSql, ct, yamlTables.Cast<object>().ToArray());
-                if (recordsResult.IsSuccess)
-                {
-                    stats.TotalRecords = Convert.ToInt32(recordsResult.Value);
-                }
-
-                var sizeSql = $@"
-                    SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0)
-                    FROM pg_class c
-                    INNER JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE n.nspname = 'public' AND c.relkind = 'r'
-                      AND c.relname IN ({yamlTablesParam})";
-
-                var sizeResult = await _dbService.ExecuteScalarAsync(sizeSql, ct, yamlTables.Cast<object>().ToArray());
-                if (sizeResult.IsSuccess)
-                {
-                    stats.TotalSizeBytes = Convert.ToInt64(sizeResult.Value);
-                    stats.TotalSizeFormatted = FormatSize(stats.TotalSizeBytes);
-                }
+                return Result.Failure<DatabaseStatistics>(row.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    row.Message ?? "获取数据库统计失败");
             }
 
-            var activeUsersSql = "SELECT COUNT(*) FROM nc_sys_users WHERE is_active = true";
-            var activeUsersResult = await _dbService.QuerySingleAsync<int>(activeUsersSql, ct);
-            if (activeUsersResult.IsSuccess)
+            var stats = new DatabaseStatistics
             {
-                stats.ActiveUsers = activeUsersResult.Value;
-            }
+                TotalTables = yamlTables.Length,
+                TotalRecords = Convert.ToInt32(row.Value.TotalRecords),
+                TotalSizeBytes = row.Value.SizeBytes,
+                TotalSizeFormatted = FormatSize(row.Value.SizeBytes),
+                ActiveUsers = Convert.ToInt32(row.Value.ActiveUsers)
+            };
 
             LogInfo($"数据库统计完成: {stats.TotalTables}张表, {stats.TotalRecords}条记录");
             return Result.Success(stats);
@@ -153,6 +133,14 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             LogError($"操作失败: {ex.Message}");
             return Result.FromException<DatabaseStatistics>(ex);
         }
+    }
+
+    /// <summary>统计单查询投影（列名 snake_case，映射层自动转 PascalCase 属性）</summary>
+    private sealed class DatabaseStatisticsRow
+    {
+        public long TotalRecords { get; set; }
+        public long SizeBytes { get; set; }
+        public long ActiveUsers { get; set; }
     }
 
     public async Task<Result<List<TableSizeInfo>>> GetTableSizesAsync(CancellationToken ct = default)
@@ -167,8 +155,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
                 return Result.Success(new List<TableSizeInfo>());
             }
 
-            var yamlTablesParam = string.Join(", ", yamlTables.Select((_, i) => $"${i + 1}"));
-            var sql = $@"
+            var sql = @"
                 SELECT 
                     c.relname AS table_name,
                     pg_total_relation_size(c.oid) AS size_bytes,
@@ -176,10 +163,10 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
                 FROM pg_class c
                 INNER JOIN pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = 'public' AND c.relkind = 'r'
-                  AND c.relname IN ({yamlTablesParam})
+                  AND c.relname = ANY($1)
                 ORDER BY pg_total_relation_size(c.oid) DESC";
 
-            var result = await _dbService.QueryAsync<TableSizeRaw>(sql, ct, yamlTables.Cast<object>().ToArray());
+            var result = await _dbService.QueryAsync<TableSizeRaw>(sql, ct, new object[] { yamlTables.ToArray() });
 
             if (result.IsSuccess && result.Value is not null)
             {
@@ -215,36 +202,41 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
     {
         LogInfo("获取备份文件列表");
 
-        try
+        // 目录扫描 + 逐文件 FileInfo/GetCreationTime 是同步 IO：旧实现在调用线程执行，
+        // 而本方法在页面进入路径上被调用（= UI 线程），备份目录文件多时会直接卡住页面（§6）
+        return Task.Run(() =>
         {
-            var storageOptions = _configService.GetStorageOptions();
-            var backupPath = storageOptions.GetBackupPath();
-
-            if (!Directory.Exists(backupPath))
+            try
             {
-                return Task.FromResult(Result.Success(new List<BackupFileInfo>()));
-            }
+                var storageOptions = _configService.GetStorageOptions();
+                var backupPath = storageOptions.GetBackupPath();
 
-            var files = Directory.GetFiles(backupPath, "*.sql")
-                .Select(f => new BackupFileInfo
+                if (!Directory.Exists(backupPath))
                 {
-                    FileName = Path.GetFileName(f),
-                    FilePath = f,
-                    SizeBytes = new FileInfo(f).Length,
-                    SizeFormatted = FormatSize(new FileInfo(f).Length),
-                    CreatedAt = File.GetCreationTime(f)
-                })
-                .OrderByDescending(f => f.CreatedAt)
-                .ToList();
+                    return Result.Success(new List<BackupFileInfo>());
+                }
 
-            LogInfo($"找到{files.Count}个备份文件");
-            return Task.FromResult(Result.Success(files));
-        }
-        catch (Exception ex)
-        {
-            LogError($"操作失败: {ex.Message}");
-            return Task.FromResult(Result.FromException<List<BackupFileInfo>>(ex));
-        }
+                var files = Directory.GetFiles(backupPath, "*.sql")
+                    .Select(f => new BackupFileInfo
+                    {
+                        FileName = Path.GetFileName(f),
+                        FilePath = f,
+                        SizeBytes = new FileInfo(f).Length,
+                        SizeFormatted = FormatSize(new FileInfo(f).Length),
+                        CreatedAt = File.GetCreationTime(f)
+                    })
+                    .OrderByDescending(f => f.CreatedAt)
+                    .ToList();
+
+                LogInfo($"找到{files.Count}个备份文件");
+                return Result.Success(files);
+            }
+            catch (Exception ex)
+            {
+                LogError($"操作失败: {ex.Message}");
+                return Result.FromException<List<BackupFileInfo>>(ex);
+            }
+        }, ct);
     }
 
     public Task<Result<int>> CleanupOldLogsAsync(int retentionDays = 90, CancellationToken ct = default)

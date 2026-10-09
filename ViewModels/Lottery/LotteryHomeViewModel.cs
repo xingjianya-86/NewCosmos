@@ -240,7 +240,7 @@ public partial class LotteryHomeViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             LoadingMessage = $"正在训练{SelectedLotteryTypeName}融合模型（LSTM + LotteryML，约5-10分钟）...";
-            var result = await _predictService.TrainFusionModelAsync(SelectedLotteryType, CancellationToken.None);
+            var result = await _predictService.TrainFusionModelAsync(SelectedLotteryType, CancellationToken);
             if (result.IsSuccess)
             {
                 await _dialogService.DisplayAlertAsync("训练完成",

@@ -104,11 +104,12 @@ public partial class ElderlyReviewListViewModel : PagedSearchViewModelBase
         }
     }
 
-    /// <summary>默认列出在享档案；搜索框（姓名/身份证）沿用同一查询。</summary>
+    /// <summary>默认列出在享档案；搜索框（姓名/身份证）沿用同一查询。
+    /// distinctIdCard=true：同证多条在享档案只显示最新一条，避免同一人出现两行。</summary>
     protected override Task LoadDataAsync()
         => LoadPageAsync(
             ct => _applicationService.GetPagedAsync(
-                SearchText, ElderlyBenefitConstants.StatusConfirmed, PageIndex, PageSize, ct),
+                SearchText, ElderlyBenefitConstants.StatusConfirmed, PageIndex, PageSize, ct, distinctIdCard: true),
             SearchResults,
             null,
             "加载在享人员...");

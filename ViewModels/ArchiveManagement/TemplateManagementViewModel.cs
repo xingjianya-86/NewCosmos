@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Categories;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Platform;
@@ -134,8 +135,10 @@ public partial class TemplateManagementViewModel : ViewModelBase
     {
         try
         {
-            var all = await _templateService.GetAllAsync(CancellationToken);
-            var filtered = all.AsEnumerable();
+            var allResult = await _templateService.GetAllAsync(CancellationToken);
+            if (allResult.IsFailure)
+                throw new BusinessException(allResult.ErrorCode!, allResult.Message!);
+            var filtered = (allResult.Value ?? new List<NewCosmos.Models.Entities.Template>()).AsEnumerable();
 
             if (!string.IsNullOrWhiteSpace(SearchText))
             {

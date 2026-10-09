@@ -26,10 +26,10 @@ public class IncomeCalculationService : BaseService, IIncomeCalculationService
     }
 
     /// <summary>
-    /// 计算年家庭总收入 = Σ(月项×12) + 赡养年值 + 土地年值 + 补贴年值 − 刚性支出×12
-    /// 【年值基准】一次性舍入到分。alimonyAnnual/landIncome/subsidyTotal 为年值，其余为月值。
+    /// 年收入核心公式（单点实现，无日志）：Σ(月项×12) + 赡养年值 + 土地年值 + 补贴年值 − 刚性×12，一次舍入到分。
+    /// 净额/毛额两个公开方法都经由此处，杜绝同一算术在类内重抄。
     /// </summary>
-    public decimal CalculateAnnualFamilyIncome(
+    private static decimal ComputeAnnualCore(
         decimal workIncome,
         decimal businessNetIncome,
         decimal propertyIncome,
@@ -50,13 +50,47 @@ public class IncomeCalculationService : BaseService, IIncomeCalculationService
                    + subsidyTotal
                    - rigidExpenditure * 12;
 
-        var result = Math.Round(annual, 2);
+        return Math.Round(annual, 2);
+    }
+
+    /// <summary>
+    /// 计算年家庭总收入 = Σ(月项×12) + 赡养年值 + 土地年值 + 补贴年值 − 刚性支出×12
+    /// 【年值基准】一次性舍入到分。alimonyAnnual/landIncome/subsidyTotal 为年值，其余为月值。
+    /// </summary>
+    public decimal CalculateAnnualFamilyIncome(
+        decimal workIncome,
+        decimal businessNetIncome,
+        decimal propertyIncome,
+        decimal transferIncome,
+        decimal otherIncome,
+        decimal alimonyAnnual,
+        decimal landIncome,
+        decimal subsidyTotal,
+        decimal rigidExpenditure)
+    {
+        var result = ComputeAnnualCore(workIncome, businessNetIncome, propertyIncome, transferIncome,
+            otherIncome, alimonyAnnual, landIncome, subsidyTotal, rigidExpenditure);
         LogInfo($"年收入计算: 务工×12={workIncome * 12:F2}, 经营×12={businessNetIncome * 12:F2}, " +
                 $"财产×12={propertyIncome * 12:F2}, 转移×12={transferIncome * 12:F2}, 其他×12={otherIncome * 12:F2}, " +
                 $"赡养年值={alimonyAnnual:F2}, 土地年值={landIncome:F2}, 补贴年值={subsidyTotal:F2}, " +
                 $"刚性×12={rigidExpenditure * 12:F2}, 年总收入={result:F2}");
         return result;
     }
+
+    /// <summary>
+    /// 计算年家庭毛收入 = 核心公式不扣刚性支出（不打日志，供绑定 getter 等热路径调用）
+    /// </summary>
+    public decimal CalculateGrossAnnualFamilyIncome(
+        decimal workIncome,
+        decimal businessNetIncome,
+        decimal propertyIncome,
+        decimal transferIncome,
+        decimal otherIncome,
+        decimal alimonyAnnual,
+        decimal landIncome,
+        decimal subsidyTotal)
+        => ComputeAnnualCore(workIncome, businessNetIncome, propertyIncome, transferIncome,
+            otherIncome, alimonyAnnual, landIncome, subsidyTotal, rigidExpenditure: 0m);
 
     /// <summary>
     /// 计算月值 = 年值÷12（分解显示口径，一次舍入）

@@ -438,7 +438,7 @@ public partial class EternalRegressionView : ContentView
     {
         try
         {
-            await Task.Delay(EternalRegressionData.AutoRecreateSeconds * 1000, _startCts?.Token ?? CancellationToken.None);
+            await Task.Delay(EternalRegressionData.AutoRecreateSeconds * 1000, _startCts?.Token ?? CancellationToken.None); // [CT 豁免] _startCts 为 null 表示无动画生命周期，None 是合法兜底
         }
         catch (OperationCanceledException)
         {

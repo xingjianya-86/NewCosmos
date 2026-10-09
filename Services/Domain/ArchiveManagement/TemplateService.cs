@@ -16,12 +16,15 @@ public class TemplateService : BaseService, ITemplateService
         _db = db;
     }
 
-    public async Task<List<Template>> GetAllAsync(CancellationToken ct = default)
+    public async Task<Result<List<Template>>> GetAllAsync(CancellationToken ct = default)
     {
         LogInfo("获取所有模板");
         var sql = "SELECT id, name, file_type, categories, config_json, sort_order, created_at, updated_at FROM nc_biz_templates ORDER BY sort_order, id";
         var result = await _db.QueryAsync<Template>(sql, ct);
-        return (result.IsSuccess && result.Value != null) ? result.Value : [];
+        // 查询失败显式上抛（原实现洗成空列表，调用方会把 DB 故障当"无模板"）
+        if (result.IsFailure)
+            return Result.Failure<List<Template>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<Template>());
     }
 
     public async Task<List<Template>> GetByCategoriesAsync(string[] categories, CancellationToken ct = default)
@@ -37,20 +40,25 @@ public class TemplateService : BaseService, ITemplateService
         return result.Value ?? [];
     }
 
-    public async Task<Template?> GetByIdAsync(long id, CancellationToken ct = default)
+    public async Task<Result<Template?>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"获取模板: {id}");
         var sql = "SELECT id, name, file_type, categories, config_json, created_at, updated_at FROM nc_biz_templates WHERE id = $1";
         var result = await _db.QuerySingleAsync<Template>(sql, ct, id);
-        return result.IsSuccess ? result.Value : null;
+        // 查询失败显式上抛（原实现失败与无行都返回 null，DB 故障被下游伪装成"模板不存在"）
+        if (result.IsFailure)
+            return Result.Failure<Template?>(result.ErrorCode!, result.Message!);
+        return Result.Success<Template?>(result.Value);
     }
 
-    public async Task<Template?> GetByNameAsync(string name, CancellationToken ct = default)
+    public async Task<Result<Template?>> GetByNameAsync(string name, CancellationToken ct = default)
     {
         LogInfo($"按名称获取模板: {name}");
         var sql = "SELECT id, name, file_type, categories, config_json, created_at, updated_at FROM nc_biz_templates WHERE name = $1";
         var result = await _db.QuerySingleAsync<Template>(sql, ct, name);
-        return result.IsSuccess ? result.Value : null;
+        if (result.IsFailure)
+            return Result.Failure<Template?>(result.ErrorCode!, result.Message!);
+        return Result.Success<Template?>(result.Value);
     }
 
     public async Task<Template> SaveAsync(string name, string fileType, byte[] fileData, string[] categories, string configJson, CancellationToken ct = default)
@@ -96,18 +104,24 @@ public class TemplateService : BaseService, ITemplateService
         }
     }
 
-    public async Task<byte[]> GetFileDataAsync(long id, CancellationToken ct = default)
+    public async Task<Result<byte[]>> GetFileDataAsync(long id, CancellationToken ct = default)
     {
         var sql = "SELECT file_data FROM nc_biz_templates WHERE id = $1";
         var result = await _db.QuerySingleAsync<byte[]>(sql, ct, id);
-        return result.IsSuccess && result.Value != null ? result.Value : [];
+        // 查询失败显式上抛（原实现洗成空数组，DB 故障被下游当"模板文件数据为空"）
+        if (result.IsFailure)
+            return Result.Failure<byte[]>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? []);
     }
 
     public async Task<string> ExportTemplateAsync(long id, string folderPath, string fileName, CancellationToken ct = default)
     {
         LogInfo($"导出模板: {fileName}");
 
-        var bytes = await GetFileDataAsync(id, ct);
+        var bytesResult = await GetFileDataAsync(id, ct);
+        if (bytesResult.IsFailure)
+            throw new BusinessException(bytesResult.ErrorCode!, bytesResult.Message!);
+        var bytes = bytesResult.Value;
         if (bytes.Length == 0)
             throw new InvalidOperationException("模板文件数据为空");
 

@@ -503,6 +503,8 @@ public partial class RecoveryManualViewModel : ViewModelBase
     /// </summary>
     private async Task NavigateToPrintAsync(long recordId)
     {
+        // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
+        PrintNavigationData.ClearDocumentMode();
         PrintNavigationData.BusinessType = "Recovery";
         PrintNavigationData.BusinessId = recordId;
         PrintNavigationData.Classification = RecoveryConstants.INPUT_MODE_MANUAL;

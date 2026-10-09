@@ -1265,13 +1265,13 @@ public class ApplicationService : BaseService, IApplicationService
                  health_status, disease_name, disability_type, disability_level,
                  family_size, is_eligible, is_single_rescue, status, current_step, original_application_id, chain_type,
                  work_income_total, business_income_total, property_income_total, transfer_income_total,
-                 other_income_total, total_family_income, per_capita_income, rigid_expenditure,
+                 other_income_total, total_family_income, per_capita_income, rigid_expenditure, alimony_income,
                  classification_result, classified_subsidy_type, classified_subsidy_amount,
                  household_monthly_guarantee_amount, total_guarantee_amount,
                  family_land_area, self_farmed_land_area, subleased_land_area, contracted_land_area,
                  land_income_total, subsidy_total,
                  created_by, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,'SingleRescue',$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50, NOW(), NOW())
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,'SingleRescue',$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49, NOW(), NOW())
                 RETURNING id";
 
             var insertResult = await _db.ExecuteScalarAsync(insertSql, ct,
@@ -1283,7 +1283,7 @@ public class ApplicationService : BaseService, IApplicationService
                 member.HealthStatus ?? "", member.DiseaseName ?? "", member.DisabilityType ?? "", member.DisabilityLevel ?? "",
                 1, true, true, "Draft", 1, sourceApplicationId,
                 source.WorkIncomeTotal, source.BusinessIncomeTotal, source.PropertyIncomeTotal, source.TransferIncomeTotal,
-                source.OtherIncomeTotal, source.TotalFamilyIncome, source.PerCapitaIncome, source.RigidExpenditure,
+                source.OtherIncomeTotal, source.TotalFamilyIncome, source.PerCapitaIncome, source.RigidExpenditure, source.AlimonyIncome,
                 classificationCode, subsidyResult.Types, subsidyResult.TotalAmount,
                 householdMonthly, totalGuarantee,
                 source.FamilyLandArea, source.SelfFarmedLandArea, source.SubleasedLandArea, source.ContractedLandArea,
@@ -1427,11 +1427,16 @@ public class ApplicationService : BaseService, IApplicationService
         await ExecOrThrowAsync(_db, financialSql, ct, targetAppId, sourceAppId);
 
         // 复制赡养人（从 nc_biz_family_members 复制 member_category='Support' 的记录）
+        // 列集与档案制作模板 SUPPORTER_* 字段对齐（性别/年龄/工作单位/收入来源等），避免补打文书索引字段为空
         var supporterSql = @"INSERT INTO nc_biz_family_members
-            (application_id, name, id_card, person_type, relationship_to_head,
-             annual_support_fee, is_support_ability, member_category, created_at)
-            SELECT $1, name, id_card, person_type, relationship_to_head,
-             annual_support_fee, is_support_ability, 'Support', NOW()
+            (application_id, name, id_card, gender, age, ethnicity, phone, marital_status,
+             relationship_to_head, health_status, employment_status, work_unit, main_income_source,
+             monthly_income_capacity, family_size, annual_support_fee, is_support_ability, person_type,
+             member_category, created_at)
+            SELECT $1, name, id_card, gender, age, ethnicity, phone, marital_status,
+             relationship_to_head, health_status, employment_status, work_unit, main_income_source,
+             monthly_income_capacity, family_size, annual_support_fee, is_support_ability, person_type,
+             'Support', NOW()
             FROM nc_biz_family_members
             WHERE application_id = $2 AND member_category = 'Support' AND deleted_at IS NULL";
         await ExecOrThrowAsync(_db, supporterSql, ct, targetAppId, sourceAppId);

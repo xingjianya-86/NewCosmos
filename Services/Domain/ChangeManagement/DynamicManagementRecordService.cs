@@ -758,7 +758,10 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
 
     private async Task<Result<long>> ResolveTemplateIdAsync(CancellationToken ct)
     {
-        var template = await _templateService.GetByNameAsync(TemplateName, ct);
+        var templateResult = await _templateService.GetByNameAsync(TemplateName, ct);
+        if (templateResult.IsFailure)
+            return Result.Failure<long>(templateResult.ErrorCode!, templateResult.Message!);
+        var template = templateResult.Value;
         if (template == null)
             return Result.Failure<long>(ErrorCodes.DOCUMENT_GENERATION_FAILED,
                 $"模板未导入模板库: {TemplateName}（请先运行 Scripts\\import_dynamic_management_template.py）");

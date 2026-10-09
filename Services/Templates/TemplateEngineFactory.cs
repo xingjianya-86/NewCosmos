@@ -1,4 +1,5 @@
 using NewCosmos.Models.Options;
+using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
 
@@ -68,7 +69,10 @@ public class TemplateEngineFactory : ITemplateEngineFactory
     {
         _logger.Debug($"执行: {templateId}");
 
-        var template = await _templateService.GetByIdAsync(templateId, ct);
+        var templateResult = await _templateService.GetByIdAsync(templateId, ct);
+        if (templateResult.IsFailure)
+            throw new BusinessException(templateResult.ErrorCode!, templateResult.Message!);
+        var template = templateResult.Value;
         if (template == null)
             throw new InvalidOperationException($"模板不存在: {templateId}");
 
@@ -81,7 +85,10 @@ public class TemplateEngineFactory : ITemplateEngineFactory
         }
         else
         {
-            template.FileData = await _templateService.GetFileDataAsync(templateId, ct);
+            var fileResult = await _templateService.GetFileDataAsync(templateId, ct);
+            if (fileResult.IsFailure)
+                throw new BusinessException(fileResult.ErrorCode!, fileResult.Message!);
+            template.FileData = fileResult.Value;
             if (template.FileData is { Length: > 0 })
             {
                 _templateCache[templateId] = (template.UpdatedAt, template.FileType, template.FileData);

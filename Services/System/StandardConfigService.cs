@@ -573,6 +573,9 @@ public class StandardConfigService : BaseService, IStandardConfigService
         }
         catch (Exception ex)
         {
+            // [吞异常豁免] 唯一调用方 InitializeFromSeedAsync 在拿到 null 后立即转为显式
+            // Result.Failure(ErrorCodes.FILE_NOT_FOUND, "标准配置YAML文件未找到或数据为空")，
+            // 失败不会被当作"空数据"继续；异常细节由本行 LogError 落盘（err_ 日志）。
             LogError($"操作失败: {ex.Message}");
             return null;
         }

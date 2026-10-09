@@ -310,6 +310,11 @@ tables:
         columns: [status]
       - name: idx_elderly_applications_apply_date
         columns: [apply_date]
+      # 同证唯一在享：防止手工登记与复核停旧增新各留一条 Confirmed（在享检索出现重复人员）
+      - name: uq_elderly_confirmed_idcard
+        columns: [id_card]
+        unique: true
+        where: status = 'Confirmed' AND deleted_at IS NULL
 
   # ── 普惠高龄补贴补发分段明细表 ──
   - name: nc_biz_elderly_payback_segments

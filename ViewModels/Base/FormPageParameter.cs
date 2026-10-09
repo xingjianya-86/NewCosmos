@@ -9,14 +9,16 @@ public sealed record FormPageParameter(FormOperationMode Mode, long? Application
 
 /// <summary>
 /// 高龄津贴申请表单页导航参数：保存后跳转停发办理的可选联动；
-/// Create 模式可选预填身份证/姓名（下月待办「待新增」快捷办理用，预填后自动判类）。
+/// Create 模式可选预填身份证/姓名（下月待办「待新增」快捷办理用，预填后自动判类）；
+/// ReturnToReview = 复核前置补全来源（保存后返回复核页继续办理，不跳档案输出页）。
 /// </summary>
 public sealed record ElderlyFormPageParameter(
     FormOperationMode Mode,
     long? ApplicationId = null,
     bool NavigateToStopAfterSave = false,
     string? PrefillIdCard = null,
-    string? PrefillName = null);
+    string? PrefillName = null,
+    bool ReturnToReview = false);
 
 /// <summary>
 /// 高龄类别复核页导航参数：队列记录 / 在享档案 / 名册记录 三选一定位人员。

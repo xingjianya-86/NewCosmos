@@ -27,6 +27,20 @@ public interface IIncomeCalculationService
         decimal rigidExpenditure);
 
     /// <summary>
+    /// 计算年家庭毛收入 = Σ(月项×12) + 赡养年值 + 土地年值 + 补贴年值（不扣刚性支出，一次舍入到分）。
+    /// 供绑定 getter 等热路径调用（无日志）；净额口径仍以 CalculateAnnualFamilyIncome 为准。
+    /// </summary>
+    decimal CalculateGrossAnnualFamilyIncome(
+        decimal workIncome,
+        decimal businessNetIncome,
+        decimal propertyIncome,
+        decimal transferIncome,
+        decimal otherIncome,
+        decimal alimonyAnnual,
+        decimal landIncome,
+        decimal subsidyTotal);
+
+    /// <summary>
     /// 计算月值 = 年值÷12（分解显示口径，一次舍入）
     /// </summary>
     decimal MonthlyFromAnnual(decimal annualIncome);

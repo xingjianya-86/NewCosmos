@@ -157,8 +157,15 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
             if (result.IsFailure)
             {
-                Logger.Warn($"ExecuteAsync<T> 操作失败: {result.ErrorCode} {result.Message}");
-                ErrorMessage = UserFriendlyMessages.Get(result.ErrorCode!, result.Message);
+                // 取消是"页面离开/新操作顶掉旧操作"的正常结果，不是错误：
+                // 不写 ErrorMessage（否则离开页面会残留红条），降 Debug 避免热路径落盘
+                if (result.ErrorCode == ErrorCodes.CANCELLED)
+                    Logger.Debug($"ExecuteAsync<T> 操作已取消: {result.Message}");
+                else
+                {
+                    Logger.Warn($"ExecuteAsync<T> 操作失败: {result.ErrorCode} {result.Message}");
+                    ErrorMessage = UserFriendlyMessages.Get(result.ErrorCode!, result.Message);
+                }
             }
 
             return result;
@@ -202,8 +209,13 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
             if (result.IsFailure)
             {
-                Logger.Warn($"ExecuteAsync 操作失败: {result.ErrorCode} {result.Message}");
-                ErrorMessage = UserFriendlyMessages.Get(result.ErrorCode!, result.Message);
+                if (result.ErrorCode == ErrorCodes.CANCELLED)
+                    Logger.Debug($"ExecuteAsync 操作已取消: {result.Message}");
+                else
+                {
+                    Logger.Warn($"ExecuteAsync 操作失败: {result.ErrorCode} {result.Message}");
+                    ErrorMessage = UserFriendlyMessages.Get(result.ErrorCode!, result.Message);
+                }
             }
 
             return result;
@@ -336,6 +348,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         {
             // 1. DI 解析页面（Android 自动解析手机专用页面）
             Logger.LogDiResolution(pageName, true);
+            // [PERF-PROBE] 阶段0归因埋点：分"DI解析+XAML膨胀"与"PushAsync(含动画)"两段计时（对照组：侧边栏→各模块首页）
+            var probe = global::System.Diagnostics.Stopwatch.StartNew();
             var resolvedPage = ResolvePage<TPage>();
             ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
             
@@ -344,14 +358,22 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             {
                 configure?.Invoke(typedPage);
             }
+            probe.Stop();
+            Logger.LogPerf("导航-页面构造", probe.Elapsed.TotalMilliseconds,
+                ("Page", pageName), ("HostBusy", IsBusy), ("HostLoading", LoadingMessage));
             
             // 3. 推送页面
+            probe.Restart();
             await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(resolvedPage);
+            probe.Stop();
+            Logger.LogPerf("导航-PushAsync", probe.Elapsed.TotalMilliseconds,
+                ("Page", pageName), ("HostBusy", IsBusy));
             
             // 4. 导航成功并按新栈顶页面的 Page.Title 恢复窗口标题
             Logger.LogNavigationSuccess(fromPage, pageName);
             RestoreWindowTitleFromNavigation();
         }
+
         catch (Exception ex)
         {
             // 5. 导航失败
@@ -954,6 +976,12 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
                 TotalCount = result.Value.TotalCount;
                 onLoaded?.Invoke(result.Value);
             }
+            else if (result.ErrorCode == ErrorCodes.CANCELLED)
+            {
+                // 取消=页面已离开（OnDisappearing 顶掉在飞查询），不是加载失败：
+                // 禁止弹"加载失败"阻断弹窗（曾致高龄复核出档后误报"加载失败/查询被取消"）
+                Logger?.Debug($"分页列表加载已取消: {result.Message}");
+            }
             else
             {
                 Logger?.Warn($"分页列表加载失败: {result.Message}");
@@ -986,6 +1014,12 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
                 TotalCount = result.Value.TotalCount;
                 if (onLoadedAsync != null)
                     await onLoadedAsync(result.Value);
+            }
+            else if (result.ErrorCode == ErrorCodes.CANCELLED)
+            {
+                // 取消=页面已离开（OnDisappearing 顶掉在飞查询），不是加载失败：
+                // 禁止弹"加载失败"阻断弹窗（曾致高龄复核出档后误报"加载失败/查询被取消"）
+                Logger?.Debug($"分页列表加载已取消: {result.Message}");
             }
             else
             {

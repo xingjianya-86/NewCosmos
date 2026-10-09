@@ -21,14 +21,16 @@ public partial class MobileElderlyApplicationFormPage : ContentPage, IParameteri
     /// <summary>导航参数入口（接口显式实现，仅经 NavigateToPageAsync 单一通道调用）。</summary>
     Task IParameterizedPage<ElderlyFormPageParameter>.SetParameterAsync(ElderlyFormPageParameter parameter)
         => SetOperationModeCoreAsync(parameter.Mode, parameter.ApplicationId, parameter.NavigateToStopAfterSave,
-                                     parameter.PrefillIdCard, parameter.PrefillName);
+                                     parameter.PrefillIdCard, parameter.PrefillName, parameter.ReturnToReview);
 
     private async Task SetOperationModeCoreAsync(FormOperationMode mode, long? applicationId = null,
-        bool navigateToStopAfterSave = false, string? prefillIdCard = null, string? prefillName = null)
+        bool navigateToStopAfterSave = false, string? prefillIdCard = null, string? prefillName = null,
+        bool returnToReview = false)
     {
         _viewModel.OperationMode = mode;
         _viewModel.PendingStopApplicationId = applicationId ?? 0;
         _viewModel.SetNavigateToStopAfterSave(navigateToStopAfterSave);
+        _viewModel.SetReturnToReview(returnToReview);
 
         if (mode == FormOperationMode.Create)
         {

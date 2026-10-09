@@ -16,6 +16,7 @@ public partial class MonthlyAssetAuditPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.OnDisappearing();
     }
 
     /// <summary>

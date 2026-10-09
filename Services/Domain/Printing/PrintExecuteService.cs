@@ -69,7 +69,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         try
         {
             // 获取模板配置以检查 copiesBySupporter
-            var template = await _templateService.GetByIdAsync(templateId, ct);
+            var templateResult = await _templateService.GetByIdAsync(templateId, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<byte[]>(templateResult.ErrorCode!, templateResult.Message!);
+            var template = templateResult.Value;
             var config = template != null && !string.IsNullOrEmpty(template.ConfigJson)
                 ? TemplateConfig.FromJson(template.ConfigJson) : null;
 
@@ -190,7 +193,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
         try
         {
-            var template = await _templateService.GetByIdAsync(templateId, ct);
+            var templateResult2 = await _templateService.GetByIdAsync(templateId, ct);
+            if (templateResult2.IsFailure)
+                return Result.Failure<PrintRecord>(templateResult2.ErrorCode!, templateResult2.Message!);
+            var template = templateResult2.Value;
             if (template == null)
             {
                 return Result.Failure<PrintRecord>(ErrorCodes.NOT_FOUND, $"模板未找到: TemplateId={templateId}");

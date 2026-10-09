@@ -1154,6 +1154,8 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             // BusinessId 显式置空：PrintNavigationData 是静态单例，快速核查提交不产生核查记录ID，
             // 不清空会残留上一流程（如人员搜索输出档案）的 checkId，导致一键打印误判"该家庭未上传核查报告"而拦截
             PrintNavigationData.BusinessId = null;
+            // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
+            PrintNavigationData.ClearDocumentMode();
             PrintNavigationData.BusinessType = "AssetVerification";
             PrintNavigationData.FieldData = fields;
             PrintNavigationData.TableData = tableRows;

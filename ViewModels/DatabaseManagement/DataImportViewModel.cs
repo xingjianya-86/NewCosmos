@@ -7,6 +7,7 @@ using NewCosmos.Services.Import;
 using NewCosmos.Services.Platform;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace NewCosmos.ViewModels.DatabaseManagement;
 
@@ -160,6 +161,24 @@ public partial class DataImportViewModel : ViewModelBase
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
     #endregion
+
+    /// <summary>
+    /// [PERF-PROBE] 阶段0归因埋点：本页无进入期数据加载，采样应恒为 0ms 左右——
+    /// 若"进入缓慢"仍复现，则延迟必然在 push 前后（见 日志中的 导航-页面构造 / 导航-PushAsync），而非 OnAppearing。
+    /// </summary>
+    public override async Task OnAppearingAsync()
+    {
+        var probe = Stopwatch.StartNew();
+        await base.OnAppearingAsync();
+        probe.Stop();
+        _logger.LogPerf("数据导入-OnAppearing", probe.Elapsed.TotalMilliseconds);
+    }
+
+    /// <summary>页面可见后异步加载（C 组：与其余子页一致，不阻塞 PushAsync）</summary>
+    public void StartLoadingInBackground() => SafeFireAndForget(async () =>
+    {
+        await OnAppearingAsync();
+    }, nameof(StartLoadingInBackground));
 
     private void LoadImportTypes()
     {

@@ -24,6 +24,7 @@ public partial class LoginPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.OnDisappearing();
         EternalRegressionEffect.PersonDeleted -= OnEternalPersonDeleted;
     }
 

@@ -1,3 +1,4 @@
+using NewCosmos.Models.NavigationData;
 using NewCosmos.ViewModels.ArchiveManagement;
 using NewCosmos.ViewModels.Base;
 
@@ -23,6 +24,23 @@ public partial class ArchiveProductionPage : ContentPage,
         if (!_viewModel.HasBusinessData)
         {
             await _viewModel.InitializeAsync();
+        }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.OnDisappearing();
+
+        // 与 ArchiveOutputPage.OnDisappearing 同口径：
+        // 页面已不在导航栈中（真正离开档案制作流程，而非 push 档案输出页）时清空打印上下文。
+        // ① FieldData/TableData 含公民 PII，不能驻留到进程退出；
+        // ② 「仅出文书」预置的 OutputCategories/OperationOverride/Prefilter/TemplateFilter
+        //    若在此不清理，会被后续整档流程（高龄停发、临救、追缴等）继承 → 误出变动文书。
+        var stack = Helpers.WindowNavigator.CurrentNavigation?.NavigationStack;
+        if (stack == null || !stack.Contains(this))
+        {
+            PrintNavigationData.Clear();
         }
     }
 

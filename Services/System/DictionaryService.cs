@@ -235,17 +235,22 @@ public class DictionaryService : BaseService, IDictionaryService
 
     public async Task<Result<List<DictCategoryView>>> GetCategoriesAsync(CancellationToken ct = default)
     {
-        await EnsureTablesExistAsync(ct);
-        await EnsureDataInitializedAsync(ct);
+        var ensureTables = await EnsureTablesExistAsync(ct);
+        if (ensureTables.IsFailure)
+            return Result.Failure<List<DictCategoryView>>(ensureTables.ErrorCode!, ensureTables.Message!);
+        var ensureData = await EnsureDataInitializedAsync(ct);
+        if (ensureData.IsFailure)
+            return Result.Failure<List<DictCategoryView>>(ensureData.ErrorCode!, ensureData.Message!);
 
         LogInfo("获取所有字典分类");
 
         var sql = "SELECT * FROM nc_view_dict_categories WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<DictCategoryView>(sql, ct);
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DictCategoryView>());
+        // 查询失败显式上抛（原实现洗成空集合，调用方会把失败当"无字典"继续）
+        if (result.IsFailure)
+            return Result.Failure<List<DictCategoryView>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DictCategoryView>());
     }
 
     public async Task<Result<List<DictItemView>>> GetItemsByCategoryAsync(string category, CancellationToken ct = default)
@@ -255,32 +260,40 @@ public class DictionaryService : BaseService, IDictionaryService
             return Result.Failure<List<DictItemView>>(ErrorCodes.VALIDATION_FAILED, "分类参数不能为空");
         }
 
-        await EnsureTablesExistAsync(ct);
-        await EnsureDataInitializedAsync(ct);
+        var ensureTables = await EnsureTablesExistAsync(ct);
+        if (ensureTables.IsFailure)
+            return Result.Failure<List<DictItemView>>(ensureTables.ErrorCode!, ensureTables.Message!);
+        var ensureData = await EnsureDataInitializedAsync(ct);
+        if (ensureData.IsFailure)
+            return Result.Failure<List<DictItemView>>(ensureData.ErrorCode!, ensureData.Message!);
 
         LogInfo($"获取分类 {category} 的字典项");
 
         var sql = "SELECT * FROM nc_view_dict_items WHERE category = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<DictItemView>(sql, ct, category);
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DictItemView>());
+        if (result.IsFailure)
+            return Result.Failure<List<DictItemView>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DictItemView>());
     }
 
     public async Task<Result<List<DictItemView>>> GetAllItemsAsync(CancellationToken ct = default)
     {
-        await EnsureTablesExistAsync(ct);
-        await EnsureDataInitializedAsync(ct);
+        var ensureTables = await EnsureTablesExistAsync(ct);
+        if (ensureTables.IsFailure)
+            return Result.Failure<List<DictItemView>>(ensureTables.ErrorCode!, ensureTables.Message!);
+        var ensureData = await EnsureDataInitializedAsync(ct);
+        if (ensureData.IsFailure)
+            return Result.Failure<List<DictItemView>>(ensureData.ErrorCode!, ensureData.Message!);
 
         LogInfo("获取全部字典项（一次查询，含分类列）");
 
         var sql = "SELECT * FROM nc_view_dict_items WHERE is_active = TRUE ORDER BY category, sort_order, id";
         var result = await _dbService.QueryAsync<DictItemView>(sql, ct);
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DictItemView>());
+        if (result.IsFailure)
+            return Result.Failure<List<DictItemView>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DictItemView>());
     }
 
     public async Task<Result<DictItemView>> GetItemByKeyAsync(string category, string itemKey, CancellationToken ct = default)
@@ -290,13 +303,20 @@ public class DictionaryService : BaseService, IDictionaryService
             return Result.Failure<DictItemView>(ErrorCodes.VALIDATION_FAILED, "分类或字典项Key不能为空");
         }
 
-        await EnsureTablesExistAsync(ct);
-        await EnsureDataInitializedAsync(ct);
+        var ensureTables = await EnsureTablesExistAsync(ct);
+        if (ensureTables.IsFailure)
+            return Result.Failure<DictItemView>(ensureTables.ErrorCode!, ensureTables.Message!);
+        var ensureData = await EnsureDataInitializedAsync(ct);
+        if (ensureData.IsFailure)
+            return Result.Failure<DictItemView>(ensureData.ErrorCode!, ensureData.Message!);
 
         var sql = "SELECT * FROM nc_view_dict_items WHERE category = $1 AND item_key = $2 LIMIT 1";
         var result = await _dbService.QuerySingleAsync<DictItemView>(sql, ct, category, itemKey);
 
-        return result.IsSuccess ? Result.Success(result.Value) : Result.Success<DictItemView>(null);
+        // 失败显式；查询成功但无行 = Success(null)（单行查询的正常"不存在"语义）
+        if (result.IsFailure)
+            return Result.Failure<DictItemView>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value);
     }
 
     #endregion
@@ -678,6 +698,9 @@ public class DictionaryService : BaseService, IDictionaryService
         }
         catch (Exception ex)
         {
+            // [吞异常豁免] 唯一调用方 InitializeFromSeedAsync 将 null/空集合转为显式
+            // Result.Failure(FILE_NOT_FOUND, "无法加载字典分类数据")，不会被当作"无数据"继续合并；
+            // 异常细节由本行 LogError 落盘。
             LogError($"加载字典分类YAML失败: {ex.Message}");
             return null;
         }
@@ -733,6 +756,9 @@ public class DictionaryService : BaseService, IDictionaryService
         }
         catch (Exception ex)
         {
+            // [吞异常豁免] 唯一调用方 InitializeFromSeedAsync 将 null/空集合转为显式
+            // Result.Failure(FILE_NOT_FOUND, "无法加载字典项数据")，不会被当作"无数据"继续合并；
+            // 任一字典项 YAML 解析失败即整体失败（不半成功合并），异常细节由本行 LogError 落盘。
             LogError($"加载字典项YAML失败: {ex.Message}");
             return null;
         }

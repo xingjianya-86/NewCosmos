@@ -70,6 +70,7 @@ public static class FamilySituationTextBuilder
         if (c.TotalFamilyIncome > 0)
         {
             var annual = c.TotalAnnualIncome;
+            // [历史数据兼容豁免] 年值缺失的老数据按月值×12 近似（一次性舍入）；正常路径年值列必有值（§9）
             if (annual <= 0) annual = Math.Round(c.TotalFamilyIncome * 12, 2);
             sb.Append($"家庭年收入合计{annual:F0}元（月收入{c.TotalFamilyIncome:F0}元×12个月），" +
                       $"人均月收入{c.PerCapitaIncome:F0}元，人均年收入{c.PerCapitaAnnualIncome:F0}元");

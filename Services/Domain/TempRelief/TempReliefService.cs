@@ -805,7 +805,7 @@ public class TempReliefService : BaseService, ITempReliefService
 
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
-            .Add($"status IN ('{TempReliefConstants.StatusConfirmed}', '{TempReliefConstants.StatusStopped}')")
+            .Add("status IN ({0}, {1})", TempReliefConstants.StatusConfirmed, TempReliefConstants.StatusStopped)
             .AddIf(!string.IsNullOrWhiteSpace(keyword), "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", $"%{keyword}%");
 
         var where = conditions.ToWhereClause();
@@ -836,7 +836,7 @@ public class TempReliefService : BaseService, ITempReliefService
         // 业务时间口径 COALESCE(apply_date, report_time, created_at)，与名单业务时间一致；范围比较
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
-            .Add($"status IN ('{TempReliefConstants.StatusConfirmed}', '{TempReliefConstants.StatusStopped}')")
+            .Add("status IN ({0}, {1})", TempReliefConstants.StatusConfirmed, TempReliefConstants.StatusStopped)
             .Add("COALESCE(apply_date, report_time, created_at) >= {0}", monthStart)
             .Add("COALESCE(apply_date, report_time, created_at) < {0}", monthEnd);
 

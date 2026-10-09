@@ -393,7 +393,7 @@ public class ElderlyPendingCounts
     /// <summary>待新增：无在享登记（正式表无 Confirmed 且历史名册无记录）</summary>
     public int PendingNew { get; set; }
 
-    /// <summary>待停旧增新：正式表 Confirmed 在享，或历史名册（nc_biz_elderly_subsidy_history）有记录</summary>
+    /// <summary>待停旧增新：存在 Pending 复核记录（复核办结后置 Completed，该人自动退出列表）</summary>
     public int PendingTransfer { get; set; }
 
     /// <summary>合计</summary>
@@ -441,6 +441,9 @@ public class ElderlyPendingItem
     /// <summary>历史名册记录ID（Transfer 且历史名册有记录时 > 0，未建档可据此迁移）</summary>
     public long HistoryId { get; set; }
 
+    /// <summary>待复核队列记录ID（Transfer 时 > 0，用于跳转复核页并在办结后闭环消账）</summary>
+    public long ReviewId { get; set; }
+
     /// <summary>是否需停旧增新</summary>
     public bool IsTransfer => string.Equals(PendingType, ElderlyBenefitConstants.PendingTypeTransfer, StringComparison.Ordinal);
 
@@ -455,7 +458,7 @@ public class ElderlyPendingItem
                     return $"在享登记 {ElderlyApplicationNo}";
                 if (HistoryId > 0)
                     return "历史名册在享";
-                return "需先停发后新增";
+                return "待类别复核";
             }
             return "待新增登记";
         }
@@ -611,6 +614,19 @@ public class ElderlyReviewEvaluation
 
     public string OldCategoryName => ElderlyBenefitConstants.GetCategoryName(OldCategory);
     public string NewCategoryName => ElderlyBenefitConstants.GetCategoryName(NewCategory);
+}
+
+/// <summary>
+/// 复核前置的档案完整性检查结果：来源类型 + 必填项缺口（中文名，与表单 Validate 同口径）。
+/// SourceType 为空 = 原生档案（非导入名册补建），调用方据此不拦截存量老数据。
+/// </summary>
+public class ElderlyReviewCompletionInfo
+{
+    /// <summary>档案来源（ElderlySubsidyHistory / ElderlyReview；原生档案为空）</summary>
+    public string SourceType { get; set; } = string.Empty;
+
+    /// <summary>缺失的必填项中文名（为空 = 已补全）</summary>
+    public List<string> MissingFields { get; set; } = new();
 }
 
 /// <summary>

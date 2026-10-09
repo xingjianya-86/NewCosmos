@@ -67,6 +67,13 @@ public interface ILoggerService
     void StopPerfTimer(string timerId, string operation);
     void LogSlowQuery(string sql, long duration, int rowCount);
 
+    /// <summary>
+    /// 记录一次分段耗时采样（每条都落 perf_.log，用于"页面进入缓慢"类问题的分段归因）。
+    /// 与 StartPerfTimer/StopPerfTimer（仅超 SlowOperationThresholdMs 才告警）互补——
+    /// 单段可能都低于阈值，但串行叠加后仍然明显，采样必须全量记录。
+    /// </summary>
+    void LogPerf(string operation, double durationMs, params (string Key, object Value)[] context);
+
     #endregion
 
     #region 导航日志 (NAV)

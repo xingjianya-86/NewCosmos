@@ -96,11 +96,19 @@ public class PdfPreviewView : ContentView
 
     private async void InjectPdfData()
     {
-        if (_pendingBase64 == null) return;
-        var b64 = _pendingBase64;
-        _pendingBase64 = null;
+        // async void：异常若不就地捕获会直接终结进程
+        try
+        {
+            if (_pendingBase64 == null) return;
+            var b64 = _pendingBase64;
+            _pendingBase64 = null;
 
-        await _webView.EvaluateJavaScriptAsync(
-            $"window._loadPdfFromBase64('{b64}')");
+            await _webView.EvaluateJavaScriptAsync(
+                $"window._loadPdfFromBase64('{b64}')");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "PdfPreviewView: 注入 PDF 数据失败");
+        }
     }
 }

@@ -273,7 +273,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     private async Task LoadMeetingAsync()
     {
         var town = SelectedTown == "全部" ? "" : SelectedTown;
-        var result = await _reportService.GetMeetingAsync(SelectedYear, SelectedMonth, town, ct: CancellationToken.None);
+        var result = await _reportService.GetMeetingAsync(SelectedYear, SelectedMonth, town, ct: CancellationToken);
         if (!result.IsSuccess || result.Value == null)
             return;
         MeetingTime = result.Value.MeetingTime;
@@ -617,6 +617,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             Absentees = Absentees,
             ApplyCategory = ApplyCategory
         };
+        // [CT 豁免] 会议记录+出勤历史两步保存无事务包装，取消会半保存——保存收尾必须完成
         var result = await _reportService.SaveMeetingAsync(meeting, CancellationToken.None);
         if (result.IsFailure)
         {
@@ -625,7 +626,8 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         }
 
         var history = await _reportService.SaveMeetingAttendanceHistoryAsync(
-            SelectedYear, SelectedMonth, town, Attendees, Absentees, App.CurrentUserFullName, CancellationToken.None);
+            SelectedYear, SelectedMonth, town, Attendees, Absentees, App.CurrentUserFullName,
+            CancellationToken.None); // [CT 豁免] 同上：与会议记录配套的第二步保存，不可中断
         if (history.IsFailure)
         {
             await ShowErrorAsync(history.Message);

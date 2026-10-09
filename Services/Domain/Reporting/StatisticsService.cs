@@ -20,8 +20,8 @@ public class StatisticsService : BaseService, IStatisticsService
     public async Task<Result<int>> GetPendingApprovalsCountAsync(CancellationToken ct = default)
     {
         // 待审批 = 业务申请表中已提交的申请。
-        var sql = $@"SELECT COUNT(*) FROM nc_biz_applications WHERE status = '{ApplicationStatusCodes.SUBMITTED}' AND deleted_at IS NULL";
-        var result = await _dbService.ExecuteScalarAsync(sql, ct);
+        var sql = @"SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
+        var result = await _dbService.ExecuteScalarAsync(sql, ct, ApplicationStatusCodes.SUBMITTED);
 
         if (result.IsSuccess)
         {
@@ -62,10 +62,10 @@ public class StatisticsService : BaseService, IStatisticsService
     {
         // 资产核查任务的真实表是 nc_biz_asset_checks（nc_biz_asset_verifications 并不存在，
         // 原查询必失败）；待处理状态口径与 AssetVerificationService 一致
-        var sql = $@"SELECT COUNT(*) FROM nc_biz_asset_checks
-                    WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND deleted_at IS NULL";
+        var sql = @"SELECT COUNT(*) FROM nc_biz_asset_checks
+                    WHERE status = $1 AND deleted_at IS NULL";
 
-        var result = await _dbService.ExecuteScalarAsync(sql, ct);
+        var result = await _dbService.ExecuteScalarAsync(sql, ct, AssetCheckStatusConstants.SUBMITTED);
 
         if (result.IsSuccess)
         {
@@ -124,22 +124,24 @@ public class StatisticsService : BaseService, IStatisticsService
                     v.new_asset_checks,
                     e.monthly_new_elderly
                 FROM
-                    (SELECT COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.APPROVED}' AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
-                            COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.STOPPED}' AND stop_date >= $1::date AND stop_date < $2::date
+                    (SELECT COUNT(*) FILTER (WHERE status = $5 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
+                            COUNT(*) FILTER (WHERE status = $6 AND stop_date >= $1::date AND stop_date < $2::date
                                 {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}) AS monthly_exits
                      FROM nc_biz_applications
                      WHERE deleted_at IS NULL) f
                 CROSS JOIN
                     (SELECT COUNT(*) AS new_asset_checks
                      FROM nc_biz_asset_checks
-                     WHERE status = '{AssetCheckStatusConstants.SUBMITTED}' AND application_date >= $1::date AND application_date < $2::date AND deleted_at IS NULL) v
+                     WHERE status = $7 AND application_date >= $1::date AND application_date < $2::date AND deleted_at IS NULL) v
                 CROSS JOIN
                     (SELECT COUNT(*) AS monthly_new_elderly
                       FROM nc_biz_elderly_applications
-                      WHERE status IN ('{ElderlyBenefitConstants.StatusConfirmed}', '{ElderlyBenefitConstants.StatusStopped}') AND apply_date >= $3::date AND apply_date < $4::date AND deleted_at IS NULL
+                      WHERE status IN ($8, $9) AND apply_date >= $3::date AND apply_date < $4::date AND deleted_at IS NULL
                         AND source_type IS NULL) e";
 
-            var result = await _dbService.QuerySingleAsync<DashboardCounts>(sql, ct, bStart, bEnd, mStart, mEnd);
+            var result = await _dbService.QuerySingleAsync<DashboardCounts>(sql, ct, bStart, bEnd, mStart, mEnd,
+                ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.STOPPED, AssetCheckStatusConstants.SUBMITTED,
+                ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusStopped);
 
             // 查询失败必须失败返回，不再伪造"全 0"的假数据——
             // 假数据会让仪表盘在数据库异常时看起来"一切正常但没业务"。
@@ -192,14 +194,15 @@ public class StatisticsService : BaseService, IStatisticsService
 
             var sql = $@"
                 SELECT
-                    COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.APPROVED}') AS active_count,
-                    COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.APPROVED}' AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
-                    COUNT(*) FILTER (WHERE status = '{ApplicationStatusCodes.STOPPED}' AND stop_date >= $1::date AND stop_date < $2::date
+                    COUNT(*) FILTER (WHERE status = $3) AS active_count,
+                    COUNT(*) FILTER (WHERE status = $3 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
+                    COUNT(*) FILTER (WHERE status = $4 AND stop_date >= $1::date AND stop_date < $2::date
                         {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}) AS monthly_exits
                 FROM nc_biz_applications
                 WHERE deleted_at IS NULL";
 
-            var result = await _dbService.QuerySingleAsync<SocialAssistanceModuleStats>(sql, ct, bStart, bEnd);
+            var result = await _dbService.QuerySingleAsync<SocialAssistanceModuleStats>(sql, ct, bStart, bEnd,
+                ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.STOPPED);
 
             if (result.IsFailure || result.Value is null)
             {
@@ -235,10 +238,10 @@ public class StatisticsService : BaseService, IStatisticsService
             var mStart = new DateTime(now.Year, now.Month, 1); // 当月1日
             var mEnd = mStart.AddMonths(1);                    // 次月1日
 
-            var sql = $@"
+            var sql = @"
                 SELECT
                     ((SELECT COUNT(*) FROM nc_biz_elderly_applications
-                       WHERE status = '{ElderlyBenefitConstants.StatusConfirmed}'
+                       WHERE status = $3
                          AND death_date IS NULL AND deleted_at IS NULL)
                     + (SELECT COUNT(*) FROM nc_biz_elderly_subsidy_history h
                        WHERE NOT EXISTS (SELECT 1 FROM nc_biz_elderly_applications e
@@ -246,11 +249,12 @@ public class StatisticsService : BaseService, IStatisticsService
                          AND NOT EXISTS (SELECT 1 FROM nc_biz_death_records d
                                          WHERE d.member_id_card = h.id_card))) AS active_count,
                     (SELECT COUNT(*) FROM nc_biz_elderly_applications
-                     WHERE status IN ('{ElderlyBenefitConstants.StatusConfirmed}', '{ElderlyBenefitConstants.StatusStopped}')
+                     WHERE status IN ($3, $4)
                        AND apply_date >= $1::date AND apply_date < $2::date
                        AND source_type IS NULL AND deleted_at IS NULL) AS monthly_new";
 
-            var result = await _dbService.QuerySingleAsync<ElderlyModuleStats>(sql, ct, mStart, mEnd);
+            var result = await _dbService.QuerySingleAsync<ElderlyModuleStats>(sql, ct, mStart, mEnd,
+                ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusStopped);
 
             if (result.IsFailure || result.Value is null)
             {
@@ -286,16 +290,17 @@ public class StatisticsService : BaseService, IStatisticsService
             var mEnd = mStart.AddMonths(1);                    // 次月1日
             var yStart = new DateTime(now.Year, 1, 1);         // 当年1月1日
 
-            var sql = $@"
+            var sql = @"
                 SELECT
-                    COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.SUBMITTED}') AS pending_report_count,
-                    COUNT(*) FILTER (WHERE status = '{AssetCheckStatusConstants.VERIFIED}' AND updated_at >= $1 AND updated_at < $2) AS monthly_completed,
+                    COUNT(*) FILTER (WHERE status = $4) AS pending_report_count,
+                    COUNT(*) FILTER (WHERE status = $5 AND updated_at >= $1 AND updated_at < $2) AS monthly_completed,
                     COUNT(*) FILTER (WHERE application_date >= $1::date AND application_date < $2::date) AS monthly_new,
                     COUNT(*) FILTER (WHERE application_date >= $3::date AND application_date < $2::date) AS year_total
                 FROM nc_biz_asset_checks
                 WHERE deleted_at IS NULL";
 
-            var result = await _dbService.QuerySingleAsync<AssetVerificationModuleStats>(sql, ct, mStart, mEnd, yStart);
+            var result = await _dbService.QuerySingleAsync<AssetVerificationModuleStats>(sql, ct, mStart, mEnd, yStart,
+                AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED);
 
             if (result.IsFailure || result.Value is null)
             {
@@ -327,15 +332,16 @@ public class StatisticsService : BaseService, IStatisticsService
             var mEnd = mStart.AddMonths(1);
             var yStart = new DateTime(now.Year, 1, 1);
 
-            const string sql = $@"
+            const string sql = @"
                 SELECT
                     COUNT(*) FILTER (WHERE stopped_at >= $1 AND stopped_at < $2) AS monthly_stopped,
                     COUNT(*) FILTER (WHERE stopped_at >= $3 AND stopped_at < $2) AS year_stopped
                 FROM nc_biz_elderly_applications
-                WHERE status = '{ElderlyBenefitConstants.StatusStopped}' AND deleted_at IS NULL
-                  AND (stop_reason IS NULL OR stop_reason <> '{ElderlyBenefitConstants.StopReasonReview}')";
+                WHERE status = $4 AND deleted_at IS NULL
+                  AND (stop_reason IS NULL OR stop_reason <> $5)";
 
-            var result = await _dbService.QuerySingleAsync<ElderlyStopStats>(sql, ct, mStart, mEnd, yStart);
+            var result = await _dbService.QuerySingleAsync<ElderlyStopStats>(sql, ct, mStart, mEnd, yStart,
+                ElderlyBenefitConstants.StatusStopped, ElderlyBenefitConstants.StopReasonReview);
 
             if (result.IsFailure || result.Value is null)
             {
@@ -360,18 +366,19 @@ public class StatisticsService : BaseService, IStatisticsService
 
         try
         {
-            const string sql = $@"
+            const string sql = @"
                 SELECT
-                    COUNT(*) FILTER (WHERE status = '{TempReliefConstants.StatusDraft}') AS draft_count,
-                    COUNT(*) FILTER (WHERE status = '{TempReliefConstants.StatusConfirmed}') AS confirmed_total,
-                    COUNT(*) FILTER (WHERE status = '{TempReliefConstants.StatusConfirmed}' AND confirmed_at >= $1 AND confirmed_at < $2) AS year_confirmed,
-                    COALESCE(SUM(confirm_amount) FILTER (WHERE status = '{TempReliefConstants.StatusConfirmed}' AND confirmed_at >= $1 AND confirmed_at < $2), 0) AS year_confirmed_amount
+                    COUNT(*) FILTER (WHERE status = $3) AS draft_count,
+                    COUNT(*) FILTER (WHERE status = $4) AS confirmed_total,
+                    COUNT(*) FILTER (WHERE status = $4 AND confirmed_at >= $1 AND confirmed_at < $2) AS year_confirmed,
+                    COALESCE(SUM(confirm_amount) FILTER (WHERE status = $4 AND confirmed_at >= $1 AND confirmed_at < $2), 0) AS year_confirmed_amount
                 FROM nc_biz_temp_relief_applications
                 WHERE deleted_at IS NULL";
 
             var yStart = new DateTime(DateTime.Now.Year, 1, 1); // 当年1月1日
             var yEnd = new DateTime(DateTime.Now.Year + 1, 1, 1); // 次年1月1日
-            var result = await _dbService.QuerySingleAsync<TempReliefStats>(sql, ct, yStart, yEnd);
+            var result = await _dbService.QuerySingleAsync<TempReliefStats>(sql, ct, yStart, yEnd,
+                TempReliefConstants.StatusDraft, TempReliefConstants.StatusConfirmed);
 
             if (result.IsFailure || result.Value is null)
             {
@@ -401,16 +408,17 @@ public class StatisticsService : BaseService, IStatisticsService
             var mEnd = mStart.AddMonths(1);
             var yStart = new DateTime(now.Year, 1, 1);
 
-            const string sql = $@"
+            const string sql = @"
                 SELECT
                     COUNT(*) FILTER (WHERE change_date >= $1::date AND change_date < $2::date) AS monthly_changes,
                     COUNT(*) FILTER (WHERE change_date >= $3::date AND change_date < $2::date) AS year_changes
                 FROM nc_biz_change_records
                 WHERE deleted_at IS NULL
                   -- M3：排除户主死亡附属的分类施保减除记录，避免一次事件计 2 次
-                  AND change_type <> '{DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE}'";
+                  AND change_type <> $4";
 
-            var result = await _dbService.QuerySingleAsync<ChangeStats>(sql, ct, mStart, mEnd, yStart);
+            var result = await _dbService.QuerySingleAsync<ChangeStats>(sql, ct, mStart, mEnd, yStart,
+                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE);
 
             if (result.IsFailure || result.Value is null)
             {

@@ -185,7 +185,8 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="与申请人关系" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding AgentRelation}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                <Picker ItemsSource="{Binding RelationOptions}" SelectedItem="{Binding AgentRelation}"
+                                        Style="{StaticResource FormFieldPickerStyle}"/>
                             </VerticalStackLayout>
 
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
@@ -196,7 +197,8 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="与申请人关系" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding AgentReceiveRelation}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                <Picker ItemsSource="{Binding RelationOptions}" SelectedItem="{Binding AgentReceiveRelation}"
+                                        Style="{StaticResource FormFieldPickerStyle}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="代领原因" Style="{StaticResource FormFieldLabelStyle}"/>

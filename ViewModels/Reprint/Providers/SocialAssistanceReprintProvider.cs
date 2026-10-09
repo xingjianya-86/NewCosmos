@@ -17,6 +17,14 @@ public class SocialAssistanceReprintProvider : IReprintDomainProvider
     private readonly IApplicationService _applicationService;
     private readonly ArchiveProductionViewModel _productionViewModel;
 
+    /// <summary>
+    /// BuildPrintDataAsync 串行闸：统一页「选中记录准备」（IsBusy 守卫）与「输出分类切换」
+    /// （OnOutputCategoryIndexChanged，无 IsBusy 守卫）两条入口可并发进入，共用注入实例的
+    /// _fieldData/_supporterTableData 内部字段状态。并发改写会产出血缘不全的打印数据
+    /// （FAMILY_LAND_AREA / 赡养人表丢失 → 档案输出清单误剔除「村级土地说明」「赡养费承诺书」）。
+    /// </summary>
+    private readonly SemaphoreSlim _prepareGate = new(1, 1);
+
     public SocialAssistanceReprintProvider(
         IApplicationService applicationService,
         ArchiveProductionViewModel productionViewModel)
@@ -72,20 +80,27 @@ public class SocialAssistanceReprintProvider : IReprintDomainProvider
 
     public async Task<Result<ReprintArchivePayload>> PrepareAsync(long businessId, CancellationToken ct = default)
     {
-        // 串行化语义由统一页保证（BuildPrintDataAsync 使用注入实例的内部字段状态，不可并发）
-        var data = await _productionViewModel.BuildPrintDataAsync(businessId);
-        if (data == null)
-            return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", "加载该档案的打印数据失败，请确认档案数据完整");
+        await _prepareGate.WaitAsync(ct);
+        try
+        {
+            var data = await _productionViewModel.BuildPrintDataAsync(businessId);
+            if (data == null)
+                return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", "加载该档案的打印数据失败，请确认档案数据完整");
 
-        return Result.Success(new ReprintArchivePayload(
-            DomainKey,
-            data.BusinessId ?? businessId,
-            data.ApplicantName,
-            data.FieldData.TryGetValue(NewCosmos.Constants.FieldKeys.APPLICANT_ID_CARD, out var idCard) ? idCard : "",
-            data.Classification,
-            "", // Status 由统一页从记录项带入
-            data.FieldData,
-            data.TableData,
-            data.SupporterTableData));
+            return Result.Success(new ReprintArchivePayload(
+                DomainKey,
+                data.BusinessId ?? businessId,
+                data.ApplicantName,
+                data.FieldData.TryGetValue(NewCosmos.Constants.FieldKeys.APPLICANT_ID_CARD, out var idCard) ? idCard : "",
+                data.Classification,
+                "", // Status 由统一页从记录项带入
+                data.FieldData,
+                data.TableData,
+                data.SupporterTableData));
+        }
+        finally
+        {
+            _prepareGate.Release();
+        }
     }
 }

@@ -220,6 +220,7 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>登录后定时更新检查定时器（间隔来自 update.ini；Dispose 时停止）</summary>
     private IDispatcherTimer? _updateTimer;
+    private bool _updateCheckRunning;
 
         /// <summary>一次初始化守卫：主页每次 OnAppearing 都会调用 InitializeAsync，但重活只需首屏跑一次</summary>
         private bool _initialized;
@@ -443,6 +444,24 @@ public partial class MainViewModel : ViewModelBase
             CheckSchemaStatusAsync(),
             WarmupDictCacheAsync());
 
+        // 高龄身份升级自检（大学生提醒同款机制）：后台扫描"已获救助身份但高龄金额未升级"人员
+        // 并写入待复核队列，完成后刷新高龄待办横幅计数（入队成功 → Transfer 计数上升 → 横幅亮起）。
+        // 不阻塞启动；SafeFireAndForget 统一捕获记录日志。
+        SafeFireAndForget(async () =>
+        {
+            var scan = await _elderlyApplicationService.ScanAndEnqueueIdentityUpgradesAsync();
+            if (scan.IsFailure)
+            {
+                _logger.Warn($"高龄身份升级自检失败: {scan.Message}");
+                return;
+            }
+            if (scan.Value > 0)
+            {
+                _logger.Info($"高龄身份升级自检入队 {scan.Value} 人，刷新待办横幅");
+                await LoadElderlyReminderAsync();
+            }
+        });
+
         _windowTitleService.SetPageTitle(null);
     }
 
@@ -532,14 +551,43 @@ public partial class MainViewModel : ViewModelBase
 
         _updateTimer = dispatcher.CreateTimer();
         _updateTimer.Interval = TimeSpan.FromMinutes(options.CheckIntervalMinutes);
-        _updateTimer.Tick += async (_, _) => await CheckForUpdatesInternalAsync(manual: false);
+        _updateTimer.Tick += async (_, _) =>
+        {
+            // 重入保护：一次检查耗时超过间隔时不再叠加并行任务；
+            // 异常必须捕获——async void Tick 抛出会变成未观察任务异常
+            if (_updateCheckRunning) return;
+            _updateCheckRunning = true;
+            try
+            {
+                await CheckForUpdatesInternalAsync(manual: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"定时更新检查失败: {ex.Message}");
+            }
+            finally
+            {
+                _updateCheckRunning = false;
+            }
+        };
         _updateTimer.Start();
         _logger.Info($"更新定时检查已启动: 间隔 {options.CheckIntervalMinutes} 分钟");
     }
 
     /// <summary>手动检查更新（主界面按钮）</summary>
     [RelayCommand]
-    private async Task CheckForUpdatesAsync() => await CheckForUpdatesInternalAsync(manual: true);
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            await CheckForUpdatesInternalAsync(manual: true);
+        }
+        catch (Exception ex)
+        {
+            // RelayCommand 的 Task 异常无人观察，必须就地捕获
+            _logger.Warn($"手动更新检查失败: {ex.Message}");
+        }
+    }
 
     private async Task CheckForUpdatesInternalAsync(bool manual)
     {

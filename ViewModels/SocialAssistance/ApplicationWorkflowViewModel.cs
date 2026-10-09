@@ -423,7 +423,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
 
         try
         {
-            var result = await _applicationService.DeleteAsync(draft.Id, CancellationToken.None);
+            var result = await _applicationService.DeleteAsync(draft.Id, CancellationToken);
             if (result.IsSuccess)
             {
                 _logger.LogBusiness("草稿已删除",
@@ -546,7 +546,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
             return;
         }
 
-        var hasPermission = await _permissionService.HasPermissionAsync(userId.Value, PermissionCodes.NEAR_RELATIVE_MANAGE, CancellationToken.None);
+        var hasPermission = await _permissionService.HasPermissionAsync(userId.Value, PermissionCodes.NEAR_RELATIVE_MANAGE, CancellationToken);
         if (!hasPermission)
         {
             await _dialogService.DisplayAlertAsync("提示", "您没有近亲属备案的操作权限", "确定");

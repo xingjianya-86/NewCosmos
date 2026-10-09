@@ -10,6 +10,7 @@ using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Shared;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace NewCosmos.ViewModels.DatabaseManagement;
 
@@ -102,14 +103,29 @@ public partial class RegionManagementViewModel : ViewModelBase
 
     public async Task InitializePermissionsAsync(int userId)
     {
+        // [PERF-PROBE] 阶段0归因埋点：子页进入时的权限查询耗时
+        var probe = Stopwatch.StartNew();
         CanManageRegion = await _permissionService.HasPermissionAsync(userId, PermissionCodes.REGION_MANAGE);
+        probe.Stop();
+        _logger.LogPerf("区划管理-权限初始化", probe.Elapsed.TotalMilliseconds, ("UserId", userId));
         OnPropertyChanged(nameof(ManageOpacity));
     }
 
     public override async Task OnAppearingAsync()
     {
+        // [PERF-PROBE] 阶段0归因埋点：子页数据加载耗时
+        var probe = Stopwatch.StartNew();
         await LoadCitiesAsync();
+        probe.Stop();
+        _logger.LogPerf("区划管理-OnAppearing", probe.Elapsed.TotalMilliseconds);
     }
+
+    /// <summary>页面可见后异步执行权限检查 + 数据加载（C 组：不阻塞 PushAsync）</summary>
+    public void StartLoadingInBackground() => SafeFireAndForget(async () =>
+    {
+        await InitializePermissionsAsync(App.CurrentUserId ?? 1);
+        await OnAppearingAsync();
+    }, nameof(StartLoadingInBackground));
 
     private async Task LoadCitiesAsync()
     {

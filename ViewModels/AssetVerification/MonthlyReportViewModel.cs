@@ -296,6 +296,8 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 .Select(x => x.Community!);
             await _addressResolver.WarmupAsync(communityCodes, CancellationToken);
 
+            // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
+            PrintNavigationData.ClearDocumentMode();
             PrintNavigationData.BusinessType = "AssetVerificationMonthlyReport";
             PrintNavigationData.BusinessId = null;
             PrintNavigationData.Classification = ClassificationConstants.AssetVerification;
@@ -397,6 +399,8 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 .Select(x => x.Community!);
             await _addressResolver.WarmupAsync(communityCodes, CancellationToken);
 
+            // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
+            PrintNavigationData.ClearDocumentMode();
             PrintNavigationData.BusinessType = "AssetVerificationMonthlyReport";
             // BusinessId 编码：月报=year*100+month，周报=year*100+weekNumber
             PrintNavigationData.BusinessId = IsWeeklyMode && SelectedWeekNumber.HasValue

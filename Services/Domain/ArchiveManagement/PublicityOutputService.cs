@@ -255,7 +255,10 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
                 return Result.Failure<PublicityGenerateResult>(ErrorCodes.NOT_FOUND, "公示名单无数据");
 
             // 解析公示模板（按名称查 nc_biz_templates）
-            var template = await _templateService.GetByNameAsync(PublicityTemplateName, ct);
+            var templateResult = await _templateService.GetByNameAsync(PublicityTemplateName, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<PublicityGenerateResult>(templateResult.ErrorCode!, templateResult.Message!);
+            var template = templateResult.Value;
             if (template == null)
                 return Result.Failure<PublicityGenerateResult>(ErrorCodes.TEMPLATE_NOT_FOUND, $"公示模板不存在: {PublicityTemplateName}");
             if (template.FileType is not ("xlsx" or "excel"))
@@ -419,9 +422,9 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             // 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算退出，避免在保户被永久排除出公示
             var stoppedResult = await _db.QueryAsync<IdCardRow>(
                 $@"SELECT applicant_id_card FROM nc_biz_applications
-                  WHERE status = '{ApplicationStatusCodes.STOPPED}' AND stop_date IS NOT NULL AND stop_date <= $1::date AND deleted_at IS NULL
+                  WHERE status = $1 AND stop_date IS NOT NULL AND stop_date <= $2::date AND deleted_at IS NULL
                   {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}",
-                ct, monthEnd);
+                ct, ApplicationStatusCodes.STOPPED, monthEnd);
             if (stoppedResult.IsFailure)
                 return Result.Failure<HashSet<string>>(stoppedResult.ErrorCode!, stoppedResult.Message!);
             foreach (var r in stoppedResult.Value ?? new List<IdCardRow>())

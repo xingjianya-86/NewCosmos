@@ -150,6 +150,9 @@ public partial class App : Application
                 return CreateErrorWindow("应用程序服务未初始化，无法启动");
             }
 
+            // 全局 SnackBar 宿主：订阅 IDialogService.SnackBarRequested，一次性接线
+            Components.GlobalSnackBarHost.Attach(Services.GetRequiredService<IDialogService>());
+
             var configService = Services.GetRequiredService<IConfigService>();
             if (configService == null)
             {
@@ -191,13 +194,58 @@ public partial class App : Application
 
             var windowTitleService = Services.GetRequiredService<IWindowTitleService>();
 
-            // 尝试恢复持久化会话（SecureStorage 同步阻塞读取，避开 UI 同步上下文）
+            // 会话恢复改真异步：原实现在 UI 线程用 GetAwaiter().GetResult() 同步阻塞
+            // SecureStorage 读取与 DB 用户校验。现立即返回窗口（过渡页），后台恢复完成后再换页。
+            var window = new Window(CreateStartupTransitionalPage()) { Title = appOptions.WindowTitle };
+            if (DeviceInfo.Platform != DevicePlatform.Android)
+            {
+                window.Width = 1920;
+                window.Height = 1080;
+                window.X = 0;
+                window.Y = 0;
+            }
+
+            _ = RestoreSessionAndNavigateAsync(window, appOptions, windowTitleService);
+
+            Serilog.Log.Information("[APP] CreateWindow 结束（会话恢复转后台）");
+            return window;
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[APP] CreateWindow 初始化失败");
+            return CreateErrorWindow($"应用程序初始化失败:\n{ex.Message}\n\n堆栈跟踪:\n{ex.StackTrace}");
+        }
+    }
+
+    private static ContentPage CreateStartupTransitionalPage() => new()
+    {
+        BackgroundColor = Colors.White,
+        Content = new VerticalStackLayout
+        {
+            VerticalOptions = LayoutOptions.Center,
+            HorizontalOptions = LayoutOptions.Center,
+            Spacing = 16,
+            Children =
+            {
+                new ActivityIndicator { IsRunning = true, Color = Colors.SteelBlue, HorizontalOptions = LayoutOptions.Center },
+                new Label { Text = "正在启动…", FontSize = 14, TextColor = Colors.Gray, HorizontalTextAlignment = TextAlignment.Center }
+            }
+        }
+    };
+
+    /// <summary>
+    /// 后台恢复会话并切换到主页面或登录页；失败一律落登录页，异常记日志+错误页兜底，绝不吞掉。
+    /// </summary>
+    private static async Task RestoreSessionAndNavigateAsync(Window window, AppOptions appOptions, IWindowTitleService windowTitleService)
+    {
+        try
+        {
             ISessionStore? sessionStore = null;
             UserSession? session = null;
             try
             {
                 sessionStore = Services.GetRequiredService<ISessionStore>();
-                session = Task.Run(() => sessionStore.LoadAsync()).GetAwaiter().GetResult();
+                session = await sessionStore.LoadAsync();
             }
             catch (Exception ex)
             {
@@ -210,7 +258,7 @@ public partial class App : Application
                 try
                 {
                     var userService = Services.GetRequiredService<Services.Domain.UserManagement.IUserService>();
-                    var userResult = Task.Run(() => userService.GetByIdAsync(session.UserId)).GetAwaiter().GetResult();
+                    var userResult = await userService.GetByIdAsync(session.UserId);
                     if (userResult.IsSuccess && userResult.Value != null && userResult.Value.IsActive)
                     {
                         ApplySession(session);
@@ -230,19 +278,10 @@ public partial class App : Application
                         }
 
                         windowTitleService.Register(mainPage);
-                        var mainWindow = new Window(new NavigationPage(mainPage))
-                        {
-                            Title = appOptions.WindowTitle
-                        };
-                        if (DeviceInfo.Platform != DevicePlatform.Android)
-                        {
-                            mainWindow.Width = 1920;
-                            mainWindow.Height = 1080;
-                            mainWindow.X = 0;
-                            mainWindow.Y = 0;
-                        }
-                        Serilog.Log.Information("[APP] CreateWindow 结束（会话恢复）");
-                        return mainWindow;
+                        window.Page = new NavigationPage(mainPage);
+                        window.Title = appOptions.WindowTitle;
+                        Serilog.Log.Information("[APP] 启动完成（会话恢复）");
+                        return;
                     }
 
                     Serilog.Log.Warning("[APP] 会话用户无效，清除并转登录页");
@@ -260,22 +299,14 @@ public partial class App : Application
             var loginPage = Services.GetRequiredService<LoginPage>();
             // root 页也注册标题跟随：pop/系统返回回登录页时窗口标题按其 Page.Title 恢复
             windowTitleService.Register(loginPage);
-            var navigationPage = new NavigationPage(loginPage);
-            var loginWindow = new Window(navigationPage) { Title = $"登录 - {appOptions.WindowTitle}" };
-
-            // 设置窗口全屏
-            loginWindow.Width = 1920;
-            loginWindow.Height = 1080;
-            loginWindow.X = 0;
-            loginWindow.Y = 0;
-
-            Serilog.Log.Information("[APP] CreateWindow 结束");
-            return loginWindow;
+            window.Page = new NavigationPage(loginPage);
+            window.Title = $"登录 - {appOptions.WindowTitle}";
+            Serilog.Log.Information("[APP] 启动完成（登录页）");
         }
         catch (Exception ex)
         {
-            Serilog.Log.Error(ex, "[APP] CreateWindow 初始化失败");
-            return CreateErrorWindow($"应用程序初始化失败:\n{ex.Message}\n\n堆栈跟踪:\n{ex.StackTrace}");
+            Serilog.Log.Error(ex, "[APP] 后台会话恢复异常");
+            window.Page = CreateErrorWindow($"启动初始化失败:\n{ex.Message}").Page;
         }
     }
 

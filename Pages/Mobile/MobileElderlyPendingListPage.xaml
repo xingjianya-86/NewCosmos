@@ -57,7 +57,7 @@
                             </Label.FormattedText>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="停发/建档" FontSize="12" Padding="10,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="复核办理" FontSize="12" Padding="10,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="{StaticResource Warning}" TextColor="White" VerticalOptions="Center"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
                             CommandParameter="{Binding .}"/>

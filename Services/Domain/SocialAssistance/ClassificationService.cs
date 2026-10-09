@@ -42,10 +42,16 @@ public class ClassificationService : BaseService, IClassificationService
 
         LogInfo($"执行分类判定");
 
-        // 过滤赡养抚养扶养义务人——不计入家庭人数，不参与劳动力/年龄/重病重残判定
-        var householdMembers = members
-            .Where(m => m.MemberCategory != MemberCategoryConstants.SUPPORT)
-            .ToList();
+        // 过滤赡养抚养扶养义务人——不计入家庭人数，不参与劳动力/年龄/重病重残判定；
+        // 同时剔除户主行——户主以主表为准单独判定，成员表若存户主行会重复计数（分类施保人数/金额虚高）
+        var householdMembers = new List<FamilyMember>();
+        foreach (var m in members)
+        {
+            var category = MemberCategoryHelper.Normalize(m.MemberCategory, m.IsApplicant, m.RelationshipToHead);
+            if (category == MemberCategoryConstants.SUPPORT) continue;
+            if (IsHouseholdHeadMember(m, application, category)) continue;
+            householdMembers.Add(m);
+        }
 
         var result = new ClassificationResult();
         var isRural = ClassificationConstants.HukouType.IsHukouRural(application.HukouType ?? "");
@@ -324,8 +330,11 @@ public class ClassificationService : BaseService, IClassificationService
         if (headEligible) count++;
 
         // ── 家庭成员逐人判定（types 叠加 / count 每人一次）──
+        // 户主已在主表计过一次（上方①~④），成员表若存户主行（is_applicant=true / 关系=本人）会双计
         foreach (var member in members)
         {
+            if (IsHouseholdHeadMember(member, application)) continue;
+
             bool eligible = false;
 
             if (member.IsSevereDisease || DictionaryConstants.HealthStatus.HasSevereDisease(member.HealthStatus ?? ""))
@@ -368,6 +377,27 @@ public class ClassificationService : BaseService, IClassificationService
     }
 
     // ── 私有方法：判定逻辑 ──
+
+    /// <summary>
+    /// 成员行是否为户主本人。户主信息权威在主表 nc_biz_applications，
+    /// 历史/导入数据的成员表可能同时存有户主行（is_applicant=true、member_category=户主、
+    /// 关系=本人、或身份证与申请人相同），判定与计数时须跳过，否则户主被双计。
+    /// </summary>
+    private static bool IsHouseholdHeadMember(FamilyMember member, ApplicationEntity application, string? normalizedCategory = null)
+    {
+        if (member.IsApplicant) return true;
+
+        var category = normalizedCategory ?? MemberCategoryHelper.Normalize(
+            member.MemberCategory, member.IsApplicant, member.RelationshipToHead);
+        if (string.Equals(category, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var memberIdCard = member.IdCard?.Trim();
+        var applicantIdCard = application.ApplicantIdCard?.Trim();
+        return !string.IsNullOrEmpty(memberIdCard)
+            && string.Equals(memberIdCard, applicantIdCard, StringComparison.OrdinalIgnoreCase);
+    }
+
 
     /// <summary>
     /// 第一层：收入超标区间判定（刚性支出困难家庭）

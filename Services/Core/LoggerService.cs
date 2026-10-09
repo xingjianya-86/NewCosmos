@@ -293,6 +293,16 @@ public class LoggerService : ILoggerService, IDisposable
         _perfLogger.Warning("慢查询告| SQL={SQL} Duration={Duration}ms RowCount={RowCount}", truncatedSql, duration, rowCount);
     }
 
+    public void LogPerf(string operation, double durationMs, params (string Key, object Value)[] context)
+    {
+        var data = new Dictionary<string, object>(context.Length);
+        foreach (var (key, value) in context)
+            data[key] = DataMasker.Sanitize(value);
+
+        _perfLogger.Information("性能采样| Operation={Operation} Duration={Duration}ms {@Context}",
+            operation, durationMs, data);
+    }
+
     #endregion
 
     #region 导航日志 (NAV)

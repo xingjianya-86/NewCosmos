@@ -12,10 +12,11 @@ public partial class DataImportPage : ContentPage
         BindingContext = _viewModel = viewModel;
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
-        await _viewModel.OnAppearingAsync();
+        // C 组：与其余子页保持一致，页面加载移出 push 关键路径
+        _viewModel.StartLoadingInBackground();
     }
 
     protected override void OnDisappearing()

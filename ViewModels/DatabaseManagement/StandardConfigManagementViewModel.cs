@@ -10,6 +10,7 @@ using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Shared;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace NewCosmos.ViewModels.DatabaseManagement;
 
@@ -144,16 +145,36 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
 
     public async Task InitializePermissionsAsync(int userId)
     {
+        // [PERF-PROBE] 阶段0归因埋点：注意本页 code-behind 与 OnAppearingAsync 会各调一次，采样应成对出现
+        var probe = Stopwatch.StartNew();
         CanViewStandard = await _permissionService.HasPermissionAsync(userId, PermissionCodes.STANDARD_VIEW);
         CanManageStandard = await _permissionService.HasPermissionAsync(userId, PermissionCodes.STANDARD_MANAGE);
+        probe.Stop();
+        _logger.LogPerf("标准配置-权限初始化", probe.Elapsed.TotalMilliseconds, ("UserId", userId));
 
         OnPropertyChanged(nameof(ManageOpacity));
     }
 
     public override async Task OnAppearingAsync()
     {
+        // 权限由 code-behind → StartLoadingInBackground 统一执行一次（旧实现此处重复调用，权限查询跑两遍）
+        // [PERF-PROBE] 阶段0归因埋点：数据加载耗时
+        await MeasureAsync("标准列表加载", LoadStandardsAsync);
+    }
+
+    /// <summary>页面可见后异步执行权限检查 + 数据加载（C 组：不阻塞 PushAsync）</summary>
+    public void StartLoadingInBackground() => SafeFireAndForget(async () =>
+    {
         await InitializePermissionsAsync(App.CurrentUserId ?? 1);
-        await LoadStandardsAsync();
+        await OnAppearingAsync();
+    }, nameof(StartLoadingInBackground));
+
+    private async Task MeasureAsync(string part, Func<Task> load)
+    {
+        var probe = Stopwatch.StartNew();
+        await load();
+        probe.Stop();
+        _logger.LogPerf("标准配置-OnAppearing", probe.Elapsed.TotalMilliseconds, ("Part", part));
     }
 
     partial void OnSelectedCategoryChanged(StandardCategoryView value)

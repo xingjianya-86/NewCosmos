@@ -89,6 +89,28 @@ public class WordEngine : ITemplateEngine
     }
 
     /// <summary>
+    /// 释放局部 COM RCW（必须在创建它的 worker 操作体内调用）。
+    /// Word 每次属性访问（Content/Range/Find/Paragraphs[i]…）都会产生新 RCW，
+    /// 不释放会随打印任务堆积导致 Word 进程/句柄泄漏。非 COM 对象静默跳过。
+    /// </summary>
+    private static void SafeRelease(params object?[] comObjects)
+    {
+        foreach (var obj in comObjects)
+        {
+            if (obj == null) continue;
+            try
+            {
+                if (Marshal.IsComObject(obj))
+                    Marshal.ReleaseComObject(obj);
+            }
+            catch
+            {
+                // RCW 已释放或对象不可释放——释放路径失败不得影响主流程
+            }
+        }
+    }
+
+    /// <summary>
     /// 在 worker 线程上执行单个占位符替换（COM 失败仅记 Warn，与原行为一致）。
     /// 非空值走 Find 定位 + Range.Text 赋值：Find/Replace 的 ReplaceWith 参数上限 255 字符且不接受控制字符，
     /// 超长文本（如救助原因叙述）会抛 COM 异常导致占位符静默残留；Range.Text 赋值无长度限制。
@@ -111,18 +133,26 @@ public class WordEngine : ITemplateEngine
             {
                 // 金额占位符无值：先尝试"占位符+元/月/元整/元"整段替换为 "-"（后缀从长到短），再退化为删除占位符。
                 // 替换目标均为短文本，可安全使用 ReplaceWith。
-                var find = _doc.Content.Find;
-                find.ClearFormatting();
-                find.Forward = true;
-                find.Wrap = 0;
-                find.MatchCase = false;
-                find.MatchWholeWord = false;
-
-                foreach (var suffix in new[] { "元/月", "元整", "元" })
+                var content = _doc.Content;
+                var find = content.Find;
+                try
                 {
-                    find.Execute(Replace: 2, FindText: placeholder + suffix, ReplaceWith: "-");
+                    find.ClearFormatting();
+                    find.Forward = true;
+                    find.Wrap = 0;
+                    find.MatchCase = false;
+                    find.MatchWholeWord = false;
+
+                    foreach (var suffix in new[] { "元/月", "元整", "元" })
+                    {
+                        find.Execute(Replace: 2, FindText: placeholder + suffix, ReplaceWith: "-");
+                    }
+                    find.Execute(Replace: 2, FindText: placeholder, ReplaceWith: "");
                 }
-                find.Execute(Replace: 2, FindText: placeholder, ReplaceWith: "");
+                finally
+                {
+                    SafeRelease(find, content);
+                }
             }
             else
             {
@@ -134,16 +164,24 @@ public class WordEngine : ITemplateEngine
                 {
                     var searchRange = _doc.Content;
                     var find = searchRange.Find;
-                    find.ClearFormatting();
-                    find.Forward = true;
-                    find.Wrap = 0; // wdFindStop
-                    find.MatchCase = false;
-                    find.MatchWholeWord = false;
+                    try
+                    {
+                        find.ClearFormatting();
+                        find.Forward = true;
+                        find.Wrap = 0; // wdFindStop
+                        find.MatchCase = false;
+                        find.MatchWholeWord = false;
 
-                    if (!find.Execute(FindText: placeholder)) break;
+                        if (!find.Execute(FindText: placeholder)) break;
 
-                    searchRange.Text = valueSafe;
-                    replaced++;
+                        searchRange.Text = valueSafe;
+                        replaced++;
+                    }
+                    finally
+                    {
+                        // 每轮的 Range/Find 都是新 RCW，循环上限 100，不释放会堆积
+                        SafeRelease(find, searchRange);
+                    }
                 }
             }
 
@@ -213,21 +251,37 @@ public class WordEngine : ITemplateEngine
             var removeSet = new HashSet<string>(placeholders);
             // 第一遍：收集待删段落的字符区间（Word 字符位置，删除段落不会使其漂移）
             var targetRanges = new List<(long Start, long End)>();
-            for (var i = 1; i <= doc.Paragraphs.Count; i++)
+            var paragraphs = doc.Paragraphs;
+            var paraCount = paragraphs.Count;
+            try
             {
-                try
+                for (var i = 1; i <= paraCount; i++)
                 {
-                    var para = doc.Paragraphs[i];
-                    var text = (para.Range.Text ?? string.Empty).Trim();
-                    if (removeSet.Contains(text))
+                    dynamic? para = null;
+                    dynamic? paraRange = null;
+                    try
                     {
-                        targetRanges.Add(((long)para.Range.Start, (long)para.Range.End));
+                        para = paragraphs[i];
+                        paraRange = para.Range;
+                        var text = (paraRange.Text ?? string.Empty).Trim();
+                        if (removeSet.Contains(text))
+                        {
+                            targetRanges.Add(((long)paraRange.Start, (long)paraRange.End));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"WordEngine: 扫描段落 {i} 失败: {ex.Message}");
+                    }
+                    finally
+                    {
+                        SafeRelease(paraRange, para);
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.Warn($"WordEngine: 扫描段落 {i} 失败: {ex.Message}");
-                }
+            }
+            finally
+            {
+                SafeRelease(paragraphs);
             }
             // 第二遍：从高到低删除整段（倒序保证低位字符位置不受影响）。
             // 注意：Paragraph.Range 已含段落标记，Range.End 指向段落末尾之后，范围语义为 [Start, End)，
@@ -235,14 +289,19 @@ public class WordEngine : ITemplateEngine
             for (var j = targetRanges.Count - 1; j >= 0; j--)
             {
                 var (start, end) = targetRanges[j];
+                dynamic? rng = null;
                 try
                 {
-                    var rng = doc.Range(start, end);
+                    rng = doc.Range(start, end);
                     rng.Delete();
                 }
                 catch (Exception ex)
                 {
                     _logger.Warn($"WordEngine: 删除段 {start}~{end} 失败: {ex.Message}");
+                }
+                finally
+                {
+                    SafeRelease(rng);
                 }
             }
             return null;
@@ -280,61 +339,121 @@ public class WordEngine : ITemplateEngine
             OfficeComWorker.Instance.Invoke<object?>($"填充表格 {tableStartMarker}", OfficeAppKind.Word, ctx =>
             {
                 // 使用 Word COM 的 Find 定位表格起始标记
-                var find = _doc!.Content.Find;
-                find.ClearFormatting();
-                find.Text = tableStartMarker;
-                find.Forward = true;
-                find.Wrap = 0;
-
-                if (!find.Execute())
+                // 局部 RCW 统一在 finally 中释放（原来每个 Range/Find/Table/Row/Cell 都泄漏）
+                dynamic? content = null;
+                dynamic? find = null;
+                dynamic? selection = null;
+                dynamic? startRange = null;
+                dynamic? endRange = null;
+                dynamic? fullRange = null;
+                try
                 {
-                    _logger.Warn($"WordEngine: 未找到表格标记 {tableStartMarker}");
-                    return null;
-                }
+                    content = _doc!.Content;
+                    find = content.Find;
+                    find.ClearFormatting();
+                    find.Text = tableStartMarker;
+                    find.Forward = true;
+                    find.Wrap = 0;
 
-                // 获取标记所在的段落
-                var selection = _doc.Application.Selection;
-                var startRange = selection.Range;
-
-                // 查找结束标记
-                find.Text = tableEndMarker;
-                if (!find.Execute())
-                {
-                    _logger.Warn($"WordEngine: 未找到结束标记 {tableEndMarker}");
-                    return null;
-                }
-
-                var endRange = selection.Range;
-                var fullRange = _doc.Range(startRange.Start, endRange.End);
-
-                // 获取范围内的表格
-                if (fullRange.Tables.Count > 0)
-                {
-                    var table = fullRange.Tables[1]; // 第一个表格
-                    var templateRow = table.Rows[table.Rows.Count]; // 最后一行作为模板
-
-                    foreach (var rowData in rows)
+                    if (!find.Execute())
                     {
-                        var newRow = table.Rows.Add(templateRow);
-                        foreach (var cell in newRow.Cells)
-                        {
-                            foreach (var para in cell.Paragraphs)
-                            {
-                                var text = para.Range.Text;
-                                foreach (var kvp in rowData)
-                                {
-                                    if (text.Contains(kvp.Key))
-                                    {
-                                        para.Range.Find.Execute(kvp.Key, false, false, false, false, false, false, 1, false, kvp.Value ?? "", 2);
-                                    }
-                                }
-                            }
-                        }
+                        _logger.Warn($"WordEngine: 未找到表格标记 {tableStartMarker}");
+                        return null;
                     }
 
-                    _logger.Info($"WordEngine: 表格填充 {rows.Count} 行");
+                    // 获取标记所在的段落
+                    selection = _doc.Application.Selection;
+                    startRange = selection.Range;
+
+                    // 查找结束标记
+                    find.Text = tableEndMarker;
+                    if (!find.Execute())
+                    {
+                        _logger.Warn($"WordEngine: 未找到结束标记 {tableEndMarker}");
+                        return null;
+                    }
+
+                    endRange = selection.Range;
+                    fullRange = _doc.Range(startRange.Start, endRange.End);
+
+                    // 获取范围内的表格
+                    if (fullRange.Tables.Count > 0)
+                    {
+                        dynamic? table = fullRange.Tables[1]; // 第一个表格
+                        dynamic? templateRow = null;
+                        try
+                        {
+                            templateRow = table.Rows[table.Rows.Count]; // 最后一行作为模板
+
+                            foreach (var rowData in rows)
+                            {
+                                dynamic? newRow = table.Rows.Add(templateRow);
+                                try
+                                {
+                                    dynamic? cells = newRow.Cells;
+                                    try
+                                    {
+                                        foreach (var cellObj in cells)
+                                        {
+                                            dynamic? cell = cellObj;
+                                            dynamic? cellParas = null;
+                                            try
+                                            {
+                                                cellParas = cell.Paragraphs;
+                                                foreach (var paraObj in cellParas)
+                                                {
+                                                    dynamic? para = paraObj;
+                                                    dynamic? pRange = null;
+                                                    dynamic? pFind = null;
+                                                    try
+                                                    {
+                                                        pRange = para.Range;
+                                                        var text = (string?)pRange.Text ?? string.Empty;
+                                                        foreach (var kvp in rowData)
+                                                        {
+                                                            if (text.Contains(kvp.Key))
+                                                            {
+                                                                pFind = pRange.Find;
+                                                                pFind.Execute(kvp.Key, false, false, false, false, false, false, 1, false, kvp.Value ?? "", 2);
+                                                            }
+                                                        }
+                                                    }
+                                                    finally
+                                                    {
+                                                        SafeRelease(pFind, pRange, para);
+                                                    }
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                SafeRelease(cellParas, cell);
+                                            }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        SafeRelease(cells);
+                                    }
+                                }
+                                finally
+                                {
+                                    SafeRelease(newRow);
+                                }
+                            }
+
+                            _logger.Info($"WordEngine: 表格填充 {rows.Count} 行");
+                        }
+                        finally
+                        {
+                            SafeRelease(templateRow, table);
+                        }
+                    }
+                    return null;
                 }
-                return null;
+                finally
+                {
+                    SafeRelease(fullRange, endRange, startRange, selection, find, content);
+                }
             });
         }
         catch (Exception ex)

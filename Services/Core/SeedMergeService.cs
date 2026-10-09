@@ -59,36 +59,59 @@ public class SeedMergeService : BaseService, ISeedMergeService
                 StringComparer.OrdinalIgnoreCase);
 
             var colList = string.Join(", ", definition.Columns);
-            var paramNames = string.Join(", ", definition.Columns.Select((_, i) => $"${i + 1}"));
-            var insertSql = $"INSERT INTO {definition.TableName} ({colList}) VALUES ({paramNames})";
             var updateSets = string.Join(", ", definition.Columns.Select((c, i) => $"{c} = ${i + 1}"));
 
+            // 新行多行 VALUES 批插（分批 100 行，防参数数量超限）
+            var insertBatches = new List<List<Dictionary<string, object>>>();
             foreach (var row in seedRows)
             {
                 var key = GetBusinessKey(row, definition.BusinessKeyColumn);
                 if (existingKeys.Contains(key))
                 {
+                    // [批写豁免] UPDATE 保留逐行：字典种子为低频管理路径且体量小（几十行级），
+                    // 合成 UPDATE...FROM VALUES 需拼接动态列名，复杂度与回归风险高于收益
                     var allParams = GetColumnValues(definition, row).Append(key).Cast<object>().ToArray();
                     var sql = $"UPDATE {definition.TableName} SET {updateSets} WHERE \"{definition.BusinessKeyColumn}\" = ${definition.Columns.Count + 1}";
                     var updateResult = await _db.ExecuteNonQueryAsync(sql, ct, allParams);
-                    if (updateResult.IsSuccess) result.Updated++;
+                    // 写失败显式中止回滚（原实现静默跳过，种子会与定义漂移）；事务已开启，回滚安全
+                    if (updateResult.IsFailure)
+                        return Result.Failure<MergeResult>(updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            $"种子 UPDATE 失败: {updateResult.Message}");
+                    result.Updated++;
                 }
                 else
                 {
-                    var allParams = GetColumnValues(definition, row).ToArray();
-                    var insertResult = await _db.ExecuteNonQueryAsync(insertSql, ct, allParams);
-                    if (insertResult.IsSuccess) result.Inserted++;
+                    if (insertBatches.Count == 0 || insertBatches[^1].Count >= 100)
+                        insertBatches.Add(new List<Dictionary<string, object>>());
+                    insertBatches[^1].Add(row);
                 }
             }
 
-            foreach (var key in existingKeys)
+            foreach (var batch in insertBatches)
             {
-                if (!seedKeys.Contains(key))
-                {
-                    var deleteSql = $"DELETE FROM {definition.TableName} WHERE \"{definition.BusinessKeyColumn}\" = $1";
-                    var deleteResult = await _db.ExecuteNonQueryAsync(deleteSql, ct, (object)key);
-                    if (deleteResult.IsSuccess) result.Deleted++;
-                }
+                if (batch.Count == 0) continue;
+                var (valuesClause, args) = MultiRowValuesBuilder.Build(
+                    batch.Count,
+                    definition.Columns.Count,
+                    r => GetColumnValues(definition, batch[r]));
+                var batchSql = $"INSERT INTO {definition.TableName} ({colList}) VALUES {valuesClause}";
+                var insertResult = await _db.ExecuteNonQueryAsync(batchSql, ct, args);
+                if (insertResult.IsFailure)
+                    return Result.Failure<MergeResult>(insertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        $"种子 INSERT 失败: {insertResult.Message}");
+                result.Inserted += batch.Count;
+            }
+
+            // 残留键一次批删（原逐 key DELETE）
+            var staleKeys = existingKeys.Where(k => !seedKeys.Contains(k)).ToList();
+            if (staleKeys.Count > 0)
+            {
+                var deleteSql = $"DELETE FROM {definition.TableName} WHERE \"{definition.BusinessKeyColumn}\" = ANY($1)";
+                var deleteResult = await _db.ExecuteNonQueryAsync(deleteSql, ct, staleKeys.ToArray());
+                if (deleteResult.IsFailure)
+                    return Result.Failure<MergeResult>(deleteResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        $"种子 DELETE 失败: {deleteResult.Message}");
+                result.Deleted = staleKeys.Count;
             }
 
             await tx.CommitAsync(ct);

@@ -136,9 +136,11 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
 
         try
         {
-            using var engine = await CreateFilledEngineForRecordAsync(record, template, ct);
-            if (engine == null)
-                return Result.Failure<string>("ARCHIVE_DATA_INCOMPLETE", "构建打印数据失败");
+            var engineResult = await CreateFilledEngineForRecordAsync(record, template, ct);
+            if (engineResult.IsFailure)
+                return Result.Failure<string>(engineResult.ErrorCode, string.IsNullOrEmpty(engineResult.Message) ? "构建打印数据失败" : engineResult.Message);
+
+            using var engine = engineResult.Value;
 
             // 用 ExportPdfAsync 返回内存字节，避免碰输出目录的文件
             var pdfBytes = await engine.ExportPdfAsync(ct);
@@ -175,9 +177,11 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             OutputPathHelper.EnsureDirectoryExists(category, record.ArchiveName, record.ArchiveIdCard);
             TryDeleteFile(sourceFilePath);
 
-            using var engine = await CreateFilledEngineForRecordAsync(record, template, ct);
-            if (engine == null)
-                return Result.Failure<string>("ARCHIVE_DATA_INCOMPLETE", "构建打印数据失败");
+            var engineResult = await CreateFilledEngineForRecordAsync(record, template, ct);
+            if (engineResult.IsFailure)
+                return Result.Failure<string>(engineResult.ErrorCode, string.IsNullOrEmpty(engineResult.Message) ? "构建打印数据失败" : engineResult.Message);
+
+            using var engine = engineResult.Value;
 
             await engine.SaveToFileAsync(sourceFilePath, ct);
             if (printToPrinter)
@@ -232,12 +236,15 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                 OutputPathHelper.EnsureDirectoryExists(category, record.ArchiveName, record.ArchiveIdCard);
                 TryDeleteFile(sourceFilePath);
 
-                using var engine = await CreateFilledEngineForRecordAsync(record, template, ct);
-                if (engine == null)
+                var engineResult = await CreateFilledEngineForRecordAsync(record, template, ct);
+                if (engineResult.IsFailure)
                 {
-                    failedItems.Add((record.ArchiveName, "构建打印数据失败"));
+                    failedItems.Add((record.ArchiveName,
+                        string.IsNullOrEmpty(engineResult.Message) ? "构建打印数据失败" : engineResult.Message));
                     continue;
                 }
+
+                using var engine = engineResult.Value;
 
                 await engine.SaveToFileAsync(sourceFilePath, ct);
                 await engine.PrintFromFileAsync(sourceFilePath, 1, ct);
@@ -272,7 +279,12 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         return result.IsSuccess ? result.Value : null;
     }
 
-    private async Task<ITemplateEngine?> CreateFilledEngineForRecordAsync(AssetVerificationTask record, TemplateSelectItem template, CancellationToken ct)
+    /// <summary>
+    /// 构建填好的模板引擎。
+    /// Failure = 字段构建/模板配置解析失败（配置损坏时必须显式失败，禁止降级为空配置——否则占位符残留缺字）；
+    /// Success 恒返回非空引擎（调用方不再以 null 判失败）。
+    /// </summary>
+    private async Task<Result<ITemplateEngine>> CreateFilledEngineForRecordAsync(AssetVerificationTask record, TemplateSelectItem template, CancellationToken ct)
     {
         // 1. 查找户主
         var headRecord = await ResolveHeadRecordAsync(record, ct);
@@ -321,14 +333,26 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             ApplicationFields = appFields,
         };
 
-        // 6. 统一构建字段
-        var fields = await _fieldBuilder.BuildFieldsAsync(template.TemplateId, rawData, ct);
+        // 6. 统一构建字段（模板配置解析失败 → 显式 Failure，不降级）
+        var fieldsResult = await _fieldBuilder.BuildFieldsAsync(template.TemplateId, rawData, ct);
+        if (fieldsResult.IsFailure)
+            return Result<ITemplateEngine>.Failure(
+                fieldsResult.ErrorCode,
+                string.IsNullOrEmpty(fieldsResult.Message) ? "构建打印数据失败" : fieldsResult.Message);
+        var fields = fieldsResult.Value;
 
-        // 7. 创建引擎并填充
+        // 7. 取模板配置（先于引擎创建，失败时不留下未释放的引擎实例）
+        var configResult = await GetTemplateConfigAsync(template.TemplateId, ct);
+        if (configResult.IsFailure)
+            return Result<ITemplateEngine>.Failure(
+                configResult.ErrorCode,
+                string.IsNullOrEmpty(configResult.Message) ? "模板配置不存在或解析失败" : configResult.Message);
+        var config = configResult.Value;
+
+        // 8. 创建引擎并填充
         var engine = await _engineFactory.CreateFromTemplateIdAsync(template.TemplateId, ct);
         engine.IsDuplex = true;
 
-        var config = await GetTemplateConfigAsync(template.TemplateId, ct);
         if (config != null)
         {
             var placeholderFields = MapFieldsToPlaceholders(fields, config.Fields, config.IndexShifts);
@@ -347,7 +371,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             engine.ReplaceFields(fields);
         }
 
-        return engine;
+        return Result<ITemplateEngine>.Success(engine);
     }
 
     /// <summary>加载同户所有家庭成员（与快速核查 GetHistoryByIdCardAsync 逻辑一致）</summary>
@@ -513,20 +537,31 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
-    private async Task<TemplateConfig?> GetTemplateConfigAsync(long templateId, CancellationToken ct)
+    /// <summary>
+    /// Success(null) = 模板未配置 ConfigJson（走裸字段替换，属正常形态）；
+    /// Failure = ConfigJson 解析失败（配置损坏），必须显式失败——降级会打印出占位符残留/缺字。
+    /// </summary>
+    private async Task<Result<TemplateConfig?>> GetTemplateConfigAsync(long templateId, CancellationToken ct)
     {
         try
         {
-            var template = await _templateService.GetByIdAsync(templateId, ct);
+            var templateResult = await _templateService.GetByIdAsync(templateId, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<TemplateConfig?>(
+                    templateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"读取模板失败: TemplateId={templateId}, {templateResult.Message}");
+            var template = templateResult.Value;
             if (template == null || string.IsNullOrEmpty(template.ConfigJson))
-                return null;
-            return TemplateConfig.FromJson(template.ConfigJson);
+                return Result.Success<TemplateConfig?>(null);
+
+            return Result.Success<TemplateConfig?>(TemplateConfig.FromJson(template.ConfigJson));
         }
         catch (Exception ex)
         {
-            // 解析失败降级为原始全量替换（与 PrintService 策略对齐），必须留日志定位打印错位
             _logger.LogError(ex, "补打-模板配置解析失败 TemplateId=" + templateId);
-            return null;
+            return Result.Failure<TemplateConfig?>(
+                ErrorCodes.FILE_FORMAT_ERROR,
+                $"模板配置解析失败: TemplateId={templateId}");
         }
     }
 

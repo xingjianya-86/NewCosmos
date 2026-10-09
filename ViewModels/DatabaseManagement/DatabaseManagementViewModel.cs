@@ -11,6 +11,8 @@ using NewCosmos.Services.System;
 using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+
 
 namespace NewCosmos.ViewModels.DatabaseManagement;
 
@@ -41,6 +43,44 @@ public partial class DatabaseManagementViewModel : ViewModelBase
     private bool _isDatabaseHealthy;
 
     #endregion
+
+    #region 表大小列表视图（A-1：首屏只渲染前 12 张，134 行一次性 realize 会卡住 UI 线程 0.6-1.6s）
+
+    /// <summary>首屏渲染的表数量上限（超出部分由"显示全部"按需展开）</summary>
+    private const int DefaultVisibleTableCount = 12;
+
+    /// <summary>实际渲染给 CollectionView 的表大小列表（TableSizes 保持为全量数据源）</summary>
+    public ObservableCollection<TableSizeInfo> VisibleTableSizes { get; } = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMoreTables))]
+    [NotifyPropertyChangedFor(nameof(TablesToggleText))]
+    private bool _showAllTables;
+
+    public bool HasMoreTables => TableSizes.Count > DefaultVisibleTableCount;
+
+    public string TablesToggleText => ShowAllTables
+        ? "收起"
+        : $"显示全部 {TableSizes.Count} 张表";
+
+    partial void OnShowAllTablesChanged(bool value) => ApplyTableSizeView();
+
+    [RelayCommand]
+    private void ToggleShowAllTables() => ShowAllTables = !ShowAllTables;
+
+    /// <summary>把全量 TableSizes 投影到 VisibleTableSizes；改动 TableSizes 后必须调用</summary>
+    private void ApplyTableSizeView()
+    {
+        VisibleTableSizes.Clear();
+        foreach (var table in ShowAllTables ? TableSizes : TableSizes.Take(DefaultVisibleTableCount))
+            VisibleTableSizes.Add(table);
+
+        OnPropertyChanged(nameof(HasMoreTables));
+        OnPropertyChanged(nameof(TablesToggleText));
+    }
+
+    #endregion
+
 
     #region 备份管理
 
@@ -134,23 +174,23 @@ public partial class DatabaseManagementViewModel : ViewModelBase
 
     /// <summary>加载客户端版本台账（登录后自动上报的记录）</summary>
     [RelayCommand]
-    private async Task LoadClientVersionsAsync()
-    {
-        await ExecuteAsync(async ct =>
-        {
-            var result = await _clientVersionService.GetListAsync(ct);
-            if (result.IsFailure)
-            {
-                ClientVersionSummary = $"加载失败：{result.Message}";
-                return;
-            }
+    private Task LoadClientVersionsAsync() => ExecuteAsync(LoadClientVersionsCoreAsync, "加载客户端版本...");
 
-            ClientVersions.Clear();
-            foreach (var row in result.Value)
-                ClientVersions.Add(row);
-            ApplyClientVersionFilter();
-        }, "加载客户端版本...");
+    private async Task LoadClientVersionsCoreAsync(CancellationToken ct)
+    {
+        var result = await _clientVersionService.GetListAsync(ct);
+        if (result.IsFailure)
+        {
+            ClientVersionSummary = $"加载失败：{result.Message}";
+            return;
+        }
+
+        ClientVersions.Clear();
+        foreach (var row in result.Value)
+            ClientVersions.Add(row);
+        ApplyClientVersionFilter();
     }
+
 
     private void ApplyClientVersionFilter()
     {
@@ -197,19 +237,62 @@ public partial class DatabaseManagementViewModel : ViewModelBase
     protected override ILoggerService Logger => _logger;
     #endregion
 
+    /// <summary>四段数据上次完整加载时间（A-2：返回本页在刷新节拍内不重跑，节拍见 performance.ini DataCenterReloadSeconds）</summary>
+    private DateTime _lastLoadedAt = DateTime.MinValue;
+
+    /// <summary>
+    /// 页面可见后异步执行权限检查 + 四段加载（C 组）。
+    /// 旧实现是 code-behind 在 OnAppearing 里 await——跨网络单查询 0.6-1.4s 时
+    /// PushAsync 会一直等到加载完成才结束，页面表现就是"点击后迟迟不出现"（实测子页 1.5s）。
+    /// </summary>
+    public void StartLoadingInBackground() => SafeFireAndForget(async () =>
+    {
+        await InitializePermissionsAsync(App.CurrentUserId ?? 1);
+        await OnAppearingAsync();
+    }, nameof(StartLoadingInBackground));
+
     public override async Task OnAppearingAsync()
     {
-        await LoadDatabaseStatusAsync();
-        await LoadBackupFilesAsync();
-        await LoadSchemaStatusAsync();
-        await LoadClientVersionsAsync();
+        var reloadSeconds = _configService.GetPerformanceOptions().DataCenterReloadSeconds;
+        if (reloadSeconds > 0 && DateTime.Now - _lastLoadedAt < TimeSpan.FromSeconds(reloadSeconds))
+        {
+            // [PERF-PROBE] 返回本页在刷新节拍内：直接复用上次数据，不重跑四段加载
+            _logger.LogPerf("数据中心-OnAppearing", 0, ("SkippedWithinSeconds", reloadSeconds));
+            return;
+        }
+
+        // A-2：四段互不依赖——串行时总耗时=各段之和（跨网络往返线性叠加），并行后≈最长段
+        // [PERF-PROBE] 分段计时保留，用于修复前后对比
+        var total = Stopwatch.StartNew();
+        await ExecuteAsync(async ct =>
+        {
+            await Task.WhenAll(
+                MeasureStageAsync("数据库状态", () => LoadDatabaseStatusCoreAsync(ct)),
+                MeasureStageAsync("备份文件", () => LoadBackupFilesCoreAsync(ct)),
+                MeasureStageAsync("Schema状态", () => LoadSchemaStatusCoreAsync(ct)),
+                MeasureStageAsync("客户端版本", () => LoadClientVersionsCoreAsync(ct)));
+        }, "加载数据库状态...");
+        total.Stop();
+        _lastLoadedAt = DateTime.Now;
+        _logger.LogPerf("数据中心-OnAppearing", total.Elapsed.TotalMilliseconds, ("Mode", "并行"));
     }
+
+    private async Task MeasureStageAsync(string stage, Func<Task> load)
+    {
+        var sw = Stopwatch.StartNew();
+        await load();
+        sw.Stop();
+        _logger.LogPerf("数据中心-阶段加载", sw.Elapsed.TotalMilliseconds, ("Stage", stage));
+    }
+
 
     public async Task InitializePermissionsAsync(int userId)
     {
         _currentUserId = userId;
         if (_currentUserId <= 0) return;
 
+        // [PERF-PROBE] 阶段0归因埋点：进入页面前的权限查询（缓存命中时仅版本比对，跨网络时仍可能是 1 次往返）
+        var probe = Stopwatch.StartNew();
         try
         {
             CanBackupDatabase = await _permissionService.HasPermissionAsync(_currentUserId, PermissionCodes.SYSTEM_BACKUP);
@@ -221,68 +304,94 @@ public partial class DatabaseManagementViewModel : ViewModelBase
         {
             _logger.Error($"权限检查失败: {ex.Message}");
         }
+        finally
+        {
+            probe.Stop();
+            _logger.LogPerf("数据中心-权限初始化", probe.Elapsed.TotalMilliseconds, ("UserId", _currentUserId));
+        }
     }
+
 
     #region 数据库状态
 
     [RelayCommand]
-    private async Task LoadDatabaseStatusAsync()
+    private Task LoadDatabaseStatusAsync() => ExecuteAsync(LoadDatabaseStatusCoreAsync, "加载数据库状态...");
+
+    private async Task LoadDatabaseStatusCoreAsync(CancellationToken ct)
     {
-        await ExecuteAsync(async ct =>
+        _logger.LogBusiness("加载数据库状态");
+
+        // 三个服务调用互不依赖：并行执行（跨网络时串行=3次往返叠加）
+        // [PERF-PROBE] 各调用独立计时，与修复前的串行数据对比
+        var swStatus = Stopwatch.StartNew();
+        var statusTask = _dbManagementService.GetDatabaseStatusAsync(ct);
+        var swStats = Stopwatch.StartNew();
+        var statsTask = _dbManagementService.GetDatabaseStatisticsAsync(ct);
+        var swTables = Stopwatch.StartNew();
+        var tablesTask = _dbManagementService.GetTableSizesAsync(ct);
+
+        await Task.WhenAll(statusTask, statsTask, tablesTask);
+        swStatus.Stop();
+        swStats.Stop();
+        swTables.Stop();
+
+        _logger.LogPerf("数据中心-子查询", swStatus.Elapsed.TotalMilliseconds, ("Part", "GetDatabaseStatus"));
+        _logger.LogPerf("数据中心-子查询", swStats.Elapsed.TotalMilliseconds, ("Part", "GetDatabaseStatistics"));
+        _logger.LogPerf("数据中心-子查询", swTables.Elapsed.TotalMilliseconds, ("Part", "GetTableSizes"));
+
+        var statusResult = await statusTask;
+        var statsResult = await statsTask;
+        var tablesResult = await tablesTask;
+
+        if (statusResult.IsSuccess)
         {
-            _logger.LogBusiness("加载数据库状态");
+            DatabaseStatus = statusResult.Value;
+            IsDatabaseHealthy = statusResult.Value.IsConnected;
+        }
 
-            var statusResult = await _dbManagementService.GetDatabaseStatusAsync(ct);
-            if (statusResult.IsSuccess)
+        if (statsResult.IsSuccess)
+        {
+            DatabaseStatistics = statsResult.Value;
+        }
+
+        if (tablesResult.IsSuccess && tablesResult.Value is not null)
+        {
+            TableSizes.Clear();
+            foreach (var table in tablesResult.Value)
             {
-                DatabaseStatus = statusResult.Value;
-                IsDatabaseHealthy = statusResult.Value.IsConnected;
+                TableSizes.Add(table);
             }
+            ApplyTableSizeView();
+        }
 
-            var statsResult = await _dbManagementService.GetDatabaseStatisticsAsync(ct);
-            if (statsResult.IsSuccess)
-            {
-                DatabaseStatistics = statsResult.Value;
-            }
-
-            var tablesResult = await _dbManagementService.GetTableSizesAsync(ct);
-            if (tablesResult.IsSuccess && tablesResult.Value is not null)
-            {
-                TableSizes.Clear();
-                foreach (var table in tablesResult.Value)
-                {
-                    TableSizes.Add(table);
-                }
-            }
-
-            _logger.LogBusiness("数据库状态加载完成");
-        }, "加载数据库状态...");
+        _logger.LogBusiness("数据库状态加载完成");
     }
+
 
     #endregion
 
     #region 备份管理
 
     [RelayCommand]
-    private async Task LoadBackupFilesAsync()
+    private Task LoadBackupFilesAsync() => ExecuteAsync(LoadBackupFilesCoreAsync, "加载备份文件...");
+
+    private async Task LoadBackupFilesCoreAsync(CancellationToken ct)
     {
-        await ExecuteAsync(async ct =>
+        _logger.LogBusiness("加载备份文件列表");
+
+        var result = await _dbManagementService.GetBackupFilesAsync(ct);
+        if (result.IsSuccess && result.Value is not null)
         {
-            _logger.LogBusiness("加载备份文件列表");
-
-            var result = await _dbManagementService.GetBackupFilesAsync(ct);
-            if (result.IsSuccess && result.Value is not null)
+            BackupFiles.Clear();
+            foreach (var file in result.Value)
             {
-                BackupFiles.Clear();
-                foreach (var file in result.Value)
-                {
-                    BackupFiles.Add(file);
-                }
+                BackupFiles.Add(file);
             }
+        }
 
-            _logger.LogBusiness($"找到 {BackupFiles.Count} 个备份文件");
-        }, "加载备份文件...");
+        _logger.LogBusiness($"找到 {BackupFiles.Count} 个备份文件");
     }
+
 
     [RelayCommand(CanExecute = nameof(CanExecuteBackup))]
     private async Task BackupDatabaseAsync()
@@ -468,40 +577,40 @@ public partial class DatabaseManagementViewModel : ViewModelBase
     #region Schema 初始化
 
     [RelayCommand]
-    private async Task LoadSchemaStatusAsync()
+    private Task LoadSchemaStatusAsync() => ExecuteAsync(LoadSchemaStatusCoreAsync, "检查Schema状态...");
+
+    private async Task LoadSchemaStatusCoreAsync(CancellationToken ct)
     {
-        await ExecuteAsync(async ct =>
+        _logger.LogBusiness("检查Schema状态");
+
+        var result = await _schemaService.GetSchemaStatusAsync(ct);
+        if (result.IsSuccess && result.Value != null)
         {
-            _logger.LogBusiness("检查Schema状态");
+            SchemaStatus = result.Value;
+            CanInitializeSchema = result.Value.HasMissingTables;
+            CanFixSchema = result.Value.HasMissingColumns;
+            OnPropertyChanged(nameof(SchemaStatusText));
+            OnPropertyChanged(nameof(SchemaStatusColor));
+            OnPropertyChanged(nameof(SchemaStatusIcon));
+            OnPropertyChanged(nameof(SchemaStatusSummary));
+            OnPropertyChanged(nameof(HasMissingColumns));
+            OnPropertyChanged(nameof(HasMissingTables));
+            OnPropertyChanged(nameof(SchemaMissingColumnsSummary));
+            OnPropertyChanged(nameof(SchemaMissingTablesSummary));
 
-            var result = await _schemaService.GetSchemaStatusAsync(ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.Value.HasMissingColumns)
             {
-                SchemaStatus = result.Value;
-                CanInitializeSchema = result.Value.HasMissingTables;
-                CanFixSchema = result.Value.HasMissingColumns;
-                OnPropertyChanged(nameof(SchemaStatusText));
-                OnPropertyChanged(nameof(SchemaStatusColor));
-                OnPropertyChanged(nameof(SchemaStatusIcon));
-                OnPropertyChanged(nameof(SchemaStatusSummary));
-                OnPropertyChanged(nameof(HasMissingColumns));
-                OnPropertyChanged(nameof(HasMissingTables));
-                OnPropertyChanged(nameof(SchemaMissingColumnsSummary));
-                OnPropertyChanged(nameof(SchemaMissingTablesSummary));
-
-                if (result.Value.HasMissingColumns)
-                {
-                    _logger.Warn($"Schema列级验证: 发现 {result.Value.TotalMissingColumns} 个缺失列");
-                }
-                if (result.Value.HasMissingTables)
-                {
-                    _logger.Warn($"Schema表级验证: 发现 {result.Value.TotalMissingTables} 个缺失表 [{string.Join(", ", result.Value.MissingTables)}]");
-                }
-
-                _logger.LogBusiness($"Schema状态: {result.Value.StatusText} | {result.Value.StatusSummary}");
+                _logger.Warn($"Schema列级验证: 发现 {result.Value.TotalMissingColumns} 个缺失列");
             }
-        }, "检查Schema状态...");
+            if (result.Value.HasMissingTables)
+            {
+                _logger.Warn($"Schema表级验证: 发现 {result.Value.TotalMissingTables} 个缺失表 [{string.Join(", ", result.Value.MissingTables)}]");
+            }
+
+            _logger.LogBusiness($"Schema状态: {result.Value.StatusText} | {result.Value.StatusSummary}");
+        }
     }
+
 
     [RelayCommand]
     private async Task InitializeSchemaAsync()
@@ -598,10 +707,25 @@ public partial class DatabaseManagementViewModel : ViewModelBase
     {
         try
         {
+            // [PERF-PROBE] 阶段0归因埋点：分"DI解析+XAML膨胀"与"PushAsync(含动画)"两段计时；
+            // HostBusy/HostLoading 记录点击瞬间本页是否仍在加载，用于验证"上一页占用 UI 线程导致 push 排队"假设
+            var hostBusy = IsBusy;
+            var hostLoading = LoadingMessage;
+
+            var probe = Stopwatch.StartNew();
             var page = _serviceProvider.GetRequiredService<T>();
             _serviceProvider.GetRequiredService<IWindowTitleService>()?.Register(page);
+            probe.Stop();
+            _logger.LogPerf("导航-页面构造", probe.Elapsed.TotalMilliseconds,
+                ("Page", typeof(T).Name), ("HostBusy", hostBusy), ("HostLoading", hostLoading));
+
+            probe.Restart();
             await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
+            probe.Stop();
+            _logger.LogPerf("导航-PushAsync", probe.Elapsed.TotalMilliseconds,
+                ("Page", typeof(T).Name), ("HostBusy", hostBusy));
         }
+
         catch (Exception ex)
         {
             _logger.Error($"Navigation to {typeof(T).Name} failed: {ex.Message}");

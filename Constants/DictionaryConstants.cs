@@ -247,16 +247,6 @@ public static class DictionaryConstants
     }
 
     /// <summary>
-    /// 土地默认单价（元/亩）
-    /// </summary>
-    public static class LandDefaultPrice
-    {
-        public const decimal SELF_FARM = 800m;
-        public const decimal SUBLEASE = 600m;
-        public const decimal CONTRACT = 500m;
-    }
-
-    /// <summary>
     /// 补贴类型
     /// </summary>
     public static class SubsidyType

@@ -145,25 +145,29 @@ public class RegionService : BaseService, IRegionService
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_cities"), ("Operation", "RegionService.InitializeFromSeed"));
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_cities", ct);
             ReportProgress(progress, 3, totalSteps, "导入地级市数据");
-            var cities = LoadCitiesFromYaml();
-            if (cities != null && cities.Count > 0)
+            var citiesResult = LoadCitiesFromYaml();
+            if (citiesResult.IsFailure)
             {
-                foreach (var city in cities)
-                {
-                    await InsertCityAsync(city, ct);
-                }
+                await tx.RollbackAsync(ct);
+                LogError("加载地级市数据失败，初始化已回滚");
+                return citiesResult;
+            }
+            foreach (var city in citiesResult.Value)
+            {
+                await InsertCityAsync(city, ct);
             }
             ReportProgress(progress, 4, totalSteps, "清空县区表");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_counties"), ("Operation", "RegionService.InitializeFromSeed"));
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_counties", ct);
             ReportProgress(progress, 5, totalSteps, "导入县区数据");
-            var counties = LoadCountiesFromYaml();
-            if (counties == null || counties.Count == 0)
+            var countiesResult = LoadCountiesFromYaml();
+            if (countiesResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
                 LogError("加载县区数据失败");
-                return Result.Failure(ErrorCodes.FILE_NOT_FOUND, "县区数据文件未找到");
+                return countiesResult;
             }
+            var counties = countiesResult.Value;
             foreach (var county in counties)
             {
                 await InsertCountyAsync(county, ct);
@@ -172,28 +176,41 @@ public class RegionService : BaseService, IRegionService
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_towns"), ("Operation", "RegionService.InitializeFromSeed"));
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_towns", ct);
             ReportProgress(progress, 7, totalSteps, "导入乡镇数据");
-            var towns = LoadTownsFromYaml();
-            if (towns != null && towns.Count > 0)
+            var townsResult = LoadTownsFromYaml();
+            if (townsResult.IsFailure)
             {
-                foreach (var town in towns)
-                {
-                    await InsertTownAsync(town, ct);
-                }
+                await tx.RollbackAsync(ct);
+                LogError("加载乡镇数据失败，初始化已回滚");
+                return townsResult;
+            }
+            var towns = townsResult.Value;
+            foreach (var town in towns)
+            {
+                await InsertTownAsync(town, ct);
             }
             ReportProgress(progress, 8, totalSteps, "清空村/社区表");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_villages"), ("Operation", "RegionService.InitializeFromSeed"));
             await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_villages", ct);
             ReportProgress(progress, 9, totalSteps, "导入村/社区数据");
-            var villagesCount = 0;
-            var villages = LoadVillagesFromCsv();
-            if (villages != null && villages.Count > 0)
+            var villagesResult = LoadVillagesFromCsv();
+            if (villagesResult.IsFailure)
             {
-                villagesCount = await BulkInsertVillagesAsync(villages, ct);
+                await tx.RollbackAsync(ct);
+                LogError("加载村/社区数据失败，初始化已回滚");
+                return villagesResult;
             }
+            var villagesCountResult = await BulkInsertVillagesAsync(villagesResult.Value, ct);
+            if (villagesCountResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                LogError("导入村/社区数据失败，初始化已回滚");
+                return Result.Failure(villagesCountResult.ErrorCode!, villagesCountResult.Message!);
+            }
+            var villagesCount = villagesCountResult.Value;
             ReportProgress(progress, 10, totalSteps, "提交事务");
             await tx.CommitAsync(ct);
             InvalidateRegionCaches();
-            LogInfo($"地区数据初始化完成: 县区{counties.Count}个, 乡镇{towns?.Count ?? 0}个, 村/社区{villagesCount}个");
+            LogInfo($"地区数据初始化完成: 县区{counties.Count}个, 乡镇{towns.Count}个, 村/社区{villagesCount}个");
             return Result.Success();
         }
         catch (Exception ex)
@@ -993,58 +1010,94 @@ public class RegionService : BaseService, IRegionService
 
     private const int VILLAGE_BATCH_SIZE = 500;
 
-    private List<VillageCsvRecord>? LoadVillagesFromCsv()
+    /// <summary>
+    /// 加载村/社区CSV种子。
+    /// 文件缺失 / 无有效行 / 读取解析异常一律返回显式 Failure——
+    /// 调用方在导入前已 TRUNCATE 目标表，若把失败当"无数据"继续，会提交出空表（静默清空真实数据）。
+    /// </summary>
+    private Result<List<VillageCsvRecord>> LoadVillagesFromCsv()
     {
         try
         {
             var csvPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Seed", "regions", "villages.csv");
-            
-            if (!File.Exists(csvPath))
+            Stream? stream;
+            string source;
+
+            if (File.Exists(csvPath))
             {
-                LogWarn($"未找到村/社区CSV文件: {csvPath}");
-                return null;
+                stream = File.OpenRead(csvPath);
+                source = csvPath;
+                LogInfo($"从文件系统加载村/社区数据: {csvPath}");
             }
-
-            LogInfo($"从文件系统加载村/社区数据: {csvPath}");
-            
-            using var reader = new StreamReader(csvPath, Encoding.UTF8);
-            var villages = new List<VillageCsvRecord>();
-
-            reader.ReadLine(); // 跳过表头
-
-            string? line;
-            while ((line = reader.ReadLine()) != null)
+            else
             {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                var parts = line.Split(',');
-                if (parts.Length < 3) continue;
-
-                villages.Add(new VillageCsvRecord
+                // Android 不复制输出目录，CSV 以 EmbeddedResource 打进程序集（csproj android 条件项），
+                // 资源名规则与 cities.yaml 等 yaml 种子一致
+                var resourceName = "NewCosmos.Resources.Seed.regions.villages.csv";
+                stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+                if (stream == null)
                 {
-                    VillageCode = parts[0],
-                    VillageName = parts[1],
-                    StreetCode = parts[2]
-                });
+                    LogError($"未找到村/社区CSV文件: {csvPath}；嵌入资源 {resourceName} 亦不存在");
+                    return Result.Failure<List<VillageCsvRecord>>(
+                        ErrorCodes.FILE_NOT_FOUND, "未找到村/社区数据文件(villages.csv)，初始化中止");
+                }
+                source = $"嵌入资源 {resourceName}";
+                LogInfo($"从嵌入资源加载村/社区数据: {resourceName}");
             }
 
-            LogInfo($"从CSV加载村/社区数据: {villages.Count}条");
-            return villages;
+            using (stream)
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
+            {
+                var villages = new List<VillageCsvRecord>();
+
+                reader.ReadLine(); // 跳过表头
+
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    var parts = line.Split(',');
+                    if (parts.Length < 3) continue;
+
+                    villages.Add(new VillageCsvRecord
+                    {
+                        VillageCode = parts[0],
+                        VillageName = parts[1],
+                        StreetCode = parts[2]
+                    });
+                }
+
+                if (villages.Count == 0)
+                {
+                    LogError($"村/社区CSV无有效数据: {source}");
+                    return Result.Failure<List<VillageCsvRecord>>(
+                        ErrorCodes.FILE_FORMAT_ERROR, "村/社区数据文件无有效数据，初始化中止");
+                }
+
+                LogInfo($"从CSV加载村/社区数据: {villages.Count}条（{source}）");
+                return Result.Success(villages);
+            }
         }
         catch (Exception ex)
         {
             LogError($"加载村/社区CSV失败: {ex.Message}");
-            return null;
+            return Result.Failure<List<VillageCsvRecord>>(
+                ErrorCodes.FILE_READ_ERROR, $"加载村/社区数据失败: {ex.Message}");
         }
     }
 
-    private async Task<int> BulkInsertVillagesAsync(List<VillageCsvRecord> villages, CancellationToken ct)
+    private async Task<Result<int>> BulkInsertVillagesAsync(List<VillageCsvRecord> villages, CancellationToken ct)
     {
-        var townMap = await LoadTownCodeToIdMapAsync(ct);
+        var townMapResult = await LoadTownCodeToIdMapAsync(ct);
+        if (townMapResult.IsFailure)
+            return Result.Failure<int>(townMapResult.ErrorCode!, townMapResult.Message!);
+        var townMap = townMapResult.Value;
         if (townMap.Count == 0)
         {
-            LogWarn("乡镇编码映射为空，跳过村/社区导入");
-            return 0;
+            // 乡镇数据在同一事务中刚导入完成，映射仍为空 = 种子数据异常（此前静默跳过会白导入 847KB 村数据）
+            LogError("乡镇编码映射为空，村/社区导入中止");
+            return Result.Failure<int>(ErrorCodes.DB_QUERY_ERROR, "乡镇编码映射为空，无法导入村/社区数据");
         }
 
         var startId = await GetNextVillageIdAsync(ct);
@@ -1071,7 +1124,7 @@ public class RegionService : BaseService, IRegionService
         }
 
         LogInfo($"村/社区批量导入完成: {totalInserted}条");
-        return totalInserted;
+        return Result.Success(totalInserted);
     }
 
     private async Task<int> InsertVillageBatchAsync(List<(int TownId, string Name, string Code, string Type, int SortOrder, bool IsActive)> batch, int startId, CancellationToken ct)
@@ -1097,16 +1150,21 @@ public class RegionService : BaseService, IRegionService
                   string.Join(", ", valueClauses);
 
         var result = await _dbService.ExecuteNonQueryAsync(sql, ct, paramValues.ToArray());
-        return result.IsSuccess ? batch.Count : 0;
+        // 批插入失败必须抛出（原实现返回 0 被上层当"插入 0 行"继续，静默漏批且事务照常提交）
+        if (result.IsFailure)
+            throw new InvalidOperationException($"村/社区批次插入失败: {result.Message}");
+        return batch.Count;
     }
 
-    private async Task<Dictionary<string, int>> LoadTownCodeToIdMapAsync(CancellationToken ct)
+    private async Task<Result<Dictionary<string, int>>> LoadTownCodeToIdMapAsync(CancellationToken ct)
     {
         var sql = "SELECT id, town_code FROM nc_regions_towns WHERE town_code IS NOT NULL AND is_active = true";
         var result = await _dbService.QueryAsync<RegionTown>(sql, ct);
-        if (result.IsFailure || result.Value is null) return new Dictionary<string, int>();
+        // 查询失败显式上抛（原实现返回空字典，BulkInsert 会把失败当"乡镇表为空"静默跳过村导入）
+        if (result.IsFailure)
+            return Result.Failure<Dictionary<string, int>>(result.ErrorCode!, result.Message!);
 
-        return result.Value.ToDictionary(t => t.TownCode!, t => t.Id);
+        return Result.Success((result.Value ?? new List<RegionTown>()).ToDictionary(t => t.TownCode!, t => t.Id));
     }
 
     private static string DetermineVillageType(string name)
@@ -1128,7 +1186,11 @@ public class RegionService : BaseService, IRegionService
 
     #region 种子数据加载
 
-    private List<RegionCity>? LoadCitiesFromYaml()
+    /// <summary>
+    /// 加载地级市YAML种子。资源缺失 / 数据为空 / 解析异常 → 显式 Failure
+    /// （调用方在导入前已 TRUNCATE，失败必须回滚，禁止当"无数据"继续提交空表）。
+    /// </summary>
+    private Result<List<RegionCity>> LoadCitiesFromYaml()
     {
         try
         {
@@ -1137,8 +1199,8 @@ public class RegionService : BaseService, IRegionService
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                LogWarn("未找到地级市YAML资源文件");
-                return null;
+                LogError("未找到地级市YAML资源文件");
+                return Result.Failure<List<RegionCity>>(ErrorCodes.FILE_NOT_FOUND, "未找到地级市种子数据文件，初始化中止");
             }
             using var reader = new StreamReader(stream);
             var yaml = reader.ReadToEnd();
@@ -1147,19 +1209,25 @@ public class RegionService : BaseService, IRegionService
                 .IgnoreUnmatchedProperties()
                 .Build();
             var data = deserializer.Deserialize<RegionCityYaml>(yaml);
-            return data.Tables[0].Data.Select(c => new RegionCity
+            if (data?.Tables == null || data.Tables.Count == 0 || data.Tables[0].Data == null)
+            {
+                LogError("地级市YAML数据为空");
+                return Result.Failure<List<RegionCity>>(ErrorCodes.FILE_FORMAT_ERROR, "地级市种子数据为空，初始化中止");
+            }
+
+            return Result.Success(data.Tables[0].Data.Select(c => new RegionCity
             {
                 Id = c.Id,
                 CityName = c.CityName ?? string.Empty,
                 CityCode = c.CityCode,
                 SortOrder = c.SortOrder,
                 IsActive = c.IsActive
-            }).ToList();
+            }).ToList());
         }
         catch (Exception ex)
         {
             LogError($"加载地级市YAML失败: {ex.Message}");
-            return null;
+            return Result.Failure<List<RegionCity>>(ErrorCodes.FILE_FORMAT_ERROR, $"加载地级市数据失败: {ex.Message}");
         }
     }
 
@@ -1176,7 +1244,10 @@ public class RegionService : BaseService, IRegionService
         }
     }
 
-    private List<RegionCounty>? LoadCountiesFromYaml()
+    /// <summary>
+    /// 加载县区YAML种子。资源缺失 / 数据为空 / 解析异常 → 显式 Failure（禁止当"无数据"继续清空提交）。
+    /// </summary>
+    private Result<List<RegionCounty>> LoadCountiesFromYaml()
     {
         try
         {
@@ -1186,8 +1257,8 @@ public class RegionService : BaseService, IRegionService
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                LogWarn("未找到县区YAML资源文件");
-                return null;
+                LogError("未找到县区YAML资源文件");
+                return Result.Failure<List<RegionCounty>>(ErrorCodes.FILE_NOT_FOUND, "未找到县区种子数据文件，初始化中止");
             }
 
             using var reader = new StreamReader(stream);
@@ -1198,10 +1269,13 @@ public class RegionService : BaseService, IRegionService
                 .Build();
 
             var data = deserializer.Deserialize<RegionCountyYaml>(yaml);
-            if (data.Tables == null || data.Tables.Count == 0 || data.Tables[0].Data == null)
-                return null;
+            if (data?.Tables == null || data.Tables.Count == 0 || data.Tables[0].Data == null)
+            {
+                LogError("县区YAML数据为空");
+                return Result.Failure<List<RegionCounty>>(ErrorCodes.FILE_NOT_FOUND, "县区数据文件未找到或数据为空");
+            }
 
-            return data.Tables[0].Data.Select(c => new RegionCounty
+            return Result.Success(data.Tables[0].Data.Select(c => new RegionCounty
             {
                 Id = c.Id,
                 CountyName = c.CountyName ?? string.Empty,
@@ -1209,16 +1283,19 @@ public class RegionService : BaseService, IRegionService
                 CityName = c.CityName,
                 SortOrder = c.SortOrder,
                 IsActive = c.IsActive
-            }).ToList();
+            }).ToList());
         }
         catch (Exception ex)
         {
             LogError($"加载县区YAML失败: {ex.Message}");
-            return null;
+            return Result.Failure<List<RegionCounty>>(ErrorCodes.FILE_FORMAT_ERROR, $"加载县区数据失败: {ex.Message}");
         }
     }
 
-    private List<RegionTown>? LoadTownsFromYaml()
+    /// <summary>
+    /// 加载乡镇YAML种子。资源缺失 / 数据为空 / 解析异常 → 显式 Failure（禁止当"无数据"继续清空提交）。
+    /// </summary>
+    private Result<List<RegionTown>> LoadTownsFromYaml()
     {
         try
         {
@@ -1228,8 +1305,8 @@ public class RegionService : BaseService, IRegionService
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                LogWarn("未找到乡镇YAML资源文件");
-                return null;
+                LogError("未找到乡镇YAML资源文件");
+                return Result.Failure<List<RegionTown>>(ErrorCodes.FILE_NOT_FOUND, "未找到乡镇种子数据文件，初始化中止");
             }
 
             using var reader = new StreamReader(stream);
@@ -1240,10 +1317,13 @@ public class RegionService : BaseService, IRegionService
                 .Build();
 
             var data = deserializer.Deserialize<RegionTownYaml>(yaml);
-            if (data.Tables == null || data.Tables.Count == 0 || data.Tables[0].Data == null)
-                return null;
+            if (data?.Tables == null || data.Tables.Count == 0 || data.Tables[0].Data == null)
+            {
+                LogError("乡镇YAML数据为空");
+                return Result.Failure<List<RegionTown>>(ErrorCodes.FILE_FORMAT_ERROR, "乡镇种子数据为空，初始化中止");
+            }
 
-            return data.Tables[0].Data.Select(t => new RegionTown
+            return Result.Success(data.Tables[0].Data.Select(t => new RegionTown
             {
                 Id = t.Id,
                 CountyId = t.CountyId,
@@ -1252,12 +1332,12 @@ public class RegionService : BaseService, IRegionService
                 TownType = t.TownType,
                 SortOrder = t.SortOrder,
                 IsActive = t.IsActive
-            }).ToList();
+            }).ToList());
         }
         catch (Exception ex)
         {
             LogError($"加载乡镇YAML失败: {ex.Message}");
-            return null;
+            return Result.Failure<List<RegionTown>>(ErrorCodes.FILE_FORMAT_ERROR, $"加载乡镇数据失败: {ex.Message}");
         }
     }
 

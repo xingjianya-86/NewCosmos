@@ -30,17 +30,19 @@ public partial class ElderlyApplicationFormPage : ContentPage, IParameterizedPag
     /// <summary>导航参数入口（接口显式实现，仅经 NavigateToPageAsync 单一通道调用）</summary>
     Task IParameterizedPage<ElderlyFormPageParameter>.SetParameterAsync(ElderlyFormPageParameter parameter)
         => SetOperationModeCoreAsync(parameter.Mode, parameter.ApplicationId, parameter.NavigateToStopAfterSave,
-                                     parameter.PrefillIdCard, parameter.PrefillName);
+                                     parameter.PrefillIdCard, parameter.PrefillName, parameter.ReturnToReview);
 
-    /// <summary>设置操作模式核心逻辑（Create/Edit/View，含保存后跳停发的联动开关 + 下月待办预填）</summary>
+    /// <summary>设置操作模式核心逻辑（Create/Edit/View，含保存后跳停发的联动开关 + 下月待办预填 + 复核补全返回）</summary>
     private async Task SetOperationModeCoreAsync(FormOperationMode mode, long? applicationId = null,
-        bool navigateToStopAfterSave = false, string? prefillIdCard = null, string? prefillName = null)
+        bool navigateToStopAfterSave = false, string? prefillIdCard = null, string? prefillName = null,
+        bool returnToReview = false)
     {
         _logger.Debug($"[PAGE] 设置普惠高龄表单操作模式: {mode}");
 
         _viewModel.OperationMode = mode;
         _viewModel.PendingStopApplicationId = applicationId ?? 0;
         _viewModel.SetNavigateToStopAfterSave(navigateToStopAfterSave);
+        _viewModel.SetReturnToReview(returnToReview);
 
         if (mode == FormOperationMode.Create)
         {

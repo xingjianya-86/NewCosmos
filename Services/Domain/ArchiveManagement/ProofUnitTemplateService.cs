@@ -82,7 +82,10 @@ public class ProofUnitTemplateService : BaseService, IProofUnitTemplateService
             if (templateIdResult.Value == null || templateIdResult.Value <= 0)
                 return Result.Failure<Template>(ErrorCodes.RECORD_NOT_FOUND, $"单位 [{unitName}] 未配置证明模板");
 
-            var template = await _templateService.GetByIdAsync(templateIdResult.Value.Value, ct);
+            var templateResult = await _templateService.GetByIdAsync(templateIdResult.Value.Value, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<Template>(templateResult.ErrorCode!, templateResult.Message!);
+            var template = templateResult.Value;
             if (template == null)
                 return Result.Failure<Template>(ErrorCodes.RECORD_NOT_FOUND, $"单位 [{unitName}] 的证明模板不存在");
             return Result.Success(template);

@@ -65,6 +65,18 @@ public partial class LoadingProgressDialogViewModel : ObservableObject
         _progressService.ProgressChanged += OnProgressChanged;
     }
 
+    /// <summary>
+    /// 弹窗生命周期结束时调用：退订单例服务事件并释放 CTS。
+    /// 进度服务是 Singleton 而本 VM 是 Transient，不退订会把 VM 永久挂在事件链上。
+    /// </summary>
+    public void Detach()
+    {
+        _progressService.ProgressChanged -= OnProgressChanged;
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+
     private void OnProgressChanged(LoadingProgress progress)
     {
         Progress = progress.Progress / 100.0;

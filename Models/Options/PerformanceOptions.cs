@@ -51,6 +51,11 @@ public class PerformanceOptions
     public int PermissionVersionCheckIntervalSeconds { get; set; }
 
     /// <summary>
+    /// 数据中心页四段数据的最小刷新间隔（秒）：返回该页在此间隔内不重跑加载（0 = 每次进入都刷新）
+    /// </summary>
+    public int DataCenterReloadSeconds { get; set; } = 30;
+
+    /// <summary>
     /// 验证配置是否完整
     /// </summary>
     public void Validate()

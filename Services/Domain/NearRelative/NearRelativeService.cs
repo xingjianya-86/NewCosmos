@@ -403,30 +403,40 @@ public class NearRelativeService : BaseService, INearRelativeService
         if (links == null || links.Count == 0)
             return Result.Success();
 
-        const string sql = @"
+        // 多行 VALUES 一次写入（原逐行 INSERT 是 N+1）；23 个数据列/行，时间列用 NOW() 字面量
+        const int ParamsPerRow = 23;
+        var (valuesClause, args) = MultiRowValuesBuilder.Build(
+            links.Count,
+            ParamsPerRow,
+            r =>
+            {
+                var l = links[r];
+                return new object?[]
+                {
+                    staffId, (object?)l.ApplicationId,
+                    l.Relation ?? "", l.Name ?? "", l.IdCard ?? "", l.Gender ?? "", l.BirthDate ?? "",
+                    l.FamilyAddress ?? "", l.HukouAddress ?? "", l.ResidenceAddress ?? "",
+                    (object?)l.FamilySize, l.HelpType ?? "",
+                    (object?)l.MonthAmount, (object?)l.ReportAmount, l.StartTime ?? "", l.FamilyRelation ?? "",
+                    l.ApplyReason ?? "", l.ApplyTime ?? "",
+                    l.FamilyDifficulty ?? "", l.EconomyInvestigate ?? "", l.TownOpinion ?? "", l.DynamicRecord ?? "",
+                    r
+                };
+            },
+            start => "(" + string.Join(",", Enumerable.Range(start, ParamsPerRow).Select(n => "$" + n)) + ",NOW(),NOW())");
+
+        var sql = $@"
             INSERT INTO nc_biz_near_relative_links
             (staff_id, application_id, relation, name, id_card, gender, birth_date,
              family_address, hukou_address, residence_address, family_size, help_type,
              month_amount, report_amount, start_time, family_relation, apply_reason, apply_time,
              family_difficulty, economy_investigate, town_opinion, dynamic_record, sort_order,
              created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW(),NOW())";
+            VALUES {valuesClause}";
 
-        for (var i = 0; i < links.Count; i++)
-        {
-            var l = links[i];
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
-                staffId, (object?)l.ApplicationId,
-                l.Relation ?? "", l.Name ?? "", l.IdCard ?? "", l.Gender ?? "", l.BirthDate ?? "",
-                l.FamilyAddress ?? "", l.HukouAddress ?? "", l.ResidenceAddress ?? "",
-                (object?)l.FamilySize, l.HelpType ?? "",
-                (object?)l.MonthAmount, (object?)l.ReportAmount, l.StartTime ?? "", l.FamilyRelation ?? "",
-                l.ApplyReason ?? "", l.ApplyTime ?? "",
-                l.FamilyDifficulty ?? "", l.EconomyInvestigate ?? "", l.TownOpinion ?? "", l.DynamicRecord ?? "",
-                i);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-        }
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, args);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode!, result.Message!);
         return Result.Success();
     }
 

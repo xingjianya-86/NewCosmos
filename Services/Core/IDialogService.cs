@@ -29,6 +29,12 @@ public interface IDialogService
     Task ShowSnackBarAsync(string message, Components.SnackBarType type = Components.SnackBarType.Success, int duration = 3000);
 
     /// <summary>
+    /// SnackBar 显示请求事件。由全局宿主（Components.GlobalSnackBarHost）在启动时订阅一次，
+    /// 业务代码只调 ShowSnackBarAsync，不要直接订阅本事件。
+    /// </summary>
+    event Action<string, Components.SnackBarType, int>? SnackBarRequested;
+
+    /// <summary>
     /// 显示输入提示对话框
     /// </summary>
     /// <returns>用户输入的内容，取消返回 null</returns>

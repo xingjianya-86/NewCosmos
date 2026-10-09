@@ -13,12 +13,11 @@ public partial class RegionManagementPage : ContentPage
         BindingContext = _viewModel;
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
-        var userId = App.CurrentUserId ?? 1;
-        await _viewModel.InitializePermissionsAsync(userId);
-        await _viewModel.OnAppearingAsync();
+        // C 组：权限与数据加载移出 push 关键路径（跨网络查询会让页面"迟迟不出现"）
+        _viewModel.StartLoadingInBackground();
     }
 
     protected override void OnDisappearing()

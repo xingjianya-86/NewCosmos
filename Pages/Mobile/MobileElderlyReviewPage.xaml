@@ -67,10 +67,17 @@
                             <Entry Text="{Binding IdentityFlag}" IsReadOnly="True"
                                    BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
                         </VerticalStackLayout>
-                        <Border IsVisible="{Binding IsHistoryOnly}" BackgroundColor="{StaticResource InfoSoft}"
+                        <!-- 补全拦截提示条：名册未建档 / 导入来源档案缺必填项时显示，按钮与确认复核的硬拦截同路径 -->
+                        <Border IsVisible="{Binding IsCompletionNeeded}" BackgroundColor="{StaticResource InfoSoft}"
                                 Stroke="Transparent" Padding="12" StrokeShape="RoundRectangle 8">
-                            <Label Text="该人员仅在高龄导入名册中发放（当前库未建档）。复核确认变更时，将先补建原类别档案再停旧增新。"
-                                   FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="该人员档案来自高龄导入名册，办理复核前需先补建并补全档案信息。补全保存后将自动返回本页继续复核（复核变更将停旧增新并打印三表）。"
+                                       FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                                <Label Text="{Binding CompletionHint}" FontSize="12"
+                                       TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                <Button Text="补全历史档案" Style="{StaticResource ButtonOutline}"
+                                        Command="{Binding CompleteHistoryArchiveCommand}" HeightRequest="36"/>
+                            </VerticalStackLayout>
                         </Border>
                     </VerticalStackLayout>
                 </Border>

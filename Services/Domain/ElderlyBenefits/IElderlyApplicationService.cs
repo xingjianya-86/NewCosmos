@@ -26,9 +26,10 @@ public interface IElderlyApplicationService
     Task<Result<List<ElderlyPaybackSegment>>> GetSegmentsAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
-    /// 分页查询（关键字：姓名/身份证；状态：空=全部）
+    /// 分页查询（关键字：姓名/身份证；状态：空=全部）。
+    /// distinctIdCard=true 时同身份证只返回最新一条（复核页在享检索用，避免重复档案显示成两行）。
     /// </summary>
-    Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default);
+    Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default, bool distinctIdCard = false);
 
     /// <summary>
     /// 按月份查询记录（月报表用）。
@@ -77,7 +78,8 @@ public interface IElderlyApplicationService
     Task<Result<bool>> CheckIdCardExistsAsync(string idCard, long? excludeId = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 搜索导入库记录（按姓名/身份证，从 nc_biz_elderly_subsidy_history 查询）
+    /// 搜索导入库记录（按姓名/身份证，从 nc_biz_elderly_subsidy_history 查询）。
+    /// 仅返回在册发放（status=Active）：已并入当前库（复核补建/停发补全标记）与已停发记录不再出现。
     /// </summary>
     Task<Result<List<ElderlyImportedSearchItem>>> SearchImportedLibraryAsync(string keyword, CancellationToken ct = default);
 
@@ -99,9 +101,11 @@ public interface IElderlyApplicationService
     Task<Result<long>> MigrateFromHistoryAsync(long historyId, string createdBy, CancellationToken ct = default);
 
     /// <summary>
-    /// 数据补全并写入数据库后删除对应导入库记录（nc_biz_elderly_subsidy_history）。
+    /// 数据补全后将对应导入库记录（nc_biz_elderly_subsidy_history）标记为已并入当前库（status: Active→Stopped）。
+    /// ⚠️ 只标记不物理删除：停止明细表"实际发放"列（GetHistorySubsidyAmountsAsync）依赖名册行读取历史金额，
+    /// 删行会使该列回退成计发金额、丢失历年发放口径；标记后各"待建档"口径按 status=Active 过滤即不再把它当名册待办。
     /// </summary>
-    Task<Result> DeleteHistoryAsync(long historyId, CancellationToken ct = default);
+    Task<Result<int>> MarkHistoryMigratedAsync(string idCard, CancellationToken ct = default);
 
     /// <summary>
     /// 归档联动：为已完结档案（排除单人保）中年满80周岁的户主/共同生活成员自动创建普惠高龄草稿。
@@ -112,14 +116,16 @@ public interface IElderlyApplicationService
 
     /// <summary>
     /// 首页提醒统计：已完结档案（排除单人保）中年满80周岁的户主/共同生活成员，
-    /// 按普惠高龄待遇状态分流——待新增 / 待停旧增新（正式表 Confirmed 在享或历史名册有记录）。
+    /// 分流——待新增（无 Pending 复核且正式表未在享且名册无 Active）/
+    /// 需停旧增新（存在 Pending 复核记录；复核办结后置 Completed 即消账）。
     /// </summary>
     Task<Result<ElderlyPendingCounts>> GetPendingElderlyCountsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// 下月待办明细：与 <see cref="GetPendingElderlyCountsAsync"/> 同口径的待办人员名单，
     /// 含姓名/身份证/年龄/来源档案/状态标注，并按 New（待新增）/ Transfer（需停旧增新）分流，
-    /// 附带跳转办理所需的记录ID（正式表在享ID、历史名册ID）。
+    /// 附带跳转办理所需的记录ID（复核记录ID、正式表在享ID、历史名册ID）。
+    /// 注：Transfer = nc_biz_elderly_reviews 中 Pending 的记录（「已完结档案」子集），办结即消账。
     /// </summary>
     Task<Result<List<ElderlyPendingItem>>> GetPendingElderlyListAsync(CancellationToken ct = default);
 
@@ -144,6 +150,14 @@ public interface IElderlyApplicationService
     Task<Result<int>> TriggerReviewsForIdCardsAsync(IEnumerable<string> idCards, string triggerSource, long? triggerRef, string? triggerReason, CancellationToken ct = default);
 
     /// <summary>
+    /// 身份升级自检（启动时后台执行）：扫描「名册 Active ∪ 在享 Confirmed」中已命中救助身份
+    /// （5 张导入 persons 表 或 Approved 救助档案户主/成员）且无 Pending 复核的人员，
+    /// 逐人评估后写入待复核队列（HasChange=false 自动跳过，Pending 去重幂等）。
+    /// 防止"名册人员获得低保/低收入身份但高龄金额未升级"被静默漏掉。返回本次入队数。
+    /// </summary>
+    Task<Result<int>> ScanAndEnqueueIdentityUpgradesAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// 重评类别：按在享档案 / 名册记录 / 身份证定位人员，用当前身份比对 + 年龄档次得出新类别，
     /// 与旧类别比较后返回变更结果（不落库）。
     /// </summary>
@@ -163,6 +177,19 @@ public interface IElderlyApplicationService
 
     /// <summary>按身份证查询复核历史（倒序）</summary>
     Task<Result<List<ElderlyReview>>> GetReviewsByPersonAsync(string idCard, CancellationToken ct = default);
+
+    /// <summary>
+    /// 复核前置：确保名册人员在当前库已有档案（同证已有在享档直接复用，否则按原类别补建）。
+    /// 补建与"名册行标记已并入当前库"在同一事务内完成，防止名册侧残留重复入口。
+    /// 仅承载复核所需的最小字段，档案信息由补全表单完善。
+    /// </summary>
+    Task<Result<long>> EnsureReviewHistoryArchiveAsync(ElderlyReviewEvaluation eval, string operatorName, CancellationToken ct = default);
+
+    /// <summary>
+    /// 复核前置：读取档案必填项缺口（联系电话/户籍市-县-乡-村/开户行/账号，对齐表单 Validate 口径），
+    /// 并带出来源类型。原生档案（source_type 为空）返回 SourceType=空，调用方据此不拦截存量老数据。
+    /// </summary>
+    Task<Result<ElderlyReviewCompletionInfo>> GetReviewIncompleteFieldsAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
     /// 确认复核：NoChange 仅落复核记录；Changed 同事务内补建旧档（仅名册人员）→ 停旧档（stop_reason=REVIEW）

@@ -32,6 +32,7 @@ public partial class ArchiveOutputPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.OnDisappearing();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.WebViewPrintPdfFunc = null;
 
@@ -120,19 +121,29 @@ public partial class ArchiveOutputPage : ContentPage
 
         Dispatcher.Dispatch(async () =>
         {
-            if (!_printStep && _pendingPrintBase64 != null)
+            // async void lambda：异常若不就地捕获会直接终结进程；
+            // 失败也要完成 TCS，否则外层要等满 60s 超时
+            try
             {
-                // 第一步：viewer.html 导航完成 → 注入 PDF base64 数据
-                _printStep = true;
-                var b64 = _pendingPrintBase64;
-                await PdfWebView.EvaluateJavaScriptAsync($"window._loadPdfFromBase64('{b64}')");
+                if (!_printStep && _pendingPrintBase64 != null)
+                {
+                    // 第一步：viewer.html 导航完成 → 注入 PDF base64 数据
+                    _printStep = true;
+                    var b64 = _pendingPrintBase64;
+                    await PdfWebView.EvaluateJavaScriptAsync($"window._loadPdfFromBase64('{b64}')");
 
-                // 等待 PdfJs 渲染完成（canvas 有内容）
-                await Task.Delay(2000);
+                    // 等待 PdfJs 渲染完成（canvas 有内容）
+                    await Task.Delay(2000);
 
-                // 第二步：触发系统打印对话框（window.print() 在 WebView2 中阻塞至对话框关闭）
-                await PdfWebView.EvaluateJavaScriptAsync("window.print()");
+                    // 第二步：触发系统打印对话框（window.print() 在 WebView2 中阻塞至对话框关闭）
+                    await PdfWebView.EvaluateJavaScriptAsync("window.print()");
 
+                    _printTcs?.TrySetResult();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ArchiveOutput] 打印注入失败: {ex.Message}");
                 _printTcs?.TrySetResult();
             }
         });

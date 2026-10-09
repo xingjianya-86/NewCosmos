@@ -61,6 +61,7 @@ public partial class MobileApplicationFormPage : ContentPage,
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.OnDisappearing();
         UnsubscribeFromStepChanges();
     }
 

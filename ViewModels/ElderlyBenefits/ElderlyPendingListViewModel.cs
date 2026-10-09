@@ -5,6 +5,7 @@ using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ElderlyBenefits;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 
@@ -13,6 +14,8 @@ namespace NewCosmos.ViewModels.ElderlyBenefits;
 /// <summary>
 /// 普惠高龄下月待办列表 ViewModel（双 Tab：待新增 / 需停旧增新）
 /// 列出具体待办老人名单（姓名/身份证/年龄/来源/状态标注），支持快捷办理。
+/// Transfer 工单 = 待复核队列（nc_biz_elderly_reviews Pending）中的「已完结档案」子集，
+/// 复核办结（Pending→Completed）后该人自动退出待办；待新增建档确认后同样退出。
 /// </summary>
 public partial class ElderlyPendingListViewModel : ViewModelBase
 {
@@ -20,6 +23,7 @@ public partial class ElderlyPendingListViewModel : ViewModelBase
     private readonly ILoggerService _logger = null!;
     private readonly IServiceProvider _serviceProvider = null!;
     private readonly IDialogService _dialogService = null!;
+    private readonly INewPermissionService _permissionService = null!;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -58,12 +62,14 @@ public partial class ElderlyPendingListViewModel : ViewModelBase
         IElderlyApplicationService applicationService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        INewPermissionService permissionService)
     {
         _applicationService = applicationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
+        _permissionService = permissionService;
         Title = "高龄津贴下月待办";
     }
 
@@ -133,55 +139,47 @@ public partial class ElderlyPendingListViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 需停旧增新：自动生成高龄申请草稿（增新），旧记录在享则跳转停发页停旧；
-    /// 旧记录已停发/无在享则仅生成草稿。
+    /// 需停旧增新：改跳高龄津贴复核页统一办理（同事务停旧 stop_reason=REVIEW + 建新 + 复核留痕）。
+    /// 复核页按 ApplicationId → HistoryId → IdCard 顺序定位人员并评估类别/身份变化。
     /// </summary>
     [RelayCommand]
     private async Task HandleTransferAsync(ElderlyPendingItem? item)
     {
         if (item == null) return;
 
-        await ExecuteAsync(async () =>
+        // 办理权限门控（对齐复核列表页 CanReview，复用 ELDERLY_EDIT）
+        try
         {
-            _logger.LogBusiness("高龄待办-需停旧增新办理",
-                ("Name", DataMasker.MaskName(item.Name)),
-                ("IdCard", DataMasker.MaskIdCard(item.IdCard)),
-                ("ElderlyApplicationId", item.ElderlyApplicationId),
-                ("HistoryId", item.HistoryId));
-
-            // 自动生成草稿（增新；已有草稿则复用，不会重复）
-            var draftResult = await _applicationService.CreateAutoDraftAsync(
-                item.IdCard, item.Name, App.CurrentUserName, CancellationToken);
-            if (draftResult.IsFailure)
+            var userId = App.CurrentUserId ?? 0;
+            var permissions = userId > 0
+                ? await _permissionService.CheckPermissionsAsync(userId, new[] { PermissionCodes.ELDERLY_EDIT })
+                : null;
+            if (permissions == null || !permissions.TryGetValue(PermissionCodes.ELDERLY_EDIT, out var granted) || !granted)
             {
-                await _dialogService.DisplayAlertAsync("提示", $"生成草稿失败：{draftResult.Message}", "确定");
-                return Result.Success();
+                await _dialogService.DisplayAlertAsync("提示", "无权限办理复核，请联系管理员分配「编辑普惠高龄」权限。", "确定");
+                return;
             }
-            var draftId = draftResult.Value;
-            _logger.LogBusiness("高龄待办-需停旧增新草稿已生成",
-                ("DraftId", draftId),
-                ("IdCard", DataMasker.MaskIdCard(item.IdCard)));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "待办复核权限校验失败");
+            await _dialogService.DisplayAlertAsync("提示", "权限校验失败，请稍后重试。", "确定");
+            return;
+        }
 
-            // 旧记录在享 → 跳转停发页停旧
-            if (item.ElderlyApplicationId > 0)
-            {
-                var appResult = await _applicationService.GetByIdAsync(item.ElderlyApplicationId, CancellationToken);
-                if (appResult.IsFailure || appResult.Value == null)
-                {
-                    await _dialogService.DisplayAlertAsync("提示",
-                        $"[{item.Name}] 在享登记加载失败，草稿已生成，请刷新后重试。", "确定");
-                    return Result.Success();
-                }
+        _logger.LogBusiness("高龄待办-需停旧增新转复核",
+            ("Name", DataMasker.MaskName(item.Name)),
+            ("IdCard", DataMasker.MaskIdCard(item.IdCard)),
+            ("ElderlyApplicationId", item.ElderlyApplicationId),
+            ("HistoryId", item.HistoryId),
+            ("ReviewId", item.ReviewId));
 
-                await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyStopPage, ElderlyApplication>(appResult.Value);
-                return Result.Success();
-            }
-
-            // 旧记录已停发/无在享：仅生成草稿（增新）
-            await _dialogService.DisplayAlertAsync("提示",
-                $"[{item.Name}] 已自动生成高龄申请草稿，请前往「高龄津贴申请登记」草稿页补全信息后确认。", "确定");
-            return Result.Success();
-        }, "生成草稿...");
+        await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyReviewPage, ElderlyReviewPageParameter>(
+            new ElderlyReviewPageParameter(
+                ReviewId: item.ReviewId > 0 ? item.ReviewId : null,
+                ApplicationId: item.ElderlyApplicationId > 0 ? item.ElderlyApplicationId : null,
+                IdCard: item.IdCard,
+                HistoryId: item.HistoryId > 0 ? item.HistoryId : null));
     }
 
     /// <summary>

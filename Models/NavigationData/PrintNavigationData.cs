@@ -59,6 +59,20 @@ public static class PrintNavigationData
     /// </summary>
     public static string[]? PrefilterTemplateNames { get; set; }
 
+    /// <summary>
+    /// 仅清「文书模式」四字段，保留记录型上下文（BusinessType/Classification/FieldData…）。
+    /// 由整档型入口（高龄停发/复核、临救、追缴、资产核查、月报等）在写入记录上下文时调用，
+    /// 防止上一次「仅出文书」会话的 OutputCategories/OperationOverride/Prefilter/TemplateFilter
+    /// 静态残留被继承（曾致高龄停发档案输出误出「档案_渐退期审批表」等变动文书）。
+    /// </summary>
+    public static void ClearDocumentMode()
+    {
+        OutputCategories = null;
+        OperationOverride = null;
+        TemplateFilter = null;
+        PrefilterTemplateNames = null;
+    }
+
     public static void Clear()
     {
         BusinessType = string.Empty;

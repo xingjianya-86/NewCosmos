@@ -167,6 +167,12 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
 
             return Result.Success<T>(default!);
         }
+        catch (OperationCanceledException)
+        {
+            // 页面离开等正常取消：与真实连接失败区分开，调用方按 CANCELLED 静默处理
+            Logger.Debug($"QuerySingleAsync 被取消: {Truncate(sql)}");
+            return Result.Failure<T>(ErrorCodes.CANCELLED, "查询被取消");
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "查询单条记录失败");
@@ -205,8 +211,10 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
         }
         catch (OperationCanceledException)
         {
-            Logger.Warn("QueryAsync 被取消");
-            return Result.Failure<List<T>>(ErrorCodes.DB_CONNECTION_FAILED, "查询被取消");
+            // 页面离开/新操作顶掉旧操作属正常取消，非连接故障：按 CANCELLED 上报，
+            // 由 ViewModelBase.LoadPageAsync 静默跳过（历史误用 DB_CONNECTION_FAILED 致"加载失败"弹窗）
+            Logger.Debug($"QueryAsync 被取消: {Truncate(sql)}");
+            return Result.Failure<List<T>>(ErrorCodes.CANCELLED, "查询被取消");
         }
         catch (Exception ex)
         {
@@ -234,6 +242,11 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
             await using var command = BuildCommand(connection!, scope?.Transaction, sql, parameters);
             var affectedRows = await command.ExecuteNonQueryAsync(ct);
             return Result.Success(affectedRows);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Debug($"ExecuteNonQueryAsync 被取消: {Truncate(sql)}");
+            return Result.Failure<int>(ErrorCodes.CANCELLED, "查询被取消");
         }
         catch (Exception ex)
         {
@@ -269,6 +282,11 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
 
             return Result.Success(Convert.ToInt64(result));
         }
+        catch (OperationCanceledException)
+        {
+            Logger.Debug($"ExecuteScalarAsync 被取消: {Truncate(sql)}");
+            return Result.Failure<long>(ErrorCodes.CANCELLED, "查询被取消");
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "执行标量查询失败");
@@ -300,6 +318,11 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
                 return Result.Success<T?>((T)result);
 
             return Result.Success<T?>((T)Convert.ChangeType(result, targetType));
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Debug($"ExecuteScalarAsync<{typeof(T).Name}> 被取消: {Truncate(sql)}");
+            return Result.Failure<T?>(ErrorCodes.CANCELLED, "查询被取消");
         }
         catch (Exception ex)
         {

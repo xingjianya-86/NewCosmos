@@ -391,6 +391,8 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
                 ("ReliefType", fullApp.ReliefType));
 
             // 填充 PrintNavigationData（复用全局单例，与 ArchiveOutputViewModel 一致）
+            // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
+            PrintNavigationData.ClearDocumentMode();
             PrintNavigationData.BusinessType = TempReliefConstants.BusinessType;
             PrintNavigationData.BusinessId = app.Id;
             PrintNavigationData.Classification = fullApp.ReliefType;

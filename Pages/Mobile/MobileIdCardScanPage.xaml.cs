@@ -23,6 +23,7 @@ public partial class MobileIdCardScanPage : ContentPage, IParameterizedPage<IdCa
     private Action<Result<IdCardInfo>?>? _onCompleted;
     private bool _capturing;
     private bool _completed;
+    private CancellationTokenSource? _scanCts;
 
     public MobileIdCardScanPage(IIdentityReader identityReader, ILoggerService logger, IDialogService dialogService)
     {
@@ -41,6 +42,7 @@ public partial class MobileIdCardScanPage : ContentPage, IParameterizedPage<IdCa
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _scanCts = new CancellationTokenSource();
 
         var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
         if (status != PermissionStatus.Granted)
@@ -66,6 +68,10 @@ public partial class MobileIdCardScanPage : ContentPage, IParameterizedPage<IdCa
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        // 离页取消在途 OCR 识别（原硬编码 CancellationToken.None，识别继续跑完还可能在已离开的页面上弹错窗）
+        _scanCts?.Cancel();
+        _scanCts?.Dispose();
+        _scanCts = null;
         try
         {
             Preview.Stop();
@@ -107,8 +113,12 @@ public partial class MobileIdCardScanPage : ContentPage, IParameterizedPage<IdCa
 
             ShowBusy(true, "正在识别身份证...");
             using var stream = new MemoryStream(bytes);
-            var result = await _identityReader.ReadAsync(stream, CancellationToken.None);
+            var result = await _identityReader.ReadAsync(stream, _scanCts?.Token ?? CancellationToken.None);
             Complete(result);
+        }
+        catch (OperationCanceledException)
+        {
+            // 页面已离开触发的取消：静默，不再弹错误框
         }
         catch (Exception ex)
         {
@@ -137,8 +147,12 @@ public partial class MobileIdCardScanPage : ContentPage, IParameterizedPage<IdCa
             _capturing = true;
             ShowBusy(true, "正在识别身份证...");
             await using var stream = await photo.OpenReadAsync();
-            var result = await _identityReader.ReadAsync(stream, CancellationToken.None);
+            var result = await _identityReader.ReadAsync(stream, _scanCts?.Token ?? CancellationToken.None);
             Complete(result);
+        }
+        catch (OperationCanceledException)
+        {
+            // 页面已离开触发的取消：静默，不再弹错误框
         }
         catch (Exception ex)
         {

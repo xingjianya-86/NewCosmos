@@ -27,6 +27,13 @@ public partial class ElderlyReviewPage : ContentPage, IParameterizedPage<Elderly
         }
     }
 
+    /// <summary>补全表单返回本页时由 VM 决定是否重评（_reEvaluateOnAppear 置位才触发）</summary>
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await _viewModel.OnAppearingAsync();
+    }
+
     /// <summary>导航参数入口：定位人员并重评（仅经 NavigateToPageAsync 单一通道调用）</summary>
     Task IParameterizedPage<ElderlyReviewPageParameter>.SetParameterAsync(ElderlyReviewPageParameter parameter)
         => _viewModel.LoadAsync(parameter);

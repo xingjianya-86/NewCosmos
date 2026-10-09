@@ -2,6 +2,7 @@ using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
+using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Utilities;
@@ -33,14 +34,21 @@ public class TemplateFieldBuilder
     }
 
     /// <summary>
-    /// 根据模板配置 + 原始数据，生成统一的字段字典
+    /// 根据模板配置 + 原始数据，生成统一的字段字典。
+    /// 模板配置解析失败返回显式 Failure（禁止降级为无配置构建——编号成员字段会整体缺失）。
     /// </summary>
-    public async Task<Dictionary<string, string>> BuildFieldsAsync(
+    public async Task<Result<Dictionary<string, string>>> BuildFieldsAsync(
         long templateId,
         RawFieldData data,
         CancellationToken ct = default)
     {
-        var config = await GetConfigAsync(templateId, ct);
+        var configResult = await GetConfigAsync(templateId, ct);
+        if (configResult.IsFailure)
+            return Result<Dictionary<string, string>>.Failure(
+                configResult.ErrorCode,
+                string.IsNullOrEmpty(configResult.Message) ? "模板配置解析失败" : configResult.Message);
+
+        var config = configResult.Value;
 
         // 1. 构建基础字段（所有模板通用）
         // 入户调查日期默认取 B 线受理窗口起点（上月15日）
@@ -66,7 +74,7 @@ public class TemplateFieldBuilder
             }
         }
 
-        return fields;
+        return Result.Success(fields);
     }
 
     /// <summary>
@@ -194,19 +202,32 @@ public class TemplateFieldBuilder
         }
     }
 
-    private async Task<TemplateConfig?> GetConfigAsync(long templateId, CancellationToken ct)
+    /// <summary>
+    /// Success(null) = 模板不存在或未配置 ConfigJson（无配置构建，占位符与字段同名，属正常形态）；
+    /// Failure = ConfigJson 已存在但解析失败（配置损坏），必须显式失败——
+    /// 过去降级为无配置构建会导致编号成员字段/默认值整体缺失（打印缺字段）。
+    /// </summary>
+    private async Task<Result<TemplateConfig?>> GetConfigAsync(long templateId, CancellationToken ct)
     {
         try
         {
-            var template = await _templateService.GetByIdAsync(templateId, ct);
-            if (template == null || string.IsNullOrEmpty(template.ConfigJson)) return null;
-            return TemplateConfig.FromJson(template.ConfigJson);
+            var templateResult = await _templateService.GetByIdAsync(templateId, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<TemplateConfig?>(
+                    templateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"读取模板失败: TemplateId={templateId}, {templateResult.Message}");
+            var template = templateResult.Value;
+            if (template == null || string.IsNullOrEmpty(template.ConfigJson))
+                return Result.Success<TemplateConfig?>(null);
+
+            return Result.Success<TemplateConfig?>(TemplateConfig.FromJson(template.ConfigJson));
         }
         catch (Exception ex)
         {
-            // 配置损坏 → 降级为无配置构建（与 PrintService 策略对齐），但必须留 Error 日志便于定位打印缺字段
             Serilog.Log.Error(ex, "[TemplateFieldBuilder] 模板配置解析失败 TemplateId={TemplateId}", templateId);
-            return null;
+            return Result.Failure<TemplateConfig?>(
+                ErrorCodes.FILE_FORMAT_ERROR,
+                $"模板配置解析失败: TemplateId={templateId}");
         }
     }
 }
