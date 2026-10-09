@@ -390,6 +390,36 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 Templates.Add(item);
             }
 
+            // 文书模式按档案类型补挂入户调查表：变动分类集（DocumentOperationCategories）不含分类码，
+            // 而「档案_入户调查表」「档案_特困入户调查表_特困人员」挂的是 12 个档案分类码 → 变动文书清单取不到。
+            // 取数走 GetByCategoriesAsync([classification])：低保/边缘/刚性 → 档案_入户调查表，特困 → 特困版，
+            // 选哪张由模板 categories 决定（跟档案类型挂钩），不硬编码模板名映射。仅列出处供下方预勾选强制勾选。
+            var addedSurveyNames = new List<string>();
+            if (!IsTemplateFilterMode && isDocumentMode
+                && businessType is "FamilyApplication" or "EconomicReview"
+                && !string.IsNullOrEmpty(classification))
+            {
+                var byClassification = await _templateService.GetByCategoriesAsync(new[] { classification }, CancellationToken);
+                foreach (var t in byClassification)
+                {
+                    if (!t.Name.Contains("入户调查") || Templates.Any(x => x.TemplateId == t.Id)) continue;
+                    var surveyConfig = await LoadTemplateConfigAsync(t.Id, classification);
+                    Templates.Add(new TemplateSelectItem
+                    {
+                        TemplateId = t.Id,
+                        Name = t.Name,
+                        FileType = t.FileType,
+                        IsSelected = true,
+                        BaseCopies = surveyConfig.Copies,
+                        IsDirectoryTemplate = surveyConfig.IsDirectory,
+                        DirectoryDateField = surveyConfig.DirectoryDateField,
+                        IsCoverTemplate = t.Name.Contains("封面"),
+                        SortOrder = t.SortOrder
+                    });
+                    addedSurveyNames.Add(t.Name);
+                }
+            }
+
             // 排序：封面 → 目录 → 其余（按 sort_order）；不适用模板不入列表
             var coverTemplates = Templates.Where(t => t.IsCoverTemplate && t.IsApplicable).ToList();
             var directoryTemplates = Templates.Where(t => t.IsDirectoryTemplate && !t.IsCoverTemplate && t.IsApplicable).ToList();
@@ -413,9 +443,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 }
             }
 
-            // 资产核查档/低收入人口家庭认定等救助申请档案：在列表末尾添加核查报告条目（仅出文书模式不追加）
+            // 低收入人口家庭认定等救助申请档案（FamilyApplication）：在列表末尾添加核查报告条目
+            //（仅出文书模式不追加）。
+            // 资产核查（AssetVerification）自身的档案制作**不追加**：核查报告的打印/保存归
+            // 「月度审核」（MonthlyAssetAuditViewModel，落 {输出根}\核查报告\），档案制作流程不重复出现。
             if (!IsTemplateFilterMode
-                && businessType is "AssetVerification" or "FamilyApplication")
+                && businessType == "FamilyApplication")
             {
                 var checkId = await ResolveCheckIdAsync(businessType, businessId, fieldData, CancellationToken);
                 if (checkId.HasValue)
@@ -484,6 +517,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     t.IsSelected = pre.Contains(t.Name);
                 var notice = Templates.FirstOrDefault(t => t.Name == DocumentTemplateNames.ChangeNotice);
                 if (notice != null) notice.IsSelected = true;
+                // 补挂的入户调查表恒勾（与告知书同待遇）：变更流程 Prefilter 名单不含它，不强制会被置为不勾
+                foreach (var surveyName in addedSurveyNames)
+                {
+                    var survey = Templates.FirstOrDefault(t => t.Name == surveyName);
+                    if (survey != null) survey.IsSelected = true;
+                }
             }
 
             if (Templates.Count > 0)

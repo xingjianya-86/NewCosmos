@@ -19,16 +19,26 @@ public static class ArchiveCategoryResolver
         if (businessType == "FamilyApplication")
         {
             // 变动操作：[classification, operation]；无 classification 时仅 [operation]
-            var op = string.IsNullOrEmpty(operationOverride) ? "新增" : operationOverride;
             var list = new List<string>();
             if (!string.IsNullOrEmpty(classification)) list.Add(classification);
-            list.Add(op);
-            // 变动场景并入固定变动分类集（模板挂叶子 Path 时也能命中）
-            if (!string.IsNullOrEmpty(operationOverride))
+
+            if (string.IsNullOrEmpty(operationOverride))
             {
+                // 无变动操作时默认挂「新增」位，但**判定为停保/不合格（收入超标、不予认定等）时不挂**：
+                // 模板按 categories 任一命中即入选（TemplateService 用 `categories && $1`），
+                // 而「档案_授权承诺书_P1」「部省协查函」只挂「新增」、自身不含停保码，
+                // 会借这位混进停保档清单；「档案_变更告知书」等停保文书靠自己的停保码命中，不受影响。
+                if (!ClassificationConstants.IsCodeStop(classification ?? string.Empty))
+                    list.Add("新增");
+            }
+            else
+            {
+                list.Add(operationOverride);
+                // 变动场景并入固定变动分类集（模板挂叶子 Path 时也能命中）
                 foreach (var c in DocumentOperationCategories)
                     if (!list.Contains(c)) list.Add(c);
             }
+
             return list.ToArray();
         }
 
