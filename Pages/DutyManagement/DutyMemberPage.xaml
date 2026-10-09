@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
@@ -24,14 +24,14 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回值班表" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
 
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="值班成员管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -154,11 +154,11 @@
                                         </Label>
                                     </VerticalStackLayout>
 
-                                    <Button Grid.Column="2" Text="&#xE74A;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                    <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74A;', Android='&#x2191;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="11"
                                             Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveUpMemberCommand}"
                                             CommandParameter="{Binding .}"/>
-                                    <Button Grid.Column="3" Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                    <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2193;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="11"
                                             Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveDownMemberCommand}"
                                             CommandParameter="{Binding .}"/>
@@ -187,7 +187,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding LeavePanelTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseLeavePanelCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseLeavePanelCommand}" Padding="4,0"/>
                         </Grid>
 
                         <!-- 请假记录列表 -->
@@ -244,7 +244,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="批量导入值班成员" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseImportPanelCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseImportPanelCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Label Text="队列名单模式：每组「序号 + 姓名」成对填写，序号即该组轮转顺序（按值升序、组内唯一、允许跳号）。导入为全量对齐——名单里没列到的库内成员将从其所在组移除（某组全空 = 清空该组）。请使用「下载导入模板」生成的标准模板填写。"

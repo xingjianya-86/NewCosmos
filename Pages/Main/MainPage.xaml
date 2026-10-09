@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Main.MainPage"
@@ -47,7 +47,7 @@
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20">
                 <!-- Logo 和标题 -->
                 <HorizontalStackLayout Grid.Column="0" Spacing="12">
-                    <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE80F;', Android='&#x2696;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="0">
                         <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="现代化 · 专业 · 高效" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
@@ -58,20 +58,20 @@
                 <HorizontalStackLayout Grid.Column="2" Spacing="20">
                     <!-- 当前日期 -->
                     <HorizontalStackLayout Spacing="8">
-                        <Label Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE823;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                         <Label Text="{Binding CurrentDateString}" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 用户信息 -->
                     <Border StrokeShape="RoundRectangle 20" BackgroundColor="{StaticResource Gray100}" Padding="8,4">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                             <Label Text="{Binding CurrentUserName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
                     </Border>
 
                     <!-- 设置按钮 -->
-                    <Button Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" WidthRequest="40" HeightRequest="40" CornerRadius="20"/>
+                    <Button Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" WidthRequest="40" HeightRequest="40" CornerRadius="20"/>
                 </HorizontalStackLayout>
             </Grid>
         </Border>
@@ -86,9 +86,9 @@
                     Padding="16,10"
                     Margin="10,5,10,5">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Label Grid.Column="0" Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding SchemaWarningMessage}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
-                    <Label Grid.Column="2" Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                    <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE713;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
                 </Grid>
             </Border>
 
@@ -102,9 +102,9 @@
                     <TapGestureRecognizer Command="{Binding NavigateToGracePeriodExpiringCommand}"/>
                 </Border.GestureRecognizers>
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Label Grid.Column="0" Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE823;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding GracePeriodExpiringBannerText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
-                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                    <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
                 </Grid>
             </Border>
 
@@ -118,9 +118,9 @@
                     <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
                 </Border.GestureRecognizers>
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Label Grid.Column="0" Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE823;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding ElderlyReminderText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
-                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                    <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
                 </Grid>
             </Border>
 
@@ -134,9 +134,9 @@
                     <TapGestureRecognizer Command="{Binding NavigateToCollegeStudentCommand}"/>
                 </Border.GestureRecognizers>
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                    <Label Grid.Column="0" Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE774;', Android='&#x1F393;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding CollegeStudentReminderText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
-                    <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                    <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
                 </Grid>
             </Border>
 
@@ -158,7 +158,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Home"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="White"/>
+                                <Label Text="{OnPlatform WinUI='&#xE80F;', Android='&#x2696;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="White"/>
                                 <Label Text="首页" FontSize="14" TextColor="White"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -171,7 +171,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="SocialAssistance"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE765;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE765;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="低收入人口救助帮扶" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -181,7 +181,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Elderly"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="高龄津贴发放" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -191,7 +191,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="AssetVerification"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="家庭经济状况核对" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -204,7 +204,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Archive"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="救助档案管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -214,7 +214,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Recovery"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE8D1;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="后补追缴" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -227,7 +227,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Database"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE88E;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="数据中心" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -237,7 +237,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="User"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="用户与权限管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -247,7 +247,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Organization"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="经办机构管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -257,7 +257,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Settings"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE8B7;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8B7;', Android='&#x1F4C1;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="文书模板管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -268,7 +268,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Lottery"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="彩票助手" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -279,7 +279,7 @@
                                 <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="Duty"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE8C0;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8C0;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SidebarItemUnselected}"/>
                                 <Label Text="值班管理" FontSize="13" TextColor="{StaticResource SidebarItemUnselected}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -293,7 +293,7 @@
                                 <TapGestureRecognizer Command="{Binding LogoutCommand}"/>
                             </Grid.GestureRecognizers>
                             <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-                                <Label Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{StaticResource Error}"/>
+                                <Label Text="{OnPlatform WinUI='&#xE7E8;', Android='&#x1F6AA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource Error}"/>
                                 <Label Text="退出登录" FontSize="13" TextColor="{StaticResource Error}"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -317,7 +317,7 @@
                             <Border Grid.Column="0" Style="{StaticResource StatCard}" Background="{StaticResource StatCardBlueGradient}">
                                 <VerticalStackLayout Spacing="8">
                                     <HorizontalStackLayout Spacing="8">
-                                        <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                         <Label Text="本月总新增" FontSize="16" TextColor="White" Opacity="0.9"/>
                                     </HorizontalStackLayout>
                                     <Label Text="{Binding MonthlyNewAdditions}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
@@ -329,7 +329,7 @@
                             <Border Grid.Column="1" Style="{StaticResource StatCard}" Background="{StaticResource StatCardGreenGradient}">
                                 <VerticalStackLayout Spacing="8">
                                     <HorizontalStackLayout Spacing="8">
-                                        <Label Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="{OnPlatform WinUI='&#xE7E8;', Android='&#x1F6AA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                         <Label Text="本月总退出" FontSize="16" TextColor="White" Opacity="0.9"/>
                                     </HorizontalStackLayout>
                                     <Label Text="{Binding MonthlyExits}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
@@ -341,7 +341,7 @@
                             <Border Grid.Column="2" Style="{StaticResource StatCard}" Background="{StaticResource StatCardOrangeGradient}">
                                 <VerticalStackLayout Spacing="8">
                                     <HorizontalStackLayout Spacing="8">
-                                        <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                         <Label Text="新申请经济核对" FontSize="16" TextColor="White" Opacity="0.9"/>
                                     </HorizontalStackLayout>
                                     <Label Text="{Binding NewAssetChecks}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
@@ -353,7 +353,7 @@
                             <Border Grid.Column="3" Style="{StaticResource StatCard}" Background="{StaticResource StatCardPurpleGradient}">
                                 <VerticalStackLayout Spacing="8">
                                     <HorizontalStackLayout Spacing="8">
-                                        <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                        <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                         <Label Text="本月新增高龄老人" FontSize="16" TextColor="White" Opacity="0.9"/>
                                     </HorizontalStackLayout>
                                     <Label Text="{Binding MonthlyNewElderly}" FontSize="36" FontAttributes="Bold" TextColor="White"/>
@@ -376,7 +376,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE765;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE765;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="低收入人口救助帮扶" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -396,7 +396,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F5F3FF" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleElderly}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleElderly}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="高龄津贴发放" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -416,7 +416,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FFFBEB" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleAssetVerification}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleAssetVerification}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="家庭经济状况核对" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -436,7 +436,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="救助档案管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -456,7 +456,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F8FAFC" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE88E;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="数据中心" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -476,7 +476,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FDF2F8" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleUser}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleUser}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="用户与权限管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -496,7 +496,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FFF7ED" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="#EA580C" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="#EA580C" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="彩票助手" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -516,7 +516,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleSocialAssistance}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="作者官网" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -536,7 +536,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="黑龙江民政官网" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -556,7 +556,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#ECFDF5" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE8C0;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE8C0;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleArchive}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="值班管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -576,7 +576,7 @@
                                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                     <HorizontalStackLayout Spacing="12">
                                         <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F0F9FF" StrokeShape="RoundRectangle 12">
-                                            <Label Text="&#xE749;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE749;', Android='&#x1F4DC;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource ModuleDatabase}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                             <Label Text="历史补打中心" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>

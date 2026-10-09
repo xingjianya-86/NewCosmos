@@ -22,8 +22,8 @@
                 <Shadow Brush="{StaticResource PrimaryDark}" Offset="0,4" Radius="8" Opacity="0.3"/>
             </Border.Shadow>
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
-                <Button Text="&#xE72B;"
-                        FontFamily="Segoe MDL2 Assets"
+                <Button Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         BackgroundColor="Transparent"
                         TextColor="{StaticResource White}"
                         FontSize="20"
@@ -31,7 +31,7 @@
                         VerticalOptions="Center"
                         Padding="8"/>
                 <HorizontalStackLayout Grid.Column="1" Spacing="14" VerticalOptions="Center">
-                    <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="26" TextColor="{StaticResource White}"/>
+                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="26" TextColor="{StaticResource White}"/>
                     <VerticalStackLayout Spacing="2">
                         <Label Text="临时救助申请" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
                         <Label Text="申请人来源仅限导入台账库与最低生活保障申请库" FontSize="13" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
@@ -55,8 +55,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE77B;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -80,8 +80,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE7A6;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -105,8 +105,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE7B8;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -130,8 +130,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE7A6;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -164,7 +164,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -211,7 +211,7 @@
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Success}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -419,7 +419,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Success}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -465,7 +465,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE7A6;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Warning}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -504,7 +504,7 @@
                                                     IsEnabled="{Binding IsEditable}"
                                                     OnColor="{StaticResource Primary}"/>
                                         </HorizontalStackLayout>
-                                        <Button Grid.Column="3" Text="&#xE710; 添加疾病" FontFamily="Segoe MDL2 Assets"
+                                        <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE710; 添加疾病', Android='&#x2795; 添加疾病'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                 Style="{StaticResource ButtonSmall}" Command="{Binding AddDiseaseCommand}"/>
                                     </Grid>
                                     <!-- 所在医院/日期/费用（共享，非多医院模式时显示） -->
@@ -561,8 +561,8 @@
                                                                        Placeholder="输入编码自动带出名称"
                                                                        TextChanged="OnDiseaseCodeTextChanged"/>
                                                             </VerticalStackLayout>
-                                                            <Button Grid.Column="3" Text="&#xE74D;"
-                                                                    FontFamily="Segoe MDL2 Assets" Style="{StaticResource ButtonSmall}"
+                                                            <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}"
+                                                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" Style="{StaticResource ButtonSmall}"
                                                                     BackgroundColor="{StaticResource Error}" TextColor="White"
                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=RemoveDiseaseCommand}"
                                                                     CommandParameter="{Binding .}" VerticalOptions="Start"/>
@@ -615,7 +615,7 @@
                                                FontSize="14" VerticalOptions="Center"/>
                                         <Label Grid.Column="1" Text="（困难类型为意外灾害时，可多条，最多 10 条）"
                                                FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
-                                        <Button Grid.Column="2" Text="&#xE710; 添加意外灾害" FontFamily="Segoe MDL2 Assets"
+                                        <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE710; 添加意外灾害', Android='&#x2795; 添加意外灾害'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                 Style="{StaticResource ButtonSmall}" Command="{Binding AddAccidentCommand}"/>
                                     </Grid>
                                     <CollectionView ItemsSource="{Binding Accidents}" SelectionMode="None">
@@ -636,7 +636,7 @@
                                                             <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=MemberNameOptions}"
                                                                     SelectedItem="{Binding MemberName}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                         </VerticalStackLayout>
-                                                        <Button Grid.Row="0" Grid.Column="2" Text="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                                        <Button Grid.Row="0" Grid.Column="2" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                                 Style="{StaticResource ButtonSmall}" BackgroundColor="{StaticResource Error}" TextColor="White"
                                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=RemoveAccidentCommand}"
                                                                 CommandParameter="{Binding .}" VerticalOptions="Start"/>
@@ -688,7 +688,7 @@
                                                FontSize="14" VerticalOptions="Center"/>
                                         <Label Grid.Column="1" Text="（困难类型为教育支出时，可多条，最多 10 条）"
                                                FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
-                                        <Button Grid.Column="2" Text="&#xE710; 添加教育支出" FontFamily="Segoe MDL2 Assets"
+                                        <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE710; 添加教育支出', Android='&#x2795; 添加教育支出'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                 Style="{StaticResource ButtonSmall}" Command="{Binding AddEducationCommand}"/>
                                     </Grid>
                                     <CollectionView ItemsSource="{Binding Educations}" SelectionMode="None">
@@ -710,7 +710,7 @@
                                                                         SelectedItem="{Binding EducationStage}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                             </VerticalStackLayout>
                                                         </Grid>
-                                                        <Button Grid.Row="0" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                                        <Button Grid.Row="0" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                                 Style="{StaticResource ButtonSmall}" BackgroundColor="{StaticResource Error}" TextColor="White"
                                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=RemoveEducationCommand}"
                                                                 CommandParameter="{Binding .}" VerticalOptions="Start"/>
@@ -774,7 +774,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE8C7;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Success}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -806,7 +806,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Info}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -829,7 +829,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE81B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE81B;', Android='&#x1F465;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -872,12 +872,12 @@
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Info}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <Label Grid.Column="1" Text="家庭成员（审批表逐行展示）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                                <Button Grid.Column="2" Text="&#xE710; 添加" FontFamily="Segoe MDL2 Assets"
+                                <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE710; 添加', Android='&#x2795; 添加'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                         Style="{StaticResource ButtonSmall}" Command="{Binding AddMemberCommand}"/>
                             </Grid>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
@@ -906,7 +906,7 @@
                                                         <Entry Text="{Binding Gender}" Style="{StaticResource FormFieldEntryStyle}"/>
                                                     </VerticalStackLayout>
                                                 </Grid>
-                                                <Button Grid.Row="0" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                                <Button Grid.Row="0" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                         Style="{StaticResource ButtonSmall}" BackgroundColor="{StaticResource Error}" TextColor="White"
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=RemoveMemberCommand}"
                                                         CommandParameter="{Binding .}" VerticalOptions="Start"/>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ArchiveManagement.ArchiveOutputPage"
@@ -14,14 +14,14 @@
 
                 <!-- 返回行 -->
                 <HorizontalStackLayout Spacing="6">
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE7B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7B5;', Android='&#x1F4C4;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="档案输出" Style="{StaticResource ModuleHeroTitle}"/>
@@ -42,32 +42,32 @@
                         ItemDisplayBinding="{Binding Name, x:DataType=TemplateSelectItem}"
                         VerticalOptions="Center"/>
                 <Button Grid.Column="2"
-                        Text="{Binding PreviewActionText, StringFormat='&#xE8BD; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding PreviewActionText, StringFormat='&#xE8BD; {0}'}, Android={Binding PreviewActionText, StringFormat='&#x1F441;&#xFE0F; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding PreviewCommand}"
                         IsEnabled="{Binding IsNotBusy}"
                         Style="{StaticResource ButtonPrimary}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="3"
-                        Text="{Binding PrintActionText, StringFormat='&#xE7A7; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding PrintActionText, StringFormat='&#xE7A7; {0}'}, Android={Binding PrintActionText, StringFormat='&#x1F5A8;&#xFE0F; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding PrintCommand}"
                         IsEnabled="{Binding IsNotBusy}"
                         Style="{StaticResource WarningButton}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="4"
-                        Text="{Binding SaveActionText, StringFormat='&#xE792; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding SaveActionText, StringFormat='&#xE792; {0}'}, Android={Binding SaveActionText, StringFormat='&#x1F4BE; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding SaveCommand}"
                         IsEnabled="{Binding IsNotBusy}"
                         Style="{StaticResource ButtonSuccess}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="5"
-                        Text="{Binding OpenOutputFolderActionText, StringFormat='&#xE8B7; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding OpenOutputFolderActionText, StringFormat='&#xE8B7; {0}'}, Android={Binding OpenOutputFolderActionText, StringFormat='&#x1F4C1; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding OpenOutputFolderCommand}"
                         Style="{StaticResource ButtonOutline}"
                         FontSize="13"
@@ -92,7 +92,7 @@
                                                      VerticalOptions="Center"
                                                      HorizontalOptions="Center"
                                                      Spacing="10">
-                                    <Label Text="&#xE894;" FontFamily="Segoe MDL2 Assets" FontSize="48"
+                                    <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48"
                                            TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                     <Label Text="{Binding PreviewActionText, StringFormat='点击「{0}」查看PDF'}" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                                 </VerticalStackLayout>
@@ -186,20 +186,20 @@
                                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8" Padding="4,6" Style="{StaticResource TableRowInteractive}">
                                             <Label Text="✓" TextColor="{StaticResource Secondary}" FontSize="16" VerticalOptions="Center"/>
                                             <Label Grid.Column="1" Text="{Binding FileName}" VerticalOptions="Center" FontSize="12" LineBreakMode="TailTruncation"/>
-                                            <Button Grid.Column="2" Text="&#xE8BD; 预览"
-                                                    FontFamily="Segoe MDL2 Assets"
+                                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE8BD; 预览', Android='&#x1F441;&#xFE0F; 预览'}"
+                                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                     FontSize="12" Padding="8,0" HeightRequest="30"
                                                     IsEnabled="{Binding IsPdf}"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PreviewFileCommand}"
                                                     CommandParameter="{Binding .}"/>
-                                            <Button Grid.Column="3" Text="&#xE7A7; 打印"
-                                                    FontFamily="Segoe MDL2 Assets"
+                                            <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE7A7; 打印', Android='&#x1F5A8;&#xFE0F; 打印'}"
+                                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                     Style="{StaticResource WarningButton}"
                                                     FontSize="12" Padding="8,0" HeightRequest="30"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PrintFileCommand}"
                                                     CommandParameter="{Binding .}"/>
-                                            <Button Grid.Column="4" Text="&#xE741; 保存"
-                                                    FontFamily="Segoe MDL2 Assets"
+                                            <Button Grid.Column="4" Text="{OnPlatform WinUI='&#xE741; 保存', Android='&#x1F4BE; 保存'}"
+                                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                     Style="{StaticResource ButtonSuccess}"
                                                     FontSize="12" Padding="8,0" HeightRequest="30"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=SaveFileCommand}"
@@ -233,36 +233,36 @@
 
         <Border Grid.Row="3" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
             <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
-                <Button Text="&#xE72B; 返回"
-                        FontFamily="Segoe MDL2 Assets"
+                <Button Text="{OnPlatform WinUI='&#xE72B; 返回', Android='&#x2190; 返回'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding GoBackCommand}"
                         Style="{StaticResource ButtonOutline}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="1"
-                        Text="{Binding SaveSelectedActionText, StringFormat='&#xE792; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding SaveSelectedActionText, StringFormat='&#xE792; {0}'}, Android={Binding SaveSelectedActionText, StringFormat='&#x1F4BE; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding SaveSelectedCommand}"
                         Style="{StaticResource ButtonSuccess}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="2"
-                        Text="{Binding SaveAllActionText, StringFormat='&#xE792; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding SaveAllActionText, StringFormat='&#xE792; {0}'}, Android={Binding SaveAllActionText, StringFormat='&#x1F4BE; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding SaveAllFilesCommand}"
                         Style="{StaticResource ButtonSuccess}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="4"
-                        Text="{Binding PrintSelectedActionText, StringFormat='&#xE7A7; {0}'}"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI={Binding PrintSelectedActionText, StringFormat='&#xE7A7; {0}'}, Android={Binding PrintSelectedActionText, StringFormat='&#x1F5A8;&#xFE0F; {0}'}}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding PrintAllCommand}"
                         Style="{StaticResource ButtonPrimary}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="5"
-                        Text="&#xE73E; 完成工单"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI='&#xE73E; 完成工单', Android='&#x2713; 完成工单'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding CompleteWorkOrderCommand}"
                         IsVisible="{Binding IsWorkOrderCompleteVisible}"
                         Style="{StaticResource ButtonSecondary}"
@@ -270,14 +270,14 @@
                         HeightRequest="38">
                     <Button.Triggers>
                         <DataTrigger TargetType="Button" Binding="{Binding IsWorkOrderCompleted}" Value="True">
-                            <Setter Property="Text" Value="&#xE73E; 工单已完成"/>
+                            <Setter Property="Text" Value="{OnPlatform WinUI='&#xE73E; 工单已完成', Android='&#x2713; 工单已完成'}"/>
                             <Setter Property="IsEnabled" Value="False"/>
                         </DataTrigger>
                     </Button.Triggers>
                 </Button>
                 <Button Grid.Column="6"
-                        Text="&#xE73E; 完成归档"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI='&#xE73E; 完成归档', Android='&#x2713; 完成归档'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding CompleteCommand}"
                         IsVisible="{Binding IsCompleteArchiveVisible}"
                         Style="{StaticResource ButtonSecondary}"

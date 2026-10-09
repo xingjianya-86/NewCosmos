@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Components.NavigationViewItem"
@@ -30,7 +30,7 @@
             <TapGestureRecognizer Command="{Binding Source={x:Reference ThisView}, Path=TapCommand}" CommandParameter="{Binding Source={x:Reference ThisView}, Path=NavigationTarget}"/>
         </Grid.GestureRecognizers>
         <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-            <Label Text="{Binding Source={x:Reference ThisView}, Path=Icon}" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="{Binding Source={x:Reference ThisView}, Path=IconColor}"/>
+            <Label Text="{Binding Source={x:Reference ThisView}, Path=Icon}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{Binding Source={x:Reference ThisView}, Path=IconColor}"/>
             <Label Text="{Binding Source={x:Reference ThisView}, Path=Label}" FontSize="16" TextColor="{Binding Source={x:Reference ThisView}, Path=LabelColor}"/>
         </HorizontalStackLayout>
     </Grid>

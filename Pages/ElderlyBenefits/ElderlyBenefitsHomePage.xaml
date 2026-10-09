@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyBenefitsHomePage"
@@ -22,7 +22,7 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -30,7 +30,7 @@
                         <!-- 标题与职责 -->
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="高龄津贴发放" Style="{StaticResource ModuleHeroTitle}"/>
@@ -70,37 +70,44 @@
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
 
                         <!-- 申请登记 -->
-                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE710;"
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE710;', Android='&#x2795;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
                                                 Title="津贴申请登记" Description="受理登记、审核确认高龄津贴申请"
                                                 Command="{Binding OpenApplicationListCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
                         <!-- 停发办理 -->
-                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE738;"
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE738;', Android='&#x1F3B5;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
                                                 Title="停发办理" Description="死亡、户籍迁出等情形停发处理"
                                                 Command="{Binding OpenStopListCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
                         <!-- 月报表 -->
-                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE81E;"
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE81E;', Android='&#x1F6E0;&#xFE0F;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
                                                 Title="高龄津贴月报表" Description="按月生成、导出发放统计报表"
                                                 Command="{Binding OpenMonthlyReportCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
                         <!-- 后补追缴 -->
-                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="&#xE8D1;"
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}"
                                                 IconBackgroundColor="#FFF3E0" IconColor="{StaticResource WarningDark}"
                                                 Title="后补追缴" Description="高龄津贴的后补追缴"
                                                 Command="{Binding OpenRecoveryCommand}"/>
 
                         <!-- 高龄津贴复核 -->
-                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE9D5;"
+                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
                                                 Title="高龄津贴复核" Description="身份/年龄重评，停旧增新并打印三表"
                                                 Command="{Binding OpenReviewListCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
+                        <!-- 下月待办 -->
+                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE823;', Android='&#x1F4C5;'}"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="下月待办" Description="已完结档案中满80周岁待办理人员"
+                                                Command="{Binding NavigateToElderlyPendingCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
                     </Grid>

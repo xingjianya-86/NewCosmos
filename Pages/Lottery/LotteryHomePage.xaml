@@ -24,7 +24,7 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -32,7 +32,7 @@
                         <!-- 标题与职责 -->
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE834;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE834;', Android='&#x1F3C6;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="彩票助手" Style="{StaticResource ModuleHeroTitle}"/>
@@ -83,37 +83,37 @@
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
 
                         <!-- 同步历史数据 -->
-                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="&#xE8B7;"
+                        <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE8B7;', Android='&#x1F4C1;'}"
                                                 IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
                                                 Title="同步历史数据" Description="从官方接口下载双色球/大乐透开奖数据"
                                                 Command="{Binding SyncHistoryDataCommand}"/>
 
                         <!-- 快速机选 -->
-                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="&#xE834;"
+                        <components:FeatureCard Grid.Row="0" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE834;', Android='&#x1F3C6;'}"
                                                 IconBackgroundColor="#ECFDF5" IconColor="{StaticResource ModuleArchive}"
                                                 Title="快速机选" Description="随机生成一组推荐号码"
                                                 Command="{Binding QuickPickCommand}"/>
 
                         <!-- 智能预测 -->
-                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="&#xE9D9;"
+                        <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D9;', Android='&#x1F4CA;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
                                                 Title="智能预测" Description="融合算法（机器学习 + LotteryML）"
                                                 Command="{Binding OpenPredictionCommand}"/>
 
                         <!-- 历史记录 -->
-                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="&#xE81C;"
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE81C;', Android='&#x26BD;'}"
                                                 IconBackgroundColor="#FFF7ED" IconColor="#EA580C"
                                                 Title="历史记录" Description="查看往期开奖结果与统计"
                                                 Command="{Binding OpenHistoryCommand}"/>
 
                         <!-- 训练模型 -->
-                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="&#xE9D5;"
+                        <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"
                                                 IconBackgroundColor="#FEF3C7" IconColor="#D97706"
                                                 Title="训练预测模型" Description="训练 机器学习(LSTM) 与 LotteryML 模型（约5-10分钟）"
                                                 Command="{Binding TrainModelCommand}"/>
 
                         <!-- 中奖结果 -->
-                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="&#xE8D4;"
+                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}"
                                                 IconBackgroundColor="#FCE7F3" IconColor="#DB2777"
                                                 Title="中奖结果" Description="查看购彩命中、奖级与奖金明细"
                                                 Command="{Binding OpenResultCommand}"/>

@@ -17,14 +17,14 @@
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
             <Border x:Name="IconHost" WidthRequest="46" HeightRequest="46"
                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                <Label x:Name="GlyphLabel" FontFamily="Segoe Fluent Icons" FontSize="22"
+                <Label x:Name="GlyphLabel" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22"
                        HorizontalOptions="Center" VerticalOptions="Center"/>
             </Border>
             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
                 <Label x:Name="TitleLabel" Style="{StaticResource FeatureCardTitle}"/>
                 <Label x:Name="DescLabel" Style="{StaticResource FeatureCardDesc}"/>
             </VerticalStackLayout>
-            <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="14"
+            <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                    TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
         </Grid>
     </Border>

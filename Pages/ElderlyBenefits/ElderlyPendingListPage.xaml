@@ -97,7 +97,7 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="停发/建档" Style="{StaticResource ButtonSmall}"
+                    <Button Grid.Column="1" Text="复核办理" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
                             CommandParameter="{Binding .}"
@@ -126,7 +126,7 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="停发/建档" Style="{StaticResource ButtonSmall}"
+                    <Button Grid.Column="1" Text="复核办理" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
                             CommandParameter="{Binding .}"
@@ -150,14 +150,14 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE823;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="高龄津贴下月待办" Style="{StaticResource ModuleHeroTitle}"/>
@@ -189,8 +189,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE74F;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE74F;', Android='&#x1F552;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -226,8 +226,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE73E;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>

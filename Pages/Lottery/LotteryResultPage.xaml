@@ -28,14 +28,14 @@
             <Setter Property="VerticalOptions" Value="Center"/>
         </Style>
         <Style x:Key="FilterPickerGlyph" TargetType="Label">
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
+            <Setter Property="FontFamily" Value="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="TextColor" Value="{StaticResource Primary}"/>
             <Setter Property="VerticalOptions" Value="Center"/>
         </Style>
         <Style x:Key="FilterPickerChevron" TargetType="Label">
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
-            <Setter Property="Text" Value="&#xE70D;"/>
+            <Setter Property="FontFamily" Value="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"/>
+            <Setter Property="Text" Value="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
             <Setter Property="VerticalOptions" Value="Center"/>
@@ -55,13 +55,13 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE8D4;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="中奖结果" Style="{StaticResource ModuleHeroTitle}"/>
@@ -87,7 +87,7 @@
                         <HorizontalStackLayout Spacing="10">
                             <Border WidthRequest="32" HeightRequest="32" StrokeShape="RoundRectangle 16"
                                     BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="&#xE71C;" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                <Label Text="{OnPlatform WinUI='&#xE71C;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="15"
                                        TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <Label Text="筛选条件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
@@ -98,7 +98,7 @@
                             <Label Text="彩种" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <Border Grid.Column="1" Style="{StaticResource FilterPickerBorder}">
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                                    <Label Text="&#xE8D4;" Style="{StaticResource FilterPickerGlyph}"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}" Style="{StaticResource FilterPickerGlyph}"/>
                                     <Picker Grid.Column="1" Style="{StaticResource FilterPicker}"
                                             ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}"
                                             ItemDisplayBinding="{Binding Name}"/>
@@ -114,7 +114,7 @@
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                             <Border Grid.Column="0" Style="{StaticResource FilterPickerBorder}">
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                                    <Label Text="&#xE9D5;" Style="{StaticResource FilterPickerGlyph}"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" Style="{StaticResource FilterPickerGlyph}"/>
                                     <Picker Grid.Column="1" Style="{StaticResource FilterPicker}"
                                             ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilterOption}"
                                             ItemDisplayBinding="{Binding Name}"/>

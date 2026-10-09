@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Reprint.UnifiedReprintPage"
@@ -22,14 +22,14 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题行：图标 + 标题（标准结构，图标垂直居中） -->
                 <HorizontalStackLayout Spacing="14" VerticalOptions="Center">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14" VerticalOptions="Center">
-                        <Label Text="&#xE749;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE749;', Android='&#x1F4DC;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="历史补打中心" Style="{StaticResource ModuleHeroTitle}"/>
@@ -194,7 +194,7 @@
                     <!-- 选中提示 -->
                     <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding HasSelectedRecord}" BackgroundColor="White">
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="1" Spacing="1">
                                 <Label Text="{Binding SelectedRecordName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 <Label Text="{Binding SelectedRecordIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
@@ -208,9 +208,11 @@
                     <!-- ArchiveSet 域 / 动态域文书清单：模板选择（组合 Output） -->
                     <Border Style="{StaticResource CardBorder}" Padding="14" IsVisible="{Binding ShowDocsPanel}" BackgroundColor="White">
                         <VerticalStackLayout Spacing="10">
-                            <Label Text="输出分类" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="输出分类" Style="{StaticResource SectionTitleLabel}" Margin="0"
+                                   IsVisible="{Binding SupportsDocMode}"/>
                             <Picker ItemsSource="{Binding OutputCategoryOptions}"
                                     SelectedIndex="{Binding OutputCategoryIndex}"
+                                    IsVisible="{Binding SupportsDocMode}"
                                     HeightRequest="40"/>
                             <Label Text="选择打印模板" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Picker ItemsSource="{Binding Output.Templates}"
@@ -402,7 +404,7 @@
                                              VerticalOptions="Fill" HorizontalOptions="Fill"/>
                     <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16"
                                          IsVisible="{Binding Output.HasPdf, Converter={StaticResource BoolToInverseConverter}}">
-                        <Label Text="&#xE894;" FontFamily="Segoe Fluent Icons" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="选择左侧人员与分类后点击预览" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="14"/>
                     </VerticalStackLayout>
                 </Grid>
@@ -520,6 +522,9 @@
         <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
                                    IsLoading="{Binding IsOverallBusy}"
                                    LoadingText="正在加载..."/>
+
+        <!-- 隐藏 WebView：核查报告等非 Office 格式打印桥（PdfJs 渲染 → window.print()，同档案输出页） -->
+        <WebView x:Name="PdfWebView" IsVisible="False"/>
     </Grid>
 
 </ContentPage>

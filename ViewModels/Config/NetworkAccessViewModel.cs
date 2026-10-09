@@ -182,8 +182,14 @@ public partial class NetworkAccessViewModel : ViewModelBase
     [RelayCommand]
     private async Task InstallAsync()
     {
+#if ANDROID
+        var confirm = await _dialogService.DisplayAlertAsync("安装 ZeroTier",
+            "将跳转应用商店安装 ZeroTier One（Android 上组网由该 App 承担）。\n\n" +
+            "安装完成后回到本页点击“检测”，再执行接入。是否继续？", "继续", "取消");
+#else
         var confirm = await _dialogService.DisplayAlertAsync("安装 ZeroTier",
             "将安装随包分发的 ZeroTier，并授予本机接入权限（需要管理员权限，会弹出 UAC）。是否继续？", "安装", "取消");
+#endif
         if (!confirm) return;
 
         await ExecuteAsync(async () =>
@@ -228,7 +234,12 @@ public partial class NetworkAccessViewModel : ViewModelBase
                 networkId, IsPublic ? null : MoonId, CancellationToken);
             if (result.IsFailure)
             {
+#if ANDROID
+                // Android 上加入网络由 ZeroTier One App 承担：这里返回的是"已跳转去操作"的指引，不是失败
+                await _dialogService.DisplayAlertAsync("请在 ZeroTier One 中完成接入", result.Message, "确定");
+#else
                 await _dialogService.DisplayAlertAsync("接入失败", result.Message, "确定");
+#endif
                 return result;
             }
 

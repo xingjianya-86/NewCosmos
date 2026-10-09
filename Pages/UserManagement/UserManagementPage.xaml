@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:uent="clr-namespace:NewCosmos.Models.Entities.UserManagement"
@@ -56,7 +56,7 @@
                            FontSize="12" FontAttributes="Bold" TextColor="White"/>
                 </Border>
                 <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
-                    <Button Text="&#xE70F;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE70F;', Android='&#x270F;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Info}" TextColor="White"
                             CornerRadius="6"
@@ -64,7 +64,7 @@
                             CommandParameter="{Binding}"
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanEditUser}"/>
-                    <Button Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Error}" TextColor="White"
                             CornerRadius="6"
@@ -72,14 +72,14 @@
                             CommandParameter="{Binding}"
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanDeleteUser}"/>
-                    <Button Text="&#xE17F;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE17F;', Android='&#x1F511;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Warning}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ResetPasswordCommand}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanResetPassword}"/>
-                    <Button Text="&#xE8D7;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE8D7;', Android='&#x1F504;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Secondary}" TextColor="White"
                             CornerRadius="6"
@@ -115,7 +115,7 @@
                            FontSize="12" FontAttributes="Bold" TextColor="White"/>
                 </Border>
                 <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
-                    <Button Text="&#xE70F;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE70F;', Android='&#x270F;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Info}" TextColor="White"
                             CornerRadius="6"
@@ -123,7 +123,7 @@
                             CommandParameter="{Binding}"
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanEditUser}"/>
-                    <Button Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Error}" TextColor="White"
                             CornerRadius="6"
@@ -131,14 +131,14 @@
                             CommandParameter="{Binding}"
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanDeleteUser}"/>
-                    <Button Text="&#xE17F;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE17F;', Android='&#x1F511;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Warning}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ResetPasswordCommand}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanResetPassword}"/>
-                    <Button Text="&#xE8D7;" FontFamily="Segoe Fluent Icons"
+                    <Button Text="{OnPlatform WinUI='&#xE8D7;', Android='&#x1F504;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             WidthRequest="32" HeightRequest="32" Padding="0" FontSize="14"
                             BackgroundColor="{StaticResource Secondary}" TextColor="White"
                             CornerRadius="6"
@@ -164,7 +164,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                     <Border Grid.Column="0" WidthRequest="48" HeightRequest="48"
                             BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
-                        <Label Text="&#xE8C7;" FontFamily="Segoe Fluent Icons"
+                        <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                FontSize="24" TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -177,12 +177,12 @@
                            FontSize="14" TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center" Margin="8,0"/>
                     <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
-                        <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 Style="{StaticResource ButtonOutline}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditRoleCommand}"
                                 CommandParameter="{Binding}"
                                 Opacity="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditRoleOpacity}"/>
-                        <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 Style="{StaticResource WarningButton}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=DeleteRoleCommand}"
                                 CommandParameter="{Binding}"
@@ -202,7 +202,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                     <Border Grid.Column="0" WidthRequest="48" HeightRequest="48"
                             BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
-                        <Label Text="&#xE8C7;" FontFamily="Segoe Fluent Icons"
+                        <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                FontSize="24" TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -215,12 +215,12 @@
                            FontSize="14" TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center" Margin="8,0"/>
                     <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
-                        <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 Style="{StaticResource ButtonOutline}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditRoleCommand}"
                                 CommandParameter="{Binding}"
                                 Opacity="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditRoleOpacity}"/>
-                        <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 Style="{StaticResource WarningButton}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=DeleteRoleCommand}"
                                 CommandParameter="{Binding}"
@@ -314,14 +314,14 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 操作按钮 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="8">
-                        <Button Text="&#xE710; 创建用户"
-                                FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE710; 创建用户', Android='&#x2795; 创建用户'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="#33FFFFFF"
                                 TextColor="White"
                                 FontSize="14"
@@ -331,8 +331,8 @@
                                 CornerRadius="20"
                                 Opacity="{Binding CreateUserOpacity}"
                                 IsVisible="{Binding IsUsersTabSelected}"/>
-                        <Button Text="&#xE710; 创建角色"
-                                FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE710; 创建角色', Android='&#x2795; 创建角色'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="White"
                                 TextColor="{StaticResource Primary}"
                                 FontSize="14"
@@ -349,7 +349,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="用户与权限管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -371,17 +371,17 @@
         <!-- Row 2: Tab 切换栏 -->
         <Border Grid.Row="2" BackgroundColor="White" Padding="20,8" Margin="0,1,0,0">
             <HorizontalStackLayout Spacing="0">
-                <Button Text="&#xE77B; 用户管理" FontFamily="Segoe Fluent Icons"
+                <Button Text="{OnPlatform WinUI='&#xE77B; 用户管理', Android='&#x1F464; 用户管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                         Command="{Binding SwitchTabCommand}" CommandParameter="Users"
                         BackgroundColor="{Binding IsUsersTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsUsersTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
                         CornerRadius="0" Padding="16,8" FontSize="16"/>
-                <Button Text="&#xE8C7; 角色管理" FontFamily="Segoe Fluent Icons"
+                <Button Text="{OnPlatform WinUI='&#xE8C7; 角色管理', Android='&#x1F3E0; 角色管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                         Command="{Binding SwitchTabCommand}" CommandParameter="Roles"
                         BackgroundColor="{Binding IsRolesTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsRolesTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
                         CornerRadius="0" Padding="16,8" FontSize="16"/>
-                <Button Text="&#xE9D9; 权限配置" FontFamily="Segoe Fluent Icons"
+                <Button Text="{OnPlatform WinUI='&#xE9D9; 权限配置', Android='&#x1F4CA; 权限配置'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                         Command="{Binding SwitchTabCommand}" CommandParameter="Permissions"
                         BackgroundColor="{Binding IsPermissionsTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsPermissionsTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
@@ -405,7 +405,7 @@
                             <Border StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray100}"
                                     Padding="12,6">
                                 <Grid ColumnDefinitions="Auto,*">
-                                    <Label Text="&#xE721;" FontFamily="Segoe Fluent Icons"
+                                    <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                            FontSize="14" TextColor="{StaticResource Gray500}"
                                            VerticalOptions="Center"/>
                                     <Entry Grid.Column="1" Placeholder="搜索用户名/姓名/手机号"
@@ -426,7 +426,7 @@
                                         ItemDisplayBinding="{Binding Name}"
                                         WidthRequest="100"/>
                             </HorizontalStackLayout>
-                            <Button Grid.Column="3" Text="&#xE721; 搜索" FontFamily="Segoe Fluent Icons"
+                            <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE721; 搜索', Android='&#x1F50D; 搜索'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     Style="{StaticResource ButtonPrimary}"
                                     HeightRequest="40" Padding="16,0"
                                     Command="{Binding SearchCommand}"/>
@@ -444,7 +444,7 @@
                     <Border Grid.Row="2" BackgroundColor="#FEF2F2" StrokeShape="RoundRectangle 8"
                             Padding="16" Margin="0,8" IsVisible="{Binding HasError}">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="&#xE783;" FontFamily="Segoe Fluent Icons"
+                            <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                    FontSize="16" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
                             <Label Text="{Binding ErrorMessage}" FontSize="14"
                                    TextColor="{StaticResource Error}" VerticalOptions="Center"
@@ -455,7 +455,7 @@
                     <!-- 空状态提示 -->
                     <VerticalStackLayout Grid.Row="3" IsVisible="{Binding HasResults, Converter={StaticResource BoolToInverseConverter}}"
                                          HorizontalOptions="Center" Padding="40" Spacing="12">
-                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons"
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                FontSize="48" TextColor="{StaticResource Gray400}"
                                HorizontalOptions="Center"/>
                         <Label Text="暂无用户数据" FontSize="16"
@@ -578,10 +578,10 @@
                     <!-- 抽屉标题 -->
                     <Border Grid.Row="0" BackgroundColor="{StaticResource Primary}" Padding="20,16">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="{Binding UserEditorViewModel.IsEditMode, Converter={StaticResource BoolToTextConverter}, ConverterParameter='编辑用户|新建用户'}"
                                    FontSize="14" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
-                            <Button Grid.Column="2" Text="&#xE711;" FontFamily="Segoe Fluent Icons"
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     BackgroundColor="Transparent" TextColor="White"
                                     Command="{Binding UserEditorViewModel.CancelCommand}"/>
                         </Grid>
@@ -645,7 +645,7 @@
                                          <Border BackgroundColor="#F1F5F9" Padding="12,8" Margin="0,4" StrokeShape="RoundRectangle 8">
                                              <Grid ColumnDefinitions="*,Auto">
                                                  <Label Text="{Binding RoleName}" FontSize="16" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-<Button Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+<Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                           Style="{StaticResource WarningButton}" WidthRequest="32" HeightRequest="32" Padding="0"
                                                           Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=UserEditorViewModel.RemoveRoleCommand}"
                                                           CommandParameter="{Binding .}"/>
@@ -661,7 +661,7 @@
                                          ItemDisplayBinding="{Binding Name}"
                                          SelectedItem="{Binding UserEditorViewModel.SelectedRoleToAdd}"
                                          HorizontalOptions="Fill"/>
-                                 <Button Grid.Column="1" Text="&#xE710;" FontFamily="Segoe Fluent Icons"
+                                 <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE710;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                          Style="{StaticResource ButtonOutline}" WidthRequest="40" HeightRequest="40" Padding="0" Margin="8,0,0,0"
                                          Command="{Binding UserEditorViewModel.AddRoleCommand}"/>
                              </Grid>
@@ -674,7 +674,7 @@
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                             <Button Grid.Column="1" Text="取消" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding UserEditorViewModel.CancelCommand}"/>
-                            <Button Grid.Column="2" Text="&#xE74E; 保存" FontFamily="Segoe Fluent Icons"
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74E; 保存', Android='&#x1F4BE; 保存'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     Style="{StaticResource ButtonPrimary}"
                                     Command="{Binding UserEditorViewModel.SaveCommand}"/>
                         </Grid>
@@ -707,10 +707,10 @@
                     <!-- 抽屉标题 -->
                     <Border Grid.Row="0" BackgroundColor="{StaticResource Primary}" Padding="20,16">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="&#xE8C7;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="{Binding RoleEditorViewModel.IsEditMode, Converter={StaticResource BoolToTextConverter}, ConverterParameter='编辑角色|新建角色'}"
                                    FontSize="14" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
-                            <Button Grid.Column="2" Text="&#xE711;" FontFamily="Segoe Fluent Icons"
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     BackgroundColor="Transparent" TextColor="White"
                                     Command="{Binding RoleEditorViewModel.CancelCommand}"/>
                         </Grid>
@@ -757,7 +757,7 @@
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                             <Button Grid.Column="1" Text="取消" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding RoleEditorViewModel.CancelCommand}"/>
-                            <Button Grid.Column="2" Text="&#xE74E; 保存" FontFamily="Segoe Fluent Icons"
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74E; 保存', Android='&#x1F4BE; 保存'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     Style="{StaticResource ButtonPrimary}"
                                     Command="{Binding RoleEditorViewModel.SaveCommand}"/>
                         </Grid>

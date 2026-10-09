@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -106,14 +106,14 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="停发办理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -148,8 +148,8 @@
                         Padding="16,8"
                         HorizontalOptions="Fill">
                     <Grid ColumnDefinitions="Auto, *, Auto">
-                        <Label Text="&#xE721;"
-                               FontFamily="Segoe MDL2 Assets"
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                               FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                FontSize="14"
                                TextColor="{StaticResource Gray500}"
                                VerticalOptions="Center"
@@ -183,8 +183,8 @@
                     StrokeShape="RoundRectangle 8"
                     Padding="14,10">
                 <HorizontalStackLayout Spacing="8">
-                    <Label Text="&#xE783;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            TextColor="{StaticResource White}"
                            VerticalOptions="Center"/>

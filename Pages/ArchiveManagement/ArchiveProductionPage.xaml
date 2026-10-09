@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ArchiveManagement.ArchiveProductionPage"
@@ -61,8 +61,8 @@
 
                                 <!-- 复制按钮 -->
                                 <Button Grid.Column="3"
-                                        Text="&#xE8C8;"
-                                        FontFamily="Segoe MDL2 Assets"
+                                        Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}"
+                                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                         FontSize="12"
                                         Padding="6,4"
                                         BackgroundColor="Transparent"
@@ -125,8 +125,8 @@
 
                                 <!-- 复制按钮 -->
                                 <Button Grid.Column="3"
-                                        Text="&#xE8C8;"
-                                        FontFamily="Segoe MDL2 Assets"
+                                        Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}"
+                                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                         FontSize="12"
                                         Padding="6,4"
                                         BackgroundColor="Transparent"
@@ -157,7 +157,7 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
@@ -170,7 +170,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8B4;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8B4;', Android='&#x1F4C2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="档案制作中心" Style="{StaticResource ModuleHeroTitle}"/>
@@ -225,7 +225,7 @@
                                     <Label Text="总字段数" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="4">
-                                    <Label Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="28" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="28" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
                                     <Label Text="点击右侧复制" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                             </Grid>
@@ -239,8 +239,8 @@
                             <Label Text="快捷操作" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
 
                             <Grid ColumnDefinitions="*" ColumnSpacing="12">
-                                <Button Text="&#xE8F5; 档案输出"
-                                        FontFamily="Segoe MDL2 Assets"
+                                <Button Text="{OnPlatform WinUI='&#xE8F5; 档案输出', Android='&#x1F50D; 档案输出'}"
+                                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                         Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding NavigateToOutputCommand}"
                                         IsEnabled="{Binding IsReady}"
@@ -253,7 +253,7 @@
                     <Border Style="{StaticResource CardBorder}" Padding="40"
                             IsVisible="{Binding HasBusinessData, Converter={StaticResource BoolToInverseConverter}}">
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
-                            <Label Text="&#xE8F5;" FontFamily="Segoe MDL2 Assets" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE8F5;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                             <Label Text="请从工作流页面选择记录进入" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                         </VerticalStackLayout>
                     </Border>
@@ -274,7 +274,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Label Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                         <Label Grid.Column="1" Text="来源数据" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
                         <Label Grid.Column="2" Text="{Binding DataSourceType}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                     </Grid>
@@ -289,7 +289,7 @@
 
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,60">
-                                <Label Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                 <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
@@ -301,15 +301,15 @@
         <!-- 底部操作栏 -->
         <Border Grid.Row="2" Padding="20,10" BackgroundColor="White" StrokeThickness="0">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
-                <Button Text="&#xE72B; 返回"
-                        FontFamily="Segoe MDL2 Assets"
+                <Button Text="{OnPlatform WinUI='&#xE72B; 返回', Android='&#x2190; 返回'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding GoBackCommand}"
                         Style="{StaticResource ButtonOutline}"
                         FontSize="13"
                         HeightRequest="38"/>
                 <Button Grid.Column="2"
-                        Text="&#xE8F5; 开始制作"
-                        FontFamily="Segoe MDL2 Assets"
+                        Text="{OnPlatform WinUI='&#xE8F5; 开始制作', Android='&#x1F50D; 开始制作'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding NavigateToOutputCommand}"
                         IsEnabled="{Binding IsReady}"
                         Style="{StaticResource ButtonPrimary}"

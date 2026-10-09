@@ -112,14 +112,14 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 操作按钮 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="12">
-                        <Button Text="&#xE710; 手工录入"
-                                FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE710; 手工录入', Android='&#x2795; 手工录入'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="White"
                                 TextColor="#E65100"
                                 FontSize="14"
@@ -134,7 +134,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8D1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="后补追缴" Style="{StaticResource ModuleHeroTitle}"/>
@@ -235,8 +235,8 @@
                             Padding="16,8"
                             HorizontalOptions="Fill">
                         <Grid ColumnDefinitions="Auto, *">
-                            <Label Text="&#xE721;"
-                                   FontFamily="Segoe MDL2 Assets"
+                            <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                    FontSize="14"
                                    TextColor="{StaticResource Gray500}"
                                    VerticalOptions="Center"
@@ -267,8 +267,8 @@
                             Padding="16,8"
                             HorizontalOptions="Fill">
                         <Grid ColumnDefinitions="Auto, *">
-                            <Label Text="&#xE721;"
-                                   FontFamily="Segoe MDL2 Assets"
+                            <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                    FontSize="14"
                                    TextColor="{StaticResource Gray500}"
                                    VerticalOptions="Center"
@@ -333,7 +333,7 @@
                                 ItemTemplate="{StaticResource RecoverySearchSelector}">
                     <CollectionView.EmptyView>
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,0">
-                            <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="48"
+                            <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48"
                                    TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                             <Label Text="输入关键词搜索停止人员"
                                    HorizontalOptions="Center"
@@ -351,7 +351,7 @@
                         Padding="16,12"
                         IsVisible="{Binding HasSearchResults}">
                     <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
-                        <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
                         <Label Text="选择人员后点击&quot;选择&quot;进入追缴表单"
                                FontSize="13"
@@ -397,7 +397,7 @@
                                     ItemTemplate="{StaticResource RecoveryHistorySelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,0">
-                                <Label Text="&#xE74B;" FontFamily="Segoe Fluent Icons" FontSize="48"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="暂无追缴记录"
                                        HorizontalOptions="Center"
@@ -415,7 +415,7 @@
                             Padding="16,12"
                             IsVisible="{Binding HasHistoryRecords}">
                         <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
-                            <Label Text="&#xE734;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                            <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                    TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
                             <Label Text="草稿可编辑/删除，已确认/已打印记录可补打"
                                    FontSize="13"

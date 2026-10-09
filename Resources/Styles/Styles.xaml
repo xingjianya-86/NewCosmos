@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <?xaml-comp compile="true" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/maui/global"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -36,7 +36,7 @@
     <Style TargetType="Label">
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
     </Style>
 
     <!-- 标题样式 -->
@@ -88,7 +88,7 @@
     <!-- 按钮样式（设计系统 v2：全部带 PointerOver/Pressed/Disabled 视觉状态） -->
     <Style TargetType="Button">
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
         <Setter Property="Padding" Value="16,0"/>
@@ -558,20 +558,20 @@
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="TitleColor" Value="{StaticResource Gray500}"/>
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
     </Style>
 
     <Style TargetType="Editor">
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
     </Style>
 
     <Style TargetType="DatePicker">
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
     </Style>
 
     <!-- 现代卡片（Border 版，替代废弃的 Frame；页面迁移时用这些） -->

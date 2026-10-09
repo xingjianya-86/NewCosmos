@@ -19,14 +19,14 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回后补追缴" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8D1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="手工录入追缴信息" Style="{StaticResource ModuleHeroTitle}"/>
@@ -50,7 +50,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
                                        TextColor="{StaticResource Info}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -88,7 +88,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
                                        TextColor="{StaticResource Primary}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -167,7 +167,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
                                        TextColor="{StaticResource Warning}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>

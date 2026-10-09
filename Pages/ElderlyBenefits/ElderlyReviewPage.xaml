@@ -17,13 +17,13 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="高龄津贴复核办理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -74,10 +74,17 @@
                             </VerticalStackLayout>
                         </Grid>
 
-                        <Border IsVisible="{Binding IsHistoryOnly}" Style="{StaticResource CardBorder}"
+                        <!-- 补全拦截提示条：名册未建档 / 导入来源档案缺必填项时显示，按钮与确认复核的硬拦截同路径 -->
+                        <Border IsVisible="{Binding IsCompletionNeeded}" Style="{StaticResource CardBorder}"
                                 BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent" Padding="12">
-                            <Label Text="该人员仅在高龄导入名册中发放（当前库未建档）。复核确认变更时，将先补建原类别档案再停旧增新。"
-                                   FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="该人员档案来自高龄导入名册，办理复核前需先补建并补全档案信息。补全保存后将自动返回本页继续复核（复核变更将停旧增新并打印三表）。"
+                                       FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                                <Label Text="{Binding CompletionHint}" FontSize="12"
+                                       TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                <Button Text="补全历史档案" Style="{StaticResource ButtonOutline}"
+                                        Command="{Binding CompleteHistoryArchiveCommand}" HeightRequest="36"/>
+                            </VerticalStackLayout>
                         </Border>
                     </VerticalStackLayout>
                 </Border>
@@ -96,7 +103,7 @@
                                     <Label Text="{Binding OldAmountText}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
                                 </VerticalStackLayout>
                             </Border>
-                            <Label Grid.Column="1" Text="&#xE72A;" FontFamily="Segoe Fluent Icons" FontSize="20"
+                            <Label Grid.Column="1" Text="{OnPlatform WinUI='&#xE72A;', Android='&#x2753;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                    TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
                             <Border Grid.Column="2" BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
                                 <VerticalStackLayout Spacing="4">

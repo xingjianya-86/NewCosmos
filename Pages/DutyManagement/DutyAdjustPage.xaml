@@ -28,14 +28,14 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回值班表" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
 
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="班务调整管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -165,7 +165,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding LeaveFormTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelLeaveFormCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelLeaveFormCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
@@ -209,7 +209,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding SwapFormTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelSwapFormCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelSwapFormCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
@@ -281,7 +281,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding SubstituteFormTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelSubstituteFormCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelSubstituteFormCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
@@ -338,7 +338,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding ReschedulePanelTitle}" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelRescheduleFormCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CancelRescheduleFormCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">

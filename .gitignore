@@ -69,6 +69,9 @@ $RECYCLE.BIN/
 # Publish output
 publish/
 
+# 本地下载/安装包落地目录（可再生物，与 publish/ 同类）
+downloads/
+
 # Runtime generated reports
 reportfiles/
 

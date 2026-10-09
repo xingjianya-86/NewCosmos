@@ -20,7 +20,7 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </Grid>
@@ -28,7 +28,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="单位模板维护" Style="{StaticResource ModuleHeroTitle}"/>
@@ -90,7 +90,7 @@
                                 </CollectionView.ItemTemplate>
                                 <CollectionView.EmptyView>
                                     <VerticalStackLayout Spacing="8" Padding="0,40" HorizontalOptions="Center">
-                                        <Label Text="&#xE7C3;" FontFamily="Segoe Fluent Icons" FontSize="40"
+                                        <Label Text="{OnPlatform WinUI='&#xE7C3;', Android='&#x1F4ED;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="40"
                                                TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                         <Label Text="尚未配置单位模板" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                                         <Label Text="点击右上角「新增单位模板」，为接收单位上传专属证明模板文件" FontSize="12"
@@ -148,7 +148,7 @@
                             <Label Text="字段映射配置 JSON（可选，留空则按 {占位符} 直接替换）"
                                    FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Editor Text="{Binding ConfigJson}" Placeholder="字段映射 JSON 配置，可留空（例: { &quot;fields&quot;: [...] }）" HeightRequest="80"
-                                    FontSize="12" FontFamily="Consolas"/>
+                                    FontSize="12" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"/>
                         </VerticalStackLayout>
 
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">

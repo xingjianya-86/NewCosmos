@@ -10,7 +10,7 @@
     <ContentPage.Resources>
         <DataTemplate x:Key="MissingConfigRow" x:DataType="x:String">
             <Grid Padding="12,8" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                        TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
                 <Label Grid.Column="1" Text="{Binding .}" FontSize="15"
                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
@@ -25,7 +25,7 @@
             <VerticalStackLayout Spacing="16">
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White"
+                        <Label Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
@@ -43,7 +43,7 @@
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="10">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                            <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                    TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
                             <Label Text="ȱʧ�������ļ�" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                         </HorizontalStackLayout>

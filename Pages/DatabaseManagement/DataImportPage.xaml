@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.DatabaseManagement.DataImportPage"
@@ -12,10 +12,10 @@
         <converters:IntToBoolConverter x:Key="IntToBoolConverter"/>
 
         <DataTemplate x:Key="ImportLogEvenRow" x:DataType="x:String">
-            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="Consolas" Margin="0,2" BackgroundColor="White"/>
+            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}" Margin="0,2" BackgroundColor="White"/>
         </DataTemplate>
         <DataTemplate x:Key="ImportLogOddRow" x:DataType="x:String">
-            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="Consolas" Margin="0,2" BackgroundColor="#F8F9FA"/>
+            <Label Text="{Binding}" FontSize="14" TextColor="{StaticResource TextSecondary}" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}" Margin="0,2" BackgroundColor="#F8F9FA"/>
         </DataTemplate>
         <converters:AlternatingRowTemplateSelector x:Key="ImportLogRowSelector"
             EvenTemplate="{StaticResource ImportLogEvenRow}"
@@ -34,14 +34,14 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 操作按钮 -->
                     <Button Grid.Column="2"
-                            Text="&#xE72C; 清空"
-                            FontFamily="Segoe Fluent Icons"
+                            Text="{OnPlatform WinUI='&#xE72C; 清空', Android='&#x1F5D1;&#xFE0F; 清空'}"
+                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             BackgroundColor="#33FFFFFF"
                             TextColor="White"
                             FontSize="14"
@@ -55,7 +55,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="数据导入" Style="{StaticResource ModuleHeroTitle}"/>
@@ -95,13 +95,13 @@
                     <VerticalStackLayout Spacing="16">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Label Grid.Column="0" Text="文件夹选择" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                            <Button Grid.Column="2" Text="&#xE8B7; 选择文件夹" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding SelectFolderCommand}"/>
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE8B7; 选择文件夹', Android='&#x1F4C1; 选择文件夹'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding SelectFolderCommand}"/>
                         </Grid>
                         
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                         
                         <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasSelectedFolder}" Margin="0,8,0,0">
-                            <Label Grid.Column="0" Text="&#xE8B7;" FontFamily="Segoe Fluent Icons" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center" Margin="0,0,8,0"/>
+                            <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE8B7;', Android='&#x1F4C1;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center" Margin="0,0,8,0"/>
                             <Label Grid.Column="1" Text="{Binding SelectedFolderPath}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" LineBreakMode="MiddleTruncation"/>
                         </Grid>
                         
@@ -113,11 +113,11 @@
                              <VerticalStackLayout Spacing="8">
                                  <Label Text="已匹配文件" FontSize="16" FontAttributes="Bold" TextColor="#10B981"/>
                                  <Grid ColumnDefinitions="Auto,*">
-                                     <Label Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
+                                     <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE8E5;', Android='&#x1F4E4;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
                                      <Label Grid.Column="1" Text="{Binding FamilyFileName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                  </Grid>
                                  <Grid ColumnDefinitions="Auto,*">
-                                     <Label Grid.Column="0" Text="&#xE8E5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
+                                     <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE8E5;', Android='&#x1F4E4;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#10B981" VerticalOptions="Center" Margin="0,0,8,0"/>
                                      <Label Grid.Column="1" Text="{Binding PersonFileName}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                  </Grid>
                              </VerticalStackLayout>
@@ -146,11 +146,11 @@
                         </Grid>
                         
 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                             <Button Grid.Column="0" Text="&#xE873; 预览" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" 
+                             <Button Grid.Column="0" Text="{OnPlatform WinUI='&#xE873; 预览', Android='&#x1F441;&#xFE0F; 预览'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" 
                                      Command="{Binding PreviewCommand}" 
                                      IsEnabled="{Binding ShowMatchedFiles}"
                                      HeightRequest="44"/>
-                             <Button Grid.Column="1" Text="&#xE8B5; 开始导入" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" 
+                             <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE8B5; 开始导入', Android='&#x1F4E5; 开始导入'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" 
                                      Command="{Binding StartImportCommand}" 
                                      IsEnabled="{Binding CanStartImport}"
                                      HeightRequest="44"/>

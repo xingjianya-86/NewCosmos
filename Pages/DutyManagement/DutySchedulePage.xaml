@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
@@ -25,7 +25,7 @@
                                 <HorizontalStackLayout.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                                 </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                                 <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </Grid>
@@ -33,7 +33,7 @@
                         <!-- 标题与职责 -->
                         <HorizontalStackLayout Spacing="14">
                             <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8BB;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="值班管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -43,11 +43,11 @@
 
                         <!-- 年月导航行 -->
                         <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="10">
-                            <Button Grid.Column="0" Text="&#xE76B;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            <Button Grid.Column="0" Text="{OnPlatform WinUI='&#xE76B;', Android='&#x2B05;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12"
                                     BackgroundColor="#33FFFFFF" TextColor="White" WidthRequest="36" HeightRequest="32" CornerRadius="8"
                                     Padding="0" Command="{Binding PreviousMonthCommand}"/>
                             <Label Grid.Column="1" Text="{Binding MonthTitle}" FontSize="18" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" Margin="6,0"/>
-                            <Button Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="12"
+                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12"
                                     BackgroundColor="#33FFFFFF" TextColor="White" WidthRequest="36" HeightRequest="32" CornerRadius="8"
                                     Padding="0" Command="{Binding NextMonthCommand}"/>
 
@@ -224,7 +224,7 @@
                     <VerticalStackLayout Spacing="14">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="导出政务值班表" FontAttributes="Bold" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                            <Button Grid.Column="1" Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseExportPanelCommand}" Padding="4,0"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="12" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseExportPanelCommand}" Padding="4,0"/>
                         </Grid>
 
                         <Label Text="选择输出月份范围（每月一个文件；单月输出时起止相同即可）"

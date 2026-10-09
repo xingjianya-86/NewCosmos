@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 x:Class="NewCosmos.Pages.SocialAssistance.ApplicationFormPage"
@@ -33,7 +33,7 @@
                 <!-- 放弃申请：第一步原本无任何退出途径，此处为全程可用的带确认退出入口 -->
                 <components:BackButton Grid.Column="0" Command="{Binding AbandonCommand}" IconColor="White" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="1" Spacing="16" VerticalOptions="Center">
-                    <Label Text="&#xE8A5;" FontFamily="Segoe Fluent Icons" FontSize="32" TextColor="{StaticResource White}"/>
+                    <Label Text="{OnPlatform WinUI='&#xE8A5;', Android='&#x1F9FE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="32" TextColor="{StaticResource White}"/>
                     <VerticalStackLayout Spacing="2">
                         <Label Text="低收入人口认定申请" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
                         <Label Text="家庭申请 · 信息录入 · 分类认定" FontSize="16" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
@@ -306,7 +306,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Label Text="&#xE8C8;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                         <Label Grid.Column="1" Text="来源数据" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
                     </Grid>
 
@@ -338,7 +338,7 @@
                         </CollectionView.ItemTemplate>
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,40">
-                                <Label Text="&#xE8C8;" FontFamily="Segoe Fluent Icons" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                 <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
@@ -511,7 +511,7 @@
                                     Margin="16,0">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,40">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                 <Label Text="暂无家庭成员数据" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>

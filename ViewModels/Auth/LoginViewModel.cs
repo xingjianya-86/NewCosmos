@@ -398,7 +398,17 @@ public partial class LoginViewModel : ViewModelBase
             var joined = netState != null;
             var authorized = netState?.IsOk == true;
             var assignedIp = netState?.AssignedAddresses.FirstOrDefault() ?? "—";
-            var isZeroTierAddress = dbHost?.StartsWith("10.110.", StringComparison.Ordinal) == true;
+
+            // 数据库地址是否属于 ZeroTier 私有网络（不再写死 "10.110." 网段——自建控制器可任意规划）：
+            // ① 与 network.ini 配置的私有化数据库地址一致；
+            // ② 命中本机已获分配的任一 ZeroTier 地址；
+            // ③ 私有化模式已配置网络ID，且地址是回环以外的内网地址（该部署形态下基本即 ZT 段）。
+            var isZeroTierAddress =
+                IsConfiguredZeroTierHost(network, dbHost)
+                || IsAssignedZeroTierAddress(status, dbHost)
+                || (network.IsPublic == false
+                    && !string.IsNullOrWhiteSpace(network.EffectiveNetworkId)
+                    && IsPrivateNonLoopbackAddress(dbHost));
 
             // 1) 私有化模式、已接入但 database.ini 地址与网络地址不一致 → 一键切换并重启
             if (!network.IsPublic && joined
@@ -444,6 +454,43 @@ public partial class LoginViewModel : ViewModelBase
         {
             _logger.LogError(ex, "数据库连接失败自动诊断异常");
         }
+    }
+
+    /// <summary>数据库地址是否就是 network.ini 中配置的私有化 ZeroTier 地址</summary>
+    private static bool IsConfiguredZeroTierHost(NetworkOptions network, string? dbHost) =>
+        !string.IsNullOrWhiteSpace(network.DbHost)
+        && !string.IsNullOrWhiteSpace(dbHost)
+        && string.Equals(dbHost.Trim(), network.DbHost.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>数据库地址是否落在本机已获 ZeroTier 分配的任一地址上</summary>
+    private static bool IsAssignedZeroTierAddress(ZeroTierStatus? status, string? dbHost)
+    {
+        if (string.IsNullOrWhiteSpace(dbHost) || status?.Networks == null) return false;
+        var target = dbHost.Trim();
+        return status.Networks
+            .Where(n => n.AssignedAddresses != null)
+            .SelectMany(n => n.AssignedAddresses)
+            .Any(a => string.Equals(a?.Trim(), target, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>回环以外的内网地址（10./172.16-31./192.168.）——私有化部署下基本即 ZeroTier 段</summary>
+    private static bool IsPrivateNonLoopbackAddress(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        var h = host.Trim();
+        if (h.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            || h.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || h.Equals("::1", StringComparison.OrdinalIgnoreCase)
+            || h.Equals("0.0.0.0", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var parts = h.Split('.');
+        if (parts.Length != 4) return false;
+        if (!byte.TryParse(parts[0], out var first) || !byte.TryParse(parts[1], out var second)) return false;
+
+        return first == 10
+            || (first == 192 && second == 168)
+            || (first == 172 && second >= 16 && second <= 31);
     }
 
     [RelayCommand]

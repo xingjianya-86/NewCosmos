@@ -18,7 +18,7 @@
         </Border.Shadow>
         <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
             <components:BackButton x:Name="BackBtn" VerticalOptions="Center"/>
-            <Label x:Name="GlyphLabel" Grid.Column="1" FontFamily="Segoe Fluent Icons" FontSize="24"
+            <Label x:Name="GlyphLabel" Grid.Column="1" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24"
                    VerticalOptions="Center" IsVisible="False"/>
             <Grid x:Name="TitleHost" Grid.Column="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
                 <Label x:Name="TitleLabel" Style="{StaticResource PageTitleLabel}" VerticalOptions="Center"/>

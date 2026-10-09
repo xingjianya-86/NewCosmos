@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -23,7 +23,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE710;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="添加家庭成员" Style="{StaticResource ModuleHeroTitle}"/>
@@ -65,7 +65,7 @@
                     <!-- 基本信息 -->
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="12">
-                            <Label Text="&#xE77B; 基本信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B; 基本信息', Android='&#x1F464; 基本信息'}" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
                                 <Entry Grid.Row="0" Text="{Binding Name}" Placeholder="姓名"/>
                                 <Entry Grid.Row="0" Grid.Column="1" Text="{Binding IdCard}" Placeholder="身份证号"/>
@@ -80,7 +80,7 @@
                     <!-- 健康状况 -->
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="12">
-                            <Label Text="&#xE95D; 健康状况" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="{OnPlatform WinUI='&#xE95D; 健康状况', Android='&#x1F48A; 健康状况'}" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="12">
                                 <Picker Grid.Row="0" ItemsSource="{Binding HealthStatusOptions}" SelectedItem="{Binding HealthStatus}" Title="健康状况"/>
                                 <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding DisabilityTypeOptions}" SelectedItem="{Binding DisabilityType}" Title="残疾类型"/>
@@ -93,7 +93,7 @@
                     <!-- 就业信息 -->
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="12">
-                            <Label Text="&#xE8A0; 就业信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="{OnPlatform WinUI='&#xE8A0; 就业信息', Android='&#x2139;&#xFE0F; 就业信息'}" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="12">
                                 <Picker Grid.Row="0" ItemsSource="{Binding EmploymentStatusOptions}" SelectedItem="{Binding EmploymentStatus}" Title="从业状况"/>
                                 <Entry Grid.Row="0" Grid.Column="1" Text="{Binding WorkUnit}" Placeholder="工作单位"/>
@@ -114,7 +114,7 @@
                             <Label Text="搜索成员（范围：所有低收入人口档案）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                 <Entry Text="{Binding SearchText}" Placeholder="输入姓名或身份证号"/>
-                                <Button Grid.Column="1" Text="&#xE721; 搜索" Style="{StaticResource ButtonSmall}" Command="{Binding SearchMemberCommand}"/>
+                                <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE721; 搜索', Android='&#x1F50D; 搜索'}" Style="{StaticResource ButtonSmall}" Command="{Binding SearchMemberCommand}"/>
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
@@ -132,7 +132,7 @@
                                     <DataTemplate x:DataType="ent:FamilyMember">
                                         <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,4">
                                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
                                                     <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                                     <Label FontSize="12" TextColor="{StaticResource TextSecondary}">

@@ -209,6 +209,31 @@ public class ConfigService : IConfigService
         return _appOptions;
     }
 
+#if ANDROID
+    /// <summary>
+    /// Android 首装时的默认数据库主机探测：取 network.ini 中配置的 ZeroTier 数据库地址；
+    /// 空值或回环地址视为"尚未配置"，退回 127.0.0.1 交给配置向导填写。
+    /// </summary>
+    private string ProbeDefaultDatabaseHost()
+    {
+        var host = GetNetworkOptions().DbHost?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(host) || IsLoopbackHost(host))
+        {
+            Serilog.Log.Information(
+                "[ConfigService] network.ini 未配置可用的数据库地址（DbHost={DbHost}），退回 127.0.0.1 待配置向导填写", host);
+            return "127.0.0.1";
+        }
+        return host;
+    }
+
+    /// <summary>回环/本机地址判定：在手机上等同于"没有可用的数据库主机"</summary>
+    private static bool IsLoopbackHost(string host) =>
+        host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("::1", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("0.0.0.0", StringComparison.OrdinalIgnoreCase);
+#endif
+
     public DatabaseOptions GetDatabaseOptions()
     {
         if (_databaseOptions != null)
@@ -219,11 +244,14 @@ public class ConfigService : IConfigService
         if (!File.Exists(filePath))
         {
 #if ANDROID
-            // Android: 首次启动无 database.ini，返回带默认值的配置（由配置向导填写密码后保存）
-            Serilog.Log.Information("[ConfigService] database.ini 不存在，使用默认值等待用户配置");
+            // Android: 首次启动无 database.ini。这里不再写死 127.0.0.1（回环地址指向手机自身，必然连不上），
+            // 改为按预定网络环境探测：优先取 network.ini 中配置的 ZeroTier 数据库地址；
+            // 仅当它也未配置/仍是回环时才退回 127.0.0.1，等待配置向导填写。
+            var probedHost = ProbeDefaultDatabaseHost();
+            Serilog.Log.Information("[ConfigService] database.ini 不存在，按网络环境探测数据库主机: Host={Host}", probedHost);
             _databaseOptions = new DatabaseOptions
             {
-                Host = "127.0.0.1",
+                Host = probedHost,
                 Port = 5432,
                 DatabaseName = "new_cosmos",
                 Username = "new_cosmos",
@@ -527,6 +555,7 @@ public class ConfigService : IConfigService
                 case "PrintRetryIncrementMs": if (int.TryParse(value, out var retryInc)) _performanceOptions.PrintRetryIncrementMs = retryInc; break;
                 case "PermissionCacheMinutes": if (int.TryParse(value, out var permCache)) _performanceOptions.PermissionCacheMinutes = permCache; break;
                 case "PermissionVersionCheckIntervalSeconds": if (int.TryParse(value, out var permCheck)) _performanceOptions.PermissionVersionCheckIntervalSeconds = permCheck; break;
+                case "DataCenterReloadSeconds": if (int.TryParse(value, out var dcReload)) _performanceOptions.DataCenterReloadSeconds = dcReload; break;
             }
         }
 
@@ -855,7 +884,17 @@ public class ConfigService : IConfigService
 
         var filePath = Path.Combine(_configDirectory, "database.ini");
         if (!File.Exists(filePath))
+        {
+#if ANDROID
+            // Android 首装时 database.ini 可能尚未生成（配置向导还没跑完）：
+            // 这里先补齐默认配置再就地改地址，避免"自动切换数据库地址"整条链路被抛异常打断。
+            // GenerateDefaultConfigFiles 只补缺失文件，不会覆盖已有配置。
+            Serilog.Log.Information("[ConfigService] database.ini 不存在，先生成默认配置再更新数据库地址");
+            GenerateDefaultConfigFiles();
+#else
             throw new ConfigurationException("database.ini", $"数据库配置文件不存在: {filePath}");
+#endif
+        }
 
         var lines = File.ReadAllLines(filePath);
         var hostUpdated = false;
@@ -957,10 +996,15 @@ public class ConfigService : IConfigService
 
 #if ANDROID
         // Android: 用简洁的 flat 格式（与 GetDatabaseOptions 读取格式一致）
+        // 主机同样按网络环境探测：空值/回环地址在手机上无意义，退回 127.0.0.1 等待向导填写，
+        // 绝不写出 "Host="（空值会让后续所有连接失败且难以排查）。
+        var androidDbHost = string.IsNullOrWhiteSpace(networkDbHost) || IsLoopbackHost(networkDbHost)
+            ? "127.0.0.1"
+            : networkDbHost;
         databaseIniContent =
             "# 数据库连接配置（由配置向导自动生成）\n" +
             "[Database]\n" +
-            "Host=" + networkDbHost + "\n" +
+            "Host=" + androidDbHost + "\n" +
             "Port=5432\n" +
             "DatabaseName=new_cosmos\n" +
             "Username=new_cosmos\n" +

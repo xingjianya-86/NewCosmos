@@ -1,6 +1,14 @@
 # 综合数据库配置文件（示例模板）
-# 复制此文件为 database.ini 并填入真实配置
-# 格式：标准INI格式，使用节(section)和键值对(key=value)
+# 复制此文件为 database.ini 并填入真实配置。
+#
+# 解析规则：应用按 key= value 逐行匹配、忽略 [Section] 行，
+# 因此节名仅作可读性分组，改名不影响读取；同一 key 重复时后者覆盖前者（会告警）。
+# 实际被读取的 key：Host / Port / DatabaseName / Username / Password /
+#                   ConnectionTimeout / CommandTimeout / MaxPoolSize / MinPoolSize /
+#                   SslMode / TrustServerCertificate / IncludeErrorDetail / ApplicationName
+#
+# 密码：首次启动读到明文后会自动加密为 "enc:" 前缀密文（DPAPI 机器级），
+#       密文不可跨机器复制；需改密码时重新填写明文即可。
 
 [General]
 # 配置文件格式版本
@@ -13,18 +21,20 @@ DefaultModule=primary
 # 数据库类型: PostgreSQL
 Type=PostgreSQL
 # 数据库服务器主机名或IP地址
+# 本机开发/单机部署：127.0.0.1
+# 私有化 ZeroTier 部署：填 network.ini 中配置的 ZeroTier 数据库地址
 Host=127.0.0.1
 # 数据库服务器端口 (PostgreSQL: 5432)
 Port=5432
-# 数据库名称
-DatabaseName=cosmos_next
+# 数据库名称（部署机统一为 new_cosmos）
+DatabaseName=new_cosmos
 # 连接超时时间（秒）
 ConnectionTimeout=5
 
 [PrimaryAuthentication]
-# 数据库用户名
-Username=your_username
-# 数据库密码
+# 数据库用户名（与库名同名）
+Username=new_cosmos
+# 数据库密码：填写明文，应用首次读取时自动加密
 Password=your_password
 
 [PrimaryPooling]
@@ -47,34 +57,53 @@ ApplicationName=NewCosmos
 
 # 控制分类部分
 [Validation]
+# 是否验证数据库连接
 EnableConnectionValidation=true
+# 连接验证超时时间（秒）
 ConnectionValidationTimeout=5
+# 是否验证数据库架构
 EnableSchemaValidation=true
+# 是否向异常信息中带出数据库详细错误（生产环境建议 false）
+IncludeErrorDetail=true
 
 [Operational]
+# 是否使用连接池
 EnableConnectionPooling=true
+# 是否支持事务
 EnableTransactionSupport=true
-EnableQueryLogging=true
-QueryLogLevel=Error
 
 [Performance]
+# 是否启用连接弹性
 EnableConnectionResiliency=true
+# 命令超时时间（秒）
 CommandTimeout=30
+# 批量操作大小
 BatchSize=1000
+# 连接保活间隔（秒）
 KeepAliveInterval=60
+# 是否启用连接保活
 EnableKeepAlive=true
 
 # 备份配置部分
 [Backup]
+# 备份工具路径（PostgreSQL bin目录）
 PgDumpPath=pg_dump
+# 备份文件名前缀
 BackupFilePrefix=cosmos_backup
+# 备份文件扩展名
 BackupFileExtension=.sql
+# 备份保留天数
 RetentionDays=30
+# 是否压缩备份
 EnableCompression=false
 
 # Schema版本控制部分
 [Schema]
+# Schema版本
 CurrentVersion=1.0
+# 初始化时间
 InitializedAt=
+# 初始化人员
 InitializedBy=
+# 表名前缀过滤（只检测此前缀开头的表，为空则检测全部）
 TablePrefixFilter=nc_

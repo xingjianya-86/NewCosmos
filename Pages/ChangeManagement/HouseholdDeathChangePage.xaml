@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -14,7 +14,7 @@
             <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="White">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
-                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Primary}"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
                         <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -38,7 +38,7 @@
             <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="#F8F9FA">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
-                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource Primary}"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Primary}"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
                         <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>

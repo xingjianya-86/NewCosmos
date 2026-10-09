@@ -57,13 +57,13 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="高龄津贴复核" Style="{StaticResource ModuleHeroTitle}"/>
@@ -78,7 +78,7 @@
                 IsVisible="{Binding HasPendingReviews}">
             <VerticalStackLayout Spacing="0">
                 <Grid Padding="16,12" ColumnDefinitions="Auto,*" ColumnSpacing="8" BackgroundColor="{StaticResource WarningSoft}">
-                    <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding PendingCount, StringFormat='待复核队列（{0} 人）'}"
                            FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                 </Grid>
@@ -100,7 +100,7 @@
                 <Border Grid.Column="1" BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
                         StrokeShape="RoundRectangle 24" Padding="16,8" HorizontalOptions="Fill">
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                        <Label Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="14"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center" Margin="0,0,8,0"/>
                         <Entry Grid.Column="1" Placeholder="搜索在享人员姓名、身份证号"
                                Text="{Binding SearchText}" FontSize="16" BackgroundColor="Transparent"

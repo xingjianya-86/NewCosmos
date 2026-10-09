@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.DatabaseManagement.DatabaseManagementPage"
@@ -22,7 +22,7 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </Grid>
@@ -30,7 +30,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE88E;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="数据中心" Style="{StaticResource ModuleHeroTitle}"/>
@@ -52,14 +52,14 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#FEF3C7" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE8B5;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="数据导入" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                     <Label Text="导入Excel数据文件" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 </VerticalStackLayout>
                             </HorizontalStackLayout>
-                            <Button Text="&#xE8B5; 进入导入" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDataImportCommand}"/>
+                            <Button Text="{OnPlatform WinUI='&#xE8B5; 进入导入', Android='&#x1F4E5; 进入导入'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDataImportCommand}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -67,14 +67,14 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource PrimarySoft}" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="数据字典管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                     <Label Text="管理系统数据字典" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 </VerticalStackLayout>
                             </HorizontalStackLayout>
-                            <Button Text="&#xE8F1; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDictionaryManagementCommand}"/>
+                            <Button Text="{OnPlatform WinUI='&#xE8F1; 进入管理', Android='&#x1F5C2;&#xFE0F; 进入管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToDictionaryManagementCommand}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -82,14 +82,14 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource SuccessSoft}" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE9D9;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="标准配置管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                     <Label Text="管理政策标准配置" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 </VerticalStackLayout>
                             </HorizontalStackLayout>
-                            <Button Text="&#xE9D9; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToStandardConfigManagementCommand}"/>
+                            <Button Text="{OnPlatform WinUI='&#xE9D9; 进入管理', Android='&#x1F4CA; 进入管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToStandardConfigManagementCommand}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -97,14 +97,14 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#F3E8FF" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#9333EA" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE80F;', Android='&#x2696;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#9333EA" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="行政区划管理" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                     <Label Text="管理黑龙江省行政区划" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 </VerticalStackLayout>
                             </HorizontalStackLayout>
-                            <Button Text="&#xE80F; 进入管理" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToRegionManagementCommand}"/>
+                            <Button Text="{OnPlatform WinUI='&#xE80F; 进入管理', Android='&#x2696;&#xFE0F; 进入管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToRegionManagementCommand}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -116,7 +116,7 @@
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                         <VerticalStackLayout Grid.Column="0" Spacing="6">
                             <HorizontalStackLayout Spacing="12">
-                                <Label Text="&#xE9D5;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{Binding SchemaStatusColor}" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{Binding SchemaStatusColor}" VerticalOptions="Center"/>
                                 <Label Text="{Binding SchemaStatusText}" FontSize="16" FontAttributes="Bold" TextColor="{Binding SchemaStatusColor}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Spacing="12" Margin="28,0,0,0">
@@ -129,13 +129,13 @@
                             </HorizontalStackLayout>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
-                            <Button Text="&#xE74E; 创建缺失表"
-                                    FontFamily="Segoe Fluent Icons"
+                            <Button Text="{OnPlatform WinUI='&#xE74E; 创建缺失表', Android='&#x1F4BE; 创建缺失表'}"
+                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     Style="{StaticResource ButtonPrimary}"
                                     Command="{Binding InitializeSchemaCommand}"
                                     IsVisible="{Binding CanInitializeSchema}"/>
-                            <Button Text="&#xE943; 修复缺失列"
-                                    FontFamily="Segoe Fluent Icons"
+                            <Button Text="{OnPlatform WinUI='&#xE943; 修复缺失列', Android='&#x1F527; 修复缺失列'}"
+                                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     Style="{StaticResource WarningButton}"
                                     Command="{Binding FixSchemaCommand}"
                                     IsVisible="{Binding HasMissingColumns}"/>
@@ -148,7 +148,7 @@
                         IsVisible="{Binding HasMissingTables}">
                     <VerticalStackLayout Spacing="8">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="&#xE783;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                            <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                    TextColor="#856404" VerticalOptions="Center"/>
                             <Label Text="缺少数据库表" FontSize="17" FontAttributes="Bold"
                                    TextColor="#856404" VerticalOptions="Center"/>
@@ -165,7 +165,7 @@
                         IsVisible="{Binding HasMissingColumns}">
                     <VerticalStackLayout Spacing="8">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="&#xE783;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                            <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                    TextColor="#856404" VerticalOptions="Center"/>
                             <Label Text="检测到列结构不匹配" FontSize="17" FontAttributes="Bold"
                                    TextColor="#856404" VerticalOptions="Center"/>
@@ -184,7 +184,7 @@
                     <Border Grid.Column="0" Style="{StaticResource StatCard}" Background="{StaticResource StatCardGreenGradient}">
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
-                                <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                 <Label Text="连接状态" FontSize="16" TextColor="White" Opacity="0.9"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding DatabaseStatus.IsConnected, Converter={StaticResource BoolToTextConverter}, ConverterParameter='已连接|未连接'}"
@@ -196,7 +196,7 @@
                     <Border Grid.Column="1" Style="{StaticResource StatCard}" Background="{StaticResource StatCardBlueGradient}">
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
-                                <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="{OnPlatform WinUI='&#xE88E;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                 <Label Text="数据库大小" FontSize="16" TextColor="White" Opacity="0.9"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding DatabaseStatus.DatabaseSizeFormatted}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
@@ -207,7 +207,7 @@
                     <Border Grid.Column="2" Style="{StaticResource StatCard}" Background="{StaticResource StatCardPurpleGradient}">
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
-                                <Label Text="&#xE80F;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="{OnPlatform WinUI='&#xE80F;', Android='&#x2696;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                 <Label Text="总记录数" FontSize="16" TextColor="White" Opacity="0.9"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding DatabaseStatistics.TotalRecords}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
@@ -218,7 +218,7 @@
                     <Border Grid.Column="3" Style="{StaticResource StatCard}" Background="{StaticResource StatCardOrangeGradient}">
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="White"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="White"/>
                                 <Label Text="活跃用户" FontSize="16" TextColor="White" Opacity="0.9"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding DatabaseStatistics.ActiveUsers}" FontSize="24" FontAttributes="Bold" TextColor="White"/>
@@ -236,7 +236,7 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource PrimarySoft}" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE88E;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE88E;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="数据库备份" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -246,7 +246,7 @@
 
                             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
-                            <Button Text="&#xE88E; 执行备份" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding BackupDatabaseCommand}" HorizontalOptions="Fill"/>
+                            <Button Text="{OnPlatform WinUI='&#xE88E; 执行备份', Android='&#x1F4CA; 执行备份'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding BackupDatabaseCommand}" HorizontalOptions="Fill"/>
 
                             <Label Text="{Binding BackupPath, StringFormat='备份路径: {0}'}" FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
                         </VerticalStackLayout>
@@ -256,7 +256,7 @@
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">
                                 <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#FEF3C7" StrokeShape="RoundRectangle 12">
-                                    <Label Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#F59E0B" HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                     <Label Text="清理本地日志" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -266,7 +266,7 @@
 
                             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
-                            <Button Text="&#xE74D; 清理本地日志" FontFamily="Segoe Fluent Icons" Style="{StaticResource WarningButton}" Command="{Binding CleanupLogsCommand}" HorizontalOptions="Fill"/>
+                            <Button Text="{OnPlatform WinUI='&#xE74D; 清理本地日志', Android='&#x1F5D1;&#xFE0F; 清理本地日志'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource WarningButton}" Command="{Binding CleanupLogsCommand}" HorizontalOptions="Fill"/>
 
                             <Label Text="app/30天 biz/180天 err/90天" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                         </VerticalStackLayout>
@@ -279,7 +279,7 @@
                     <VerticalStackLayout Spacing="16">
                         <HorizontalStackLayout Spacing="12">
                             <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource DangerSoft}" StrokeShape="RoundRectangle 12">
-                                <Label Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="{StaticResource Error}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="{StaticResource Error}" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="清理软删除档案" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -290,8 +290,8 @@
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <Button Text="&#xE721; 检测软删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding DetectSoftDeleteCommand}" HorizontalOptions="Fill"/>
-                            <Button Grid.Column="1" Text="&#xE74D; 执行清理" FontFamily="Segoe Fluent Icons" Style="{StaticResource WarningButton}" Command="{Binding CleanupSoftDeletedCommand}" HorizontalOptions="Fill"/>
+                            <Button Text="{OnPlatform WinUI='&#xE721; 检测软删除', Android='&#x1F50D; 检测软删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" Command="{Binding DetectSoftDeleteCommand}" HorizontalOptions="Fill"/>
+                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D; 执行清理', Android='&#x1F5D1;&#xFE0F; 执行清理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource WarningButton}" Command="{Binding CleanupSoftDeletedCommand}" HorizontalOptions="Fill"/>
                         </Grid>
 
                         <Label Text="{Binding SoftDeleteResultText}" FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"
@@ -303,7 +303,7 @@
                     <VerticalStackLayout Spacing="16">
                         <HorizontalStackLayout Spacing="12">
                             <Border WidthRequest="48" HeightRequest="48" BackgroundColor="{StaticResource SuccessSoft}" StrokeShape="RoundRectangle 12">
-                                <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#10B981" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="备份文件列表" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -332,9 +332,16 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Label Text="表大小统计" Style="{StaticResource SectionTitleLabel}" Margin="0,12,0,8"/>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,12,0,8">
+                    <Label Grid.Column="0" Text="表大小统计" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="{Binding TablesToggleText}"
+                            Style="{StaticResource ButtonOutline}" FontSize="13"
+                            HeightRequest="30" Padding="12,0" MinimumWidthRequest="0"
+                            Command="{Binding ToggleShowAllTablesCommand}"
+                            IsVisible="{Binding HasMoreTables}"/>
+                </Grid>
 
-                <CollectionView ItemsSource="{Binding TableSizes}" ItemsLayout="VerticalGrid,2">
+                <CollectionView ItemsSource="{Binding VisibleTableSizes}" ItemsLayout="VerticalGrid,2">
                     <CollectionView.EmptyView>
                         <Label Text="加载中..." Style="{StaticResource EmptyStateLabel}"/>
                     </CollectionView.EmptyView>

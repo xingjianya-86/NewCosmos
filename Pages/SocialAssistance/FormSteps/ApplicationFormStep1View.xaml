@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.FormSteps.ApplicationFormStep1View"
@@ -16,7 +16,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                TextColor="{StaticResource Success}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -61,7 +61,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="&#xE707;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE707;', Android='&#x1F4CD;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -125,7 +125,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                TextColor="{StaticResource StatCardOrangeStart}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -249,7 +249,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="&#xE90D;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE90D;', Android='&#x1F3E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                TextColor="{StaticResource Error}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>

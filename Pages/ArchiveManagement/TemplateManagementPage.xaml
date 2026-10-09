@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -19,14 +19,14 @@
                     <HorizontalStackLayout.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                     </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                 </HorizontalStackLayout>
 
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE943;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE943;', Android='&#x1F527;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="文书模板管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -47,7 +47,7 @@
                         Padding="16,8"
                         HorizontalOptions="Fill">
                     <Grid ColumnDefinitions="Auto, *">
-                        <Label Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="14"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center" Margin="0,0,8,0"/>
                         <Entry Grid.Column="1" Placeholder="搜索模板名称..."
                                Text="{Binding SearchText}" FontSize="16"
@@ -108,7 +108,7 @@
                                                                FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                                     </HorizontalStackLayout>
                                                 </VerticalStackLayout>
-                                                <Label Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets"
+                                                <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                                                        FontSize="16" TextColor="{StaticResource Gray400}"
                                                        VerticalOptions="Center"/>
                                             </Grid>
@@ -173,11 +173,11 @@
                                         StrokeThickness="1" Padding="12">
                                     <Grid>
                                         <Label Text="{Binding SelectedTemplate.ConfigJson, TargetNullValue='暂无配置'}"
-                                               FontSize="14" FontFamily="Consolas"
+                                               FontSize="14" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
                                                TextColor="{StaticResource TextPrimary}"
                                                IsVisible="{Binding IsEditingConfig, Converter={StaticResource BoolToInverseConverter}}"/>
                                         <Editor Text="{Binding EditingConfigJson}"
-                                                FontSize="14" FontFamily="Consolas"
+                                                FontSize="14" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
                                                 TextColor="{StaticResource TextPrimary}"
                                                 IsVisible="{Binding IsEditingConfig}"/>
                                     </Grid>
@@ -236,31 +236,31 @@
                              <Grid ColumnDefinitions="*" HorizontalOptions="End">
                                  <HorizontalStackLayout Spacing="12" HorizontalOptions="End"
                                          IsVisible="{Binding IsNotEditing}">
-                                     <Button Text="&#xE74E; 导出" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE74E; 导出', Android='&#x1F4BE; 导出'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonPrimary}"
                                              Command="{Binding DownloadCommand}" WidthRequest="120"/>
-                                     <Button Text="&#xE777; 变更文件" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE777; 变更文件', Android='&#x1F504; 变更文件'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonSecondary}"
                                              Command="{Binding ReplaceFileCommand}" WidthRequest="130"/>
-                                     <Button Text="&#xE843; 修改字段映射" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE843; 修改字段映射', Android='&#x1F4DD; 修改字段映射'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonOutline}"
                                              Command="{Binding EditConfigCommand}" WidthRequest="160"/>
-                                     <Button Text="&#xE8F1; 修改分类" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE8F1; 修改分类', Android='&#x1F5C2;&#xFE0F; 修改分类'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonOutline}"
                                              Command="{Binding EditCategoriesCommand}" WidthRequest="120"/>
-                                     <Button Text="&#xE73A; 上移" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE73A; 上移', Android='&#x2B06;&#xFE0F; 上移'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonOutline}"
                                              Command="{Binding MoveUpCommand}" WidthRequest="80"/>
-                                     <Button Text="&#xE73B; 下移" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE73B; 下移', Android='&#x2B07;&#xFE0F; 下移'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonOutline}"
                                              Command="{Binding MoveDownCommand}" WidthRequest="80"/>
-                                     <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonDanger}"
                                              Command="{Binding DeleteCommand}" WidthRequest="120"/>
                                  </HorizontalStackLayout>
                                  <HorizontalStackLayout Spacing="12" HorizontalOptions="End"
                                          IsVisible="{Binding IsEditingConfig}">
-                                     <Button Text="&#xE74E; 保存配置" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE74E; 保存配置', Android='&#x1F4BE; 保存配置'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonPrimary}"
                                              Command="{Binding SaveConfigCommand}" WidthRequest="130"/>
                                      <Button Text="取消" Style="{StaticResource ButtonOutline}"
@@ -268,7 +268,7 @@
                                  </HorizontalStackLayout>
                                  <HorizontalStackLayout Spacing="12" HorizontalOptions="End"
                                          IsVisible="{Binding IsEditingCategories}">
-                                     <Button Text="&#xE74E; 保存分类" FontFamily="Segoe Fluent Icons"
+                                     <Button Text="{OnPlatform WinUI='&#xE74E; 保存分类', Android='&#x1F4BE; 保存分类'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                              Style="{StaticResource ButtonPrimary}"
                                              Command="{Binding SaveCategoriesCommand}" WidthRequest="130"/>
                                      <Button Text="取消" Style="{StaticResource ButtonOutline}"
@@ -381,7 +381,7 @@
                                             StrokeThickness="1" Padding="12">
                                         <Editor Text="{Binding ConfigJson}"
                                                 Placeholder='{}{"fields":[{"placeholder":"{户主姓名}","fieldKey":"HEAD_NAME"}]}'
-                                                HeightRequest="242" FontFamily="Consolas" FontSize="14"
+                                                HeightRequest="242" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}" FontSize="14"
                                                 TextColor="{StaticResource TextPrimary}"/>
                                     </Border>
                                 </VerticalStackLayout>

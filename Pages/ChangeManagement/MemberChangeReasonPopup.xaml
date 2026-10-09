@@ -18,7 +18,7 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding CancelCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </Grid>
@@ -26,7 +26,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="&#xE716;" FontFamily="Segoe Fluent Icons" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="{Binding Title}" Style="{StaticResource ModuleHeroTitle}"/>
@@ -46,7 +46,7 @@
                     <VerticalStackLayout Spacing="12">
                         <Label Text="成员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="{Binding MemberName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 <Label Text="{Binding MemberIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
@@ -84,7 +84,7 @@
                                             BackgroundColor="{StaticResource Gray50}"
                                             Padding="12" Margin="0,4">
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                            <Label Text="&#xE73E;" FontFamily="Segoe Fluent Icons" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                             <Label Grid.Column="1" Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </Border>
@@ -113,7 +113,7 @@
                 <!-- 提示 -->
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}" Stroke="Transparent">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Label Text="&#xE7BA;" FontFamily="Segoe Fluent Icons" FontSize="20" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                         <Label Grid.Column="1" Text="{Binding HintText}" FontSize="12" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                     </Grid>
                 </Border>

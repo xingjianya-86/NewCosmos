@@ -23,14 +23,14 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 每月公示文档输出按钮 -->
                     <Button Grid.Column="2"
-                            Text="&#xE7B5; 每月公示文档输出"
-                            FontFamily="Segoe Fluent Icons"
+                            Text="{OnPlatform WinUI='&#xE7B5; 每月公示文档输出', Android='&#x1F4C4; 每月公示文档输出'}"
+                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             BackgroundColor="White"
                             TextColor="{StaticResource Primary}"
                             FontSize="14"
@@ -44,7 +44,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="救助档案管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -119,7 +119,7 @@
                     <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding HasSelectedArchive}">
                         <VerticalStackLayout Spacing="12">
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="28"
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28"
                                        TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
                                     <Label Text="{Binding ApplicantName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
@@ -325,7 +325,7 @@
                                              HorizontalOptions="Fill"/>
                     <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16"
                                          IsVisible="{Binding HasPdf, Converter={StaticResource BoolToInverseConverter}}">
-                        <Label Text="&#xE894;" FontFamily="Segoe Fluent Icons" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="选择左侧档案并点击预览" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="14"/>
                     </VerticalStackLayout>
                 </Grid>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -71,7 +71,7 @@
                                             <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
                                                    VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                 FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
                                                 TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                                                 Padding="0" CornerRadius="14" VerticalOptions="Center"
@@ -116,7 +116,7 @@
                                             <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
                                                    VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                        <Button Grid.RowSpan="4" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                 FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
                                                 TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                                                 Padding="0" CornerRadius="14" VerticalOptions="Center"
@@ -157,7 +157,7 @@
                                             <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
                                                    VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                 FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
                                                 TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                                                 Padding="0" CornerRadius="14" VerticalOptions="Center"
@@ -198,7 +198,7 @@
                                             <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
                                                    VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                        <Button Grid.RowSpan="3" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                 FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
                                                 TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                                                 Padding="0" CornerRadius="14" VerticalOptions="Center"
@@ -234,7 +234,7 @@
                                             <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="14"
                                                    VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <Button Grid.RowSpan="2" Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons"
+                                        <Button Grid.RowSpan="2" Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                 FontSize="16" BackgroundColor="{StaticResource ErrorLight}"
                                                 TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                                                 Padding="0" CornerRadius="14" VerticalOptions="Center"
@@ -262,7 +262,7 @@
                         Stroke="{StaticResource Gray200}" StrokeThickness="1">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="🌾 土地信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleLandExpandedCommand}"/>
                     </Grid>
@@ -508,7 +508,7 @@
                         Stroke="{StaticResource Gray200}" StrokeThickness="1">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="📑 农业补贴" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleSubsidyExpandedCommand}"/>
                     </Grid>
@@ -538,7 +538,7 @@
                                             <Picker ItemsSource="{Binding BindingContext.SubsidyTypeOptions, Source={x:Reference StepRoot}}"
                                                     SelectedItem="{Binding SubsidyType}" HeightRequest="32" FontSize="15"
                                                     IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="1" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                            <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="15"
                                                     BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                     WidthRequest="28" HeightRequest="28" Padding="0" CornerRadius="14"
                                                     Command="{Binding BindingContext.RemoveSubsidyCommand, Source={x:Reference StepRoot}}"
@@ -581,7 +581,7 @@
                         Stroke="{StaticResource Gray200}" StrokeThickness="1">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="💸 刚性支出" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleRigidExpenditureExpandedCommand}"/>
                     </Grid>
@@ -620,7 +620,7 @@
                                                HeightRequest="28" BackgroundColor="Transparent"
                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                         <!-- 删除按钮 -->
-                                        <Button Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                        <Button Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                                 BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                 WidthRequest="24" HeightRequest="24" Padding="0" CornerRadius="12"
                                                 HorizontalOptions="End"
@@ -647,7 +647,7 @@
                         Stroke="{StaticResource Gray200}" StrokeThickness="1">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="🏠 财产信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding TogglePropertyExpandedCommand}"/>
                     </Grid>
@@ -679,7 +679,7 @@
                                             <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                             <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                            <Button Grid.Column="6" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                                     BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                     WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
                                                     Command="{Binding BindingContext.RemoveFamilyPropertyCommand, Source={x:Reference StepRoot}}"
@@ -732,7 +732,7 @@
                                             <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                             <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                            <Button Grid.Column="6" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                                     BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                     WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
                                                     Command="{Binding BindingContext.RemoveVehicleCommand, Source={x:Reference StepRoot}}"
@@ -782,7 +782,7 @@
                                             <Label Grid.Column="4" Text="评估:" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                             <Entry Grid.Column="5" Text="{Binding EstimatedValue}" HeightRequest="38" FontSize="16" Keyboard="Numeric"
                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="6" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                                            <Button Grid.Column="6" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                                     BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                     WidthRequest="38" HeightRequest="38" Padding="0" CornerRadius="19"
                                                     Command="{Binding BindingContext.RemoveMachineryCommand, Source={x:Reference StepRoot}}"
@@ -821,7 +821,7 @@
                         Stroke="{StaticResource Gray200}" StrokeThickness="1">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="👨‍👩‍👧 赡养抚养扶养" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="16"
+                        <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE70D;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 WidthRequest="38" HeightRequest="38" Padding="0" Command="{Binding ToggleSupportExpandedCommand}"/>
                     </Grid>
@@ -895,7 +895,7 @@
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
                                             <Label Text="有赡养能力" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                             <Switch Grid.Column="1" IsToggled="{Binding IsSupportAbility}" VerticalOptions="Center"/>
-                                            <Button Grid.Column="2" Text="&#xE74D;" FontFamily="Segoe Fluent Icons" FontSize="14"
+                                            <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
                                                     BackgroundColor="{StaticResource ErrorLight}" TextColor="{StaticResource Error}"
                                                     WidthRequest="24" HeightRequest="24" Padding="0" CornerRadius="12"
                                                     Command="{Binding BindingContext.RemoveSupporterCommand, Source={x:Reference StepRoot}}"

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -19,14 +19,14 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="&#xE72B;" FontFamily="Segoe Fluent Icons" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 操作按钮 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="8">
-                        <Button Text="&#xE774; 同步Schema"
-                                FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE774; 同步Schema', Android='&#x1F310; 同步Schema'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="#33FFFFFF"
                                 TextColor="White"
                                 FontSize="14"
@@ -35,8 +35,8 @@
                                 Padding="16,10"
                                 CornerRadius="20"
                                 Opacity="{Binding ManageOpacity}"/>
-                        <Button Text="&#xE9F9; 初始化"
-                                FontFamily="Segoe Fluent Icons"
+                        <Button Text="{OnPlatform WinUI='&#xE9F9; 初始化', Android='&#x1F504; 初始化'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="White"
                                 TextColor="{StaticResource Primary}"
                                 FontSize="14"
@@ -52,7 +52,7 @@
                 <!-- 标题与副标题 -->
                 <HorizontalStackLayout Spacing="14">
                     <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="&#xE8F1;" FontFamily="Segoe Fluent Icons" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="行政区划管理" Style="{StaticResource ModuleHeroTitle}"/>
@@ -200,20 +200,20 @@
                             <HorizontalStackLayout Grid.Column="1" Spacing="8">
 
                                 <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsCountyLevel}">
-                                    <Button Text="&#xE710; 新增镇" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddTownCommand}" Opacity="{Binding ManageOpacity}"/>
-                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditCountyCommand}" Opacity="{Binding ManageOpacity}"/>
-                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteCountyCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE710; 新增镇', Android='&#x2795; 新增镇'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditCountyCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteCountyCommand}" Opacity="{Binding ManageOpacity}"/>
                                 </HorizontalStackLayout>
 
                                 <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsTownLevel}">
-                                    <Button Text="&#xE710; 新增村" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddVillageCommand}" Opacity="{Binding ManageOpacity}"/>
-                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditTownCommand}" Opacity="{Binding ManageOpacity}"/>
-                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE710; 新增村', Android='&#x2795; 新增村'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding StartAddVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditTownCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteTownCommand}" Opacity="{Binding ManageOpacity}"/>
                                 </HorizontalStackLayout>
 
                                 <HorizontalStackLayout Spacing="4" IsVisible="{Binding IsVillageLevel}">
-                                    <Button Text="&#xE70F; 编辑" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditVillageCommand}" Opacity="{Binding ManageOpacity}"/>
-                                    <Button Text="&#xE74D; 删除" FontFamily="Segoe Fluent Icons" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" Command="{Binding StartEditVillageCommand}" Opacity="{Binding ManageOpacity}"/>
+                                    <Button Text="{OnPlatform WinUI='&#xE74D; 删除', Android='&#x1F5D1;&#xFE0F; 删除'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonDanger}" Command="{Binding DeleteVillageCommand}" Opacity="{Binding ManageOpacity}"/>
                                 </HorizontalStackLayout>
 
                                 <Label Text="请从左侧选择" FontSize="15" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"

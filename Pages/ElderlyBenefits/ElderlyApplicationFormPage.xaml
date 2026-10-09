@@ -22,8 +22,8 @@
                 <Shadow Brush="{StaticResource PrimaryDark}" Offset="0,4" Radius="8" Opacity="0.3"/>
             </Border.Shadow>
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
-                <Button Text="&#xE72B;"
-                        FontFamily="Segoe MDL2 Assets"
+                <Button Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}"
+                        FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         BackgroundColor="Transparent"
                         TextColor="{StaticResource White}"
                         FontSize="20"
@@ -31,7 +31,7 @@
                         VerticalOptions="Center"
                         Padding="8"/>
                 <HorizontalStackLayout Grid.Column="1" Spacing="14" VerticalOptions="Center">
-                    <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="26" TextColor="{StaticResource White}"/>
+                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="26" TextColor="{StaticResource White}"/>
                     <VerticalStackLayout Spacing="2">
                         <Label Text="高龄津贴申请登记" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
                         <Label Text="输入身份证自动评估享受类别与补发金额" FontSize="13" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
@@ -64,8 +64,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE77B;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -89,8 +89,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE7A6;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -114,8 +114,8 @@
                     <SolidColorBrush Color="{StaticResource Primary}" />
                 </Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="&#xE7B8;"
-                           FontFamily="Segoe MDL2 Assets"
+                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}"
+                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                            FontSize="14"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
@@ -152,7 +152,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -200,7 +200,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE81B;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE81B;', Android='&#x1F465;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Success}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -291,7 +291,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE8C7;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Warning}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -325,7 +325,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE7A6;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Info}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -341,31 +341,33 @@
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="2" Spacing="6">
                                     <Label Text="与申请人关系" Style="{StaticResource FormFieldLabelStyle}"/>
-                                    <Entry Text="{Binding AgentRelation}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    <Picker ItemsSource="{Binding RelationOptions}" SelectedItem="{Binding AgentRelation}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
                             </Grid>
 
                             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
                             <Label Text="代领人（代领补贴款项）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
-                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12" RowSpacing="12">
-                                <VerticalStackLayout Grid.Row="0" Spacing="6">
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                                <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="6">
                                     <Label Text="代领人姓名" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Entry Text="{Binding AgentReceiveName}" Style="{StaticResource FormFieldEntryStyle}"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="6">
                                     <Label Text="与申请人关系" Style="{StaticResource FormFieldLabelStyle}"/>
-                                    <Entry Text="{Binding AgentReceiveRelation}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    <Picker ItemsSource="{Binding RelationOptions}" SelectedItem="{Binding AgentReceiveRelation}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Row="0" Grid.Column="2" Spacing="6">
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="0" Spacing="6">
                                     <Label Text="代领原因" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Entry Text="{Binding AgentReceiveReason}" Style="{StaticResource FormFieldEntryStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Row="0" Grid.Column="3" Spacing="6">
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="6">
                                     <Label Text="代领人社保卡开户行" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Entry Text="{Binding AgentReceiveBankName}" Style="{StaticResource FormFieldEntryStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="4" Spacing="6">
+                                <VerticalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="6">
                                     <Label Text="代领人社保卡账号" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Entry Text="{Binding AgentReceiveBankAccount}" Style="{StaticResource FormFieldEntryStyle}"/>
                                 </VerticalStackLayout>
@@ -387,7 +389,7 @@
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="&#xE7B8;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -522,6 +524,8 @@
                                 <Label Text="特殊情况原因说明 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Editor Text="{Binding SpecialReason}" HeightRequest="80"
                                         Placeholder="如：因身份登记信息纠错、材料延迟申报等，需手动调整补发起止月份"/>
+                                <Label Text="提示：补发起算月与止算月都留空 = 无补发；填写后补发月数/金额/分段按该区间立即重算，须与原因说明一致"
+                                       FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                             </VerticalStackLayout>
                         </VerticalStackLayout>
                     </Border>
