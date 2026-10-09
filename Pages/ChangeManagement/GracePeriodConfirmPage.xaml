@@ -98,6 +98,11 @@
                                 <Label Text="{Binding PeriodText}" FontSize="14" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                         </Grid>
+                        <!-- 分类施保变化（户主死亡进入渐退期减去死者份额等链档案场景，原=现隐藏） -->
+                        <VerticalStackLayout Spacing="2" IsVisible="{Binding IsClassifiedChangeVisible}">
+                            <Label Text="分类施保" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding ClassifiedChangeText}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                        </VerticalStackLayout>
                         <VerticalStackLayout Spacing="6">
                             <Label Text="渐退期月数（1–12）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                             <Picker ItemsSource="{Binding MonthOptions}"

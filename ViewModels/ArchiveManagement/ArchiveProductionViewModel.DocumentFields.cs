@@ -1094,6 +1094,7 @@ public partial class ArchiveProductionViewModel
     private async Task<string> BuildGraceChangeDetailAsync(ApplicationEntity app, GracePeriodRecord grace)
     {
         var parts = new List<string>();
+        decimal? chainOldClassified = null;
 
         if (app.OriginalApplicationId > 0)
         {
@@ -1144,6 +1145,9 @@ public partial class ArchiveProductionViewModel
                 {
                     parts.Add(incomePart);
                 }
+
+                // 分类施保原值：死亡/户主变更链旧档未被编辑，旧档行即真旧值（复核链为同档覆写，不取）
+                chainOldClassified = old.ClassifiedSubsidyAmount;
             }
         }
         else
@@ -1172,7 +1176,18 @@ public partial class ArchiveProductionViewModel
         if (grace.OriginalGuaranteeAmount is > 0)
         {
             var newAmt = grace.GraceGrantAmount ?? app.HouseholdMonthlyGuaranteeAmount;
-            parts.Add($"月保障金由{FormatDecimal(grace.OriginalGuaranteeAmount.Value)}元调整为{FormatDecimal(newAmt)}元");
+            var oldAmt = grace.OriginalGuaranteeAmount.Value;
+            // 渐退封顶未触发时原额=现额：输出"无变化"，而非"由X调整为X"（曾输出"由521调整为521"错例）
+            if (oldAmt != newAmt)
+                parts.Add($"月保障金由{FormatDecimal(oldAmt)}元调整为{FormatDecimal(newAmt)}元");
+            else
+                parts.Add($"月保障金{FormatDecimal(oldAmt)}元无变化");
+        }
+
+        // 分类施保：户主死亡进入渐退期减去死者享受份额（原=现不输出）
+        if (chainOldClassified is decimal oldClassifiedAmt && oldClassifiedAmt != app.ClassifiedSubsidyAmount)
+        {
+            parts.Add($"分类施保由{FormatDecimal(oldClassifiedAmt)}元调整为{FormatDecimal(app.ClassifiedSubsidyAmount)}元");
         }
 
         parts.Add("财产状况无变化");

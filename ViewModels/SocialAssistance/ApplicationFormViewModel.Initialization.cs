@@ -631,13 +631,21 @@ public partial class ApplicationFormViewModel
                 // 供渐退期判定"低保→低收入"识别渐变前原分类（主表列已删，仅内存承载）
                 _originalClassificationContext = null;
                 _originalGuaranteeContext = null;
+                _originalApplicationId = 0;
+                _originalClassifiedContext = null;
+                _originalHeadNameContext = null;
                 if (app.OriginalApplicationId > 0)
                 {
                     var oldAppRes = await _applicationService.GetByIdAsync(app.OriginalApplicationId, ct);
                     if (oldAppRes.IsSuccess && oldAppRes.Value != null)
                     {
                         _originalClassificationContext = oldAppRes.Value.ClassificationResult;
-                        _originalGuaranteeContext = oldAppRes.Value.TotalGuaranteeAmount;
+                        // 渐退封顶原额 = 上游"户月保障金"（不含分类施保；原取 TotalGuaranteeAmount 会把
+                        // 分类施保并入户月，导致 313+208 被当作 521 户月续发——樊万河户实测错例）
+                        _originalGuaranteeContext = oldAppRes.Value.HouseholdMonthlyGuaranteeAmount;
+                        _originalApplicationId = app.OriginalApplicationId;
+                        _originalClassifiedContext = oldAppRes.Value.ClassifiedSubsidyAmount;
+                        _originalHeadNameContext = oldAppRes.Value.ApplicantName;
                     }
                 }
 

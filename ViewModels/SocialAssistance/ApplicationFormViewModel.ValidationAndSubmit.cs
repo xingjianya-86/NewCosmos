@@ -423,7 +423,8 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 保存成功且处于渐退期：提醒原/现保障金与减发是否进月报，然后预置输出文书上下文并进档案制作页。
+    /// 保存成功且处于渐退期：提醒月保障金/分类施保的原现值与减发去向，然后预置输出文书上下文并进档案制作页。
+    /// 链档案（户主死亡等停旧建新）分类施保行取上游原值 vs 渐退后现值；非链档案无分类施保行。
     /// </summary>
     private async Task ShowGracePeriodSavedReminderAsync()
     {
@@ -433,16 +434,30 @@ public partial class ApplicationFormViewModel
         var reduce = original - current;
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"已进入渐退期（{GracePeriodMonths} 个月，至 {period}）");
-        sb.AppendLine($"原保障金：{original:F2} 元/月");
+        sb.AppendLine($"月保障金：原 {original:F2} → 现 {current:F2} 元/月");
         if (reduce > 0)
         {
-            sb.AppendLine($"现保障金：{current:F2} 元/月（超过本户口类型上限，已封顶）");
-            sb.AppendLine($"减发金额：{reduce:F2} 元/月");
-            sb.AppendLine("该减发将计入「保障金减发表」（月报）。");
+            sb.AppendLine($"（超过本户口类型上限已封顶，减发 {reduce:F2} 元/月，该减发计入「保障金减发表」月报）");
         }
         else
         {
-            sb.AppendLine($"现保障金：{current:F2} 元/月（与原额一致，无减发）");
+            sb.AppendLine("（渐退期内按原额发放，月保障金无变化）");
+        }
+
+        // 分类施保：链上游原额 vs 渐退后现额（原=现不显示；减发去向一并提示）
+        if (_originalClassifiedContext is decimal origClassified)
+        {
+            var classifiedNow = ClassifiedSubsidyAmount;
+            if (origClassified != classifiedNow)
+            {
+                var classifiedReduce = origClassified - classifiedNow;
+                var headName = string.IsNullOrEmpty(_originalHeadNameContext) ? "原户主" : _originalHeadNameContext;
+                sb.AppendLine(classifiedReduce > 0
+                    ? $"分类施保：原 {origClassified:F2} → 现 {classifiedNow:F2} 元/月（减去原户主{headName}享受的 {classifiedReduce:F2} 元/月）"
+                    : $"分类施保：原 {origClassified:F2} → 现 {classifiedNow:F2} 元/月");
+                sb.AppendLine("分类施保减发已记入变更记录（分类施保减除），并计入月报「分类施保金减发人员表」。");
+            }
+            sb.AppendLine($"合计发放：原 {original + origClassified:F2} → 现 {current + classifiedNow:F2} 元/月");
         }
         sb.AppendLine("档案制作须待渐退期满后办理；可先在制作页「档案输出」打印所需文书。");
 

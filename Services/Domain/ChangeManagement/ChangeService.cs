@@ -331,6 +331,17 @@ public interface IChangeService
     Task<Result<long?>> EnsureChainCategoryAddAsync(long applicationId, string operatorName, CancellationToken ct = default);
 
     /// <summary>
+    /// 户主死亡链进入渐退期后同步分类施保减发记录（change_type=ClassifiedSubsidyReduce，挂旧档）：
+    /// 原分类施保（上游档）&gt; 渐退后现分类施保时写入，供变更历史展示「分类施保减除」、
+    /// 统计/退出纠治表排除（避免一次死亡事件计两次）与月报「分类施保金减发人员表」取数。
+    /// 幂等——同户同类记录金额一致跳过、变化就地更新；条件消失（回同额）软删。
+    /// change_category=NULL（不入增减员调整表）、无快照（不抢链上死亡快照的 latest）、
+    /// change_reason_type='分类施保减除'（避开复核情况/渐退退出按 '户主死亡' 取最近一条的误读）、
+    /// triggered_grace_period/triggered_stop 恒 false。
+    /// </summary>
+    Task<Result<long?>> EnsureChainClassifiedSubsidyReduceAsync(long applicationId, string operatorName, CancellationToken ct = default);
+
+    /// <summary>
     /// 查询与本档案关联（application_id 或 new_application_id）且含快照的最近变更记录的 Before/After 快照。
     /// 定期复核审批表「死亡原因/家庭人口」取数兜底：停旧建新链的 CategoryAdd 行自身无快照
     /// （经济复核跨类行/Step5 跨类补写行），快照在链上发起记录（如户主死亡记录）；无匹配时 Value 为 null 非失败。

@@ -16,4 +16,11 @@ public static class ChangeReasonTypeConstants
 
     /// <summary>跨大类转入（接续链 Step5 分类判定补写 CategoryAdd 时，非死亡/成员变更链的兜底原因类型）</summary>
     public const string CrossCategoryTransfer = "跨大类转入";
+
+    /// <summary>
+    /// 户主死亡进入渐退期的分类施保减除附属记录。
+    /// 故意不复用 HeadDeceased——复核情况/渐退退出取数按 ('经济复核','户主死亡') 取"最近一条"，
+    /// 本记录 id 更大且同日期，会造成旧档文书误读本记录。
+    /// </summary>
+    public const string ClassifiedSubsidyReduce = "分类施保减除";
 }

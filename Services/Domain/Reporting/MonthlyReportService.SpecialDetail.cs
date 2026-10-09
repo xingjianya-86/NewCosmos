@@ -1467,6 +1467,28 @@ public partial class MonthlyReportService
     }
 
     /// <summary>
+    /// 户主死亡渐退分类施保减发行（施保金减发数据源之二：nc_biz_change_records 挂旧档，
+    /// 户主/地址/类别/原现户月取旧档，死亡成员取 nc_biz_death_records）
+    /// </summary>
+    private class ShiBaoReduceRow
+    {
+        public long Id { get; set; }
+        public DateTime ChangeDate { get; set; }
+        public decimal OldGuaranteeAmount { get; set; }
+        public decimal NewGuaranteeAmount { get; set; }
+        public string? ApplicantName { get; set; }
+        public string? ApplicantIdCard { get; set; }
+        public string? ClassificationResult { get; set; }
+        public string? Address { get; set; }
+        public string? District { get; set; }
+        public string? Town { get; set; }
+        public string? Community { get; set; }
+        public decimal OldMonthly { get; set; }
+        public decimal? NewMonthly { get; set; }
+        public string? DeceasedName { get; set; }
+    }
+
+    /// <summary>
     /// 分类施保增发候选户成员行（低保导入库 persons JOIN families，含户内全部成员；
     /// TotalClassifiedAmount 用于区分符合增发条件成员与户内其他成员）
     /// </summary>

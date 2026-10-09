@@ -16,7 +16,9 @@ public sealed record GracePeriodConfirmParameter(
     decimal GuaranteeAmount,
     int Months,
     DateTime StartDate,
-    DateTime EndDate);
+    DateTime EndDate,
+    decimal? OriginalClassifiedAmount = null,
+    decimal? NewClassifiedAmount = null);
 
 /// <summary>渐退期确认结果：确认 => Confirmed=true 并携带所选月数；取消 => Confirmed=false</summary>
 public sealed record GracePeriodConfirmResult(bool Confirmed, int SelectedMonths);
@@ -72,6 +74,14 @@ public partial class GracePeriodConfirmViewModel : ObservableObject
     [ObservableProperty]
     private string _hintText = string.Empty;
 
+    /// <summary>分类施保变化行是否显示（链档案原/现分类施保有差异时）</summary>
+    [ObservableProperty]
+    private bool _isClassifiedChangeVisible;
+
+    /// <summary>分类施保变化行文本，如 "208.00 → 104.00 元/月（减发 104.00 元）"</summary>
+    [ObservableProperty]
+    private string _classifiedChangeText = string.Empty;
+
     /// <summary>所选渐退期月数（Picker，默认判定结果月数/6）</summary>
     [ObservableProperty]
     private int _selectedMonth = GracePeriodConstants.DEFAULT_MONTHS;
@@ -109,6 +119,21 @@ public partial class GracePeriodConfirmViewModel : ObservableObject
         PeriodText = $"{parameter.StartDate:yyyy-MM-dd} 至 {end:yyyy-MM-dd}（{months} 个月）";
 
         HintText = "确认后本次分类判定将写入渐退期状态并在保存时激活渐退记录；取消则不应用本次渐退，可返回修改数据后重新判定。";
+
+        // 分类施保变化行：仅链档案（原/现均有值且不同）显示——户主死亡进入渐退期减去死者份额场景
+        if (parameter.OriginalClassifiedAmount is decimal oc && parameter.NewClassifiedAmount is decimal nc && oc != nc)
+        {
+            var diff = oc - nc;
+            IsClassifiedChangeVisible = true;
+            ClassifiedChangeText = diff > 0
+                ? $"{oc:N2} → {nc:N2} 元/月（减发 {diff:N2} 元）"
+                : $"{oc:N2} → {nc:N2} 元/月（增发 {-diff:N2} 元）";
+        }
+        else
+        {
+            IsClassifiedChangeVisible = false;
+            ClassifiedChangeText = string.Empty;
+        }
     }
 
     /// <summary>确认（回传所选月数）</summary>

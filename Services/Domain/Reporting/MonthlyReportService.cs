@@ -1327,10 +1327,13 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     }
 
     /// <summary>
-    /// 分类施保金减发（低保导入库）：农村/城市低保导入表 person_classified_amount&gt;0 的户，
-    /// 户内本月满 18 周岁成员（含户主）每人一行——即 18 周岁生日落在本月自然月
-    /// [本月1日, 下月1日) 的成员。享受日期=纳入时间（imported_at）。
-    /// 减发金额=人员分类施保金额；原/现分类施保金=0。
+    /// 分类施保金减发（两个数据源）：
+    /// ① 低保导入库：农村/城市低保导入表 person_classified_amount&gt;0 的户，户内本月满 18 周岁成员
+    ///    （含户主）每人一行——即 18 周岁生日落在本月自然月 [本月1日, 下月1日) 的成员，
+    ///    享受日期=纳入时间（imported_at），减发金额=人员分类施保金额，原/现分类施保金=0。
+    /// ② 户主死亡进入渐退期的分类施保减发（nc_biz_change_records，change_type=ClassifiedSubsidyReduce，
+    ///    挂旧档）：changed_at 落在本月 B 线周期（与保障金增减发同口径）；户主/地址/类别/原现户月取旧档，
+    ///    减发成员取死亡记录（缺失回退旧档户主=死亡户主本人），原/现分类施保取记录 old/new_guarantee_amount。
     /// </summary>
     public async Task<Result<List<MonthlyShiBaoRow>>> GetShiBaoReductionRowsAsync(int year, int month, CancellationToken ct = default)
     {
@@ -1364,8 +1367,40 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         var rows = new List<MonthlyShiBaoRow>();
         var families = result.Value ?? new List<ShiBaoFamilyRow>();
 
+        // ② 户主死亡渐退分类施保减发（变更记录口径；B 线周期内 changed_at，先于享受日期映射取出）
+        var cycleResult = await GetCycleRangeAsync(year, month, ct);
+        if (cycleResult.IsFailure)
+            return Result.Failure<List<MonthlyShiBaoRow>>(cycleResult.ErrorCode!, cycleResult.Message!);
+        var cycle = cycleResult.Value;
+
+        var reduceSql = @"SELECT cr.id, cr.change_date, cr.old_guarantee_amount, cr.new_guarantee_amount,
+                                 a.applicant_name, a.applicant_id_card, a.classification_result,
+                                 a.address, a.district, a.town, a.community,
+                                 a.household_monthly_guarantee_amount AS old_monthly,
+                                 n.household_monthly_guarantee_amount AS new_monthly,
+                                 d.member_name AS deceased_name
+                          FROM nc_biz_change_records cr
+                          JOIN nc_biz_applications a ON a.id = cr.application_id AND a.deleted_at IS NULL
+                          LEFT JOIN nc_biz_applications n ON n.id = cr.new_application_id AND n.deleted_at IS NULL
+                          LEFT JOIN LATERAL (
+                              SELECT member_name FROM nc_biz_death_records d
+                              WHERE d.application_id = cr.application_id AND d.is_household_head
+                                AND (cr.new_application_id IS NULL OR d.new_application_id = cr.new_application_id)
+                              ORDER BY d.id DESC LIMIT 1
+                          ) d ON TRUE
+                          WHERE cr.change_type = $1 AND cr.deleted_at IS NULL
+                            AND cr.old_guarantee_amount > cr.new_guarantee_amount
+                            AND cr.changed_at >= $2 AND cr.changed_at < $3
+                          ORDER BY cr.id";
+        var reduceResult = await _db.QueryAsync<ShiBaoReduceRow>(reduceSql, ct,
+            DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE, cycle.Start, cycle.End);
+        if (reduceResult.IsFailure)
+            return Result.Failure<List<MonthlyShiBaoRow>>(reduceResult.ErrorCode!, reduceResult.Message!);
+        var reduceRows = reduceResult.Value ?? new List<ShiBaoReduceRow>();
+
         // 初次享受日期统一：导入库建档户取纳入时间、其余取首次审批时间（LoadApprovalDateMapAsync），与停保/增减发/自然减员同口径
-        var dateMapResult = await LoadApprovalDateMapAsync(families.Select(f => f.ApplicantIdCard), ct);
+        var dateMapResult = await LoadApprovalDateMapAsync(
+            families.Select(f => f.ApplicantIdCard).Concat(reduceRows.Select(r => r.ApplicantIdCard)), ct);
         if (dateMapResult.IsFailure)
             return Result.Failure<List<MonthlyShiBaoRow>>(dateMapResult.ErrorCode!, dateMapResult.Message!);
         var dateMap = dateMapResult.Value;
@@ -1400,6 +1435,31 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 });
             }
         }
+
+        // ② 减发行装配：户主=旧档户主（樊万河户），减发成员=死亡记录户主姓名，低保金原/现=旧/新档户月
+        foreach (var red in reduceRows)
+        {
+            var enjoy = dateMap.TryGetValue(red.ApplicantIdCard ?? "", out var rdt)
+                ? rdt
+                : monthLast.ToString("yyyy-MM-dd");
+
+            rows.Add(new MonthlyShiBaoRow
+            {
+                HeadName = red.ApplicantName ?? "",
+                MemberName = string.IsNullOrEmpty(red.DeceasedName) ? red.ApplicantName ?? "" : red.DeceasedName,
+                Address = JoinFullAddress(red.District, red.Town, red.Community, red.Address),
+                Category = "最低生活保障对象",
+                EnjoyDate = enjoy,
+                OriginalAmount = red.OldMonthly.ToString("F2"),
+                OriginalClassified = red.OldGuaranteeAmount.ToString("F2"),
+                Reason = ChangeReasonTypeConstants.HeadDeceased,
+                DecreaseAmount = (red.OldGuaranteeAmount - red.NewGuaranteeAmount).ToString("F2"),
+                CurrentAmount = (red.NewMonthly ?? red.OldMonthly).ToString("F2"),
+                CurrentClassified = red.NewGuaranteeAmount.ToString("F2"),
+                IsRural = ClassificationConstants.IsCodeRural(red.ClassificationResult ?? "")
+            });
+        }
+
         return Result.Success(rows);
     }
 

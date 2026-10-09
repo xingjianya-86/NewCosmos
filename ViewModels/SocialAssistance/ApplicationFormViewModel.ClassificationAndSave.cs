@@ -206,7 +206,9 @@ public partial class ApplicationFormViewModel
                 // 渐退期（1B：判定命中先弹确认页，确认后才应用；取消则本次不进渐退、可改数据再判定）
                 if (classification.GracePeriod != null && classification.GracePeriod.IsEligible)
                 {
-                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, ct);
+                    // 链档案渐退期内按原分类待遇重算分类施保（低收入判定不算分类施保，死亡/变更链新档需保住幸存成员份额）
+                    var graceClassified = await TryCalcChainGraceClassifiedAsync(application, ct);
+                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, graceClassified, ct);
                     if (selectedMonths is int months && GracePeriodConstants.IsValidMonths(months))
                     {
                         IsInGracePeriod = true;
@@ -214,6 +216,8 @@ public partial class ApplicationFormViewModel
                         GracePeriodStartDate = classification.GracePeriod.StartDate;
                         GracePeriodEndDate = classification.GracePeriod.StartDate.AddMonths(months).AddDays(-1);
                         OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
+                        if (graceClassified != null)
+                            ApplyGraceClassifiedSubsidy(graceClassified);
                         await ApplyGraceCapAsync(priorGuaranteeForGrace, ct);
                     }
                     else
@@ -345,7 +349,9 @@ public partial class ApplicationFormViewModel
                 // 渐退期（1B：判定命中先弹确认页，确认后才应用；取消则本次不进渐退、可改数据再判定）
                 if (classification.GracePeriod != null && classification.GracePeriod.IsEligible)
                 {
-                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, CancellationToken);
+                    // 链档案渐退期内按原分类待遇重算分类施保（低收入判定不算分类施保，死亡/变更链新档需保住幸存成员份额）
+                    var graceClassified = await TryCalcChainGraceClassifiedAsync(application, CancellationToken);
+                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, graceClassified, CancellationToken);
                     if (selectedMonths is int months && GracePeriodConstants.IsValidMonths(months))
                     {
                         IsInGracePeriod = true;
@@ -353,6 +359,8 @@ public partial class ApplicationFormViewModel
                         GracePeriodStartDate = classification.GracePeriod.StartDate;
                         GracePeriodEndDate = classification.GracePeriod.StartDate.AddMonths(months).AddDays(-1);
                         OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
+                        if (graceClassified != null)
+                            ApplyGraceClassifiedSubsidy(graceClassified);
                         await ApplyGraceCapAsync(priorGuaranteeForGrace, CancellationToken);
                     }
                     else
@@ -435,9 +443,12 @@ public partial class ApplicationFormViewModel
     /// <summary>
     /// 弹出渐退期确认页（modal，模式与 MemberChangeReasonPopup 一致）：
     /// 确认 => 所选月数（调用方应用渐退状态并继续保存）；取消/异常 => null（本次不进渐退）。
+    /// graceClassified：链档案渐退口径的分类施保预估（null=非链/预估失败，确认页不显示分类施保行）。
     /// </summary>
     private async Task<int?> ShowGracePeriodConfirmAsync(
-        Services.Domain.SocialAssistance.ClassificationResult classification, CancellationToken ct)
+        Services.Domain.SocialAssistance.ClassificationResult classification,
+        ClassifiedSubsidyResult? graceClassified,
+        CancellationToken ct)
     {
         try
         {
@@ -453,7 +464,9 @@ public partial class ApplicationFormViewModel
                 classification.GuaranteeAmount,
                 grace.Months,
                 grace.StartDate,
-                grace.EndDate);
+                grace.EndDate,
+                _originalClassifiedContext,
+                graceClassified?.TotalAmount);
 
             ContentPage popup;
             Task<GracePeriodConfirmResult> resultTask;
@@ -495,6 +508,48 @@ public partial class ApplicationFormViewModel
             _logger.Error($"渐退期确认页异常: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// 链档案渐退期内分类施保预估：低收入分类不计算分类施保（ClassificationService 口径），
+    /// 渐退期内待遇按原分类（低保）对幸存成员延续，故按权威 CalculateClassifiedSubsidyAsync 重算。
+    /// 非链档案返回 null（沿用判定值，行为不变）；标准配置缺失等异常返回 null 并告警——
+    /// 预估只用于确认页展示与"确认"后应用，异常禁止按 0 写库。
+    /// </summary>
+    private async Task<ClassifiedSubsidyResult?> TryCalcChainGraceClassifiedAsync(
+        Application application, CancellationToken ct)
+    {
+        if (_originalApplicationId <= 0) return null;
+        try
+        {
+            var isRural = ClassificationConstants.HukouType.IsHukouRural(application.HukouType ?? "");
+            var sub = await _classificationService.CalculateClassifiedSubsidyAsync(
+                isRural, application, FamilyMembers.ToList(), ct);
+            if (sub == null || sub.PerPersonAmount <= 0)
+            {
+                _logger.Warn($"渐退分类施保预估无效（标准缺失或空结果），不应用: ApplicationId={_applicationId}");
+                return null;
+            }
+            return sub;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"渐退分类施保预估失败，不应用: ApplicationId={_applicationId}, {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 应用渐退期内分类施保（确认进入渐退期后调用）：Types/Count/PerPerson/Amount 与判定路径四项同步覆写，
+    /// 保障金总额由调用方后续统一合成。
+    /// </summary>
+    private void ApplyGraceClassifiedSubsidy(ClassifiedSubsidyResult sub)
+    {
+        ClassifiedSubsidyTypes = sub.Types;
+        ClassifiedSubsidyType = sub.Types;
+        ClassifiedSubsidyCount = sub.Count;
+        ClassifiedSubsidyPerPerson = sub.PerPersonAmount;
+        ClassifiedSubsidyAmount = sub.TotalAmount;
     }
 
     /// <summary>
@@ -639,6 +694,10 @@ public partial class ApplicationFormViewModel
                 // 接续链（户主死亡/成员变更等停旧建新）Step5 判定跨大类时补写 CategoryAdd：
                 // 月报「新增救助明细」跨类新增行与本档变更记录列表依赖此行（服务幂等，失败不阻断分类保存）
                 await EnsureChainCategoryAddAsync(CancellationToken);
+
+                // 户主死亡链进入渐退期：分类施保减发（上游原额>现额）补写减发记录挂旧档，
+                // 供变更历史展示、统计排除与月报「分类施保金减发人员表」取数（服务幂等，失败不阻断分类保存）
+                await EnsureChainClassifiedSubsidyReduceAsync(CancellationToken);
             }
             else
             {
@@ -678,6 +737,36 @@ public partial class ApplicationFormViewModel
         catch (Exception ex)
         {
             _logger.Warn($"接续链跨类新增CategoryAdd同步异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 户主死亡链渐退分类施保减发同步（服务端幂等：一致跳过/变化更新/条件消失软删）。
+    /// 分类已落库，同步失败仅告警不抛出，避免分类保存被报告类记录拖失败。
+    /// </summary>
+    private async Task EnsureChainClassifiedSubsidyReduceAsync(CancellationToken ct)
+    {
+        try
+        {
+            var result = await _changeService.EnsureChainClassifiedSubsidyReduceAsync(
+                _applicationId,
+                string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName,
+                ct);
+            if (result.IsSuccess)
+            {
+                if (result.Value is long changeId && changeId > 0)
+                    _logger.LogBusiness("户主死亡渐退分类施保减发记录已同步",
+                        ("ApplicationId", _applicationId),
+                        ("ChangeId", changeId));
+            }
+            else
+            {
+                _logger.Warn($"户主死亡渐退分类施保减发记录同步失败: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"户主死亡渐退分类施保减发记录同步异常: {ex.Message}");
         }
     }
 

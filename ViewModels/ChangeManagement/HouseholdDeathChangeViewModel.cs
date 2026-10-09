@@ -242,7 +242,8 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                     ("NewApplicationId", newApplicationId),
                     ("TriggeredGracePeriod", result.Value.TriggeredGracePeriod));
 
-                var successMessage = "户主死亡变更已提交，旧档案已停止。幸存家庭收入已按现行规则重算写入新档案，请在表单 Step5 完成正式分类判定（渐退资格在判定后确认）。";
+                var successMessage = "户主死亡变更已提交，旧档案已停止。幸存家庭收入已按现行规则重算写入新档案，请在表单 Step5 完成正式分类判定（渐退资格在判定后确认）。"
+                    + "\n若原家庭享受分类施保，进入渐退期后将减去死亡户主享受的份额、其余成员继续享受；减发将记入变更记录（分类施保减除）并进入月报「分类施保金减发人员表」。";
                 await _dialogService.DisplayAlertAsync("成功", successMessage, "确定");
 
                 // 弹出本页，直接进入统一申请表单（Edit 模式）规划新档案，

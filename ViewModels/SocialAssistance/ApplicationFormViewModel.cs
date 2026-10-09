@@ -710,9 +710,25 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private string? _originalClassificationContext;
 
     /// <summary>
-    /// 变更链上游档案的原月保障金额（户主死亡等停旧建新：渐退封顶比较用"原有享受额度"）
+    /// 变更链上游档案的原月保障金额（户主死亡等停旧建新：渐退封顶比较用"原有享受额度"，
+    /// 口径=户月保障金，不含分类施保，与 ApplyGraceCapAsync 文档一致）
     /// </summary>
     private decimal? _originalGuaranteeContext;
+
+    /// <summary>
+    /// 变更链上游档案ID（0=非链档案；渐退期内分类施保按原分类待遇重算的适用条件判定用）
+    /// </summary>
+    private long _originalApplicationId;
+
+    /// <summary>
+    /// 变更链上游档案的分类施保金额（渐退保存提醒/渐退审批表"分类施保由X调整为Y"取原值用）
+    /// </summary>
+    private decimal? _originalClassifiedContext;
+
+    /// <summary>
+    /// 变更链上游档案的户主姓名（渐退减发分类施保话术中"减去原户主X享受的份额"用）
+    /// </summary>
+    private string? _originalHeadNameContext;
 
     /// <summary>
     /// 渐退期内实际应发月保障金（原额超户口类型上限时已封顶；null=未封顶/未进渐退）
