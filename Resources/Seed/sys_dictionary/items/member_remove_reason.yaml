@@ -1,0 +1,17 @@
+# 家庭成员减员原因字典（固定 ID）—— 减员登记弹窗选项唯一数据源
+# 分类 ID=73（ChangeReasons，显示名：减员理由），字典项 ID 范围: 73001-73999
+# 注意：item_key=Death 是死亡联动语义哨兵（ChangeService.RebuildAndReview 按 IsDeath(ReasonCode) 写死亡记录），
+#       且月报按名称"人员死亡"识别自然减员 —— 禁止删除该项或改动 item_key/item_value。
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 73001, category: "ChangeReasons", item_key: "Death", item_value: "人员死亡", sort_order: 1, is_active: true, description: "死亡联动哨兵：禁止删除或改 key/名称" }
+      - { id: 73002, category: "ChangeReasons", item_key: "HukouMove", item_value: "户籍迁出", sort_order: 2, is_active: true }
+      - { id: 73003, category: "ChangeReasons", item_key: "MarriageMove", item_value: "婚嫁迁出", sort_order: 3, is_active: true }
+      - { id: 73004, category: "ChangeReasons", item_key: "Prison", item_value: "服刑/服兵役", sort_order: 4, is_active: true }
+      - { id: 73005, category: "ChangeReasons", item_key: "Graduation", item_value: "最高学历毕业", sort_order: 5, is_active: true }
+      - { id: 73006, category: "ChangeReasons", item_key: "JobSearchPeriodEnd", item_value: "择业期满", sort_order: 6, is_active: true }
+      - { id: 73007, category: "ChangeReasons", item_key: "Other", item_value: "其他原因", sort_order: 7, is_active: true }

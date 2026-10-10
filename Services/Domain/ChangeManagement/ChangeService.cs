@@ -172,7 +172,7 @@ public class MemberChangeEntry
     public string RelationshipToHead { get; set; } = string.Empty;
     public string MemberCategory { get; set; } = string.Empty;
 
-    /// <summary>变更原因代码（MemberChangeReasonConstants）</summary>
+    /// <summary>变更原因代码（字典 item_key，分类 ChangeReasons/MemberAddReasons）</summary>
     public string ReasonCode { get; set; } = string.Empty;
 
     /// <summary>变更原因名称（冗余存储，供输出与审计直读）</summary>

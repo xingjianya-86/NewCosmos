@@ -523,6 +523,18 @@
                                 Command="{Binding AddSubsidyCommand}"
                                 IsVisible="{Binding IsEconomyEditable}"/>
                     </Grid>
+                    <!-- 按份数比例换算补贴金额：家庭份数 ÷ 总份数 → 全部明细的 RatioFactor -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                            <Label Text="{Binding SubsidyShareRatioPercent, StringFormat='计算比例: {0:F2}%'}"
+                                   FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                            <Label Text="{Binding FamilyLandShares, StringFormat='家庭 {0:F1} 份 ÷ 总份数（见上方土地面积汇总）'}"
+                                   FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="更新计算比例" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="12,0" FontSize="16"
+                                Command="{Binding UpdateSubsidyRatioCommand}"
+                                IsVisible="{Binding IsEconomyEditable}"/>
+                    </Grid>
                     <CollectionView ItemsSource="{Binding Subsidies}" SelectionMode="None"
                                     HeightRequest="{Binding SubsidyListHeight}">
                         <CollectionView.ItemsLayout>

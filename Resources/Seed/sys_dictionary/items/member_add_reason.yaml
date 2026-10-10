@@ -1,0 +1,13 @@
+# 家庭成员增员原因字典（固定 ID）—— 增员登记弹窗选项唯一数据源
+# 分类 ID=76（MemberAddReasons，显示名：增员理由），字典项 ID 范围: 76001-76999
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 76001, category: "MemberAddReasons", item_key: "Birth", item_value: "出生", sort_order: 1, is_active: true }
+      - { id: 76002, category: "MemberAddReasons", item_key: "MarriageMoveIn", item_value: "婚嫁迁入", sort_order: 2, is_active: true }
+      - { id: 76003, category: "MemberAddReasons", item_key: "HukouMoveIn", item_value: "户籍迁入", sort_order: 3, is_active: true }
+      - { id: 76004, category: "MemberAddReasons", item_key: "SharedLivingNew", item_value: "共同生活新增", sort_order: 4, is_active: true }
+      - { id: 76005, category: "MemberAddReasons", item_key: "Other", item_value: "其他原因", sort_order: 5, is_active: true }

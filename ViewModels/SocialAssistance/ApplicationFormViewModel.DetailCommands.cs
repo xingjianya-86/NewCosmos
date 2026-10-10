@@ -238,6 +238,9 @@ public partial class ApplicationFormViewModel
     /// </summary>
     private async Task<MemberChangeReasonResult?> ShowMemberChangeReasonPopupAsync(bool isRemove, FamilyMember? member)
     {
+        // 选项来自字典缓存：先确保缓存已载入（TTL 内短路），否则纯字典下弹窗无选项
+        await _serviceProvider.GetRequiredService<IDictCacheService>().EnsureFreshAsync();
+
         var popup = _serviceProvider.GetRequiredService<Pages.ChangeManagement.MemberChangeReasonPopup>();
         popup.Initialize(isRemove, member);
 
@@ -1054,6 +1057,61 @@ public partial class ApplicationFormViewModel
     private async Task RemoveSubsidyAsync(Subsidy? subsidy) =>
         await RemoveIncomeItemAsync(Subsidies, subsidy, "农业补贴");
 
+    /// <summary>
+    /// 更新计算比例：按 家庭份数 ÷ 总份数（土地确权归户表汇总口径）算出比例系数，
+    /// 一次性回写到全部农业补贴明细的 RatioFactor 并重算金额与收入汇总。
+    /// </summary>
+    [RelayCommand]
+    private async Task UpdateSubsidyRatioAsync()
+    {
+        var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+
+        if (Subsidies.Count == 0)
+        {
+            await dialog.DisplayAlertAsync("提示", "暂无农业补贴明细，无法更新比例", "确定");
+            return;
+        }
+        if (TotalLandShares <= 0)
+        {
+            await dialog.DisplayAlertAsync("提示", "未录入土地确权份数（家庭份数/总份数为 0），无法计算比例", "确定");
+            return;
+        }
+
+        var ratio = FamilyLandShares / TotalLandShares;
+        if (ratio <= 0)
+        {
+            await dialog.DisplayAlertAsync("提示", "家庭份数为 0，计算出的比例无效，请先检查土地确权归户表", "确定");
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            foreach (var subsidy in Subsidies)
+                subsidy.RatioFactor = ratio;
+
+            RecalculateIncome();
+
+            _logger.LogBusiness("更新农业补贴计算比例",
+                ("RatioPercent", Math.Round(ratio * 100, 2)),
+                ("FamilyShares", FamilyLandShares),
+                ("TotalShares", TotalLandShares),
+                ("SubsidyCount", Subsidies.Count));
+
+            await dialog.DisplayAlertAsync("成功",
+                $"已按 {Math.Round(ratio * 100, 2)}%（{FamilyLandShares}份 ÷ {TotalLandShares}份）更新 {Subsidies.Count} 条补贴明细", "确定");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "更新农业补贴计算比例失败");
+            await dialog.DisplayAlertAsync("错误", $"更新比例失败: {ex.Message}", "确定");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     #endregion
 
     #region 财产净收入命令
@@ -1553,6 +1611,7 @@ public partial class ApplicationFormViewModel
             LandIncomeTotal = 0;
             OnPropertyChanged(nameof(CalculatedPerPersonArea));
             OnPropertyChanged(nameof(LandCalculationFormula));
+            OnPropertyChanged(nameof(SubsidyShareRatioPercent));
             RecalculateIncome();
             return;
         }
@@ -1650,6 +1709,7 @@ public partial class ApplicationFormViewModel
 
         OnPropertyChanged(nameof(CalculatedPerPersonArea));
         OnPropertyChanged(nameof(LandCalculationFormula));
+        OnPropertyChanged(nameof(SubsidyShareRatioPercent));
 
         // 按组内份额计算每人的面积
         foreach (var group in LandConfirmationGroups)

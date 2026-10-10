@@ -55,9 +55,10 @@ tables:
       - { id: 70, category: "ApplicationReasons", display_name: "申请原因", description: "救助申请原因", sort_order: 70, is_active: true }
       - { id: 71, category: "ApplicationReasonTemplates", display_name: "申请原因模板", description: "申请原因预设话术", sort_order: 71, is_active: true }
       - { id: 72, category: "DeregisterReasons", display_name: "注销原因", description: "停保注销原因", sort_order: 72, is_active: true }
-      - { id: 73, category: "ChangeReasons", display_name: "变更理由", description: "变更业务理由", sort_order: 73, is_active: true }
+      - { id: 73, category: "ChangeReasons", display_name: "减员理由", description: "家庭成员减员登记原因", sort_order: 73, is_active: true }
       - { id: 74, category: "ArchiveStatuses", display_name: "档案状态", description: "档案状态", sort_order: 74, is_active: true }
       - { id: 75, category: "ArchiveReasons", display_name: "归档原因", description: "归档原因", sort_order: 75, is_active: true }
+      - { id: 76, category: "MemberAddReasons", display_name: "增员理由", description: "家庭成员增员登记原因", sort_order: 76, is_active: true }
       
       # 权限与角色 (ID: 80-89)
       - { id: 80, category: "Permissions", display_name: "权限定义", description: "系统权限定义", sort_order: 80, is_active: true }

@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Services.Core;
 using System.Collections.ObjectModel;
 
 namespace NewCosmos.ViewModels.ChangeManagement;
@@ -19,11 +20,18 @@ public sealed record MemberChangeReasonResult(string ReasonCode, string ReasonNa
 /// <summary>
 /// 家庭成员变更登记弹窗 ViewModel（增员/减员共用）：
 /// 结果采用 TaskCompletionSource 模式（与 SelectMembersPopup 一致），弹窗由调用方 Push/Pop。
+/// 选项唯一数据源 = 字典（减员 ChangeReasons / 增员 MemberAddReasons），字典空则选项空，无硬编码兜底。
 /// </summary>
-/// 不继承 ViewModelBase（审计豁免）：纯 TCS 结果弹窗 + 表单字段，无服务调用/异步 IO。
+/// 不继承 ViewModelBase（审计豁免）：纯 TCS 结果弹窗 + 表单字段，仅同步读字典缓存快照，无异步 IO。
 public partial class MemberChangeReasonPopupViewModel : ObservableObject
 {
+    private readonly IDictCacheService _dictCacheService;
     private readonly TaskCompletionSource<MemberChangeReasonResult?> _tcs = new();
+
+    public MemberChangeReasonPopupViewModel(IDictCacheService dictCacheService)
+    {
+        _dictCacheService = dictCacheService;
+    }
 
     /// <summary>弹窗结果：确认 => 增/减员登记信息；取消 => null</summary>
     public Task<MemberChangeReasonResult?> Result => _tcs.Task;
@@ -106,13 +114,14 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
             MemberHealthStatus = member.HealthStatusDisplay;
         }
 
-        var codes = isRemoveMode ? MemberChangeReasonConstants.RemoveCodes : MemberChangeReasonConstants.AddCodes;
+        var category = isRemoveMode ? DictionaryTypeCodes.ChangeReasons : DictionaryTypeCodes.MemberAddReasons;
         Reasons = new ObservableCollection<MemberChangeReasonOption>(
-            codes.Select(c => new MemberChangeReasonOption
+            _dictCacheService.GetOptions(category).Select(o => new MemberChangeReasonOption
             {
-                Code = c,
-                Name = MemberChangeReasonConstants.GetName(isRemoveMode, c)
+                Code = o.Key,
+                Name = o.Display
             }));
+        SelectedReason = null;
     }
 
     /// <summary>确认（未选择原因时按钮不可用）</summary>

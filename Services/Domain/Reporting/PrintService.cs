@@ -582,6 +582,8 @@ public partial class PrintService : BaseService, IPrintService
                 // 分页：模板表体槽位 1..10，超 10 条拆多页
                 const int pageCapacity = 10;
                 var all = src.Value;
+                // 多页时每页落独立文件，须带页码后缀，否则同名文件互相覆盖（单页保持原文件名）
+                var pageCount = (int)Math.Ceiling(all.Count / (double)pageCapacity);
                 for (var pageIndex = 0; pageIndex * pageCapacity < all.Count; pageIndex++)
                 {
                     var pageRows = all.Skip(pageIndex * pageCapacity).Take(pageCapacity).ToList();
@@ -613,7 +615,12 @@ public partial class PrintService : BaseService, IPrintService
                             [FieldKeys.TR_BANK_ACCOUNT] = r.BankAccount
                         });
                     }
-                    pages.Add(new MonthlyFormPageData { Fields = fields, Rows = rows });
+                    pages.Add(new MonthlyFormPageData
+                    {
+                        Fields = fields,
+                        Rows = rows,
+                        TitleSuffix = pageCount > 1 ? $"_{pageIndex + 1}" : string.Empty
+                    });
                 }
                 break;
             }

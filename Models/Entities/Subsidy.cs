@@ -41,9 +41,10 @@ public partial class Subsidy : ObservableObject
     public int Count { get; set; } = 1;
 
     /// <summary>
-    /// 比例系数（用于按份额分配）
+    /// 比例系数（用于按份额分配，0~1）
     /// </summary>
-    public decimal RatioFactor { get; set; } = 1;
+    [ObservableProperty]
+    private decimal _ratioFactor = 1;
 
     /// <summary>
     /// 原始金额（元）= 面积 × 单价 × 数量
@@ -109,6 +110,16 @@ public partial class Subsidy : ObservableObject
     /// 面积变化时自动重算金额
     /// </summary>
     partial void OnAreaChanged(decimal value)
+    {
+        CalculateAmount();
+        OnPropertyChanged(nameof(Amount));
+        OnPropertyChanged(nameof(OriginalAmount));
+    }
+
+    /// <summary>
+    /// 比例系数变化时自动重算金额（如「更新计算比例」批量回写）
+    /// </summary>
+    partial void OnRatioFactorChanged(decimal value)
     {
         CalculateAmount();
         OnPropertyChanged(nameof(Amount));

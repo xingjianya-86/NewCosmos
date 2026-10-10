@@ -306,11 +306,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                 }
             }
 
-            if (Relationships.Count == 0)
-            {
-                AddDefaultRelationships();
-            }
-
             foreach (var r in Relationships.Where(r => r != PickerConstants.Relationship.HeadDisplay))
             {
                 NonHeadRelationships.Add(r);
@@ -322,35 +317,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             Relationships.Clear();
             NonHeadRelationships.Clear();
             _relationshipCodeMap.Clear();
-            AddDefaultRelationships();
-            foreach (var r in Relationships.Where(r => r != PickerConstants.Relationship.HeadDisplay))
-            {
-                NonHeadRelationships.Add(r);
-            }
-        }
-    }
-
-    private void AddDefaultRelationships()
-    {
-        var defaults = new (string code, string display)[]
-        {
-            (PickerConstants.Relationship.HeadCode, PickerConstants.Relationship.HeadDisplay),
-            (PickerConstants.Relationship.SpouseCode, PickerConstants.Relationship.SpouseDisplay),
-            (PickerConstants.Relationship.SonCode, PickerConstants.Relationship.SonDisplay),
-            (PickerConstants.Relationship.DaughterCode, PickerConstants.Relationship.DaughterDisplay),
-            (PickerConstants.Relationship.GrandchildCode, PickerConstants.Relationship.GrandchildDisplay),
-            (PickerConstants.Relationship.ParentCode, PickerConstants.Relationship.ParentDisplay),
-            (PickerConstants.Relationship.GrandparentCode, PickerConstants.Relationship.GrandparentDisplay),
-            (PickerConstants.Relationship.SiblingCode, PickerConstants.Relationship.SiblingDisplay),
-            (PickerConstants.Relationship.OtherCode, PickerConstants.Relationship.OtherDisplay)
-        };
-        foreach (var (code, display) in defaults)
-        {
-            if (!Relationships.Contains(display))
-            {
-                Relationships.Add(display);
-                _relationshipCodeMap[display] = code;
-            }
         }
     }
 
@@ -385,41 +351,15 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                     _applicationReasonCodeMap[displayValue] = item.ItemKey;
                 }
             }
-            else
-            {
-                AddDefaultApplicationReasons();
-            }
         }
-        catch
+        catch (Exception ex)
         {
-            AddDefaultApplicationReasons();
+            _logger.LogError(ex, "失败");
+            ApplicationReasons.Clear();
+            _applicationReasonCodeMap.Clear();
         }
 
         SelectedApplicationReason = ApplicationReasons.FirstOrDefault() ?? string.Empty;
-    }
-
-    private void AddDefaultApplicationReasons()
-    {
-        var defaults = new (string code, string display)[]
-        {
-            (PickerConstants.ApplicationReason.IllnessCode, PickerConstants.ApplicationReason.IllnessDisplay),
-            (PickerConstants.ApplicationReason.DisasterCode, PickerConstants.ApplicationReason.DisasterDisplay),
-            (PickerConstants.ApplicationReason.DisabilityCode, PickerConstants.ApplicationReason.DisabilityDisplay),
-            (PickerConstants.ApplicationReason.EducationCode, PickerConstants.ApplicationReason.EducationDisplay),
-            (PickerConstants.ApplicationReason.LowIncomeCode, PickerConstants.ApplicationReason.LowIncomeDisplay),
-            (PickerConstants.ApplicationReason.UnemploymentCode, PickerConstants.ApplicationReason.UnemploymentDisplay),
-            (PickerConstants.ApplicationReason.LandLossCode, PickerConstants.ApplicationReason.LandLossDisplay),
-            (PickerConstants.ApplicationReason.AccidentCode, PickerConstants.ApplicationReason.AccidentDisplay),
-            (PickerConstants.ApplicationReason.OtherCode, PickerConstants.ApplicationReason.OtherDisplay)
-        };
-        foreach (var (code, display) in defaults)
-        {
-            if (!ApplicationReasons.Contains(display))
-            {
-                ApplicationReasons.Add(display);
-                _applicationReasonCodeMap[display] = code;
-            }
-        }
     }
 
     private async Task LoadIdTypesAsync()
@@ -456,18 +396,13 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                 }
             }
 
-            if (IdTypes.Count == 0)
-            {
-                AddDefaultIdTypes();
-            }
-
             RestoreAgentIdType(previousType);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "失败");
             IdTypes.Clear();
             _idTypeCodeMap.Clear();
-            AddDefaultIdTypes();
             RestoreAgentIdType(previousType);
         }
     }
@@ -480,27 +415,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             AgentIdType = IdTypeConstants.ResidentIdCardDisplay;
         else if (IdTypes.Count > 0)
             AgentIdType = IdTypes[0];
-    }
-
-    private void AddDefaultIdTypes()
-    {
-        var defaults = new (string code, string display)[]
-        {
-            (IdTypeConstants.ResidentIdCardCode, IdTypeConstants.ResidentIdCardDisplay),
-            (IdTypeConstants.HouseholdRegisterCode, IdTypeConstants.HouseholdRegisterDisplay),
-            (IdTypeConstants.PassportCode, IdTypeConstants.PassportDisplay),
-            (IdTypeConstants.HKMacauPermitCode, IdTypeConstants.HKMacauPermitDisplay),
-            (IdTypeConstants.TaiwanPermitCode, IdTypeConstants.TaiwanPermitDisplay),
-            (IdTypeConstants.OtherCode, IdTypeConstants.OtherDisplay)
-        };
-        foreach (var (code, display) in defaults)
-        {
-            if (!IdTypes.Contains(display))
-            {
-                IdTypes.Add(display);
-                _idTypeCodeMap[display] = code;
-            }
-        }
     }
 
     #endregion

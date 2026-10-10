@@ -31,6 +31,8 @@ public static class DictionaryTypeCodes
     public const string CaregiverTypes = "CaregiverTypes";
     public const string SpecialApprovalTemplates = "SpecialApprovalTemplates";
     public const string DeathReasons = "DeathReasons";
+    public const string ChangeReasons = "ChangeReasons";
+    public const string MemberAddReasons = "MemberAddReasons";
 
     public static readonly string[] All =
     {
@@ -41,6 +43,6 @@ public static class DictionaryTypeCodes
         LandUsage, RigidExpenditureTypes, DeregisterReasons, SubsidyTypes,
         ApplicationReasons, Positions,
         InstitutionCategory, InstitutionType, IdTypes, CaregiverTypes,
-        SpecialApprovalTemplates, DeathReasons
+        SpecialApprovalTemplates, DeathReasons, ChangeReasons, MemberAddReasons
     };
 }

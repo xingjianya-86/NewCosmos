@@ -13,7 +13,9 @@ using NewCosmos.Controls;
 namespace NewCosmos.Platforms.Android.Camera;
 
 /// <summary>
-/// Android 原生 Camera2 相机预览 Handler：TextureView 预览 + ImageReader(JPEG) 拍照�?/// 用于身份证扫描页的实时取景框（叠加层�?MAUI XAML 绘制）�?/// </summary>
+/// Android 原生 Camera2 相机预览 Handler：TextureView 预览 + ImageReader(JPEG) 拍照。
+/// 用于身份证扫描页的实时取景框（叠加层，MAUI XAML 绘制）。
+/// </summary>
 public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayout>, ICameraPreviewController
 {
     public static readonly IPropertyMapper<CameraPreviewView, CameraPreviewViewHandler> PropertyMapper =

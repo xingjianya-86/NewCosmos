@@ -627,6 +627,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     public string LandCalculationFormula =>
         $"{TotalConfirmedLandArea:F2}亩 ÷ {FamilyLandPersonCount}人 = {CalculatedPerPersonArea:F2}亩/人";
 
+    /// <summary>
+    /// 农业补贴计算比例（百分比）= 家庭份数 ÷ 总份数 × 100，供补贴区显示与「更新计算比例」按钮取值。
+    /// 无有效份数时为 0（按钮据此提示）。
+    /// </summary>
+    public decimal SubsidyShareRatioPercent =>
+        TotalLandShares > 0 ? Math.Round(FamilyLandShares / TotalLandShares * 100, 2) : 0;
+
     public List<string> LandStatusOptions { get; } = new(LandStatusConstants.All);
 
     #endregion
