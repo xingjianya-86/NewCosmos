@@ -58,6 +58,13 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     private Dictionary<string, string>? _proofFields;
     private long? _proofBusinessId;
 
+    /// <summary>
+    /// 当前详情户主身份证（留痕归属过滤用）：打印历史只显示归属本档案的记录。
+    /// business_id 跨当前库/5 张导入台账六套 id 空间，仅靠 (type,id) 会把 id 碰撞的别家记录查进来（串台）；
+    /// NULL/空归属的记录一律不展示（含存量无归属行）。
+    /// </summary>
+    private string _proofOwnerIdCard = string.Empty;
+
     #region 搜索区
 
     [ObservableProperty]
@@ -420,6 +427,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             HasSelectedArchive = true;
             ApplicantName = item.ApplicantName;
             ApplicantIdCard = item.ApplicantIdCard;
+            _proofOwnerIdCard = item.ApplicantIdCard ?? string.Empty;
             SourceDisplay = item.SourceDisplay;
             ClassificationName = string.IsNullOrEmpty(item.DerivedClassificationName)
                 ? item.SourceDisplay : item.DerivedClassificationName;
@@ -454,6 +462,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         _importedDetail = null;
         _proofFields = null;
         _proofBusinessId = null;
+        _proofOwnerIdCard = string.Empty;
         SummaryFields.Clear();
         MemberItems.Clear();
         HasImportedDetail = false;
@@ -1253,6 +1262,11 @@ public partial class ArchiveQueryViewModel : ViewModelBase
 
             foreach (var pr in result.Value ?? [])
             {
+                // 归属过滤：仅展示本档案户主的打印留痕。id 碰撞串台记录与无归属（NULL）记录一律排除。
+                if (string.IsNullOrEmpty(pr.ApplicantIdCard)
+                    || !string.Equals(pr.ApplicantIdCard, _proofOwnerIdCard, StringComparison.Ordinal))
+                    continue;
+
                 PrintHistory.Add(new PrintRecordDisplayItem(
                     pr.Id,
                     pr.TemplateName,

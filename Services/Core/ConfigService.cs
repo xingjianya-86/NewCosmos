@@ -1,6 +1,7 @@
 using NewCosmos.Constants;
 using NewCosmos.Models.Exceptions;
 using NewCosmos.Models.Options;
+using System.Text.Json;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -1319,6 +1320,14 @@ public class ConfigService : IConfigService
         var options = new DocumentOutputOptions();
         var filePath = Path.Combine(_configDirectory, "document_output.yaml");
 
+        // 1) 用户级覆盖（「系统设置」选择的目录，存 AppData，升级/重装不丢）优先
+        var overrideDirectory = ReadUserOutputOverride();
+        if (!string.IsNullOrWhiteSpace(overrideDirectory))
+        {
+            options.BaseDirectory = overrideDirectory;
+            options.IsUserOverride = true;
+        }
+
         try
         {
             if (File.Exists(filePath))
@@ -1330,7 +1339,7 @@ public class ConfigService : IConfigService
                 var dto = deserializer.Deserialize<DocumentOutputYamlDto>(File.ReadAllText(filePath));
 
                 var raw = dto?.Output?.BaseDirectory?.Trim();
-                if (!string.IsNullOrWhiteSpace(raw))
+                if (!options.IsUserOverride && !string.IsNullOrWhiteSpace(raw))
                     options.BaseDirectory = ResolveOutputPlaceholders(raw);
 
                 var tempDir = dto?.Output?.Subdirectories?.Temp?.Trim();
@@ -1354,17 +1363,104 @@ public class ConfigService : IConfigService
         else
             options.BaseDirectory = Path.GetFullPath(options.BaseDirectory);
 
-        Serilog.Log.Information("[ConfigService] 文档输出根: {Root}, 预览临时目录: {Temp}",
-            options.BaseDirectory, Path.Combine(options.BaseDirectory, options.TempSubdirectory));
+        Serilog.Log.Information("[ConfigService] 文档输出根: {Root}（{Source}）, 预览临时目录: {Temp}",
+            options.BaseDirectory,
+            options.IsUserOverride ? "用户自定义" : "默认配置",
+            Path.Combine(options.BaseDirectory, options.TempSubdirectory));
 
         _documentOutputOptions = options;
         return options;
     }
 
-    /// <summary>展开输出根占位符：{AppData} → 应用数据目录（跨平台 MAUI API）</summary>
+    /// <summary>用户级输出根覆盖文件（AppData，升级/重装不丢；不写安装目录，规避 Program Files 权限与升级覆盖）</summary>
+    private static string UserOutputOverridePath =>
+        Path.Combine(FileSystem.AppDataDirectory, "document_output.user.json");
+
+    /// <summary>读取用户覆盖的输出根；无文件/损坏/为空均返回 null（回退 yaml）</summary>
+    private static string? ReadUserOutputOverride()
+    {
+        try
+        {
+            var path = UserOutputOverridePath;
+            if (!File.Exists(path))
+                return null;
+
+            var dto = JsonSerializer.Deserialize<UserOutputOverrideDto>(File.ReadAllText(path));
+            var raw = dto?.BaseDirectory?.Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            var resolved = ResolveOutputPlaceholders(raw);
+            return string.IsNullOrWhiteSpace(resolved) ? null : Path.GetFullPath(resolved);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[ConfigService] 读取输出根用户覆盖失败，回退 yaml 配置");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 保存用户选择的输出根（写用户级覆盖文件并使缓存失效；不改 config/document_output.yaml）。
+    /// 调用方随后须调用 OutputPathHelper.Configure 生效，必要时触发 OutputRootMigrationService 迁移。
+    /// </summary>
+    public void SetDocumentOutputBaseDirectory(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            throw new ConfigurationException("DocumentOutputOptions.BaseDirectory", "输出目录不能为空");
+
+        var fullPath = Path.GetFullPath(directory.Trim());
+        var dto = new UserOutputOverrideDto
+        {
+            BaseDirectory = fullPath,
+            UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+        };
+        File.WriteAllText(UserOutputOverridePath,
+            JsonSerializer.Serialize(dto,
+                new JsonSerializerOptions { WriteIndented = true }));
+
+        _documentOutputOptions = null;
+        Serilog.Log.Information("[ConfigService] 文档输出根已由用户改为: {Root}", fullPath);
+    }
+
+    /// <summary>恢复默认输出根（删除用户覆盖文件，回退 config/document_output.yaml）</summary>
+    public void ResetDocumentOutputBaseDirectory()
+    {
+        try
+        {
+            if (File.Exists(UserOutputOverridePath))
+                File.Delete(UserOutputOverridePath);
+        }
+        catch (Exception ex)
+        {
+            throw new ConfigurationException("DocumentOutputOptions.BaseDirectory", $"删除输出根覆盖文件失败: {ex.Message}");
+        }
+
+        _documentOutputOptions = null;
+        Serilog.Log.Information("[ConfigService] 文档输出根已恢复为默认配置");
+    }
+
+    /// <summary>document_output.user.json DTO（用户级输出根覆盖）</summary>
+    private sealed class UserOutputOverrideDto
+    {
+        public string? BaseDirectory { get; set; }
+        public string? UpdatedAt { get; set; }
+    }
+
+    /// <summary>展开输出根占位符：{Documents} → 用户文档目录、{AppData} → 应用数据目录。
+    /// Android 无共享「文档」目录写权限，{Documents} 一律落应用私有存储。</summary>
     private static string ResolveOutputPlaceholders(string raw)
     {
+#if ANDROID
+        var documents = FileSystem.AppDataDirectory;
+#else
+        var documents = Environment.GetFolderPath(global::System.Environment.SpecialFolder.MyDocuments);
+        if (string.IsNullOrWhiteSpace(documents))
+            documents = FileSystem.AppDataDirectory;
+#endif
         return raw
+            .Replace("{Documents}", documents, StringComparison.OrdinalIgnoreCase)
+            .Replace("{documents}", documents, StringComparison.OrdinalIgnoreCase)
             .Replace("{AppData}", FileSystem.AppDataDirectory, StringComparison.OrdinalIgnoreCase)
             .Replace("{appdata}", FileSystem.AppDataDirectory, StringComparison.OrdinalIgnoreCase);
     }

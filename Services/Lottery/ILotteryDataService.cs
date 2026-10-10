@@ -62,31 +62,4 @@ public interface ILotteryDataService
     /// <param name="ct">取消令牌</param>
     /// <returns>开奖记录列表</returns>
     Task<Result<List<LotteryDraw>>> GetRecentDrawsAsync(LotteryType lotteryType, int count = 30, CancellationToken ct = default);
-
-    /// <summary>
-    /// 获取号码统计数据
-    /// </summary>
-    /// <param name="lotteryType">彩种类型</param>
-    /// <param name="periodCount">统计期数范围（如：近100期）</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>号码统计列表</returns>
-    Task<Result<List<NumberStatistics>>> GetNumberStatisticsAsync(LotteryType lotteryType, int periodCount = 100, CancellationToken ct = default);
-
-    /// <summary>
-    /// 获取冷号列表（近期出现频率低的号码）
-    /// </summary>
-    /// <param name="lotteryType">彩种类型</param>
-    /// <param name="count">返回数量</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>冷号列表</returns>
-    Task<Result<List<NumberStatistics>>> GetColdNumbersAsync(LotteryType lotteryType, int count = 10, CancellationToken ct = default);
-
-    /// <summary>
-    /// 获取热号列表（近期出现频率高的号码）
-    /// </summary>
-    /// <param name="lotteryType">彩种类型</param>
-    /// <param name="count">返回数量</param>
-    /// <param name="ct">取消令牌</param>
-    /// <returns>热号列表</returns>
-    Task<Result<List<NumberStatistics>>> GetHotNumbersAsync(LotteryType lotteryType, int count = 10, CancellationToken ct = default);
 }

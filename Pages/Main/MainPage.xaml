@@ -71,7 +71,8 @@
                     </Border>
 
                     <!-- 设置按钮 -->
-                    <Button Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" WidthRequest="40" HeightRequest="40" CornerRadius="20"/>
+                    <Button Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" WidthRequest="40" HeightRequest="40" CornerRadius="20"
+                            Command="{Binding OpenSettingsCommand}"/>
                 </HorizontalStackLayout>
             </Grid>
         </Border>

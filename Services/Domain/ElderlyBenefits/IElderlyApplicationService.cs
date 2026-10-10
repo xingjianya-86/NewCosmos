@@ -60,6 +60,12 @@ public interface IElderlyApplicationService
     Task<Result> ConfirmAsync(long id, string operatorName, CancellationToken ct = default);
 
     /// <summary>
+    /// 归档完成（打印页「完成归档」入口）：记录存在即幂等成功——确认后状态已是终态，
+    /// 无状态可推进，仅校验本表存在性。不得拿高龄 ID 去查 nc_biz_applications（会误报「申请不存在」）。
+    /// </summary>
+    Task<Result> CompleteArchiveAsync(long id, CancellationToken ct = default);
+
+    /// <summary>
     /// 停发（含追缴信息）
     /// </summary>
     Task<Result> StopAsync(long id, string reason, string operatorName, DateTime? dueStopDate,

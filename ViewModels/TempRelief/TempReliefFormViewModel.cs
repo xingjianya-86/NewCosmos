@@ -945,8 +945,10 @@ public partial class TempReliefFormViewModel : ViewModelBase
     /// 公示日期默认值：按【申请日期】归属 C 线窗口（公示固定每月10日~12日）：
     /// 取第一个"申请日 ≤ 该窗口调查截止日"的月份（9号及以前归当月，10号起顺延下月），否则顺延；
     /// 低保等特殊群体调查期按5个工作日、普通按10个工作日。
-    /// 申请日期仅自动提前到调查起日（不推后）；填报时间不参与计算。
-    /// 仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算
+    /// 申请日期约束进调查窗口：窗口已开启（起日 ≤ 今天）且申请日早于起日时上推到起日；
+    /// 窗口未开启（起日为未来）保持原值，不写入未来日期；已在窗口内则不动。填报时间不参与计算。
+    /// 公示日期仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算
+    /// （申请日期的窗口约束见 LoadAsync 非草稿分支）。
     /// </summary>
     private async Task ApplyPublicizeDefaultsAsync()
     {
@@ -969,9 +971,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
                 PublicizeEndDateValue = timeline.PublicityEndDate;
                 HasPublicizeDates = true;
 
-                // 申请日期仅自动提前到调查核实窗口首日（赶本轮公示）；早于起日则保持真实申请日，不推后
-                if (ApplyDate > timeline.InvestigationStartDate)
-                    ApplyDate = timeline.InvestigationStartDate;
+                ClampApplyDateIntoWindow(timeline);
             }
             finally
             {
@@ -982,6 +982,20 @@ public partial class TempReliefFormViewModel : ViewModelBase
         {
             _logger.Warn($"生成公示日期默认值失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 申请日期约束进调查窗口：窗口已开启（起日 ≤ 今天）且申请日早于起日 → 上推到起日；
+    /// 窗口未开启（起日为未来）→ 不推，避免写入未来日期；已在窗口内或晚于起日 → 不动。
+    /// 上界不处理：窗口归属算法已保证申请日 ≤ 调查截止日。跨年同样生效
+    /// （12月申请归属次年1月窗口时，由"起日 ≤ 今天"这道闸决定是否上推）。
+    /// </summary>
+    private void ClampApplyDateIntoWindow(TimelineResult timeline)
+    {
+        var start = timeline.InvestigationStartDate.Date;
+        if (start > DateTime.Today) return;
+        if (ApplyDate.Date >= start) return;
+        ApplyDate = start;
     }
 
 }

@@ -71,6 +71,16 @@ public interface IBusinessTimelineService
     /// 按申请日期归属 C 线窗口（公示固定每月10日~12日）：取第一个"申请日 ≤ 该月窗口调查截止日"的月份（9号及以前归当月，10号起顺延下月），否则顺延到下月。
     /// </summary>
     Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate, bool simplified);
+
+    /// <summary>C线窗口归属（同步版）：供表单申请日期约束与保存校验在同步上下文中调用。</summary>
+    TimelineResult CalculateTempReliefForApplyDate(DateTime applyDate, bool simplified);
+
+    /// <summary>
+    /// C线文书「入户调查时间」= min(今日的最近工作日, 该窗口调查截止日=公示开始前一个工作日)。
+    /// 今日为工作日取今日（如9号打印→9号，恰为公示前一天）；今日为周末/节假日往回取过去最近工作日；
+    /// 晚于截止日（补打历史档案）兜底为截止日。特殊5/普通10两档上限一致（截止日与档位无关）。
+    /// </summary>
+    DateTime GetTempReliefInvestigationPrintDate(TimelineResult cLine);
 }
 
 public class BusinessTimelineService : BaseService, IBusinessTimelineService
@@ -130,10 +140,27 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         return _holidayService.GetNextWorkDay(current.PublicityEndDate);
     }
 
+    /// <inheritdoc />
+    public DateTime GetTempReliefInvestigationPrintDate(TimelineResult cLine)
+    {
+        // 今日的最近工作日：工作日取今日，周末/节假日往回取（调查事实已完成，不倒填未来）
+        var today = DateTime.Today;
+        var recentWorkday = _holidayService.IsWorkDay(today)
+            ? today
+            : _holidayService.GetPreviousWorkDay(today);
+
+        // 上限 = 该窗口调查截止（公示开始前一个工作日）：晚于截止（补打历史档案）则兜底为截止日
+        var deadline = cLine.InvestigationDeadline.Date;
+        return recentWorkday > deadline ? deadline : recentWorkday;
+    }
+
     public Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate, bool simplified)
     {
         return Task.FromResult(CalculateCLineForApplyDate(applyDate, simplified));
     }
+
+    public TimelineResult CalculateTempReliefForApplyDate(DateTime applyDate, bool simplified)
+        => CalculateCLineForApplyDate(applyDate, simplified);
 
     /// <summary>
     /// 申请日归属窗口：从申请日所在月起，取第一个 applyDate ≤ InvestigationDeadline（调查截止=公示前一工作日，

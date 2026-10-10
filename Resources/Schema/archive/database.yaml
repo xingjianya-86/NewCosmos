@@ -222,6 +222,10 @@ tables:
         type: timestamp without time zone
         nullable: true
         comment: 更新时间（PrintRecordService使用）
+      - name: applicant_id_card
+        type: character varying(18)
+        nullable: true
+        comment: 申请人身份证号（打印留痕归属标记：证明类打印按户主身份证区分键空间，防不同档案 id 碰撞串台；NULL=无归属，档案查询打印历史不展示）
     indexes:
       - name: idx_print_records_application_id
         columns: [application_id]

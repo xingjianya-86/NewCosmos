@@ -283,6 +283,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     PrinterName = printerName,
                     Copies = copies,
                     OperatorId = currentUserId,
+                    ApplicantIdCard = applicantIdCard,
                     Status = PrintJobConstants.StatusCompleted
                 };
 
@@ -406,6 +407,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 PrinterName = printerName,
                 Copies = copies,
                 OperatorId = currentUserId,
+                ApplicantIdCard = applicantIdCard,
                 Status = PrintJobConstants.StatusCompleted
             };
 
@@ -437,7 +439,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 Status = PrintJobConstants.StatusFailed,
                 Remark = ex.Message,
                 Copies = copies,
-                OperatorId = currentUserId
+                OperatorId = currentUserId,
+                ApplicantIdCard = applicantIdCard
             };
             await _printRecordService.SaveAsync(failedRecord, ct);
 

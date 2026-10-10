@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.1.20261009</ApplicationDisplayVersion>
-		<ApplicationVersion>20261009</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.20261010</ApplicationDisplayVersion>
+		<ApplicationVersion>20261010</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -221,14 +221,19 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</None>
-		<!-- 预训练模型随包分发（新装机免重训）；用户已重训的模型升级时不被覆盖（iss onlyifdoesntexist） -->
+		<!-- 预训练模型随包分发（新装机免重训）；模型位于内嵌原版工程 model/<彩种>/window_N/ -->
 		<None Include="Scripts\Lottery\**\*.keras">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>Scripts\Lottery\%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</None>
-		<None Include="Scripts\Lottery\models\**\*.json">
+		<!-- 原版工程运行时必需：config/config.yaml（GitHub 默认路径模板）+ 训练元数据 metadata.json -->
+		<None Include="Scripts\Lottery\predict_Lottery_ticket\config\*.yaml">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Link>Scripts\Lottery\models\%(Filename)%(Extension)</Link>
+			<Link>Scripts\Lottery\predict_Lottery_ticket\config\%(Filename)%(Extension)</Link>
+		</None>
+		<None Include="Scripts\Lottery\predict_Lottery_ticket\model\**\*.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Scripts\Lottery\predict_Lottery_ticket\model\%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</None>
 	</ItemGroup>
 

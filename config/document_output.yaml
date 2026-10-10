@@ -2,8 +2,10 @@
 # 参考设计方案：第九章 9.10
 
 # ── 输出目录配置 ──
+# 占位符：{AppData}=应用数据目录、{Documents}=用户「文档」目录（Android 上二者均落应用私有存储）
+# 优先级：用户在「系统设置」选择的目录（AppData 覆盖文件 document_output.user.json）> 本文件 > 历史相对"输出"
 output:
-  base_directory: "{AppData}/CosmosApp/ArchiveOutput"  # 文档输出根目录，{AppData}为系统应用数据目录
+  base_directory: "{Documents}/帝皇权杖δ-me13输出"  # 文档输出根目录（默认：用户文档）
   subdirectories:
     docx: "docx"                    # Word文档子目录
     xlsx: "xlsx"                    # Excel表格子目录

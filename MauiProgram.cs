@@ -382,6 +382,7 @@ public static class MauiProgram
 
         builder.Services.AddTransient<ConfigWizardViewModel>();
         builder.Services.AddTransient<NetworkAccessViewModel>();
+        builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.Shared.LoadingProgressDialogViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.CollegeStudentManagementViewModel>();
 
@@ -523,6 +524,7 @@ public static class MauiProgram
         
         builder.Services.AddTransient<ConfigWizardPage>();
         builder.Services.AddTransient<Pages.Config.NetworkAccessPage>();
+        builder.Services.AddTransient<Pages.Config.SettingsPage>();
 
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyApplicationListPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyApplicationFormPage>();

@@ -33,7 +33,7 @@
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                                 <Label Text="智能预测" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="融合算法 · 机器学习(LSTM) + LotteryML" Style="{StaticResource ModuleHeroSubtitle}"/>
+                                <Label Text="机器学习(LSTM) · 基于tensorflow lstm模型的彩票预测" Style="{StaticResource ModuleHeroSubtitle}"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
                     </VerticalStackLayout>
@@ -44,16 +44,12 @@
                     <Label Text="预测设置" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
                     <Border Style="{StaticResource CardBorder}" Padding="16">
                         <VerticalStackLayout Spacing="0">
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                                 <VerticalStackLayout Spacing="4">
                                     <Label Text="彩种" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
                                     <Picker ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}" ItemDisplayBinding="{Binding Name}" HeightRequest="44" VerticalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Spacing="4" Grid.Column="1">
-                                    <Label Text="算法" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                                    <Picker ItemsSource="{Binding AlgorithmOptions}" SelectedItem="{Binding SelectedAlgorithmOption}" ItemDisplayBinding="{Binding Name}" HeightRequest="44" VerticalOptions="Center"/>
-                                </VerticalStackLayout>
-                                <VerticalStackLayout Spacing="4" Grid.Column="2">
                                     <Label Text="注数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
                                     <Picker ItemsSource="{Binding PredictionCountOptions}" SelectedItem="{Binding PredictionCount}" HeightRequest="44" VerticalOptions="Center"/>
                                 </VerticalStackLayout>

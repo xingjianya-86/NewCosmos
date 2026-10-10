@@ -445,7 +445,7 @@ public static class FieldKeys
     public const string TEMP_POLICY_CHECKLIST = "TEMP_POLICY_CHECKLIST";               // 享受政策清单（□/√ 勾选格式；入户调查表专用）
     public const string TEMP_ACCEPTANCE_REASON = "TEMP_ACCEPTANCE_REASON";             // 临时救助原因（叙述+费用明细；验收报告专用）
     public const string TEMP_ACCEPTANCE_CONCLUSION = "TEMP_ACCEPTANCE_CONCLUSION";     // 验收结论整句（因病因学…，于…公示，…验收通过）
-    public const string TEMP_INVESTIGATION_DATE = "TEMP_INVESTIGATION_DATE";           // 入户调查日期（C线调查核实窗口首日；入户调查表用）
+    public const string TEMP_INVESTIGATION_DATE = "TEMP_INVESTIGATION_DATE";           // 入户调查时间（动态：min(今日最近工作日, 公示开始前一工作日)；入户调查表/审核审批表用）
     public const string TEMP_TOWN_OPINION_DATE = "TEMP_TOWN_OPINION_DATE";             // 街道（乡镇）意见日期（=公示结束日；审核审批表用）
     public const string TEMP_DIFFICULTY_SUMMARY = "TEMP_DIFFICULTY_SUMMARY";           // 困难情况摘要（概括句，不含疾病名称/编码/费用；点名患病人；入户调查表+信息公示用）
     public const string TEMP_AUDIT_REASON = "TEMP_AUDIT_REASON";                       // 申请救助原因（精简句；审核审批表专用）

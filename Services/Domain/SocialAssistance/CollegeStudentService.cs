@@ -24,6 +24,24 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
         "id, application_id, family_member_id, student_name, id_card, education_level, " +
         "school_name, school_duration, enrollment_year, graduation_year, status, remark, created_at, updated_at";
 
+    /// <summary>
+    /// 「保障已终止」判定子查询表达式（关联列 = 传入的身份证列表达式）：
+    /// 有停保档案 且 无在保/在途续档——停旧建新续档（旧 Stopped + 新 Draft）不算终止，不误剔。
+    /// 关联键只用身份证（family_member_id 混语义必悬空、application_id 无回写回路，均不可作依据）。
+    /// 状态字面量与 ApplicationStatusCodes 同步：Stopped=停保；Draft/Submitted/Approved/Completed=在保在途。
+    /// 消费方：今年毕业过滤、GetAllAsync 的 is_household_stopped 计算列（已关联/已退出分栏）。
+    /// </summary>
+    private static string HouseholdStoppedExpr(string idCardExpr) => $@"
+(
+    EXISTS (SELECT 1 FROM nc_biz_family_members m
+            JOIN nc_biz_applications a ON a.id = m.application_id
+            WHERE m.id_card = {idCardExpr} AND a.deleted_at IS NULL AND a.status = 'Stopped')
+    AND NOT EXISTS (SELECT 1 FROM nc_biz_family_members m2
+            JOIN nc_biz_applications a2 ON a2.id = m2.application_id
+            WHERE m2.id_card = {idCardExpr} AND a2.deleted_at IS NULL
+              AND a2.status IN ('Draft','Submitted','Approved','Completed'))
+)";
+
     /// <inheritdoc/>
     public async Task<Result<List<CollegeStudent>>> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
@@ -50,8 +68,11 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
             var kw = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim();
             LogInfo($"查询大学生档案列表: keywordLength={(kw ?? string.Empty).Length}");
 
+            // is_household_stopped：保障已终止计算列（非库列）——「已关联/已退出」Tab 分栏依据
             var sql = $@"
-                SELECT {SelectColumns} FROM nc_biz_college_students
+                SELECT {SelectColumns},
+                       {HouseholdStoppedExpr("id_card")} AS is_household_stopped
+                FROM nc_biz_college_students
                 WHERE deleted_at IS NULL
                   AND ($1::text IS NULL OR student_name LIKE '%' || $1 || '%' OR id_card = $1)
                 ORDER BY student_name
@@ -335,13 +356,19 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
         try
         {
             LogInfo($"获取{year}年毕业的在读/已毕业大学生");
+            // 停保过滤（与已关联/已退出分栏同一判定，HouseholdStoppedExpr 单点）：
+            // 保障已终止的学生不再提醒核查退出；Tab3「今年毕业」与首页提醒横幅共用本方法，改一处双处生效。
             var sql = $@"
-                SELECT {SelectColumns} FROM nc_biz_college_students
-                WHERE graduation_year = $1 AND deleted_at IS NULL AND status IN ($2, $3)
-                ORDER BY student_name
+                SELECT {SelectColumns} FROM nc_biz_college_students cs
+                WHERE cs.graduation_year = $1 AND cs.deleted_at IS NULL AND cs.status IN ($2, $3)
+                  AND NOT {HouseholdStoppedExpr("cs.id_card")}
+                ORDER BY cs.student_name
                 LIMIT 500";
 
-            var result = await _db.QueryAsync<CollegeStudent>(sql, ct, year, CollegeStudentConstants.StatusStudying, CollegeStudentConstants.StatusGraduated);
+            var result = await _db.QueryAsync<CollegeStudent>(sql, ct,
+                year,
+                CollegeStudentConstants.StatusStudying,
+                CollegeStudentConstants.StatusGraduated);
             if (result.IsSuccess) LogInfo($"今年毕业大学生 {result.Value.Count} 人");
             return result;
         }

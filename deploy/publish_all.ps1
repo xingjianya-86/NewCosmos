@@ -68,6 +68,7 @@ if ($Version -eq "") {
     if (-not $m.Success) { throw "无法从 csproj 读取版本号，请用 -Version 指定" }
     $Version = $m.Groups[1].Value.Trim()
 }
+if ($Version -notmatch '^\d+\.\d+\.\d{8}$') { throw "版本号格式应为 主.次.yyyyMMdd，如 1.1.20261010（当前: $Version）" }
 
 # ── 交互向导（运行后按 Y/F 选择；已显式传入的参数不再询问；自动化用 -NonInteractive 关闭）──
 if (-not $NonInteractive) {
@@ -142,8 +143,33 @@ if ($DryRun) {
     Write-Host ("  回环校验: {0}" -f $(if ($SkipDownloadVerify) { "跳过" } else { "执行（下载两端安装包）" }))
     Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
     Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
+    Write-Host ("  版本同步: {0}（csproj/app.ini/iss；DryRun 不写入）" -f $Version)
     return
 }
+
+# ── 0. 版本号三处同步 ──
+# 必须在平台分支之前执行：原先同步只在 publish_release.ps1（Windows 分支）里做，
+# -SkipWindows 时不会同步，Android 清单沿用 csproj 旧版本号 → 手机端判定"已是最新"而不更新。
+Write-Step "同步版本号（csproj / app.ini / iss）"
+$numeric = ($Version -split '\.')[2]
+$csproj = [IO.File]::ReadAllText($csprojPath)
+$csproj = [regex]::Replace($csproj, '<ApplicationDisplayVersion>[^<]*</ApplicationDisplayVersion>', "<ApplicationDisplayVersion>$Version</ApplicationDisplayVersion>")
+$csproj = [regex]::Replace($csproj, '<ApplicationVersion>[^<]*</ApplicationVersion>', "<ApplicationVersion>$numeric</ApplicationVersion>")
+[IO.File]::WriteAllText($csprojPath, $csproj, (New-Object System.Text.UTF8Encoding($false)))
+
+$appIniPath = Join-Path $Repo "config\app.ini"
+$appIni = [IO.File]::ReadAllText($appIniPath)
+$appIni = [regex]::Replace($appIni, '(?m)^Version=.*$', "Version=$Version")
+[IO.File]::WriteAllText($appIniPath, $appIni, (New-Object System.Text.UTF8Encoding($false)))
+
+$issPath = Join-Path $Repo "installer\NewCosmosSetup.iss"
+$iss = [IO.File]::ReadAllText($issPath)
+$iss = [regex]::Replace($iss, '#define MyAppVersion "[^"]*"', "#define MyAppVersion ""$Version""")
+$yearV = [int]$numeric.Substring(0, 4)
+$mdV   = [int]$numeric.Substring(4, 4)
+$iss = [regex]::Replace($iss, 'VersionInfoVersion=[0-9.]+', "VersionInfoVersion=1.1.$yearV.$mdV")
+[IO.File]::WriteAllText($issPath, $iss, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "已同步：$Version / $numeric / VersionInfo=1.1.$yearV.$mdV"
 
 $releaseDir = Join-Path $Repo "publish\release\$Version"
 $apkName    = "NewCosmosSetup_$Version.apk"

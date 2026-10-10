@@ -48,6 +48,12 @@ public partial class CollegeStudent : ObservableObject
     [ObservableProperty]
     private string _status = Constants.CollegeStudentConstants.StatusStudying;
 
+    /// <summary>
+    /// 保障已终止（有停保档案且无在保/在途续档）——GetAllAsync 按身份证实时计算的非库列，
+    /// 供「已关联 / 已退出」分栏：停保户学生移入已退出；查询未产出该列时默认 false
+    /// </summary>
+    public bool IsHouseholdStopped { get; set; }
+
     /// <summary>备注</summary>
     [ObservableProperty]
     private string? _remark;

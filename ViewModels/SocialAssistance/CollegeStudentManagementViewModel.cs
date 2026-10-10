@@ -191,8 +191,35 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
     /// <inheritdoc/>
     public override async Task OnAppearingAsync()
     {
-        await LoadCurrentTabDataAsync();
+        // 首次进入即全量加载：原只载当前 Tab，其余三个 Tab 徽标计数停留初始值 "0"（不刷新）
+        await LoadAllTabsAsync();
         await base.OnAppearingAsync();
+    }
+
+    /// <summary>
+    /// 四个 Tab 一次性加载（入口刷新）：Tab1/Tab2 共用 GetAllAsync 单次查询拆两栏，
+    /// 与 Tab0 可关联搜索、Tab3 今年毕业并行；徽标计数首进即真值。
+    /// </summary>
+    private async Task LoadAllTabsAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            LoadingMessage = "加载大学生数据中...";
+            await Task.WhenAll(
+                LoadEligibleMembersAsync(),
+                LoadAssociatedAndNotInScopeAsync(),
+                LoadGraduatingStudentsAsync());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载数据异常");
+            ErrorMessage = "加载异常，请稍后重试";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     #region Tab 切换
@@ -265,49 +292,49 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Tab1: 加载已关联档案（在读+已毕业+未收到高等教育，排除已退出）</summary>
-    private async Task LoadAssociatedStudentsAsync()
+    /// <summary>
+    /// Tab1 已关联 + Tab2 已退出：共用一次 GetAllAsync 拆两栏（互补判定）。
+    /// 已关联 = 在读+已毕业+未收到高等教育，排除已退出与保障已终止；
+    /// 已退出 = 不符合人员 / 超择业期 / 保障已终止（家庭档案停保，按身份证实时计算）
+    /// </summary>
+    private async Task LoadAssociatedAndNotInScopeAsync()
     {
         var result = await _collegeStudentService.GetAllAsync();
-        if (result.IsSuccess)
-        {
-            var filtered = result.Value
-                .Where(s => s.Status != CollegeStudentConstants.StatusNotEligible && !s.IsBeyondJobSeekingPeriod)
-                .ToList();
-
-            AssociatedStudents.Clear();
-            foreach (var s in filtered)
-                AssociatedStudents.Add(s);
-            HasAssociatedStudents = AssociatedStudents.Count > 0;
-            AssociatedCountText = AssociatedStudents.Count.ToString();
-        }
-        else
+        if (!result.IsSuccess)
         {
             ErrorMessage = result.Message ?? "加载失败";
+            return;
         }
+
+        var associated = result.Value
+            .Where(s => s.Status != CollegeStudentConstants.StatusNotEligible
+                && !s.IsBeyondJobSeekingPeriod
+                && !s.IsHouseholdStopped)
+            .ToList();
+        var notInScope = result.Value
+            .Where(s => s.Status == CollegeStudentConstants.StatusNotEligible
+                || s.IsBeyondJobSeekingPeriod
+                || s.IsHouseholdStopped)
+            .ToList();
+
+        AssociatedStudents.Clear();
+        foreach (var s in associated)
+            AssociatedStudents.Add(s);
+        HasAssociatedStudents = AssociatedStudents.Count > 0;
+        AssociatedCountText = AssociatedStudents.Count.ToString();
+
+        NotInScopeStudents.Clear();
+        foreach (var s in notInScope)
+            NotInScopeStudents.Add(s);
+        HasNotInScopeStudents = NotInScopeStudents.Count > 0;
+        NotInScopeCountText = NotInScopeStudents.Count.ToString();
     }
 
-    /// <summary>Tab2: 加载不在范围内（已退出或超择业期）</summary>
-    private async Task LoadNotInScopeStudentsAsync()
-    {
-        var result = await _collegeStudentService.GetAllAsync();
-        if (result.IsSuccess)
-        {
-            var filtered = result.Value
-                .Where(s => s.Status == CollegeStudentConstants.StatusNotEligible || s.IsBeyondJobSeekingPeriod)
-                .ToList();
+    /// <summary>Tab1: 加载已关联档案（与 Tab2 共用一次查询）</summary>
+    private Task LoadAssociatedStudentsAsync() => LoadAssociatedAndNotInScopeAsync();
 
-            NotInScopeStudents.Clear();
-            foreach (var s in filtered)
-                NotInScopeStudents.Add(s);
-            HasNotInScopeStudents = NotInScopeStudents.Count > 0;
-            NotInScopeCountText = NotInScopeStudents.Count.ToString();
-        }
-        else
-        {
-            ErrorMessage = result.Message ?? "加载失败";
-        }
-    }
+    /// <summary>Tab2: 加载不在范围内（已退出：不符合人员/超择业期，或保障已终止）</summary>
+    private Task LoadNotInScopeStudentsAsync() => LoadAssociatedAndNotInScopeAsync();
 
     /// <summary>Tab3: 加载今年毕业大学生</summary>
     private async Task LoadGraduatingStudentsAsync()

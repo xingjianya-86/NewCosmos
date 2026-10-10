@@ -1,9 +1,17 @@
 # 彩票预测 Python 依赖（随 python-embed 预置；本文件用于环境核对/重建）
+# 机器学习主链路：内嵌原版 KittenCN/predict_Lottery_ticket（GPL-3.0）——「基于tensorflow lstm模型的彩票预测」
+# 训练/预测数据源：开奖数据下载链路落库表 nc_lottery_draws（fetch_history.py 同步），不联网抓取
 numpy>=1.24.0
 pandas>=2.0.0
-scipy>=1.11.0
-scikit-learn>=1.3.0
+# 原版按 TF 2.15 开发；python-embed 现为 2.21，由原版 src.bootstrap 兼容 shim 兜底
+tensorflow>=2.15.0
 
-# 网络请求（历史开奖抓取用）
+# 原版工程硬依赖（src.data_fetcher 模块级 import，虽本层只用其中的 load_history 仍需在位）
 requests>=2.31.0
 beautifulsoup4>=4.12.0
+lxml>=4.9.0
+loguru>=0.7.0
+pyyaml>=6.0
+
+# 开奖数据导出与负样本降权查询（lstm_entry 直连 nc_lottery_draws / nc_lottery_user_purchases）
+# psycopg2 随 python-embed 预置

@@ -52,10 +52,21 @@ public interface IConfigService
     UpdateOptions GetUpdateOptions();
 
     /// <summary>
-    /// 获取文档输出配置（config/document_output.yaml）；
-    /// 解析失败时回退历史相对目录"输出"，不抛异常
+    /// 获取文档输出配置（config/document_output.yaml + 用户覆盖 document_output.user.json）；
+    /// 优先级：用户覆盖 > yaml > 历史相对"输出"；解析失败不抛异常
     /// </summary>
     DocumentOutputOptions GetDocumentOutputOptions();
+
+    /// <summary>
+    /// 保存用户选择的输出根（写 AppData 用户级覆盖文件并使配置缓存失效）。
+    /// 调用方随后须调用 OutputPathHelper.Configure 生效，必要时触发 IOutputRootMigrationService 迁移
+    /// </summary>
+    void SetDocumentOutputBaseDirectory(string directory);
+
+    /// <summary>
+    /// 恢复默认输出根（删除用户覆盖文件，回退 config/document_output.yaml）
+    /// </summary>
+    void ResetDocumentOutputBaseDirectory();
 
     /// <summary>
     /// 保存网络接入配置（写回 network.ini）

@@ -232,19 +232,19 @@ public partial class LotteryHomeViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 训练预测模型：原版机器学习（TensorFlow LSTM）+ LotteryML（clean-room 逐位模型）
+    /// 训练预测模型：机器学习(LSTM)（内嵌原版 KittenCN/predict_Lottery_ticket，全量历史+GitHub默认超参）
     /// </summary>
     [RelayCommand]
     private async Task TrainModelAsync()
     {
         await ExecuteAsync(async () =>
         {
-            LoadingMessage = $"正在训练{SelectedLotteryTypeName}融合模型（LSTM + LotteryML，约5-10分钟）...";
-            var result = await _predictService.TrainFusionModelAsync(SelectedLotteryType, CancellationToken);
+            LoadingMessage = $"正在训练{SelectedLotteryTypeName} LSTM模型（全量历史下载+训练，视数据量约10-40分钟）...";
+            var result = await _predictService.TrainLstmModelAsync(SelectedLotteryType, CancellationToken);
             if (result.IsSuccess)
             {
                 await _dialogService.DisplayAlertAsync("训练完成",
-                    $"{SelectedLotteryTypeName}的融合模型（机器学习 LSTM + LotteryML）已训练完成。", "确定");
+                    $"{SelectedLotteryTypeName}的LSTM模型已训练完成。", "确定");
             }
             else
             {

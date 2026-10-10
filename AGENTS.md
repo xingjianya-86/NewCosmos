@@ -134,7 +134,7 @@ NewCosmos/
 ├── deploy/         发布与在线更新：publish_all(.bat/.ps1)、publish_release、download_update、
 │                   PatchTool、UpdateSigningTool、README.md（本机参数 *.local.ps1 不入库）
 ├── installer/      Inno Setup：NewCosmosSetup.iss、Languages\、appicon.ico
-├── Scripts/        Lottery\（彩票 Python 脚本与预训练模型，随包分发）、import_templates.ps1|.bat、
+├── Scripts/        Lottery\（彩票 Python：lstm_entry.py 统一入口 + 内嵌原版 KittenCN/predict_Lottery_ticket「基于tensorflow lstm模型的彩票预测」GPL-3.0，运行时数据/模型在 %APPDATA%\NewCosmos\LotteryLSTM）、import_templates.ps1|.bat、
 │                   templates_manifest.json；脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
 ├── python-embed/   嵌入式 Python（彩票训练/预测用，不入库）
 ├── Templates_NEW/   模板资源（入库 7 文件）；公文字体/、keystore/ 为本机资产，**不入库**（§2）
@@ -243,6 +243,7 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 ## §11 配置
 
 - 文件：`config\app.ini`（版本/窗口标题）、`database.ini`（+`database.ini.example`，见 §2）、`performance.ini`（重试/超时/慢操作阈值）、`network.ini`、`update.ini`（在线更新）+ `document_output.yaml`、`print_settings.yaml`、`timeline_config.yaml`。
+- **文档输出根**：`document_output.yaml` → `output.base_directory`（占位 `{Documents}`/`{AppData}`，默认落用户「文档」）；用户在「系统设置」（主页顶栏设置按钮 → `SettingsPage`）所选目录存 **AppData 用户级覆盖** `document_output.user.json`，优先级 覆盖 > yaml > 历史相对`输出`。改根即时生效并由 `OutputRootMigrationService` 后台把旧根复制过去 + 改写留痕表路径（权威细则见 `docs\20261007_文档动作与输出路径统一规范.md` §2）。
 - 读取一律走 `IConfigService`（`Services\Core\ConfigService.cs`，进程内缓存）。**禁止硬编码**：路径、连接串、金额标准、阈值——分别归 config、`nc_config_*` 表、Constants。
 - 注意：INI 解析按 key 全文件匹配、忽略 section；跨 section 重名 key 会告警并被后者覆盖。
 
@@ -274,7 +275,7 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 审计 / 业务日志必记点 | `Services\Core\ILoggerService.cs`（`LogBusiness`/`LogSecurity` 调用约定） | 原 `docs\audit-logging.md` 已不存在 |
 | 模板字段 FieldKey 命名 | `Constants\FieldKeys.cs` | 原 `docs\template-fieldkey.md`、`docs\compose\...` 均已不存在 |
 | 身份证校验 | `Helpers\IdCardValidator.cs` | |
-| 彩票奖级与金额 | `Helpers\LotteryPrizeResolver.cs`、`Services\Lottery\*`、`Scripts\Lottery\` | |
+| 彩票奖级与金额 | SSQ/DLT 奖级判定唯一权威 `Services\Lottery\UserPurchaseService.cs`（含大乐透 26014 期起 9→7 奖级改版），奖金解析 `Helpers\LotteryPrizeResolver.cs`；算法与 LSTM 预测 `Scripts\Lottery\lstm_entry.py`（适配层：数据导出/窗口/负样本降权/JSON）+ `Scripts\Lottery\predict_Lottery_ticket\`（原版 LSTM，commit 6cf60bb7，GPL-3.0；其 `src\bootstrap.py` 承担 TF2.21/Keras3 兼容） | 训练/预测数据源 = `nc_lottery_draws`（由 `fetch_history.py` 同步），算法侧不联网抓取；`nc_lottery_predictions`、`nc_lottery_statistics` 已无代码读写 |
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
-| 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照见该文档 |
+| 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`Services\Core\ConfigService.cs`（用户级覆盖读写）、`Pages\Config\SettingsPage`（改根入口）、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照与输出根优先级见该文档 |
 | 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |

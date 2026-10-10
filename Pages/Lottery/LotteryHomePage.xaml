@@ -97,7 +97,7 @@
                         <!-- 智能预测 -->
                         <components:FeatureCard Grid.Row="1" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D9;', Android='&#x1F4CA;'}"
                                                 IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
-                                                Title="智能预测" Description="融合算法（机器学习 + LotteryML）"
+                                                Title="智能预测" Description="机器学习(LSTM) 预测（双色球/大乐透）"
                                                 Command="{Binding OpenPredictionCommand}"/>
 
                         <!-- 历史记录 -->
@@ -109,7 +109,7 @@
                         <!-- 训练模型 -->
                         <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"
                                                 IconBackgroundColor="#FEF3C7" IconColor="#D97706"
-                                                Title="训练预测模型" Description="训练 机器学习(LSTM) 与 LotteryML 模型（约5-10分钟）"
+                                                Title="训练预测模型" Description="训练 LSTM 模型（全量历史，约10-40分钟）"
                                                 Command="{Binding TrainModelCommand}"/>
 
                         <!-- 中奖结果 -->

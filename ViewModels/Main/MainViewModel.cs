@@ -387,6 +387,13 @@ public partial class MainViewModel : ViewModelBase
             // 首次权限加载失败时不锁死：每次 OnAppearing 重试至成功（失败不得清零 CanAccess*）
             if (!_permissionsLoaded)
                 await LoadPermissionsAsync();
+
+            // 回首页即刷新三条提醒横幅（渐退到期/高龄待办/大学生毕业）：原仅首屏加载是半开环，
+            // 会话内办理停保/复核/渐退后横幅计数残留至重启；三条均为轻量计数查询、内部失败容忍，与权限重试同型
+            await Task.WhenAll(
+                LoadGracePeriodReminderAsync(),
+                LoadElderlyReminderAsync(),
+                LoadCollegeStudentReminderAsync());
             return;
         }
         _initialized = true;
@@ -904,6 +911,12 @@ public partial class MainViewModel : ViewModelBase
             await _dialogService.DisplayAlertAsync("错误", $"页面导航失败: {ex.Message}", "确定");
         }
     }
+
+    /// <summary>
+    /// 系统设置（文档输出位置等本机配置）——主页顶栏设置按钮入口
+    /// </summary>
+    [RelayCommand]
+    private Task OpenSettingsAsync() => NavigateToAsync<Pages.Config.SettingsPage>("系统设置");
 
     /// <summary>
     /// 打开官方网站

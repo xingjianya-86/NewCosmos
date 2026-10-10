@@ -23,7 +23,7 @@ public static class TempReliefPrintDataBuilder
     /// <param name="members">家庭成员明细</param>
     /// <param name="contactUnitPhone">公示异议反馈电话（当前登录用户所在单位联系电话）</param>
     /// <param name="acceptanceDate">验收日期（C线：公示结束次一个工作日；为空则回退公示结束日/当天）</param>
-    /// <param name="investigationDate">入户调查日期（C线调查核实窗口首日；为空则不输出）</param>
+    /// <param name="investigationDate">入户调查时间（动态：min(今日的最近工作日, 公示开始前一工作日)；为空则不输出）</param>
     public static Dictionary<string, string> BuildSingleFields(
         TempReliefApplication app,
         List<TempReliefMember> members,
@@ -161,8 +161,10 @@ public static class TempReliefPrintDataBuilder
     private static string FormatCnDate(DateTime? dt) => dt?.ToString("yyyy年M月d日") ?? string.Empty;
 
     /// <summary>
-    /// 解析打印用日期：验收日（= 公示结束的次一个工作日）与入户调查日期（= C线调查核实窗口首日）。
-    /// 月份以记录公示开始日（无则公示结束日/申请日/当天）为锚；调查核实期按家庭类别区分特殊5/普通10个工作日。
+    /// 解析打印用日期：验收日（= 公示结束的次一个工作日）与入户调查时间
+    /// （= min(今日的最近工作日, 调查截止=公示开始前一个工作日)：今日是工作日填今日、
+    /// 非工作日往回取、补打超期兜底截止日；特殊5/普通10两档上限一致）。
+    /// 月份以记录公示开始日（无则公示结束日/申请日/当天）为锚。
     /// 打印调用方统一走此方法，避免各自重抄。
     /// </summary>
     public static async Task<(DateTime Acceptance, DateTime Investigation)> ResolveScheduleAsync(
@@ -174,7 +176,7 @@ public static class TempReliefPrintDataBuilder
         var anchor = app.PublicizeStartDate ?? app.PublicizeEndDate ?? app.ApplyDate ?? DateTime.Today;
         var cLine = await timelineService.CalculateTempReliefAsync(anchor.Year, anchor.Month, simplified);
 
-        return (acceptance, cLine.InvestigationStartDate);
+        return (acceptance, timelineService.GetTempReliefInvestigationPrintDate(cLine));
     }
 
     /// <summary>

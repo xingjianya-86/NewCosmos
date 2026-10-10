@@ -1,5 +1,12 @@
 -- 彩票模块数据库表
--- 执行方式: psql -h 192.168.0.2 -U new_cosmos -d new_cosmos -f create_tables.sql
+-- 执行方式: psql -h <host> -U new_cosmos -d new_cosmos -f create_tables.sql
+--
+-- 代码实际读写情况（2026-10 核对）：
+--   nc_lottery_draws          ← 读写。开奖数据下载链路（fetch_history.py → LotteryDataService）落库；
+--                               也是 LSTM 训练/预测的唯一数据源（lstm_entry.py 直读本表导出）。
+--   nc_lottery_user_purchases ← 读写。预测/机选入库 + 开奖后验证（UserPurchaseService，奖级规则权威）。
+--   nc_lottery_predictions    ✗ 已无任何代码读写（保留建表语句仅作历史记录，不 DROP 既有表）。
+--   nc_lottery_statistics     ✗ 已无任何代码读写（统计 API 已删除，同上）。
 
 -- 开奖记录表
 CREATE TABLE IF NOT EXISTS nc_lottery_draws (
@@ -17,7 +24,7 @@ CREATE TABLE IF NOT EXISTS nc_lottery_draws (
     UNIQUE(lottery_type, draw_number)
 );
 
--- 预测记录表
+-- 预测记录表（已废弃：无代码读写，仅供历史追溯；不 DROP 既有表）
 CREATE TABLE IF NOT EXISTS nc_lottery_predictions (
     id SERIAL PRIMARY KEY,
     lottery_type VARCHAR(10) NOT NULL,        -- 彩种类型
@@ -55,7 +62,7 @@ CREATE TABLE IF NOT EXISTS nc_lottery_user_purchases (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- 统计缓存表（可选，用于加速查询）
+-- 统计缓存表（已废弃：统计 API 已删除，无代码读写；仅供历史追溯）
 CREATE TABLE IF NOT EXISTS nc_lottery_statistics (
     id SERIAL PRIMARY KEY,
     lottery_type VARCHAR(10) NOT NULL,

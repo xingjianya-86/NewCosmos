@@ -139,4 +139,31 @@ public static class OutputPathHelper
             _ => businessType
         };
     }
+
+    /// <summary>
+    /// 判断两路径是否存在包含关系（任一方向，含同一路径）——输出根切换前的迁移安全校验：
+    /// 旧根与新根互嵌套时，"复制旧根到新根"会变成自复制（枚举器持续看到新写入文件）→ 无限循环，必须拒绝。
+    /// </summary>
+    public static bool ArePathsNested(string pathA, string pathB)
+    {
+        var a = TrimSeparators(Path.GetFullPath(pathA));
+        var b = TrimSeparators(Path.GetFullPath(pathB));
+
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IsUnder(a, b) || IsUnder(b, a);
+    }
+
+    /// <summary>child 是否位于 parent 之内（不含相等）</summary>
+    private static bool IsUnder(string parent, string child)
+    {
+        var rel = Path.GetRelativePath(parent, child);
+        if (rel == "." || Path.IsPathRooted(rel))
+            return false;
+        return !rel.StartsWith("..", StringComparison.Ordinal);
+    }
+
+    private static string TrimSeparators(string path) =>
+        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 }

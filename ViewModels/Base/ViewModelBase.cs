@@ -555,9 +555,10 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     /// <summary>
     /// 统一的导出目录选择：无论取消/失败都立即给出可见反馈。
     /// 返回非空路径表示用户已选择；返回 null 表示用户取消或选择器失败（两种情况均已有提示）。
+    /// promptReuse=false 跳过"是否复用上次目录"询问（系统设置改输出根等场景：初始目录即当前值，无需反问）。
     /// </summary>
     protected async Task<string?> PickExportFolderAsync(string title, string? initialDirectory = null,
-        string cancelMessage = "已取消导出")
+        string cancelMessage = "已取消导出", bool promptReuse = true)
     {
         var dialog = ServiceProvider?.GetService<IDialogService>();
         var picker = ServiceProvider?.GetService<IFolderPickerService>();
@@ -575,7 +576,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(remembered))
             remembered = picker.GetLastDirectory();
 
-        if (!string.IsNullOrWhiteSpace(remembered) && Directory.Exists(remembered) && dialog != null)
+        if (promptReuse && !string.IsNullOrWhiteSpace(remembered) && Directory.Exists(remembered) && dialog != null)
         {
             var reuse = await dialog.DisplayAlertAsync("选择导出目录",
                 $"上次使用的目录：\n{remembered}\n\n是否继续使用该目录？", "使用上次目录", "选择其他目录");

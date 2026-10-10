@@ -9,9 +9,11 @@ using NewCosmos.Models.Results;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.AssetVerification;
 using NewCosmos.Services.Domain.ChangeManagement;
+using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.Domain.Printing;
 using NewCosmos.Services.Domain.Recovery;
+using NewCosmos.Services.Domain.TempRelief;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Platform;
 using NewCosmos.Services.Utilities;
@@ -529,30 +531,78 @@ public partial class ArchiveOutputViewModel
         // 系统无独立审批工作流，归档即视为审批通过（跳过状态机 Draft→Approved 校验）
         if (PrintNavigationData.BusinessId.HasValue)
         {
+            var bizId = PrintNavigationData.BusinessId.Value;
             try
             {
                 if (PrintNavigationData.BusinessType == "Recovery")
                 {
                     var recoveryService = _serviceProvider.GetRequiredService<IRecoveryService>();
                     var recoveryResult = await recoveryService.UpdateRecoveryRecordStatusAsync(
-                        PrintNavigationData.BusinessId.Value, RecoveryConstants.STATUS_PRINTED,
+                        bizId, RecoveryConstants.STATUS_PRINTED,
                         CancellationToken.None); // [CT 豁免] 追缴状态回写属收尾落库，不可中断
                     if (recoveryResult.IsSuccess)
-                        _logger.LogBusiness("追缴记录归档完成，状态置已打印", ("RecoveryId", PrintNavigationData.BusinessId.Value));
+                        _logger.LogBusiness("追缴记录归档完成，状态置已打印", ("RecoveryId", bizId));
                     else
                     {
                         _logger.Error($"追缴记录归档完成但更新状态失败: {recoveryResult.Message}");
                         await _dialogService.DisplayAlertAsync("错误",
                             $"文书已生成，但追缴记录状态更新失败：{recoveryResult.Message}", "确定");
+                        return; // 失败留在打印页（清理/退出仅成功路径执行），用户可重试或返回
                     }
+                }
+                else if (PrintNavigationData.BusinessType == TempReliefConstants.BusinessType)
+                {
+                    // 临时救助数据在独立表 nc_biz_temp_relief_applications，保存并确认后已是终态 Confirmed。
+                    // 必须走本域 Service 幂等校验本表存在——拿临时救助 ID 查社会救助主表恒查不到，
+                    // 会误报「申请不存在」（此前 BUG）。
+                    var tempReliefService = _serviceProvider.GetRequiredService<ITempReliefService>();
+                    var stepResult = await tempReliefService.CompleteArchiveAsync(
+                        bizId, CancellationToken.None); // [CT 豁免] 归档完成回写属收尾落库，不可中断
+                    if (stepResult.IsSuccess)
+                        _logger.LogBusiness("临时救助归档完成（幂等，状态已是已确认）", ("ApplicationId", bizId));
+                    else
+                    {
+                        _logger.Error($"临时救助归档完成但状态校验失败: {stepResult.Message}");
+                        await _dialogService.DisplayAlertAsync("错误",
+                            $"文书已生成，但档案状态更新失败：{stepResult.Message}", "确定");
+                        return;
+                    }
+                }
+                else if (PrintNavigationData.BusinessType == "ElderlyBenefits")
+                {
+                    // 高龄登记数据在独立表 nc_biz_elderly_applications，同临时救助：
+                    // 归档走本域 Service 幂等校验，不得拿高龄 ID 查社会救助主表（同型 BUG 一次修全）。
+                    var elderlyService = _serviceProvider.GetRequiredService<IElderlyApplicationService>();
+                    var stepResult = await elderlyService.CompleteArchiveAsync(
+                        bizId, CancellationToken.None); // [CT 豁免] 归档完成回写属收尾落库，不可中断
+                    if (stepResult.IsSuccess)
+                        _logger.LogBusiness("普惠高龄归档完成（幂等，状态已是已确认）", ("ApplicationId", bizId));
+                    else
+                    {
+                        _logger.Error($"普惠高龄归档完成但状态校验失败: {stepResult.Message}");
+                        await _dialogService.DisplayAlertAsync("错误",
+                            $"文书已生成，但档案状态更新失败：{stepResult.Message}", "确定");
+                        return;
+                    }
+                }
+                else if (PrintNavigationData.BusinessType == "AssetVerification"
+                    || PrintNavigationData.BusinessType == "AssetVerificationMonthlyReport")
+                {
+                    // 资产核查（BusinessId=核查任务 ID，档案产出/补打两入口）与核查月报/周报
+                    // （BusinessId=year*100+month 期间编码）均无档案归档语义：核查状态由月度审核、
+                    // 档案纳入动作推进，报表是纯展示。拿这些 ID 查 nc_biz_applications 会误报
+                    // 「申请不存在」，期间编码若恰好命中主表档案 ID 还会误推无关档案归档——
+                    // 此处一律幂等成功、不写任何状态（与快速核查入口 BusinessId=null 的行为一致）。
+                    _logger.LogBusiness("核查域归档跳过（无档案归档语义，幂等留痕）",
+                        ("BusinessType", PrintNavigationData.BusinessType), ("BusinessId", bizId));
                 }
                 else
                 {
                     var appService = _serviceProvider.GetRequiredService<IApplicationService>();
-                    var stepResult = await appService.CompleteArchiveAsync(PrintNavigationData.BusinessId.Value,
+                    var stepResult = await appService.CompleteArchiveAsync(bizId,
                         CancellationToken.None); // [CT 豁免] 归档完成回写属收尾落库，不可中断
                     if (stepResult.IsSuccess)
-                        _logger.LogBusiness("归档完成，current_step=6 且已置已审批", ("ApplicationId", PrintNavigationData.BusinessId.Value));
+                        _logger.LogBusiness("归档完成，current_step=6 且已置已审批", ("ApplicationId", bizId));
                     else
                     {
                         // 失败必须显式失败（AGENTS §7）：旧实现只写日志，文书照出、状态不动，
@@ -560,12 +610,16 @@ public partial class ArchiveOutputViewModel
                         _logger.Error($"归档完成但更新状态失败: {stepResult.Message}");
                         await _dialogService.DisplayAlertAsync("错误",
                             $"文书已生成，但档案状态更新失败：{stepResult.Message}", "确定");
+                        return;
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.Error($"归档完成更新状态异常: {ex.Message}");
+                await _dialogService.DisplayAlertAsync("错误",
+                    $"文书已生成，但档案状态更新异常：{ex.Message}", "确定");
+                return;
             }
         }
 

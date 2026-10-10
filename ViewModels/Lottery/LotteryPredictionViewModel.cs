@@ -52,34 +52,10 @@ public partial class LotteryPredictionViewModel : ViewModelBase
     private LotteryType _selectedLotteryType = LotteryType.SSQ;
 
     /// <summary>
-    /// 选中的算法类型
-    /// </summary>
-    [ObservableProperty]
-    private PredictionAlgorithm _selectedAlgorithm = PredictionAlgorithm.Fusion;
-
-    /// <summary>
     /// 生成注数
     /// </summary>
     [ObservableProperty]
     private int _predictionCount = 5;
-
-    /// <summary>
-    /// 统计期数范围（0=全部）
-    /// </summary>
-    [ObservableProperty]
-    private int _statisticsPeriod = 100;
-
-    /// <summary>
-    /// 最低置信度门槛（百分比）：生成的预测须高于该值，不足的注自动重算（机选不受限）
-    /// </summary>
-    [ObservableProperty]
-    private int _minConfidence = (int)LotteryConstants.DEFAULT_MIN_CONFIDENCE;
-
-    /// <summary>
-    /// 单注最大重算次数：重算耗尽仍不达标时保留最高分结果
-    /// </summary>
-    [ObservableProperty]
-    private int _maxRetryCount = LotteryConstants.DEFAULT_MAX_RETRIES;
 
     /// <summary>
     /// 预测结果列表
@@ -127,40 +103,9 @@ public partial class LotteryPredictionViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 算法选项列表
-    /// </summary>
-    public List<AlgorithmOption> AlgorithmOptions { get; } = AlgorithmOption.GetAll();
-
-    /// <summary>
-    /// 当前选中的算法选项
-    /// </summary>
-    [ObservableProperty]
-    private AlgorithmOption _selectedAlgorithmOption = new() { Name = "融合算法", Value = PredictionAlgorithm.Fusion };
-
-    partial void OnSelectedAlgorithmOptionChanged(AlgorithmOption value)
-    {
-        if (value != null) SelectedAlgorithm = value.Value;
-    }
-
-    /// <summary>
     /// 预设注数选项
     /// </summary>
     public List<int> PredictionCountOptions { get; } = new() { 1, 3, 5, 10, 20 };
-
-    /// <summary>
-    /// 统计期数选项（0=全部）
-    /// </summary>
-    public List<int> StatisticsPeriodOptions { get; } = new() { 0, 30, 50, 100, 200, 500 };
-
-    /// <summary>
-    /// 置信度门槛预设选项
-    /// </summary>
-    public List<int> MinConfidenceOptions { get; } = LotteryConstants.MinConfidenceOptions.ToList();
-
-    /// <summary>
-    /// 最大重算次数预设选项
-    /// </summary>
-    public List<int> MaxRetryOptions { get; } = LotteryConstants.MaxRetryOptions.ToList();
 
     #endregion
 
@@ -172,12 +117,12 @@ public partial class LotteryPredictionViewModel : ViewModelBase
     [RelayCommand]
     private async Task ExecutePredictionAsync()
     {
-        // 融合算法需要先训练两套模型（LSTM + LotteryML）
-        if (SelectedAlgorithm == PredictionAlgorithm.Fusion && !_predictService.IsFusionModelTrained(SelectedLotteryType))
+        // 机器学习(LSTM)需要先训练模型
+        if (!_predictService.IsLstmModelTrained(SelectedLotteryType))
         {
             var goTrain = await _dialogService.DisplayAlertAsync(
                 "模型未训练",
-                $"尚未训练{SelectedLotteryType.GetDisplayName()}的融合模型。\n请先在首页点击「训练预测模型」进行训练。",
+                $"尚未训练{SelectedLotteryType.GetDisplayName()}的LSTM模型。\n请先在首页点击「训练预测模型」进行训练。",
                 "去训练", "取消");
             if (goTrain)
             {
@@ -191,12 +136,7 @@ public partial class LotteryPredictionViewModel : ViewModelBase
             LoadingMessage = "正在生成预测号码...";
             Predictions.Clear();
 
-            var result = SelectedAlgorithm switch
-            {
-                PredictionAlgorithm.Fusion => await _predictService.PredictByFusionAsync(SelectedLotteryType, PredictionCount),
-                PredictionAlgorithm.Random => await _predictService.RandomPickAsync(SelectedLotteryType, PredictionCount),
-                _ => throw new NotSupportedException($"不支持的算法: {SelectedAlgorithm}")
-            };
+            var result = await _predictService.PredictByLstmAsync(SelectedLotteryType, PredictionCount);
 
             if (result.IsSuccess)
             {
@@ -207,7 +147,7 @@ public partial class LotteryPredictionViewModel : ViewModelBase
 
                 // 预测即购彩：每次生成只入库一次（「保存结果」仅做导出，不再重复入库）
                 var saveResult = await _userPurchaseService.SaveFromPredictionsAsync(
-                    SelectedLotteryType, result.Value, SelectedAlgorithmOption.Name);
+                    SelectedLotteryType, result.Value, LotteryConstants.LSTM_ALGORITHM_NAME);
                 if (!saveResult.IsSuccess)
                 {
                     await _dialogService.DisplayAlertAsync("入库失败",
@@ -240,7 +180,7 @@ public partial class LotteryPredictionViewModel : ViewModelBase
             var lines = new List<string>();
             lines.Add($"=== {SelectedLotteryType.GetDisplayName()} 预测结果 ===");
             lines.Add($"生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            lines.Add($"算法: {SelectedAlgorithmOption.Name}");
+            lines.Add($"算法: {LotteryConstants.LSTM_ALGORITHM_NAME}");
             lines.Add($"注数: {Predictions.Count}");
             lines.Add("");
 

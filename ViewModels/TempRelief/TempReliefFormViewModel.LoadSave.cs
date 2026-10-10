@@ -117,6 +117,22 @@ public partial class TempReliefFormViewModel
             await ResolveHukouFromOrganizationAsync(CancellationToken);
             await ApplyPublicizeDefaultsAsync();
         }
+        else
+        {
+            // 非草稿：公示日期保留库中原值，仅把申请日期约束进其归属调查窗口（存量档案自愈，
+            // 否则早于窗口起日的旧数据会被保存校验挡住）。须抑制联动，避免重算覆盖公示日期。
+            _suppressReload = true;
+            try
+            {
+                var simplified = TempReliefConstants.IsSimplifiedProcedure(ApplicantFamilyCategory, _sourceTable);
+                ClampApplyDateIntoWindow(_serviceProvider.GetRequiredService<IBusinessTimelineService>()
+                    .CalculateTempReliefForApplyDate(ApplyDate, simplified));
+            }
+            finally
+            {
+                _suppressReload = false;
+            }
+        }
 
         // 小额：加载档位并回显
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
@@ -868,6 +884,19 @@ public partial class TempReliefFormViewModel
 
         if (HasPublicizeDates && PublicizeEndDateValue < PublicizeStartDateValue)
             return "公示结束日期不能早于开始日期";
+
+        // 申请日期：不能晚于今天，且须落在归属调查窗口 [起日, 截止日]
+        // （下界与申请日期约束同用"起日 ≤ 今天"这道闸：窗口未开启时不校验，今天新建不受挡）
+        if (ApplyDate.Date > DateTime.Today)
+            return "申请日期不能晚于今天";
+
+        var cLine = _serviceProvider.GetRequiredService<IBusinessTimelineService>()
+            .CalculateTempReliefForApplyDate(
+                ApplyDate, TempReliefConstants.IsSimplifiedProcedure(ApplicantFamilyCategory, _sourceTable));
+        if (ApplyDate.Date > cLine.InvestigationDeadline.Date)
+            return $"申请日期须早于或等于调查截止日 {cLine.InvestigationDeadline:yyyy-MM-dd}";
+        if (cLine.InvestigationStartDate.Date <= DateTime.Today && ApplyDate.Date < cLine.InvestigationStartDate.Date)
+            return $"申请日期须在入户调查窗口 {cLine.InvestigationStartDate:yyyy-MM-dd} 至 {cLine.InvestigationDeadline:yyyy-MM-dd} 之间";
 
         return null;
     }

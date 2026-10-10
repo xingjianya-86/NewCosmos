@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Config.SettingsPage"
+             x:DataType="SettingsViewModel"
+             Title="系统设置"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- 渐变头部 -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
+            <VerticalStackLayout Spacing="16">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="系统设置" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="文书与报表输出位置（全局生效）" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- 文档输出位置 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="文档输出位置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="当前目录" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Border StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray100}" Padding="10,8">
+                                <Label Text="{Binding OutputRoot}" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                       LineBreakMode="WordWrap"/>
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="来源" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding OutputRootSourceText}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="预览临时目录" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="{Binding PreviewTempDirectory}" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                       LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start">
+                            <Button Text="更改位置…" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding ChangeOutputRootCommand}" IsVisible="{Binding CanChangeOutputRoot}"
+                                    Margin="0,0,8,8" MinimumWidthRequest="130"/>
+                            <Button Text="打开目录" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding OpenOutputRootCommand}" Margin="0,0,8,8" MinimumWidthRequest="110"/>
+                            <Button Text="恢复默认" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding ResetOutputRootCommand}" IsVisible="{Binding CanChangeOutputRoot}"
+                                    Margin="0,0,8,8" MinimumWidthRequest="110"/>
+                        </FlexLayout>
+
+                        <Label Text="{Binding PlatformHintText}" FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <Label Text="更改后立即生效：档案制作、档案查询补打、核查直打/补打、月报表、高龄月报、资产核查月报都写入新目录；原目录文件与打印留痕路径会在后台自动整理到新目录（旧文件保留不删除）。"
+                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 生效说明 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="目录结构" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Label Text="例：月报表保存在 [输出根]\月报表\202610\（目录以方括号占位）"
+                               FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                        <Label Text="各功能按类别分目录存放：月报表\{期间}\、高龄月报\{期间}\、核查报告\、以及按主体分目录的档案文书。配置优先级：本页选择（用户级）＞ config\document_output.yaml ＞ 历史相对“输出”目录。"
+                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 底部操作 -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <Button Grid.Column="1" Text="返回" Style="{StaticResource ButtonOutline}"
+                        Command="{Binding GoBackCommand}" MinimumWidthRequest="100"/>
+            </Grid>
+        </Border>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3" IsLoading="{Binding IsBusy}" LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

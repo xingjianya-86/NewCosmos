@@ -23,8 +23,8 @@ public class PrintRecordService : BaseService, IPrintRecordService
         var sql = @"INSERT INTO nc_biz_print_records
                     (batch_no, business_type, business_id, template_id, template_name,
                      pdf_data, pdf_size, source_data, source_type, source_size, file_path, pdf_path,
-                     printer_name, copies, operator_id, operator_name, status, remark, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
+                     printer_name, copies, operator_id, operator_name, applicant_id_card, status, remark, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW())
                     RETURNING id AS Id, created_at AS CreatedAt";
         // template_id 在库中为 character varying(100)（历史遗留），实体属性为 long；
         // Npgsql 二进制参数 bigint→varchar 不做隐式转换会直接报错，必须以字符串传参。
@@ -32,7 +32,8 @@ public class PrintRecordService : BaseService, IPrintRecordService
             record.BatchNo, record.BusinessType, record.BusinessId, record.TemplateId.ToString(), record.TemplateName,
             record.PdfData, record.PdfSize, record.SourceData, record.SourceType, record.SourceSize,
             record.FilePath, record.PdfPath,
-            record.PrinterName, record.Copies, record.OperatorId, record.OperatorName, record.Status, record.Remark);
+            record.PrinterName, record.Copies, record.OperatorId, record.OperatorName, record.ApplicantIdCard,
+            record.Status, record.Remark);
 
         if (result.IsFailure)
         {
@@ -52,7 +53,7 @@ public class PrintRecordService : BaseService, IPrintRecordService
 
         var sql = @"SELECT id, batch_no, business_type, business_id, template_id, template_name,
                            pdf_size, source_type, source_size, printer_name, copies,
-                           operator_id, operator_name, status, remark, created_at, updated_at
+                           operator_id, operator_name, applicant_id_card, status, remark, created_at, updated_at
                     FROM nc_biz_print_records
                      WHERE business_type = $1 AND business_id = $2
                     ORDER BY created_at DESC";

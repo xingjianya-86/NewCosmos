@@ -27,6 +27,11 @@ public class PrintRecord
     public int Copies { get; set; } = 1;
     public int? OperatorId { get; set; }
     public string OperatorName { get; set; } = string.Empty;
+    /// <summary>
+    /// 申请人身份证号（留痕归属标记）：证明类打印 business_id 跨多套 id 空间
+    /// （当前库/5 张导入台账），按此列区分归属，防 id 碰撞串台。NULL=无归属。
+    /// </summary>
+    public string ApplicantIdCard { get; set; } = string.Empty;
     public string Status { get; set; } = ApplicationStatusCodes.COMPLETED;
     public string Remark { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

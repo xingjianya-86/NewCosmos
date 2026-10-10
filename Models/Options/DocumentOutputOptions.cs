@@ -1,14 +1,17 @@
 namespace NewCosmos.Models.Options;
 
 /// <summary>
-/// 文档输出配置（config/document_output.yaml）。
+/// 文档输出配置（config/document_output.yaml + 用户覆盖 document_output.user.json）。
 /// 统一输出根：打印留痕、保存、预览临时文件全部落在 BaseDirectory 之下，
 /// 解析失败时回退到历史相对目录"输出"（保持旧行为，不阻断启动）。
 /// </summary>
 public class DocumentOutputOptions
 {
-    /// <summary>输出根目录（已展开 {AppData} 占位符并转为绝对路径）</summary>
+    /// <summary>输出根目录（已展开 {AppData}/{Documents} 占位符并转为绝对路径）</summary>
     public string BaseDirectory { get; set; } = string.Empty;
+
+    /// <summary>输出根是否来自用户在「系统设置」的选择（true）而非 yaml 默认值</summary>
+    public bool IsUserOverride { get; set; }
 
     /// <summary>预览临时文件子目录（相对 BaseDirectory，默认 temp）</summary>
     public string TempSubdirectory { get; set; } = "temp";

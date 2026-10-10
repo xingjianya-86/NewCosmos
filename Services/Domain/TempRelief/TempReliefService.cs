@@ -1091,6 +1091,24 @@ public class TempReliefService : BaseService, ITempReliefService
         return Result.Success();
     }
 
+    public async Task<Result> CompleteArchiveAsync(long id, CancellationToken ct = default)
+    {
+        // 打印页「完成归档」入口：临时救助保存并确认后状态已是终态 Confirmed，无状态可推进。
+        // 仅校验本表存在性——此前该入口误走 nc_biz_applications（社会救助主表），
+        // 拿临时救助 ID 查主表恒查不到，报「申请不存在」。
+        var exists = await _db.ExecuteScalarAsync<long>(
+            "SELECT id FROM nc_biz_temp_relief_applications WHERE id = $1 AND deleted_at IS NULL",
+            ct, id);
+        if (exists.IsFailure)
+            return Result.Failure(exists.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                exists.Message ?? "读取临时救助申请失败");
+        if (exists.Value == 0)
+            return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+
+        Logger.LogBusiness("临时救助归档完成（幂等，状态已是已确认）", ("ApplicationId", id));
+        return Result.Success();
+    }
+
     public async Task<Result> StopAsync(long id, string reason, string operatorName, CancellationToken ct = default)
     {
         LogInfo($"终止临时救助: id={id}, operator={operatorName}");
