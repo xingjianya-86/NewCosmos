@@ -27,6 +27,12 @@ public class FamilySituationContext
     public decimal FamilyLandArea { get; set; }
     public decimal LandIncomeTotal { get; set; }
     public decimal SubsidyTotal { get; set; }
+
+    /// <summary>
+    /// 农业补贴有效折算比例（百分比，由明细 Σ金额÷Σ原始金额 算出）。
+    /// null = 未知（无明细可算）；≥100 = 未折算——两者均不输出注记，老数据零干扰。
+    /// </summary>
+    public decimal? SubsidyRatioPercent { get; set; }
     public int PropertyCount { get; set; }
     public int VehicleCount { get; set; }
     public int MachineryCount { get; set; }
@@ -112,8 +118,14 @@ public static class FamilySituationTextBuilder
         }
 
         // 补贴（年值，与土地/赡养费同为年度口径；0 则省略，保证合计=明细和）
+        // 折算注记：补贴为 面积×单价×比例 折算后值，比例≠100% 时附条件说明（c.SubsidyRatioPercent 由调用方填充）
         if (c.SubsidyTotal > 0)
-            sb.Append($"另有补贴收入{c.SubsidyTotal:F0}元。");
+        {
+            var ratioNote = c.SubsidyRatioPercent is decimal pct && pct < 99.99m
+                ? $"（已按家庭份额{pct:F2}%折算）"
+                : "";
+            sb.Append($"另有补贴收入{c.SubsidyTotal:F0}元{ratioNote}。");
+        }
 
         return sb.ToString();
     }

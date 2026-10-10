@@ -209,14 +209,8 @@ public partial class ApplicationFormViewModel
     {
         _logger.LogBusiness("添加赡养抚养扶养人");
 
-        // 家庭成员变更模式：先登记增员原因与事由日期（取消则不新增）
-        MemberChangeReasonResult? reason = null;
-        if (IsMemberChangeMode)
-        {
-            reason = await ShowMemberChangeReasonPopupAsync(isRemove: false, member: null);
-            if (reason == null) return;
-        }
-
+        // 赡养/抚养/扶养人属"被赡养对象登记"，不构成家庭成员增员事由，
+        // 家庭成员变更模式下也不登记增员理由（不弹窗）；共同生活成员与减员仍逐人登记
         await EnsureRegionOptionsLoadedAsync();
 
         var member = CreateDefaultFamilyMember(MemberCategoryConstants.SUPPORT);
@@ -225,8 +219,6 @@ public partial class ApplicationFormViewModel
         member.HukouDistrict = SelectedDistrict ?? string.Empty;
         member.HukouTown = SelectedTown ?? string.Empty;
 
-        if (reason != null)
-            _addedMemberReasons[member] = reason;
         FamilyMembers.Add(member);
         RefreshDerivedCollections();
         await Task.CompletedTask;

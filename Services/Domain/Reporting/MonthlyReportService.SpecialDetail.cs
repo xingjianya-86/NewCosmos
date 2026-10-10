@@ -1254,6 +1254,12 @@ public partial class MonthlyReportService
         public string? RelationshipToHead { get; set; }
     }
 
+    private class SubsidyRatioRow
+    {
+        public long? ApplicationId { get; set; }
+        public decimal? RatioPercent { get; set; }
+    }
+
     private class StoppedRowData
     {
         public string? HeadName { get; set; }

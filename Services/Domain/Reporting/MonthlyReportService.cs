@@ -581,6 +581,9 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         var sickMap = sickResult.Value;
         var supporterMap = supporterResult.Value;
         var assetMap = assetResult.Value;
+        // 农业补贴折算比例（家庭情况说明条件注记用；失败降级为 null = 不注，不阻断会议记录生成）
+        var subsidyRatioResult = await LoadSubsidyRatioMapAsync(appIds, ct);
+        var subsidyRatioMap = subsidyRatioResult.IsSuccess ? subsidyRatioResult.Value : new Dictionary<long, decimal>();
         foreach (var item in rows)
         {
             var categoryCode = item.ClassificationResult ?? "";
@@ -632,6 +635,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                     FamilyLandArea = item.FamilyLandArea ?? 0,
                     LandIncomeTotal = item.LandIncomeTotal ?? 0,
                     SubsidyTotal = item.SubsidyTotal ?? 0,
+                    SubsidyRatioPercent = subsidyRatioMap.TryGetValue(appId, out var sr) ? sr : null,
                     PropertyCount = assetMap.TryGetValue(appId, out var a) ? a.Item1 : 0,
                     VehicleCount = assetMap.TryGetValue(appId, out var b) ? b.Item2 : 0,
                     MachineryCount = assetMap.TryGetValue(appId, out var m) ? m.Item3 : 0,
@@ -664,6 +668,37 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             foreach (var r in result.Value)
                 if (r.ApplicationId.HasValue && !string.IsNullOrWhiteSpace(r.RelationshipToHead))
                     map[r.ApplicationId.Value] = r.RelationshipToHead;
+        }
+        return Result.Success(map);
+    }
+
+    /// <summary>
+    /// 批量查询农业补贴有效折算比例（百分比 = Σamount ÷ Σ原始金额 × 100，逐户 GROUP BY）。
+    /// 供"家庭情况说明"条件注记：比例 ≠ 100% 时标注已按家庭份额折算；老数据/无明细返回 100（不注）。
+    /// 原始金额回退口径与 SubsidyRatioHelper 一致：original_amount > 0 用存量，否则 面积×单价×数量。
+    /// 一次性批查避免 N+1。
+    /// </summary>
+    private async Task<Result<Dictionary<long, decimal>>> LoadSubsidyRatioMapAsync(long[] applicationIds, CancellationToken ct = default)
+    {
+        var map = new Dictionary<long, decimal>();
+        if (applicationIds.Length == 0) return Result.Success(map);
+        var result = await _db.QueryAsync<SubsidyRatioRow>(
+            @"SELECT application_id,
+                     CASE WHEN SUM(CASE WHEN original_amount > 0 THEN original_amount
+                                        ELSE ROUND(COALESCE(area, 0) * COALESCE(unit_price, 0) * COALESCE(count, 1), 2) END) > 0
+                          THEN ROUND(SUM(amount) / SUM(CASE WHEN original_amount > 0 THEN original_amount
+                                                            ELSE ROUND(COALESCE(area, 0) * COALESCE(unit_price, 0) * COALESCE(count, 1), 2) END) * 100, 2)
+                          ELSE 100 END AS ratio_percent
+              FROM nc_biz_subsidies
+              WHERE application_id = ANY($1) AND deleted_at IS NULL
+              GROUP BY application_id",
+            ct, applicationIds);
+        if (result.IsFailure)
+            return Result.Failure<Dictionary<long, decimal>>(result.ErrorCode!, result.Message!);
+        foreach (var r in result.Value ?? new List<SubsidyRatioRow>())
+        {
+            if (r.ApplicationId.HasValue && r.RatioPercent.HasValue)
+                map[r.ApplicationId.Value] = r.RatioPercent.Value;
         }
         return Result.Success(map);
     }

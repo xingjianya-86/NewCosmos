@@ -491,7 +491,7 @@
                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                             <Label Grid.Column="3" Text="元/亩" Style="{StaticResource FormFieldLabelStyle}"/>
                                         </Grid>
-                                        <Label Text="{Binding Amount, StringFormat='= ¥{0:N2}'}" FontSize="15"
+                                        <Label Text="{Binding AmountFormula}" FontSize="15"
                                                TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                 </Border>

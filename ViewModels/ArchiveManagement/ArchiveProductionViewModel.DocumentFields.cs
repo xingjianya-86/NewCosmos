@@ -656,7 +656,9 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 村级土地说明：享受补贴类型与内容
+    /// 村级土地说明：享受补贴类型与内容。
+    /// 逐行完整算式：比例=100% 为「10亩×75.6元/亩=756.00元」；
+    /// 折算后为「10亩×75.6元/亩×35.20%=266.11元」——避免"面积×单价"与实际金额不符的误解。
     /// </summary>
     private static string BuildSubsidyTypeContent(ApplicationEntity app, Services.Domain.SocialAssistance.EconomicDetailData? economicDetail)
     {
@@ -667,7 +669,9 @@ public partial class ArchiveProductionViewModel
         foreach (var subsidy in economicDetail.Subsidies)
         {
             if (sb.Length > 0) sb.Append("；");
-            sb.Append($"{subsidy.SubsidyType}{FormatDecimal(subsidy.Area)}亩×{FormatDecimal(subsidy.UnitPrice)}元/亩={FormatDecimal(subsidy.Amount)}元");
+            var percent = Math.Round(subsidy.RatioFactor * 100, 2);
+            var ratioPart = percent >= 99.99m ? "" : $"×{percent:F2}%";
+            sb.Append($"{subsidy.SubsidyType}{FormatDecimal(subsidy.Area)}亩×{FormatDecimal(subsidy.UnitPrice)}元/亩{ratioPart}={FormatDecimal(subsidy.Amount)}元");
         }
         return sb.ToString();
     }
@@ -836,10 +840,10 @@ public partial class ArchiveProductionViewModel
                 parts.Add($"{label}{FormatDecimal(value * 12)}元/年");
         }
 
-        void AddAnnual(string label, decimal value)
+        void AddAnnual(string label, decimal value, string note = "")
         {
             if (value != 0)
-                parts.Add($"{label}{FormatDecimal(value)}元/年");
+                parts.Add($"{label}{FormatDecimal(value)}元/年{note}");
         }
 
         // 收入构成（年值口径：月值项×12、年值项原样，构成之和 = 家庭年收入 TotalAnnualIncome）
@@ -850,9 +854,9 @@ public partial class ArchiveProductionViewModel
         AddAnnual("赡养收入", app.AlimonyIncome);          // 赡养存储为年值
         AddMonthly("其他收入", app.OtherIncomeTotal);
 
-        // 土地和补贴本身是年值
+        // 土地和补贴本身是年值（补贴为折算后值，比例≠100% 时附条件注记）
         AddAnnual("土地收入", app.LandIncomeTotal);
-        AddAnnual("农业补贴", app.SubsidyTotal);
+        AddAnnual("农业补贴", app.SubsidyTotal, SubsidyRatioHelper.BuildNote(economicDetail?.Subsidies));
 
         // 合计（年值为权威口径，月值 = 年值÷12 分解显示）
         var totalAnnual = app.TotalAnnualIncome;
@@ -920,7 +924,7 @@ public partial class ArchiveProductionViewModel
         if (app.LandIncomeTotal != 0)
             items.Add($"土地收入{FormatDecimal(app.LandIncomeTotal)}元/年");
         if (app.SubsidyTotal != 0)
-            items.Add($"农业补贴{FormatDecimal(app.SubsidyTotal)}元/年");
+            items.Add($"农业补贴{FormatDecimal(app.SubsidyTotal)}元/年{SubsidyRatioHelper.BuildNote(economicDetail?.Subsidies)}");
 
         return items.Count > 0 ? string.Join("、", items) : "-";
     }
@@ -1091,7 +1095,7 @@ public partial class ArchiveProductionViewModel
     /// 经济复核同档：人口无变化省略该分句，月人均收入取变更记录新旧值；
     /// 旧档读取/变更查询失败仅跳过对应分句（LogWarn），类别/保障金/财产照常输出——不吞整段。
     /// </summary>
-    private async Task<string> BuildGraceChangeDetailAsync(ApplicationEntity app, GracePeriodRecord grace)
+    private async Task<string> BuildGraceChangeDetailAsync(ApplicationEntity app, GracePeriodRecord grace, string subsidyRatioNote = "")
     {
         var parts = new List<string>();
         decimal? chainOldClassified = null;
@@ -1140,7 +1144,7 @@ public partial class ArchiveProductionViewModel
                     parts.Add($"家庭人口由{oldFamilySize}人变为{app.FamilySize}人（{cause}）");
                 }
 
-                var incomePart = BuildAnnualIncomeComparisonPart(snap, old, app);
+                var incomePart = BuildAnnualIncomeComparisonPart(snap, old, app, subsidyRatioNote);
                 if (!string.IsNullOrEmpty(incomePart))
                 {
                     parts.Add(incomePart);
@@ -1199,8 +1203,9 @@ public partial class ArchiveProductionViewModel
     /// 旧值来源：Before 快照 Components（复核链真旧值）优先，回退旧档行分项（死亡/户主变更链真旧值）。
     /// 口径统一为年值：务工/经营/财产性/转移性/其他/刚性支出为月值×12，土地收入/农业补贴/赡养费收入为年值原样；
     /// 复核链历史记录（旧档已被覆写、无快照）旧源与新档全等且总额相等 → 不输出，避免误导性"无变化"。
+    /// subsidyRatioNote：农业补贴折算条件注记（比例≠100% 非空），附在补贴分项尾部。
     /// </summary>
-    private static string? BuildAnnualIncomeComparisonPart(BeforeSnapshotOldValues? snap, ApplicationEntity old, ApplicationEntity app)
+    private static string? BuildAnnualIncomeComparisonPart(BeforeSnapshotOldValues? snap, ApplicationEntity old, ApplicationEntity app, string subsidyRatioNote = "")
     {
         var oldAnnual = snap?.OldTotalAnnualIncome ?? old.TotalAnnualIncome;
         var totalChanged = oldAnnual != app.TotalAnnualIncome;
@@ -1249,7 +1254,9 @@ public partial class ArchiveProductionViewModel
         {
             if (oldValue != newValue)
             {
-                changed.Add($"{label}由{FormatDecimal(oldValue)}元变为{FormatDecimal(newValue)}元");
+                // 农业补贴为折算后年值，比例≠100% 时附注记避免误读为全额
+                var note = label == "农业补贴" ? subsidyRatioNote : "";
+                changed.Add($"{label}由{FormatDecimal(oldValue)}元变为{FormatDecimal(newValue)}元{note}");
             }
             else
             {

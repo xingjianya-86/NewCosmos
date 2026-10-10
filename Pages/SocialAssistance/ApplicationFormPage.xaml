@@ -210,7 +210,7 @@
                             </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
                             <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
-                                    <Span Text="补贴(年) "/><Span Text="{Binding SubsidyTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                                    <Span Text="补贴(年) "/><Span Text="{Binding SubsidyTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/><Span Text="{Binding SubsidyRatioNote}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                                 </FormattedString></Label.FormattedText>
                             </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
                             <Label FontSize="16" TextColor="{StaticResource TextSecondary}">

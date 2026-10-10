@@ -42,4 +42,11 @@ public interface ICollegeStudentService
     /// 获取某年份毕业的在读大学生（用于首页年度提醒）
     /// </summary>
     Task<Result<List<CollegeStudent>>> GetGraduatingStudentsAsync(int year, CancellationToken ct = default);
+
+    /// <summary>
+    /// 批量查「在读」大学生的身份证集合（分类认定劳动力豁免用）。
+    /// 按身份证 = ANY 批查（不按 application_id，该列无回写回路不可作依据），
+    /// 返回去重后的身份证列表（大写、去空白）。
+    /// </summary>
+    Task<Result<List<string>>> GetStudyingIdCardsAsync(List<string> idCards, CancellationToken ct = default);
 }

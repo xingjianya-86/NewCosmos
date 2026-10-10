@@ -888,8 +888,12 @@ public partial class ApplicationFormViewModel
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED, "新增成员信息不完整");
             }
 
-            // 增员/减员必须逐人登记原因（弹窗登记；此处兜底校验，防止旁路修改列表）
-            var missingReason = addedMembers.Where(m => !_addedMemberReasons.ContainsKey(m)).Select(m => m.Name).ToList();
+            // 增员/减员必须逐人登记原因（弹窗登记；此处兜底校验，防止旁路修改列表）。
+            // 赡养/抚养/扶养（SUPPORT）成员不构成增员事由，不登记理由（豁免）；
+            // 共同生活成员增员与所有减员仍强制登记
+            var missingReason = addedMembers
+                .Where(m => m.MemberCategory != MemberCategoryConstants.SUPPORT && !_addedMemberReasons.ContainsKey(m))
+                .Select(m => m.Name).ToList();
             missingReason.AddRange(removedEntries.Where(e => e.Reason == null).Select(e => e.Member.Name));
             if (missingReason.Count > 0)
             {
@@ -906,7 +910,9 @@ public partial class ApplicationFormViewModel
             var summaryParts = new List<string>();
             if (addedMembers.Count > 0)
             {
-                summaryParts.Add($"新增 {string.Join("、", addedMembers.Select(m => $"{m.Name}（{_addedMemberReasons[m].ReasonName}）"))}");
+                // 赡养/抚养/扶养成员无登记理由，只拼姓名，不拼空括号
+                summaryParts.Add($"新增 {string.Join("、", addedMembers.Select(m =>
+                    _addedMemberReasons.TryGetValue(m, out var r) ? $"{m.Name}（{r.ReasonName}）" : m.Name))}");
             }
             if (removedEntries.Count > 0)
             {
@@ -926,7 +932,8 @@ public partial class ApplicationFormViewModel
             var changeEntries = new List<MemberChangeEntry>();
             changeEntries.AddRange(addedMembers.Select(m =>
             {
-                var r = _addedMemberReasons[m];
+                // 赡养/抚养/扶养成员无登记理由：ReasonCode/ReasonName 留空，EventDate 记当天
+                _addedMemberReasons.TryGetValue(m, out var r);
                 return new MemberChangeEntry
                 {
                     Direction = DictionaryConstants.ChangeType.MEMBER_ADD,
@@ -935,10 +942,10 @@ public partial class ApplicationFormViewModel
                     IdCard = m.IdCard ?? string.Empty,
                     RelationshipToHead = m.RelationshipToHead ?? string.Empty,
                     MemberCategory = m.MemberCategory ?? string.Empty,
-                    ReasonCode = r.ReasonCode,
-                    ReasonName = r.ReasonName,
-                    EventDate = r.EventDate,
-                    Remark = r.Remark
+                    ReasonCode = r?.ReasonCode ?? string.Empty,
+                    ReasonName = r?.ReasonName ?? string.Empty,
+                    EventDate = r?.EventDate ?? DateTime.Today,
+                    Remark = r?.Remark ?? string.Empty
                 };
             }));
             changeEntries.AddRange(removedEntries.Select(e => new MemberChangeEntry

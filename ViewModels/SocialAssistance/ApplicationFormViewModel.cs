@@ -270,6 +270,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             FamilyLandArea = FamilyLandArea,
             LandIncomeTotal = LandIncomeTotal,
             SubsidyTotal = SubsidyTotal,
+            // 折算比例来自补贴明细（Σ金额÷Σ原始金额），供家庭情况说明条件注记
+            SubsidyRatioPercent = Math.Round(Helpers.SubsidyRatioHelper.GetEffectiveRatio(Subsidies) * 100, 2),
             PropertyCount = FamilyProperties.Count,
             VehicleCount = Vehicles.Count,
             MachineryCount = Machineries.Count,
@@ -633,6 +635,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     public decimal SubsidyShareRatioPercent =>
         TotalLandShares > 0 ? Math.Round(FamilyLandShares / TotalLandShares * 100, 2) : 0;
+
+    /// <summary>
+    /// 农业补贴折算条件注记：明细有效比例 ≠ 100% 时为「（已按家庭份额XX.XX%折算）」，否则空串。
+    /// 供顶栏「补贴(年)」等汇总输出附加说明，单点实现见 SubsidyRatioHelper。
+    /// </summary>
+    public string SubsidyRatioNote => Helpers.SubsidyRatioHelper.BuildNote(Subsidies);
 
     public List<string> LandStatusOptions { get; } = new(LandStatusConstants.All);
 

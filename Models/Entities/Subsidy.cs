@@ -83,6 +83,22 @@ public partial class Subsidy : ObservableObject
     {
         OriginalAmount = Math.Round(Area * UnitPrice * Count, 2);
         Amount = Math.Round(OriginalAmount * RatioFactor, 2);
+        OnPropertyChanged(nameof(AmountFormula));
+    }
+
+    /// <summary>
+    /// 金额显示算式（条件式）：比例=100% 时为「= ¥756.00」；
+    /// 折算后为「原 ¥756.00 × 35.20% = ¥266.11」，避免"面积×单价=金额"与实际值不符的误解。
+    /// </summary>
+    public string AmountFormula
+    {
+        get
+        {
+            var percent = Math.Round(RatioFactor * 100, 2);
+            return percent >= 99.99m
+                ? $"= ¥{Amount:N2}"
+                : $"原 ¥{OriginalAmount:N2} × {percent:F2}% = ¥{Amount:N2}";
+        }
     }
 
     /// <summary>

@@ -1,11 +1,12 @@
 # 照料类型字典（固定 ID）
-# 分类 ID=61，字典项 ID 范围: 61001-61999
+# 分类 ID=62，字典项 ID 范围: 62001-62999
+# （原误用 61 段与 subsidy_type.yaml 撞号，导致从种子初始化 23505 整体回滚，已改用独立 62 段）
 database: sys_dictionary
 version: 1.0
 
 tables:
   - name: nc_dict_items
     data:
-      - { id: 61001, category: "CaregiverTypes", item_key: "None", item_value: "无", sort_order: 1, is_active: true }
-      - { id: 61002, category: "CaregiverTypes", item_key: "Family", item_value: "亲属照料", sort_order: 2, is_active: true }
-      - { id: 61003, category: "CaregiverTypes", item_key: "Institution", item_value: "机构照料", sort_order: 3, is_active: true }
+      - { id: 62001, category: "CaregiverTypes", item_key: "None", item_value: "无", sort_order: 1, is_active: true }
+      - { id: 62002, category: "CaregiverTypes", item_key: "Family", item_value: "亲属照料", sort_order: 2, is_active: true }
+      - { id: 62003, category: "CaregiverTypes", item_key: "Institution", item_value: "机构照料", sort_order: 3, is_active: true }

@@ -378,4 +378,44 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
             return Result.FromException<List<CollegeStudent>>(ex);
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<Result<List<string>>> GetStudyingIdCardsAsync(List<string> idCards, CancellationToken ct = default)
+    {
+        if (idCards == null || idCards.Count == 0)
+            return Result.Success(new List<string>());
+
+        try
+        {
+            // 身份证列表以单个 text[] 参数传入（= ANY），参数个数与 N 无关；
+            // 只按身份证关联（application_id 无回写回路、family_member_id 混语义，均不可作依据）。
+            // 注意：string[] 必须包一层 object[]，否则会被 params object[] 展开成多个参数，
+            // $2 将变成单个字符串而非数组，导致 ANY($2) 解析失败（42809/22P02）。
+            const string sql = @"SELECT DISTINCT UPPER(TRIM(id_card)) AS id_card
+                                 FROM nc_biz_college_students
+                                 WHERE status = $1 AND deleted_at IS NULL
+                                   AND id_card = ANY($2::text[])";
+
+            LogInfo($"批量查在读大学生身份证: 输入 {idCards.Count} 张");
+            var result = await _db.QueryAsync<CollegeStudent>(sql, ct,
+                new object[] { CollegeStudentConstants.StatusStudying, idCards.ToArray() });
+
+            if (result.IsSuccess)
+            {
+                var cards = result.Value
+                    .Select(s => s.IdCard?.Trim() ?? string.Empty)
+                    .Where(c => c.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                LogInfo($"在读大学生命中 {cards.Count} 张身份证");
+                return Result.Success(cards);
+            }
+            return Result.Failure<List<string>>(result.ErrorCode!, result.Message!);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "批量查在读大学生身份证");
+            return Result.FromException<List<string>>(ex);
+        }
+    }
 }

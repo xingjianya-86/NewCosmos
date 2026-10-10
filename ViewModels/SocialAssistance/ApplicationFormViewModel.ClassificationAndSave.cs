@@ -145,6 +145,9 @@ public partial class ApplicationFormViewModel
         OnPropertyChanged(nameof(IncomeSubtotal));
         OnPropertyChanged(nameof(TotalFamilyIncomeAnnual));
         OnPropertyChanged(nameof(PerCapitaIncomeAnnual));
+
+        // 农业补贴折算说明随明细/比例变化（顶栏「补贴(年)」条件注记）
+        OnPropertyChanged(nameof(SubsidyRatioNote));
     }
 
     #endregion

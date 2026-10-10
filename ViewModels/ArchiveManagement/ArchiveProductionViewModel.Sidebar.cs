@@ -206,7 +206,8 @@ public partial class ArchiveProductionViewModel
 
     private async Task BuildSidebarFromApplicationAsync(ApplicationEntity app, string civilAssistantName, OrganizationInfoDto orgInfo,
         decimal totalIncome, decimal workIncome, decimal businessIncome, decimal propertyIncome,
-        decimal transferIncome, decimal alimonyIncome, decimal otherIncome, decimal rigidExpenditure)
+        decimal transferIncome, decimal alimonyIncome, decimal otherIncome, decimal rigidExpenditure,
+        string subsidyRatioNote = "")
     {
         SidebarGroups.Clear();
         AutoFilledCount = 0;
@@ -276,7 +277,7 @@ public partial class ArchiveProductionViewModel
         economicGroup.Items.Add(new SidebarItem { Label = "经营收入", Value = FormatDecimal(businessIncome), IsMatchable = false });
         economicGroup.Items.Add(new SidebarItem { Label = "财产性收入", Value = FormatDecimal(propertyIncome), IsMatchable = false });
         economicGroup.Items.Add(new SidebarItem { Label = "转移性收入", Value = FormatDecimal(transferIncome), IsMatchable = false });
-        economicGroup.Items.Add(new SidebarItem { Label = "农业补贴", Value = FormatDecimal(app.SubsidyTotal), IsMatchable = false });
+        economicGroup.Items.Add(new SidebarItem { Label = "农业补贴", Value = FormatDecimal(app.SubsidyTotal) + subsidyRatioNote, IsMatchable = false });
         economicGroup.Items.Add(new SidebarItem { Label = "刚性支出", Value = FormatDecimal(rigidExpenditure), IsMatchable = false });
         economicGroup.Items.Add(new SidebarItem { Label = "赡养费收入", Value = FormatDecimal(Math.Round(alimonyIncome / 12m, 2)), IsMatchable = false });
         SidebarGroups.Add(economicGroup);
@@ -312,7 +313,7 @@ public partial class ArchiveProductionViewModel
                 }
 
                 // 渐退期审批表：依赖渐退行的字段（变动说明/月数/起止/退出句）
-                _fieldData[FieldKeys.GP_CHANGE_DETAIL] = await BuildGraceChangeDetailAsync(app, graceRes.Value);
+                _fieldData[FieldKeys.GP_CHANGE_DETAIL] = await BuildGraceChangeDetailAsync(app, graceRes.Value, subsidyRatioNote);
                 _fieldData[FieldKeys.GP_PERIOD_MONTHS] = graceRes.Value.GracePeriodMonths?.ToString() ?? "";
                 _fieldData[FieldKeys.GP_START] = graceRes.Value.StartDate?.ToString("yyyy年M月d日") ?? "";
                 _fieldData[FieldKeys.GP_END] = graceRes.Value.EndDate?.ToString("yyyy年M月d日") ?? "";
@@ -440,9 +441,15 @@ public partial class ArchiveProductionViewModel
                 // 无复核记录时回退中文描述，禁止拼 ClassificationResult 原始码（曾打出 RuralLowIncome 英文）
                 var summaryParts = new List<string>();
                 foreach (var e in removeAll.Take(3))
-                    summaryParts.Add($"减员：{e.Name}（{ResolveAdjustShortReason(e)}）");
+                {
+                    var reason = ResolveAdjustShortReason(e);
+                    summaryParts.Add(string.IsNullOrEmpty(reason) ? $"减员：{e.Name}" : $"减员：{e.Name}（{reason}）");
+                }
                 foreach (var e in addAll.Take(3))
-                    summaryParts.Add($"增员：{e.Name}（{ResolveAdjustShortReason(e)}）");
+                {
+                    var reason = ResolveAdjustShortReason(e);
+                    summaryParts.Add(string.IsNullOrEmpty(reason) ? $"增员：{e.Name}" : $"增员：{e.Name}（{reason}）");
+                }
                 var adjustSummary = string.Join("；", summaryParts);
                 var reviewSituation = _fieldData.GetValueOrDefault(FieldKeys.REVIEW_SITUATION, "");
                 var familyFallback = $"{app.ApplicantName}户，家庭人口{app.FamilySize}人，" +
@@ -762,6 +769,7 @@ public partial class ArchiveProductionViewModel
         decimal soybeanAmount = 0;         // 大豆补贴
         decimal rotationAmount = 0;        // 轮作补贴
         decimal riceAmount = 0;            // 种植补贴
+        List<Subsidy>? subsidies = null;   // 折算注记计算用（比例≠100% 时附条件说明）
 
         try
         {
@@ -769,6 +777,7 @@ public partial class ArchiveProductionViewModel
             var detailResult = await economicDetailService.LoadAllAsync(app.Id, CancellationToken);
             if (detailResult.IsSuccess && detailResult.Value?.Subsidies != null)
             {
+                subsidies = detailResult.Value.Subsidies;
                 foreach (var subsidy in detailResult.Value.Subsidies)
                 {
                     switch (subsidy.SubsidyType)
@@ -784,6 +793,9 @@ public partial class ArchiveProductionViewModel
             }
         }
         catch { }
+
+        // 折算条件注记：补贴金额为 面积×单价×比例 折算后值，比例≠100% 时在补贴分项末尾附说明
+        var subsidyRatioNote = SubsidyRatioHelper.BuildNote(subsidies);
 
         // 全家土地总计收入 = 作物收入（数据库）+ 补贴
         var totalLandIncome = cropIncome + landFertilityAmount + soybeanAmount + rotationAmount + riceAmount;
@@ -801,7 +813,7 @@ public partial class ArchiveProductionViewModel
         sb.Append($"粮食补贴:{FormatDecimal(riceAmount)}元；");
         sb.Append($"土地轮作补贴：{FormatDecimal(rotationAmount)}元；");
         sb.Append($"高脂高油补贴：{FormatDecimal(soybeanAmount)}元；");
-        sb.Append($"地力补贴：{FormatDecimal(landFertilityAmount)}元。");
+        sb.Append($"地力补贴：{FormatDecimal(landFertilityAmount)}元{subsidyRatioNote}。");
         sb.AppendLine();
         sb.Append($"全家土地总计收入为{FormatDecimal(totalLandIncome)}元。（标准亩666.7方）—特此证明。");
 

@@ -358,6 +358,23 @@ public class DictionaryService : BaseService, IDictionaryService
         {
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, $"存在 {invalidItems.Count} 个无效字典项");
         }
+
+        // 种子撞号必须在表结构同步（DROP TABLE 重建）之前中止：
+        // 否则合并阶段 23505 回滚会把刚清空的字典表留在空库状态，全系统字典选项丢失（2026-10-10 实际发生）。
+        var duplicateCategoryIds = categories.GroupBy(c => c.Id)
+            .Where(g => g.Count() > 1).Select(g => g.Key).OrderBy(x => x).ToList();
+        if (duplicateCategoryIds.Count > 0)
+        {
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                $"种子分类 id 重复: {string.Join(", ", duplicateCategoryIds)}（检查 categories/_index.yaml）");
+        }
+        var duplicateItemIds = items.GroupBy(i => i.Id)
+            .Where(g => g.Count() > 1).Select(g => g.Key).OrderBy(x => x).ToList();
+        if (duplicateItemIds.Count > 0)
+        {
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                $"种子字典项 id 重复: {string.Join(", ", duplicateItemIds)}（检查 items/*.yaml 的 id 段归属）");
+        }
         await DelayAfterCompletionAsync();
 
         await ReportProgressWithDelayAsync(progress, 4, totalSteps, "确保表结构存在");

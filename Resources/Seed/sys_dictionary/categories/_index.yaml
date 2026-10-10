@@ -50,6 +50,7 @@ tables:
       # 支出与补贴 (ID: 60-69)
       - { id: 60, category: "RigidExpenditureTypes", display_name: "刚性支出类型", description: "刚性支出分类", sort_order: 60, is_active: true }
       - { id: 61, category: "SubsidyTypes", display_name: "补贴类型", description: "农业补贴类型", sort_order: 61, is_active: true }
+      - { id: 62, category: "CaregiverTypes", display_name: "照料类型", description: "照料方式（无/亲属照料/机构照料）", sort_order: 62, is_active: true }
       
       # 业务相关 (ID: 70-79)
       - { id: 70, category: "ApplicationReasons", display_name: "申请原因", description: "救助申请原因", sort_order: 70, is_active: true }

@@ -570,8 +570,8 @@
                                             <Label Grid.Column="3" Text="元/亩" FontSize="14" VerticalOptions="Center"
                                                    TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <!-- 第3行：金额合计 -->
-                                        <Label Text="{Binding Amount, StringFormat='= ¥{0:N2}'}" FontSize="15"
+                                        <!-- 第3行：金额算式（比例<100% 时显示 原×比例=实际，避免与面积×单价不符的误解） -->
+                                        <Label Text="{Binding AmountFormula}" FontSize="15"
                                                TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                 </Border>

@@ -17,14 +17,17 @@ public class ClassificationService : BaseService, IClassificationService
     protected override string ServiceName => "ClassificationService";
     private readonly IStandardConfigService _standardConfigService;
     private readonly ICapabilityAssessmentService _capabilityAssessmentService;
+    private readonly ICollegeStudentService _collegeStudentService;
 
     public ClassificationService(
         ILoggerService logger,
         IStandardConfigService standardConfigService,
-        ICapabilityAssessmentService capabilityAssessmentService) : base(logger)
+        ICapabilityAssessmentService capabilityAssessmentService,
+        ICollegeStudentService collegeStudentService) : base(logger)
     {
         _standardConfigService = standardConfigService;
         _capabilityAssessmentService = capabilityAssessmentService;
+        _collegeStudentService = collegeStudentService;
     }
 
     /// <summary>
@@ -53,6 +56,10 @@ public class ClassificationService : BaseService, IClassificationService
             householdMembers.Add(m);
         }
 
+        // 在读大学生（大学生档案 status=Studying）免于劳动力判定：按身份证匹配户内成员与户主。
+        // 按身份证关联（application_id 无回写回路不可作依据）；查询失败只记警告、按"无豁免"继续，不阻断判定。
+        var studyingIdCards = await LoadStudyingIdCardsAsync(application, householdMembers, ct);
+
         var result = new ClassificationResult();
         var isRural = ClassificationConstants.HukouType.IsHukouRural(application.HukouType ?? "");
         var familySize = application.FamilySize > 0 ? application.FamilySize : householdMembers.Count + 1;
@@ -70,12 +77,16 @@ public class ClassificationService : BaseService, IClassificationService
         var hasHeadSevereDisease = DictionaryConstants.HealthStatus.HasSevereDisease(application.HealthStatus ?? "");
         var hasHeadSevereDisability = DictionaryConstants.HealthStatus.HasSevereDisability(application.HealthStatus ?? "")
             || ClassificationConstants.DisabilityLevel.IsSevereForAssistance(headLevelKey, headTypeKey);
+        // 户主在读大学生（大学生档案 status=Studying）同样豁免劳动力判定
+        var headIdCard = (application.ApplicantIdCard ?? "").Trim().ToUpperInvariant();
+        var headIsStudying = headIdCard.Length > 0 && studyingIdCards.Contains(headIdCard);
         // 劳动力口径：未成年（<18）与 60 岁以上（老年）不计入劳动力；劳动年龄内按健康状况判定；
-        // 重残（一、二级任意类型及三级智力/精神）无劳动能力
+        // 重残（一、二级任意类型及三级智力/精神）无劳动能力；在读大学生免于劳动力判定
         var headHasLaborAbility = headAge is >= AgeConstants.ELDERLY_THRESHOLD or < AgeConstants.MINOR_THRESHOLD
             ? false
             : (application.HealthStatus ?? "") is HealthStatusConstants.HEALTHY or HealthStatusConstants.FAIR_OR_WEAK
-              && !ClassificationConstants.DisabilityLevel.IsSevereForAssistance(headLevelKey, headTypeKey);
+              && !ClassificationConstants.DisabilityLevel.IsSevereForAssistance(headLevelKey, headTypeKey)
+              && !headIsStudying;
 
         var hasSevereDisease = CheckHasSevereDisease(householdMembers) || hasHeadSevereDisease;
         var hasSevereDisability = CheckHasSevereDisability(householdMembers) || hasHeadSevereDisability;
@@ -83,8 +94,18 @@ public class ClassificationService : BaseService, IClassificationService
         // 单人保口径：一、二级任意残疾类型及三级智力/精神计入重残；其余三级/四级不计（等级未知回退健康状况/标记）
         var singleRescueCandidates = BuildSingleRescueCandidates(application, householdMembers, headAge);
         var hasSingleRescueCondition = singleRescueCandidates.Count > 0;
-        var hasLaborAbility = CalculateHasLaborAbility(householdMembers) || headHasLaborAbility;
+        var hasLaborAbility = CalculateHasLaborAbility(householdMembers, studyingIdCards) || headHasLaborAbility;
         var allAbove60 = headAge >= AgeConstants.ELDERLY_THRESHOLD && CheckAllMembersOver60(householdMembers);
+
+        // 在读大学生豁免劳动力判定的痕迹（供审核追溯判定路径）
+        foreach (var m in householdMembers)
+        {
+            var mid = (m.IdCard ?? "").Trim().ToUpperInvariant();
+            if (mid.Length > 0 && studyingIdCards.Contains(mid))
+                result.DeterminationDetails.Add($"{m.Name}（在读大学生）免于劳动力判定");
+        }
+        if (headIsStudying)
+            result.DeterminationDetails.Add($"{application.ApplicantName}（在读大学生）免于劳动力判定");
 
         // 判定特困条件
         var isSingleHousehold = familySize == 1;
@@ -576,13 +597,43 @@ public class ClassificationService : BaseService, IClassificationService
 
     // ── 私有方法：辅助判定 ──
 
-    private bool CalculateHasLaborAbility(List<FamilyMember> members)
+    /// <summary>
+    /// 加载在读大学生身份证集合（大学生档案 status=Studying，按身份证匹配户内成员与户主）。
+    /// 查询失败只记警告、返回空集合（按"无豁免"继续判定），不阻断分类流程。
+    /// </summary>
+    private async Task<HashSet<string>> LoadStudyingIdCardsAsync(
+        ApplicationEntity application, List<FamilyMember> householdMembers, CancellationToken ct)
+    {
+        var idCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var m in householdMembers)
+        {
+            var idc = (m.IdCard ?? "").Trim();
+            if (idc.Length > 0) idCards.Add(idc);
+        }
+        var headIdCard = (application.ApplicantIdCard ?? "").Trim();
+        if (headIdCard.Length > 0) idCards.Add(headIdCard);
+
+        if (idCards.Count == 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var lookup = await _collegeStudentService.GetStudyingIdCardsAsync(idCards.ToList(), ct);
+        if (lookup.IsSuccess && lookup.Value != null)
+            return new HashSet<string>(lookup.Value, StringComparer.OrdinalIgnoreCase);
+
+        LogWarn($"在读大学生身份证查询失败，本次判定不应用学生劳动力豁免: {lookup.ErrorCode} {lookup.Message}");
+        return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private bool CalculateHasLaborAbility(List<FamilyMember> members, HashSet<string> studyingIdCards)
     {
         var laborAbilities = new[] { HealthStatusConstants.HEALTHY, HealthStatusConstants.FAIR_OR_WEAK };
         foreach (var member in members)
         {
             // 因照顾本户重病/重残亲属而免于劳动力判定的成员不计入"有劳动力"
             if (member.IsLaborExempt)
+                continue;
+            // 在读大学生（大学生档案 status=Studying）免于劳动力判定
+            var mid = (member.IdCard ?? "").Trim().ToUpperInvariant();
+            if (mid.Length > 0 && studyingIdCards.Contains(mid))
                 continue;
             // 重残（一、二级任意类型及三级智力/精神）无劳动能力
             if (ClassificationConstants.DisabilityLevel.IsSevereForAssistance(

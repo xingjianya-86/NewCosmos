@@ -1433,9 +1433,13 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             TaskScheduler.Default).Unwrap();
         _logger.LogBusiness("经济明细查询完成", ("IsSuccess", economicResult.IsSuccess.ToString()));
 
+        // 农业补贴折算条件注记（比例≠100% 时非空），经济明细加载成功后计算，供下方 INCOME_SUBSIDY 等输出附加
+        var subsidyRatioNote = "";
+
         if (economicResult.IsSuccess && economicResult.Value != null)
         {
             var economic = economicResult.Value;
+            subsidyRatioNote = SubsidyRatioHelper.BuildNote(economic.Subsidies);
             _logger.LogBusiness("经济明细数据",
                 ("LaborIncomes", (economic.LaborIncomes?.Count ?? 0).ToString()),
                 ("BreedingIncomes", (economic.BreedingIncomes?.Count ?? 0).ToString()),
@@ -1552,7 +1556,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         _fieldData[FieldKeys.INCOME_ALIMONY] = FormatDecimal(
             isRural ? app.AlimonyIncome : Math.Round(app.AlimonyIncome / 12m, 2)) + "元";
         _fieldData[FieldKeys.INCOME_OTHER] = FormatDecimal(app.OtherIncomeTotal * monthToDisplay) + "元";
-        _fieldData[FieldKeys.INCOME_SUBSIDY] = FormatDecimal(app.SubsidyTotal);  // 年收入直接显示
+        _fieldData[FieldKeys.INCOME_SUBSIDY] = FormatDecimal(app.SubsidyTotal) + subsidyRatioNote;  // 年收入直接显示；折算后附条件注记
         _fieldData[FieldKeys.INCOME_LAND] = FormatDecimal(app.LandIncomeTotal);  // 年收入直接显示
 
         // 总收入：农村打印年值权威口径（TotalAnnualIncome），城市打印月值（年÷12）
@@ -1583,7 +1587,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
 
         StatusText = "正在构建侧边栏...";
         _logger.LogBusiness("开始构建侧边栏");
-        await BuildSidebarFromApplicationAsync(app, civilAssistantName, orgInfo, app.TotalFamilyIncome, app.WorkIncomeTotal, app.BusinessIncomeTotal, app.PropertyIncomeTotal, app.TransferIncomeTotal, app.AlimonyIncome, app.OtherIncomeTotal, app.RigidExpenditure);
+        await BuildSidebarFromApplicationAsync(app, civilAssistantName, orgInfo, app.TotalFamilyIncome, app.WorkIncomeTotal, app.BusinessIncomeTotal, app.PropertyIncomeTotal, app.TransferIncomeTotal, app.AlimonyIncome, app.OtherIncomeTotal, app.RigidExpenditure, subsidyRatioNote);
         _logger.LogBusiness("侧边栏构建完成");
 
         _logger.LogBusiness("LoadApplicationDataAsync 完成", ("ApplicationId", applicationId.ToString()), ("FieldCount", _fieldData.Count.ToString()));
@@ -1980,7 +1984,8 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
         // 构建侧边栏（月值口径：总收入取主表月值权威口径 TotalFamilyIncome，赡养费年值由侧边栏÷12 显示）
         await BuildSidebarFromApplicationAsync(app, civilAssistantName, orgInfo,
             app.TotalFamilyIncome, app.WorkIncomeTotal, app.BusinessIncomeTotal, app.PropertyIncomeTotal,
-            app.TransferIncomeTotal, app.AlimonyIncome, app.OtherIncomeTotal, app.RigidExpenditure);
+            app.TransferIncomeTotal, app.AlimonyIncome, app.OtherIncomeTotal, app.RigidExpenditure,
+            SubsidyRatioHelper.BuildNote(economicDetail?.Subsidies));
     }
 
     public sealed record OrganizationInfoDto(string District, string Town, string DistrictCivilBureau, string DistrictCivilBureauPhone, string OperatorUnitName, string OperatorUnitPhone);
