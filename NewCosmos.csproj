@@ -152,6 +152,9 @@
 		<AndroidAsset Include="config\timeline_config.yaml" Link="timeline_config.yaml" />
 		<!-- 端侧 OCR 模型（PP-OCRv3 det/rec），资源路径 Ocr/xxx.onnx -->
 		<AndroidAsset Include="Resources\Ocr\**\*.onnx" Link="Ocr\%(Filename)%(Extension)" />
+		<!-- 登录页背景图：打包进 APK assets（backgrounds/），首次启动由
+		     BackgroundLoaderService 复制到 AppData 可写目录（None+CopyToOutput 只对 Windows 生效） -->
+		<AndroidAsset Include="Resources\Backgrounds\**\*" Link="backgrounds\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<!-- Android AOT：NPOI.Core/OOXML 的元数据引用 SkiaSharp，但该传递依赖未进入 Android
