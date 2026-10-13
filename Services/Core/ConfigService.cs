@@ -98,6 +98,12 @@ public class ConfigService : IConfigService
             Directory.CreateDirectory(writableConfigDir);
             CopyDefaultConfigFromAssets(writableConfigDir);
         }
+        else
+        {
+            // APK 升级不清空 AppData：旧 app.ini 会一直残留，导致显示旧版本号。
+            // 启动时把 assets 里的 Version 同步进来（只改 Version 行，不动 BCycleSettleDay 等其他配置）。
+            SyncAppIniVersionFromAsset(writableConfigDir);
+        }
         return writableConfigDir;
 #else
         var productionConfigPath = Path.Combine(AppContext.BaseDirectory, "config");
@@ -156,6 +162,77 @@ public class ConfigService : IConfigService
 
         Serilog.Log.Information("[ConfigService] 已从 assets 复制默认配置到 {Dir}", targetDir);
     }
+
+    /// <summary>
+    /// Android: 把 APK assets 内 app.ini 的 Version 同步到可写目录的 app.ini。
+    /// APK 升级不清空 AppData（只有卸载才清），旧 app.ini 会一直残留，
+    /// 导致"升级后仍显示旧版本号"。app.ini 在运行期从不被本程序改写（无 SaveAppOptions），
+    /// 这里只改 Version 一行，保留用户对 BCycleSettleDay 等其他键的改动。
+    /// </summary>
+    private static void SyncAppIniVersionFromAsset(string targetDir)
+    {
+        try
+        {
+            string assetVersion;
+            using (var assetStream = FileSystem.OpenAppPackageFileAsync("app.ini").GetAwaiter().GetResult())
+            using (var reader = new StreamReader(assetStream))
+            {
+                assetVersion = ReadIniValue(reader.ReadToEnd(), "Version");
+            }
+            if (string.IsNullOrWhiteSpace(assetVersion))
+                return;
+
+            var targetPath = Path.Combine(targetDir, "app.ini");
+            if (!File.Exists(targetPath))
+                return;
+
+            var currentVersion = ReadIniValue(File.ReadAllText(targetPath), "Version");
+            if (string.Equals(currentVersion, assetVersion, StringComparison.Ordinal))
+                return;
+
+            var lines = File.ReadAllLines(targetPath);
+            var changed = false;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var trimmed = lines[i].Trim();
+                if (trimmed.StartsWith('#') || trimmed.StartsWith('['))
+                    continue;
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length == 2 && parts[0].Trim().Equals("Version", StringComparison.OrdinalIgnoreCase))
+                {
+                    lines[i] = $"Version={assetVersion}";
+                    changed = true;
+                    break;
+                }
+            }
+            if (!changed)
+                return;
+
+            File.WriteAllLines(targetPath, lines, new global::System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            Serilog.Log.Information("[ConfigService] app.ini Version 已从 assets 同步: {Old} -> {New}",
+                currentVersion, assetVersion);
+        }
+        catch (Exception ex)
+        {
+            // 同步失败不阻断启动（版本号显示旧值，其余功能不受影响）
+            Serilog.Log.Warning("[ConfigService] 同步 app.ini Version 失败: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>从 INI 文本按 key 全文件匹配取值（与 ReadIniLines 同口径：忽略 section、跳过注释）</summary>
+    private static string ReadIniValue(string iniText, string key)
+    {
+        foreach (var raw in iniText.Split('\n'))
+        {
+            var trimmed = raw.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#') || trimmed.StartsWith('['))
+                continue;
+            var parts = trimmed.Split('=', 2);
+            if (parts.Length == 2 && parts[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+                return parts[1].Trim();
+        }
+        return string.Empty;
+    }
 #endif
 
     public AppOptions GetAppOptions()
@@ -199,6 +276,20 @@ public class ConfigService : IConfigService
                     {
                         Serilog.Log.Warning("[ConfigService] app.ini BCycleSettleDay 配置无效: {Value}，使用默认 {Default}",
                             value, BusinessCycleConstants.DefaultSettleDay);
+                    }
+                    break;
+                case "FundChangeThreshold":
+                    // 保障金变更登记阈值（默认 10 元/月）。非法值回退默认并告警，不阻断启动。
+                    if (decimal.TryParse(value, out var fundThreshold)
+                        && fundThreshold >= FundChangeThresholdConstants.MinThreshold
+                        && fundThreshold <= FundChangeThresholdConstants.MaxThreshold)
+                    {
+                        _appOptions.FundChangeThreshold = fundThreshold;
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("[ConfigService] app.ini FundChangeThreshold 配置无效: {Value}，使用默认 {Default}",
+                            value, FundChangeThresholdConstants.DefaultFundChangeThreshold);
                     }
                     break;
             }

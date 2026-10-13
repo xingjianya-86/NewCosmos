@@ -999,6 +999,119 @@ public partial class ElderlyApplicationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<List<ElderlyAge90Row>>> GetAge90ReportRowsAsync(int year, int month, CancellationToken ct = default)
+    {
+        try
+        {
+            var baseResult = await GetAge90AdjustRowsAsync(year, month, ct);
+            if (baseResult.IsFailure)
+                return Result.Failure<List<ElderlyAge90Row>>(baseResult.ErrorCode!, baseResult.Message!);
+            var rows = baseResult.Value ?? new List<ElderlyAge90Row>();
+            var seen = new HashSet<string>(rows.Select(r => r.IdCard), StringComparer.Ordinal);
+
+            // 补录：该月已完成的 90 档复核。停旧增新后基础查询不再命中（旧档 Stopped、新档 CAT3、
+            // 名册已有档），但《调整备案表》必须仍能列出——先复核后打印也能打全。
+            // 不限 trigger_source：身份自检/人工先入队的 AGE 变更同样覆盖；new_category=CAT3
+            // 天然排除 100 岁档变动（其 effective_month 为 100 周岁月，不会等于所选月）。
+            var effectiveMonth = new DateTime(year, month, 1).ToString("yyyy-MM");
+            const string reviewSql = @"
+                SELECT id_card, name, old_category, old_monthly_amount, new_monthly_amount,
+                       age_at_review, identity_flag
+                FROM nc_biz_elderly_reviews
+                WHERE status = $1 AND review_result = $2 AND effective_month = $3 AND new_category = $4
+                  AND deleted_at IS NULL
+                ORDER BY id";
+            var reviewResult = await _db.QueryAsync<Age90ReviewRow>(reviewSql, ct,
+                ElderlyBenefitConstants.ReviewStatusCompleted,
+                ElderlyBenefitConstants.ReviewResultChanged,
+                effectiveMonth,
+                ElderlyBenefitConstants.Cat90To99);
+            if (reviewResult.IsFailure)
+                return Result.Failure<List<ElderlyAge90Row>>(reviewResult.ErrorCode!, reviewResult.Message!);
+
+            var completed = (reviewResult.Value ?? new List<Age90ReviewRow>())
+                .Where(r => !string.IsNullOrWhiteSpace(r.IdCard) && seen.Add(r.IdCard!))
+                .ToList();
+            if (completed.Count == 0) return Result.Success(rows);
+
+            // 展示字段（性别/出生日期/地址）从档案取：优先在享档，其次最新任意档
+            var cards = completed.Select(r => r.IdCard!).Distinct(StringComparer.Ordinal).ToArray();
+            const string appSql = @"
+                SELECT id_card, name, gender, birth_date, hukou_address, family_address, detail_address
+                FROM nc_biz_elderly_applications
+                WHERE id_card = ANY($1) AND deleted_at IS NULL
+                ORDER BY (status = 'Confirmed') DESC, id DESC";
+            var appResult = await _db.QueryAsync<Age90AppRow>(appSql, ct, cards);
+            if (appResult.IsFailure)
+                return Result.Failure<List<ElderlyAge90Row>>(appResult.ErrorCode!, appResult.Message!);
+            var appMap = new Dictionary<string, Age90AppRow>(StringComparer.Ordinal);
+            foreach (var a in appResult.Value ?? new List<Age90AppRow>())
+                if (!appMap.ContainsKey(a.IdCard)) appMap[a.IdCard] = a;
+
+            // 地址空回退名册地址（补建档字段最小化的名册人员）
+            var needFallback = completed
+                .Where(r => !appMap.TryGetValue(r.IdCard!, out var a)
+                            || (string.IsNullOrWhiteSpace(a.HukouAddress) && string.IsNullOrWhiteSpace(a.FamilyAddress)))
+                .Select(r => r.IdCard!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            var historyAddr = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (needFallback.Length > 0)
+            {
+                const string histSql = @"
+                    SELECT DISTINCT ON (id_card) id_card, address
+                    FROM nc_biz_elderly_subsidy_history
+                    WHERE id_card = ANY($1) AND address IS NOT NULL AND address <> ''
+                    ORDER BY id_card, id DESC";
+                var histResult = await _db.QueryAsync<HistoryAddrRow>(histSql, ct, needFallback);
+                if (histResult.IsFailure)
+                    return Result.Failure<List<ElderlyAge90Row>>(histResult.ErrorCode!, histResult.Message!);
+                foreach (var h in histResult.Value ?? new List<HistoryAddrRow>())
+                    if (!string.IsNullOrWhiteSpace(h.Address)) historyAddr[h.IdCard ?? string.Empty] = h.Address!;
+            }
+
+            foreach (var r in completed)
+            {
+                appMap.TryGetValue(r.IdCard!, out var app);
+                var hukou = app?.HukouAddress ?? string.Empty;
+                var family = app != null ? CombineAddress(app.FamilyAddress, app.DetailAddress) : string.Empty;
+                if (string.IsNullOrWhiteSpace(hukou) && string.IsNullOrWhiteSpace(family)
+                    && historyAddr.TryGetValue(r.IdCard!, out var addr))
+                {
+                    hukou = addr;
+                    family = addr;
+                }
+                rows.Add(new ElderlyAge90Row
+                {
+                    ApplicationId = app?.Id,
+                    Name = string.IsNullOrWhiteSpace(r.Name) ? (app?.Name ?? r.IdCard!) : r.Name,
+                    IdCard = r.IdCard!,
+                    Gender = app?.Gender ?? string.Empty,
+                    BirthDate = app?.BirthDate ?? IdCardValidator.ExtractBirthDate(r.IdCard),
+                    Age = r.AgeAtReview ?? ElderlyBenefitConstants.Threshold90,
+                    IdentityFlag = r.IdentityFlag ?? string.Empty,
+                    HukouAddress = hukou,
+                    FamilyAddress = family,
+                    OldCategory = r.OldCategory ?? string.Empty,
+                    OldMonthlyAmount = r.OldMonthlyAmount ?? 0m,
+                    NewCategory = ElderlyBenefitConstants.Cat90To99,
+                    NewMonthlyAmount = r.NewMonthlyAmount ?? 0m,
+                    EffectiveMonth = effectiveMonth
+                });
+            }
+
+            rows = rows.OrderBy(r => r.BirthDate ?? DateTime.MaxValue).ToList();
+            LogInfo($"满90周岁报表名单: {year}-{month} 基础 {rows.Count - completed.Count} 人 + 已复核补录 {completed.Count} 人");
+            return Result.Success(rows);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "GetAge90ReportRowsAsync");
+            return Result.FromException<List<ElderlyAge90Row>>(ex);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<Result<int>> EnqueueAge90ReviewsAsync(int year, int month, CancellationToken ct = default)
     {
         var rowsResult = await GetAge90AdjustRowsAsync(year, month, ct);
@@ -1053,6 +1166,37 @@ public partial class ElderlyApplicationService
         if (created > 0)
             Logger.LogBusiness("满90周岁月报自动入队", ("Year", year), ("Month", month), ("Created", created));
         return Result.Success(created);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<int>> ScanAndEnqueueAge90Async(CancellationToken ct = default)
+    {
+        try
+        {
+            var todayMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            var startMonth = todayMonth.AddMonths(-ElderlyBenefitConstants.Age90ScanLookbackMonths);
+            var total = 0;
+            for (var cursor = startMonth; cursor <= todayMonth; cursor = cursor.AddMonths(1))
+            {
+                var result = await EnqueueAge90ReviewsAsync(cursor.Year, cursor.Month, ct);
+                if (result.IsFailure)
+                    return Result.Failure<int>(result.ErrorCode!, result.Message!);
+                total += result.Value;
+            }
+            if (total > 0)
+            {
+                Logger.LogBusiness("满90周岁自扫描入队",
+                    ("From", startMonth.ToString("yyyy-MM")),
+                    ("To", todayMonth.ToString("yyyy-MM")),
+                    ("Created", total));
+            }
+            return Result.Success(total);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "ScanAndEnqueueAge90Async");
+            return Result.FromException<int>(ex);
+        }
     }
 
     /// <inheritdoc />
@@ -1142,6 +1286,25 @@ public partial class ElderlyApplicationService
         public string PersonType { get; set; } = string.Empty;
         public string? Address { get; set; }
         public decimal? SubsidyAmount { get; set; }
+    }
+
+    /// <summary>满90报表补录：已完成复核行（snake_case 自动映射）</summary>
+    private sealed class Age90ReviewRow
+    {
+        public string IdCard { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? OldCategory { get; set; }
+        public decimal? OldMonthlyAmount { get; set; }
+        public decimal? NewMonthlyAmount { get; set; }
+        public int? AgeAtReview { get; set; }
+        public string? IdentityFlag { get; set; }
+    }
+
+    /// <summary>名册地址回退行（DISTINCT ON id_card）</summary>
+    private sealed class HistoryAddrRow
+    {
+        public string? IdCard { get; set; }
+        public string? Address { get; set; }
     }
 
     #endregion

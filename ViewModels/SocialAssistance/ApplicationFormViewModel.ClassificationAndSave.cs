@@ -698,9 +698,14 @@ public partial class ApplicationFormViewModel
                 // 月报「新增救助明细」跨类新增行与本档变更记录列表依赖此行（服务幂等，失败不阻断分类保存）
                 await EnsureChainCategoryAddAsync(CancellationToken);
 
-                // 户主死亡链进入渐退期：分类施保减发（上游原额>现额）补写减发记录挂旧档，
-                // 供变更历史展示、统计排除与月报「分类施保金减发人员表」取数（服务幂等，失败不阻断分类保存）
-                await EnsureChainClassifiedSubsidyReduceAsync(CancellationToken);
+                // 接续链 Step5 判定后保障金变更登记 + 分类施保变动登记（服务幂等，失败不阻断分类保存）：
+                // ①旧/新同属低保群体且户月保障金差 ≥ 阈值 → 写"保障金变更登记"记录（进月报增减发/增减员调整表/告知书）；
+                // ②分类施保金额有变动（不套阈值，也不套低保同码门）→ 写分类施保变更记录（增/减双向，挂旧档）。
+                // 两个挂点合并成一次调用：结算入口内部按上述两步分别把关，第 2 步独立于第 1 步的门槛。
+                // 户主死亡链的最终保障金额在本步才确定（死亡瞬间只建链不判金额），故登记必须在此做。
+                // 户主死亡进渐退期（低保→低收入）时：第 1 步被渐退期跳过（待遇走封顶减发），
+                // 第 2 步照写分类施保减发记录（月保障金 313→313 无增减发，该减发由月报施保金减发表承载）。
+                await EnsureChainFundChangeSettlementAsync(CancellationToken);
             }
             else
             {
@@ -744,32 +749,34 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 户主死亡链渐退分类施保减发同步（服务端幂等：一致跳过/变化更新/条件消失软删）。
+    /// 接续链 Step5 判定后保障金变更登记 + 分类施保变动登记同步（服务端幂等）。
+    /// ①旧/新同属低保群体且户月保障金差 ≥ 阈值 → "保障金变更登记"记录（月报增减发/增减员调整表/告知书数据源）；
+    /// ②分类施保有变动（不套阈值）→ 分类施保变更记录（增/减双向，挂旧档）。
     /// 分类已落库，同步失败仅告警不抛出，避免分类保存被报告类记录拖失败。
     /// </summary>
-    private async Task EnsureChainClassifiedSubsidyReduceAsync(CancellationToken ct)
+    private async Task EnsureChainFundChangeSettlementAsync(CancellationToken ct)
     {
         try
         {
-            var result = await _changeService.EnsureChainClassifiedSubsidyReduceAsync(
+            var result = await _changeService.EnsureChainFundChangeSettlementAsync(
                 _applicationId,
                 string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName,
                 ct);
             if (result.IsSuccess)
             {
                 if (result.Value is long changeId && changeId > 0)
-                    _logger.LogBusiness("户主死亡渐退分类施保减发记录已同步",
+                    _logger.LogBusiness("接续链保障金变更/分类施保变动登记已同步",
                         ("ApplicationId", _applicationId),
                         ("ChangeId", changeId));
             }
             else
             {
-                _logger.Warn($"户主死亡渐退分类施保减发记录同步失败: {result.Message}");
+                _logger.Warn($"接续链保障金变更登记同步失败: {result.Message}");
             }
         }
         catch (Exception ex)
         {
-            _logger.Warn($"户主死亡渐退分类施保减发记录同步异常: {ex.Message}");
+            _logger.Warn($"接续链保障金变更登记同步异常: {ex.Message}");
         }
     }
 
@@ -1262,7 +1269,9 @@ public partial class ApplicationFormViewModel
             TotalAnnualIncome = TotalAnnualIncome,
             PerCapitaAnnualIncome = PerCapitaAnnualIncome,
             FamilySize = FamilySize,
-            UpdatedBy = App.CurrentUserId?.ToString() ?? "system"
+            // 统一记用户名（原为 App.CurrentUserId?.ToString()，落库成 updated_by='1'，
+            // 与主表另两条路径的用户名语义不一致——同字段三套写法并存）
+            UpdatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
         };
 
         var updateResult = await _applicationService.UpdateEconomicInfoAsync(request, ct);

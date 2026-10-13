@@ -30,6 +30,13 @@ public class AppOptions
     public int BCycleSettleDay { get; set; } = BusinessCycleConstants.DefaultSettleDay;
 
     /// <summary>
+    /// 保障金变更登记阈值（元/月）：动态管理停旧建新后旧/新档同属低保群体时，
+    /// 户月保障金差 ≥ 本值才登记"保障金变更"（进月报/文书），&lt; 本值只重建不登记。
+    /// 启动时由 App 注入 FundChangeThresholdHelper；分类施保变动不适用本阈值。
+    /// </summary>
+    public decimal FundChangeThreshold { get; set; } = FundChangeThresholdConstants.DefaultFundChangeThreshold;
+
+    /// <summary>
     /// 验证配置是否完整
     /// </summary>
     public void Validate()

@@ -12,7 +12,8 @@ namespace NewCosmos.ViewModels.ElderlyBenefits;
 
 /// <summary>
 /// 高龄津贴复核列表 ViewModel（上：待复核队列；下：在享人员检索）。
-/// 检索覆盖当前库在享档案；队列由其他进程（低收入归档/信息变更）触发写入。
+/// 检索覆盖当前库在享档案；队列来源：低收入归档/信息变更联动 + 启动自检 + 本页进页时
+/// 满90周岁自扫描（当月+回溯3个月，幂等去重）。
 /// </summary>
 public partial class ElderlyReviewListViewModel : PagedSearchViewModelBase
 {
@@ -66,8 +67,24 @@ public partial class ElderlyReviewListViewModel : PagedSearchViewModelBase
     {
         await base.OnAppearingAsync();
         await LoadPermissionAsync();
+        await ScanAge90Async();
         await LoadPendingAsync();
         await LoadDataAsync();
+    }
+
+    /// <summary>满90周岁自扫描（当月+回溯3个月入队，幂等）；失败仅记日志，不阻断队列加载。</summary>
+    private async Task ScanAge90Async()
+    {
+        try
+        {
+            var result = await _applicationService.ScanAndEnqueueAge90Async();
+            if (result.IsFailure)
+                Logger.Warn($"复核页满90周岁自扫描失败: {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "复核页满90周岁自扫描异常");
+        }
     }
 
     private async Task LoadPermissionAsync()

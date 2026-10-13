@@ -452,7 +452,9 @@ public partial class MonthlyReportService
     /// <summary>
     /// 退出对象兜底纠治表（表 7）。
     /// 退出对象识别（本月周期）：停保(status=ApplicationStatusCodes.STOPPED) + 渐退期满(grace_periods.end_date，仅已生效档案) + 经济复核降档(change_records.triggered_grace_period，排除户主死亡/分类施保减除)。
-    /// 核查列：给予渐退期(事件日期落在渐退期内)；纳入低保/特困/低保边缘/刚性支出(本户原档案当前生效分类)；直接退出(均否)。
+    /// 核查列：给予渐退期(事件日期落在渐退期内，连带下游接续档案匹配)；纳入低保/特困/低保边缘/刚性支出(本户原档案当前生效分类)；直接退出(均否)。
+    /// 同人去重：一人多档案退出（旧档链停+新档再停）按身份证收敛为一行（停保>渐退期满>经济复核降档，同型取最晚事件）。
+    /// 户主死亡：退保原因记"人员死亡"，家属兜底（渐退期/纳入类别）按下游接续档案如实体现，不再短路硬编码"直接退出"。
     /// </summary>
     public async Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, CancellationToken ct = default)
     {
@@ -470,11 +472,12 @@ public partial class MonthlyReportService
 
         // 1. 识别本月退出事件（三源 UNION）
         var eventSql = $@"
-            SELECT x.application_id, x.event_date, x.event_type, x.exit_reason, x.old_classification
+            SELECT x.application_id, x.event_date, x.event_type, x.exit_reason, x.old_classification, x.head_id_card
             FROM (
                 SELECT a.id AS application_id, a.stop_date AS event_date, '停保' AS event_type,
                        COALESCE(a.stop_reason, '') AS exit_reason,
-                       a.classification_result AS old_classification
+                       a.classification_result AS old_classification,
+                       a.applicant_id_card AS head_id_card
                 FROM nc_biz_applications a
                 WHERE a.status = $6 AND a.stop_date >= $1 AND a.stop_date < $2
                   AND a.deleted_at IS NULL AND ($3 = '' OR a.town = $3)
@@ -482,8 +485,10 @@ public partial class MonthlyReportService
                   {StoppedArchiveFilter.NotRebuildContinuationSql("a")}
                 UNION ALL
                 SELECT c.application_id, c.change_date AS event_date, '经济复核降档' AS event_type,
-                       '经济复核转低收入' AS exit_reason, c.old_classification
+                       '经济复核转低收入' AS exit_reason, c.old_classification,
+                       a.applicant_id_card AS head_id_card
                 FROM nc_biz_change_records c
+                JOIN nc_biz_applications a ON c.application_id = a.id AND a.deleted_at IS NULL
                 WHERE c.triggered_grace_period = TRUE AND c.change_date >= $1 AND c.change_date < $2
                   AND c.deleted_at IS NULL
                   -- 排除户主死亡/分类施保减除（死亡已有停保事件行，避免误标经济复核降档）
@@ -502,7 +507,8 @@ public partial class MonthlyReportService
                               AND c.change_date <= g.end_date
                               AND c.old_classification IS NOT NULL AND c.old_classification <> ''
                             ORDER BY c.change_date ASC, c.id ASC LIMIT 1),
-                           a.classification_result) AS old_classification
+                           a.classification_result) AS old_classification,
+                       a.applicant_id_card AS head_id_card
                 FROM nc_biz_grace_periods g
                 LEFT JOIN nc_biz_applications a ON g.application_id = a.id
                 WHERE g.end_date >= $4 AND g.end_date < $5 AND g.deleted_at IS NULL
@@ -521,12 +527,17 @@ public partial class MonthlyReportService
         if (events.Count == 0)
             return Result.Success(new List<MonthlyExitRectificationRow>());
 
-        // 同 application_id 去重：停保 > 渐退期满 > 经济复核降档
+        // 同人去重（2026-10 改）：一人多档案退出（旧档链停 + 新档复核不合格又停）按档案去重会漏出两行
+        // （贺满程 82/83、梁玉祥 93/94 实测错例）——按身份证收敛为一行：
+        // 停保 > 渐退期满 > 经济复核降档，同类型取最晚事件（真正的最终退出）；身份证为空按档案独立成行防误合并。
         var distinctEvents = events
-            .GroupBy(e => e.ApplicationId)
+            .Where(e => e.ApplicationId.HasValue)
+            .GroupBy(e => string.IsNullOrWhiteSpace(e.HeadIdCard)
+                ? $"APP:{e.ApplicationId}"
+                : $"ID:{e.HeadIdCard.Trim()}")
             .Select(g => g.OrderByDescending(e => e.EventType == "停保")
                            .ThenByDescending(e => e.EventType == "渐退期满")
-                           .ThenBy(e => e.EventDate)
+                           .ThenByDescending(e => e.EventDate ?? DateTime.MinValue)
                            .First())
             .ToList();
         var ids = distinctEvents.Select(e => e.ApplicationId).ToArray();
@@ -544,21 +555,13 @@ public partial class MonthlyReportService
         var details = (detailResult.Value ?? new List<ExitDetailRow>())
             .ToDictionary(d => d.Id, d => d);
 
-        // 3. 批量查渐退期（判定"给予渐退期"）
-        var graceSql = @"SELECT application_id, start_date, end_date
-                         FROM nc_biz_grace_periods
-                         WHERE deleted_at IS NULL AND application_id = ANY($1)";
-        var graceResult = await _db.QueryAsync<ExitGraceRow>(graceSql, ct, ids);
-        if (graceResult.IsFailure)
-            return Result.Failure<List<MonthlyExitRectificationRow>>(graceResult.ErrorCode!, graceResult.Message!);
-        var graces = graceResult.Value ?? new List<ExitGraceRow>();
-
         // 3.5 停旧建新：批量查停保户的下游新档案（original_application_id=本户），
-        //     用于确定"退出后纳入类别"（解维平 44 → 新档案 45 特困）与退保原因。
-        var rebuildMap = new Dictionary<long, string>();
+        //     用于确定"退出后纳入类别"（解维平 44 → 新档案 45 特困）与退保原因；
+        //     同时记下下游档案 ID——渐退期行挂在下游新档案上，"给予渐退期"须连带匹配（见 3.6）。
+        var rebuildMap = new Dictionary<long, (string Class, long NewAppId)>();
         if (ids.Length > 0)
         {
-            var rebuildSql = @"SELECT DISTINCT ON (original_application_id) original_application_id, classification_result
+            var rebuildSql = @"SELECT DISTINCT ON (original_application_id) original_application_id, id, classification_result
                                FROM nc_biz_applications
                                WHERE original_application_id = ANY($1)
                                ORDER BY original_application_id, (deleted_at IS NULL) DESC, created_at DESC";
@@ -567,10 +570,27 @@ public partial class MonthlyReportService
                 return Result.Failure<List<MonthlyExitRectificationRow>>(rebuildResult.ErrorCode!, rebuildResult.Message!);
             foreach (var row in rebuildResult.Value ?? new List<RebuildTargetRow>())
             {
-                if (row.OriginalApplicationId.HasValue && !string.IsNullOrEmpty(row.ClassificationResult))
-                    rebuildMap[row.OriginalApplicationId.Value] = row.ClassificationResult!;
+                if (row.OriginalApplicationId.HasValue)
+                    rebuildMap[row.OriginalApplicationId.Value] = (row.ClassificationResult ?? "", row.Id ?? 0);
             }
         }
+
+        // 3.6 批量查渐退期（判定"给予渐退期"）——查询范围含下游接续档案：
+        //     户主死亡/停旧建新的渐退期行挂在下游新档案上（樊万河户 68→80 实测错例：渐退期挂在 80 上，
+        //     只查事件档案 68 会误显"否"）。
+        var chainIds = ids
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Concat(rebuildMap.Values.Where(v => v.NewAppId > 0).Select(v => v.NewAppId))
+            .Distinct()
+            .ToArray();
+        var graceSql = @"SELECT application_id, start_date, end_date
+                         FROM nc_biz_grace_periods
+                         WHERE deleted_at IS NULL AND application_id = ANY($1)";
+        var graceResult = await _db.QueryAsync<ExitGraceRow>(graceSql, ct, chainIds);
+        if (graceResult.IsFailure)
+            return Result.Failure<List<MonthlyExitRectificationRow>>(graceResult.ErrorCode!, graceResult.Message!);
+        var graces = graceResult.Value ?? new List<ExitGraceRow>();
 
         // 3.7 户主变更识别：该档案存在户主死亡/户主变更变更记录 → 退保原因描述为"停止"
         var headChangeApps = new HashSet<long>();
@@ -604,7 +624,8 @@ public partial class MonthlyReportService
                     stopReasonTypeMap[row.ApplicationId.Value] = row.ChangeReasonType!;
         }
 
-        // 3.9 死亡识别：周期内户主死亡记录（死亡日期落在本月周期内）→ 死亡户直接退出。
+        // 3.9 死亡识别：周期内户主死亡记录（死亡日期落在本月周期内）→ 退保原因记"人员死亡"，
+        //     家属兜底（渐退期/纳入类别）仍按下链档案如实计算（不再短路置"直接退出"）。
         // 仅认"周期内死亡"：佟淑华户 2 月前户主吴克学死亡但家庭继续保障、8 月渐退期满重新核算纳入低保，
         // 该户死亡不在本月周期，不会被误判为死亡退出。
         var deathAppIds = new HashSet<long>();
@@ -637,47 +658,32 @@ public partial class MonthlyReportService
 
             var categoryCode = string.IsNullOrEmpty(ev.OldClassification) ? d.ClassificationResult ?? "" : ev.OldClassification;
 
-            // 死亡户短路：周期内户主死亡 → 人员死亡直接退出，不参与渐退期/纳入类别核查。
-            // 死亡人不可能转入低保/特困等类别，新户主建档属新申请，不构成"退出后纳入"。
-            // 优先级最高，覆盖 headChangeApps（"停止"）与停旧建新（纳入类别）判定。
-            if (deathAppIds.Contains(appId))
-            {
-                outRows.Add(new MonthlyExitRectificationRow
-                {
-                    Name = d.ApplicantName ?? "",
-                    IdCard = d.ApplicantIdCard ?? "",
-                    Category = ClassificationConstants.ConvertToMajorCategoryName(categoryCode),
-                    FamilySize = (d.FamilySize ?? 0).ToString(),
-                    StopMonth = ev.EventDate?.ToString("yyyy年M月") ?? "",
-                    StopReason = "人员死亡",
-                    GracePeriod = "否",
-                    IntoDibao = "否",
-                    IntoTeku = "否",
-                    IntoEdge = "否",
-                    IntoRigid = "否",
-                    DirectExit = "是"
-                });
-                continue;
-            }
-
             var isActive = d.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
+
+            // 停旧建新下游档案（纳入类别 + 渐退期连带匹配用）；无下游时 NewAppId=0、Class=""。
+            rebuildMap.TryGetValue(appId, out var rebuild);
+            var rebuildCode = rebuild.Class ?? "";
+            var chainAppIds = rebuild.NewAppId > 0 ? new[] { appId, rebuild.NewAppId } : new[] { appId };
 
             // 给予渐退期：档案生效期=办理月次月 1 日（提前办理档案），
             // 渐退期在某月结束，次月新开档案不算在渐退期内。
             // 判定口径 = 渐退期是否覆盖"生效日"（事件日期所在月的次月 1 日）。
+            // 渐退期行可能挂在下游接续新档案上（户主死亡/停旧建新），须连同下游档案一并匹配，
+            // 否则死亡/接续户会误显"否"（樊万河户 68→80 实测错例：渐退期挂在新档案 80 上）。
             var eventDate = ev.EventDate;
             var effectiveDate = eventDate.HasValue
                 ? new DateTime(eventDate.Value.Year, eventDate.Value.Month, 1).AddMonths(1)
                 : (DateTime?)null;
             var hasGrace = effectiveDate.HasValue && graces.Any(g =>
-                g.ApplicationId == appId && g.StartDate.HasValue && g.EndDate.HasValue
+                g.ApplicationId.HasValue && chainAppIds.Contains(g.ApplicationId.Value)
+                && g.StartDate.HasValue && g.EndDate.HasValue
                 && g.StartDate.Value <= effectiveDate.Value
                 && g.EndDate.Value >= effectiveDate.Value);
             var graceText = hasGrace ? "是" : "否";
 
             // 纳入类别：停旧建新（有下游新档案）优先用新档案分类（如解维平 44→45 特困）；
             // 否则用当前档案分类（isActive Approved/Completed 才视为纳入）。
-            var intoCategory = rebuildMap.TryGetValue(appId, out var rebuildCode) && !string.IsNullOrEmpty(rebuildCode)
+            var intoCategory = !string.IsNullOrEmpty(rebuildCode)
                 ? rebuildCode
                 : (isActive ? d.ClassificationResult ?? "" : "");
 
@@ -688,12 +694,15 @@ public partial class MonthlyReportService
             var directExit = !hasGrace && hasDibao == "否" && hasTeku == "否" && hasEdge == "否" && hasRigid == "否" ? "是" : "否";
 
             // 退保原因（事件类型 + 纳入类别，标准化）：
-            // 停保 + 户主变更（户主死亡/户主变更）→ "停止"
+            // 停保 + 周期内户主死亡 → "人员死亡"（家属兜底按下链档案如实体现，不再短路硬编码，
+            //   旧版曾把渐退期/纳入类别全置否、直接退出=是，掩盖在世家属实际获得的兜底：樊万河户 68→80）
+            // 停保 + 户主变更 → "停止"
             // 停保 + 停旧建新（经济复核跨类）→ "经济复核后"；停保 + 纯停保 → 保留 stop_reason/停保退出
             // 经济复核降档（低保→低收入，进渐退期）→ "渐退期满，经经济复核转低收入"
             // 渐退期满 → "渐退期满，经经济复核转{纳入类别}"
             var stopReason = ev.EventType switch
             {
+                "停保" when deathAppIds.Contains(appId) => "人员死亡",
                 "停保" when headChangeApps.Contains(appId) => "停止",
                 "停保" when !string.IsNullOrEmpty(intoCategory) && !string.IsNullOrEmpty(rebuildCode)
                     => $"{(stopReasonTypeMap.TryGetValue(appId, out var reasonType) ? reasonType : ChangeReasonTypeConstants.EconomicReview)}后 由 {ClassificationConstants.ConvertToMajorCategoryName(categoryCode)}转入{ClassificationConstants.ConvertToMajorCategoryName(intoCategory)}",
@@ -1376,6 +1385,15 @@ public partial class MonthlyReportService
         public string? District { get; set; }
         public string? Town { get; set; }
         public string? Community { get; set; }
+
+        /// <summary>新档案ID（分类施保现额取链尾现役档案用）</summary>
+        public long? NewApplicationId { get; set; }
+
+        /// <summary>新档分类施保金额（LEFT JOIN n.classified_subsidy_amount；无新档回退本档值）</summary>
+        public decimal? NewClassifiedSubsidyAmount { get; set; }
+
+        /// <summary>新档户月保障金（LEFT JOIN n.household_monthly_guarantee_amount，与 Before 快照旧值同为户月口径配对）</summary>
+        public decimal? NewHouseholdMonthly { get; set; }
     }
 
     private class DeathRow
@@ -1401,6 +1419,7 @@ public partial class MonthlyReportService
         public string? EventType { get; set; }
         public string? ExitReason { get; set; }
         public string? OldClassification { get; set; }
+        public string? HeadIdCard { get; set; }
     }
 
     /// <summary>退出对象申请详情行</summary>
@@ -1422,10 +1441,11 @@ public partial class MonthlyReportService
         public DateTime? EndDate { get; set; }
     }
 
-    /// <summary>停旧建新目标档案行（原档案 → 新档案分类）</summary>
+    /// <summary>停旧建新目标档案行（原档案 → 新档案分类 + 新档案 ID）</summary>
     private class RebuildTargetRow
     {
         public long? OriginalApplicationId { get; set; }
+        public long? Id { get; set; }
         public string? ClassificationResult { get; set; }
     }
 
@@ -1473,8 +1493,9 @@ public partial class MonthlyReportService
     }
 
     /// <summary>
-    /// 户主死亡渐退分类施保减发行（施保金减发数据源之二：nc_biz_change_records 挂旧档，
-    /// 户主/地址/类别/原现户月取旧档，死亡成员取 nc_biz_death_records）
+    /// 变更链分类施保减发行（施保金减发数据源之二：nc_biz_change_records 挂旧档，
+    /// 户主/地址/类别/原现户月取旧档，死亡成员取 nc_biz_death_records；
+    /// 取数带互斥守卫——该链已有保障金变更登记记录时不出行，见 GetShiBaoReductionRowsAsync 注释）
     /// </summary>
     private class ShiBaoReduceRow
     {

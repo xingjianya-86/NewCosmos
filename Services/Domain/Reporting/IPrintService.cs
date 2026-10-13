@@ -27,6 +27,12 @@ public interface IPrintService
     Task<Result<byte[]>> RenderMonthlyFormsMergedAsync(int year, int month, IEnumerable<string> formKeys, string town, CancellationToken ct = default);
 
     /// <summary>
+    /// 组装勾选月报表单的预览数据（表头字段 + ConfigJson 列定义 + 行数据；无数据表单自动跳过）。
+    /// 手机端 HTML 预览专用：只查数据不渲染模板，绕开 Office COM（Android 无 PDF 能力）。
+    /// </summary>
+    Task<Result<List<MonthlyFormPreviewData>>> BuildMonthlyFormsPreviewDataAsync(int year, int month, IEnumerable<string> formKeys, string town, CancellationToken ct = default);
+
+    /// <summary>
     /// 渲染月报表表单为源文件字节（xlsx/docx，供导出；双页表单拆多页）
     /// </summary>
     Task<Result<List<MonthlySourceFile>>> RenderMonthlyFormToSourceAsync(int year, int month, string formKey, string town, CancellationToken ct = default);
@@ -60,7 +66,8 @@ public interface IPrintService
     Task<Result<bool>> PrintElderlyMonthlyFormAsync(int year, int month, bool isStop, string categoryCode, string printerName, int copies = 1, CancellationToken ct = default);
 
     /// <summary>
-    /// 渲染《普惠高龄津贴调整备案表》为 PDF（月报「满90周岁」逐人一页；首次渲染自动写入待复核队列）。
+    /// 渲染《普惠高龄津贴调整备案表》为 PDF（月报「满90周岁」逐人一页；纯读不写队列，
+    /// 名单含未办理候选 + 该月已完成复核人员）。
     /// </summary>
     Task<Result<byte[]>> RenderElderlyAge90FormAsync(int year, int month, CancellationToken ct = default);
 
@@ -152,4 +159,40 @@ public class GracePeriodPrintInfo
     public DateTime EndDate { get; set; }
     public string OriginalClassification { get; set; } = string.Empty;
     public decimal OriginalAmount { get; set; }
+}
+
+/// <summary>
+/// 月报表单预览数据（一张表单一页；手机端 HTML 预览专用）
+/// </summary>
+public class MonthlyFormPreviewData
+{
+    /// <summary>报表标题（含分页/城乡后缀）</summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>填报单位</summary>
+    public string Unit { get; set; } = string.Empty;
+
+    /// <summary>填报日期</summary>
+    public string Date { get; set; } = string.Empty;
+
+    /// <summary>表格列（顺序取模板 ConfigJson Tables[0].Columns）</summary>
+    public List<MonthlyFormPreviewColumn> Columns { get; set; } = new();
+
+    /// <summary>表格行（每格一个 FieldKey→值）</summary>
+    public List<Dictionary<string, string>> Rows { get; set; } = new();
+
+    /// <summary>段落型表单内容（会议记录等无行表单，label 为中文占位符）</summary>
+    public List<KeyValuePair<string, string>> Paragraphs { get; set; } = new();
+}
+
+/// <summary>
+/// 月报预览表格列定义
+/// </summary>
+public class MonthlyFormPreviewColumn
+{
+    /// <summary>标准字段KEY（如 NEW_NAME）</summary>
+    public string FieldKey { get; set; } = string.Empty;
+
+    /// <summary>中文表头（取模板 ConfigJson 列占位符去花括号）</summary>
+    public string Header { get; set; } = string.Empty;
 }

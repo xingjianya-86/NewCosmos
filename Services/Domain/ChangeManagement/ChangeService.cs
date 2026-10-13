@@ -86,6 +86,19 @@ public class EconomicReviewContext
     public decimal? OldGuaranteeAmount { get; set; }
 
     /// <summary>
+    /// 覆写前的户月保障金（household_monthly_guarantee_amount，不含分类施保/照料费）。
+    /// 保障金变更登记的差额口径只认本值（分类施保变动另行保存记录，不并入保障金差）；
+    /// 必须在 Step5 判定落库前由表单捕获，null 时回退 OldGuaranteeAmount − OldClassified − OldCaregiver。
+    /// </summary>
+    public decimal? OldHouseholdMonthlyGuaranteeAmount { get; set; }
+
+    /// <summary>覆写前的分类施保金额（分类施保变更记录的旧值来源；同样须判定前捕获）</summary>
+    public decimal? OldClassifiedSubsidyAmount { get; set; }
+
+    /// <summary>覆写前的照料补贴金额（户月口径回退换算用）</summary>
+    public decimal? OldCaregiverSubsidyAmount { get; set; }
+
+    /// <summary>
     /// 覆写前的收入分项旧值（与 Application 列同名同口径：务工/经营/财产/转移/其他/刚性为月值，赡养/土地/补贴为年值）
     /// </summary>
     public IncomeComponentValues? OldComponents { get; set; }
@@ -137,6 +150,18 @@ public class MemberChangeContext
 
     /// <summary>覆写前的保障金合计（户月 + 分类施保 + 照料费）。同上必须在判定落库前捕获。</summary>
     public decimal? OldGuaranteeAmount { get; set; }
+
+    /// <summary>
+    /// 覆写前的户月保障金（不含分类施保/照料费）。保障金变更登记的差额口径只认本值；
+    /// 必须在 Step5 判定落库前由表单捕获，null 时回退 OldGuaranteeAmount − OldClassified − OldCaregiver。
+    /// </summary>
+    public decimal? OldHouseholdMonthlyGuaranteeAmount { get; set; }
+
+    /// <summary>覆写前的分类施保金额（分类施保变更记录的旧值来源）</summary>
+    public decimal? OldClassifiedSubsidyAmount { get; set; }
+
+    /// <summary>覆写前的照料补贴金额（户月口径回退换算用）</summary>
+    public decimal? OldCaregiverSubsidyAmount { get; set; }
 
     /// <summary>覆写前的家庭月总收入（表单入口快照；null 回退读库——本事务 SaveEconomicDetailsAsync 已先写回）</summary>
     public decimal? OldTotalFamilyIncome { get; set; }
@@ -331,15 +356,39 @@ public interface IChangeService
     Task<Result<long?>> EnsureChainCategoryAddAsync(long applicationId, string operatorName, CancellationToken ct = default);
 
     /// <summary>
-    /// 户主死亡链进入渐退期后同步分类施保减发记录（change_type=ClassifiedSubsidyReduce，挂旧档）：
-    /// 原分类施保（上游档）&gt; 渐退后现分类施保时写入，供变更历史展示「分类施保减除」、
-    /// 统计/退出纠治表排除（避免一次死亡事件计两次）与月报「分类施保金减发人员表」取数。
-    /// 幂等——同户同类记录金额一致跳过、变化就地更新；条件消失（回同额）软删。
-    /// change_category=NULL（不入增减员调整表）、无快照（不抢链上死亡快照的 latest）、
-    /// change_reason_type='分类施保减除'（避开复核情况/渐退退出按 '户主死亡' 取最近一条的误读）、
-    /// triggered_grace_period/triggered_stop 恒 false。
+    /// 接续链档案 Step5 分类判定后的统一结算挂点：保障金变更登记 + 分类施保变更登记（两步独立把关）。
+    /// 户主死亡的最终保障金额在新档 Step5 才确定（死亡瞬间只建链不判金额），故结算不能在死亡时刻做，
+    /// 必须在本步以旧档（未被表单覆写，可信）vs 本档（新档）已落库值比对。
+    ///
+    /// ① 保障金变更登记：旧/新同属最低生活保障群体（同码）且户月差 ≥ FundChangeThresholdHelper.Threshold
+    ///    时写入，金额为户月口径；渐退期活跃时跳过（待遇走渐退封顶减发，防同户同月两条 FundChange）。
+    ///    幂等——同链金额一致跳过、漂移就地更新。
+    ///
+    /// ② 分类施保变更登记：不套阈值、也不套低保同码门（原「户主死亡进入渐退期」专用减发记录
+    ///    EnsureChainClassifiedSubsidyReduceAsync 已删，语义由本步覆盖并放宽到三分支）。
+    ///    change_type 按方向取 ClassifiedSubsidyReduce / ClassifiedSubsidyAdd，change_reason_type='分类施保变更'；
+    ///    change_category=NULL（不入增减员调整表）、triggered_grace_period/triggered_stop 恒 false
+    ///    （置 true 会使月报「退出对象纠治表」误标经济复核降档事件）。
+    ///    幂等——链感知键（application_id + new_application_id + change_type）：金额一致跳过、漂移就地更新、
+    ///    方向翻转软删重建。
+    ///
+    /// 典型形态：户主死亡进渐退期（低保→低收入）→ 第 ① 步被渐退期跳过，第 ② 步照写分类施保减发记录，
+    /// 该减发由月报「分类施保金减发人员表」承载（月保障金按原额封顶，无增减发行）。
     /// </summary>
-    Task<Result<long?>> EnsureChainClassifiedSubsidyReduceAsync(long applicationId, string operatorName, CancellationToken ct = default);
+    /// </summary>
+    Task<Result<long?>> EnsureChainFundChangeSettlementAsync(long applicationId, string operatorName, CancellationToken ct = default);
+
+    /// <summary>
+    /// 本档案关联链上是否存在"保障金变更登记"记录（application_id 或 new_application_id 关联）。
+    /// 档案输出追加《档案_变更告知书》"待遇调整"场景的判定依据（与停保场景并列，无停保时仍出告知书）。
+    /// </summary>
+    Task<Result<bool>> HasFundChangeRegistrationAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询本档案关联链上最近一条"保障金变更登记"记录（告知书待遇调整场景字段装配用；无则 Value 为 null）。
+    /// 金额列为户月保障金口径。
+    /// </summary>
+    Task<Result<FundChangeRegistrationRecord?>> GetLatestFundChangeRegistrationAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
     /// 查询与本档案关联（application_id 或 new_application_id）且含快照的最近变更记录的 Before/After 快照。
@@ -458,6 +507,9 @@ public class ChangeRecord
     /// <summary>变更类型显示名（列表绑定用；未知类型回退原值）</summary>
     public string ChangeTypeDisplay => ChangeType switch
     {
+        // 经济复核主记录与"保障金变更登记"记录同为 FundChange：按原因类型区分显示，
+        // 否则成员变更/户主死亡补写的登记记录会在变更历史里误显示为"经济复核"
+        DictionaryConstants.ChangeType.FUND_CHANGE when IsFundChangeRegistration => "保障金变更",
         DictionaryConstants.ChangeType.FUND_CHANGE => "经济复核",
         DictionaryConstants.ChangeType.MEMBER_ATTRIBUTE => "成员属性变更",
         DictionaryConstants.ChangeType.MEMBER_ADD => "成员增加",
@@ -470,8 +522,17 @@ public class ChangeRecord
         DictionaryConstants.ChangeType.CATEGORY_STOP => "原类别停止",
         DictionaryConstants.ChangeType.CATEGORY_ADD => "新类别新增",
         DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE => "分类施保减除",
+        DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD => "分类施保增加",
         _ => ChangeType
     };
+
+    /// <summary>变更原因类型（change_reason_type；查询未选列时为空）</summary>
+    public string? ChangeReasonType { get; set; }
+
+    /// <summary>是否为"保障金变更登记"记录（change_type=FundChange 且 reason_type=保障金变更登记）</summary>
+    public bool IsFundChangeRegistration =>
+        string.Equals(ChangeType, DictionaryConstants.ChangeType.FUND_CHANGE, global::System.StringComparison.Ordinal)
+        && string.Equals(ChangeReasonType, ChangeReasonTypeConstants.FundChangeRegistration, global::System.StringComparison.Ordinal);
 }
 
 /// <summary>
@@ -481,6 +542,29 @@ public class TriggeredStopChangeRecord
 {
     public string? OldClassification { get; set; }
     public string? NewClassification { get; set; }
+}
+
+/// <summary>
+/// 保障金变更登记记录（告知书待遇调整场景字段装配用）。
+/// 金额列一律为户月保障金口径（不含分类施保/照料费，分类施保变动走独立的分类施保变更记录）。
+/// </summary>
+public class FundChangeRegistrationRecord
+{
+    public long Id { get; set; }
+    public string? OldClassification { get; set; }
+    public string? NewClassification { get; set; }
+
+    /// <summary>变更前户月保障金</summary>
+    public decimal OldGuaranteeAmount { get; set; }
+
+    /// <summary>变更后户月保障金</summary>
+    public decimal NewGuaranteeAmount { get; set; }
+
+    public string? ChangeReason { get; set; }
+    public DateTime ChangeDate { get; set; }
+
+    /// <summary>变动方向（增发/减发），由金额差符号判定</summary>
+    public bool IsIncrease => NewGuaranteeAmount > OldGuaranteeAmount;
 }
 
 /// <summary>

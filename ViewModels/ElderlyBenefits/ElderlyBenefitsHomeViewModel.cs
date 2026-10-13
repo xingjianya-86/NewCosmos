@@ -152,10 +152,7 @@ public partial class ElderlyBenefitsHomeViewModel : ModuleHomeViewModelBase
         NavigateToFeatureAsync<Pages.ElderlyBenefits.ElderlyPendingListPage>(
             CanAccessElderlyBenefit, "高龄津贴下月待办", "高龄津贴下月待办");
 
-    [RelayCommand]
-    private Task OpenRecoveryAsync() =>
-        NavigateToFeatureAsync<Pages.Recovery.RecoverySearchPage>(
-            true, "后补追缴", "后补追缴");
+    // 后补追缴入口已收敛到工作台（带权限校验），本页不再重复（原命令权限硬编码 true）
 
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
 

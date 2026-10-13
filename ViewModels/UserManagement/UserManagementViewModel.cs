@@ -967,7 +967,8 @@ public partial class UserEditorViewModel : ViewModelBase
                     IdentityCard = IdentityCard,
                     Position = SelectedPosition,
                     OrganizationId = SelectedOrganization?.Id,
-                    CreatedBy = "System"
+                    // 审计记真实操作人（原硬编码 "System"，致 nc_sys_users 创建人不可追溯）
+                    CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
                 };
 
                 var result = await _userService.CreateAsync(createRequest, ct);
@@ -1022,7 +1023,8 @@ public partial class UserEditorViewModel : ViewModelBase
                     Position = SelectedPosition,
                     OrganizationId = SelectedOrganization?.Id,
                     IsActive = IsActive,
-                    UpdatedBy = "System"
+                    // 审计记真实操作人（原硬编码 "System"，致 nc_sys_users 更新人不可追溯）
+                    UpdatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
                 };
 
                 var result = await _userService.UpdateAsync(updateRequest, ct);
@@ -1208,7 +1210,8 @@ public partial class RoleEditorViewModel : ViewModelBase
                     Description = RoleDescription,
                     Level = RoleLevel,
                     DataScope = RoleDataScope,
-                    CreatedBy = "System"
+                    // 审计记真实操作人（原硬编码 "System"，致 nc_sys_roles 创建人不可追溯）
+                    CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
                 };
 
                 var result = await _roleService.CreateRoleAsync(createRequest, ct);
@@ -1232,7 +1235,8 @@ public partial class RoleEditorViewModel : ViewModelBase
                     Description = RoleDescription,
                     Level = RoleLevel,
                     DataScope = RoleDataScope,
-                    UpdatedBy = "System"
+                    // 审计记真实操作人（原硬编码 "System"，致 nc_sys_roles 更新人不可追溯）
+                    UpdatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
                 };
 
                 var result = await _roleService.UpdateRoleAsync(updateRequest, ct);

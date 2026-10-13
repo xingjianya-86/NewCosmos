@@ -86,6 +86,34 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private decimal? _loadedTotalGuaranteeAmount;
 
     /// <summary>
+    /// 加载时数据库中的户月保障金（household_monthly_guarantee_amount，不含分类施保/照料费，覆写前真旧值）。
+    /// 保障金变更登记的差额口径只认本值（分类施保变动另行记录，不并入保障金差）。
+    /// </summary>
+    private decimal? _loadedHouseholdMonthlyGuaranteeAmount;
+
+    /// <summary>加载时数据库中的分类施保金额（覆写前真旧值，分类施保变更记录旧值来源）</summary>
+    private decimal? _loadedClassifiedSubsidyAmount;
+
+    /// <summary>加载时数据库中的照料补贴金额（覆写前真旧值，户月口径回退换算用）</summary>
+    private decimal? _loadedCaregiverSubsidyAmount;
+
+    /// <summary>
+    /// 加载时的入户调查日期快照（未加载/新建 = null）。
+    /// Step4「入户调查日期避公示」校验只对**新档或本次会话改过调查日期**的档生效：
+    /// 存量档原值放行，避免历史数据（调查日恰落在当时公示窗口内，如杨树贵 08-11 ∈ 08-10~08-16）
+    /// 一打开就被卡死无法保存（与临时救助「存量档案自愈」惯例一致）。
+    /// </summary>
+    private DateTime? _loadedSurveyDate;
+
+    /// <summary>
+    /// B 线周期锚点的稳定部分（数据补全完成日 ?? 首次审批日；草稿/新建 = null → 按「今天」锚定）。
+    /// 与 <see cref="Helpers.ArchiveAnchorHelper.ResolveArchiveAnchorDate"/> 同口径——草稿档该函数
+    /// 取 updated_at（= 保存时刻 ≈ 今天），故校验看到的公示窗口与档案产出打印的公示窗口是同一个，
+    /// 否则校验放行的日期打印时仍会落进公示期。
+    /// </summary>
+    private DateTime? _archiveAnchorBase;
+
+    /// <summary>
     /// 向导入口（LoadApplicationAsync）固化的复核前主表快照（真旧值）。
     /// Step5 分类判定与 SaveEconomicDetailsAsync（步骤保存/复核保存）随后都会覆写本档收入列，
     /// 保存时再读库拿到的"旧值"已是覆写后值（Before 快照 / old_per_capita_income 失真）——
@@ -101,6 +129,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     /// <summary>成员变更模式：加载时的成员名单（身份证→姓名，变更类型判定与变更摘要用）</summary>
     private Dictionary<string, string> _loadedMembersByIdCard = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 成员变更检测：加载时的"身份证→成员身份类型"快照（经 MemberCategoryHelper.Normalize 归一化的代码值）。
+    /// 必须是值拷贝——_loadedMemberEntities 与 FamilyMembers 共享同一批对象引用，直接读会被原地编辑污染。
+    /// 用于识别"同一身份证仍在册、但身份类型变了"（UI 无身份类型编辑控件，实际路径是删掉后按另一身份重新新增）。
+    /// </summary>
+    private Dictionary<string, string> _loadedMemberCategoryByIdCard = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>成员变更模式：增员登记原因（按新增成员对象引用暂存；弹窗确认后写入）</summary>
     private readonly Dictionary<FamilyMember, MemberChangeReasonResult> _addedMemberReasons =

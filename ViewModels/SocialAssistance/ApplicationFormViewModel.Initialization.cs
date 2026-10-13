@@ -17,6 +17,7 @@ using NewCosmos.Services.Domain.SocialAssistance;
 
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.System;
+using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ChangeManagement;
 using System.Collections.ObjectModel;
@@ -269,7 +270,7 @@ public partial class ApplicationFormViewModel
             if (HukouType == null)
                 HukouType = HukouTypeOptions.FirstOrDefault(o => o.Key == DefaultValuesConstants.HUKOU_TYPE_KEY);
 
-            SurveyDate = DateTime.Today;
+            SurveyDate = ResolveDefaultSurveyDate();
             SurveyorName = App.CurrentUserFullName;
 
             _logger.Info("默认值设置完成");
@@ -277,6 +278,30 @@ public partial class ApplicationFormViewModel
         catch (Exception ex)
         {
             _logger.Error($"设置默认值失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 新档「入户调查日期」默认值：今天；今天已进入（或晚于）当月 B 线公示窗口时回退
+    /// 公示开始前一个工作日——口径与 C 线 GetTempReliefInvestigationPrintDate 一致
+    /// （min(今日最近工作日, 公示前一工作日)），否则新建档打出来就是「调查在公示期内」
+    /// （刘明珍档：10-12 建档 → 调查日 10-12 落入公示 10-09~10-15）。
+    /// 窗口按「今天」锚定（草稿档的档案产出锚点 = updated_at = 保存时刻 ≈ 今天，两者同口径）。
+    /// </summary>
+    private DateTime ResolveDefaultSurveyDate()
+    {
+        try
+        {
+            var today = DateTime.Today;
+            var timeline = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
+            var bLine = timeline.GetTimelineForDate(today, TimelineType.BusinessProcess);
+            var prePublicity = timeline.GetPrePublicityWorkday(bLine);
+            return today > prePublicity ? prePublicity : today;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"计算调查日期默认值失败，回退今天: {ex.Message}");
+            return DateTime.Today;
         }
     }
 
@@ -453,10 +478,18 @@ public partial class ApplicationFormViewModel
                 _loadedUpdatedAt = app.UpdatedAt == default ? null : app.UpdatedAt;
                 // 记录库中真实步骤：变更流程模式保存时回写，防止 UI 归位步数冲掉 current_step
                 _loadedCurrentStep = app.CurrentStep;
+                // B 线周期锚点稳定部分（补全完成 ?? 首次审批；草稿 = null → 校验按今天锚定）：
+                // Step4「调查日期避公示」必须用与档案产出相同的公示窗口，见 ArchiveAnchorHelper
+                _archiveAnchorBase = app.DataCompletedAt ?? app.FirstApprovedAt;
                 // 覆写前真旧值：Step5 分类判定会覆写 classification_result/total_guarantee_amount，
                 // 变更流程的新旧对比必须用此处捕获值，否则恒判"无变化"
                 _loadedClassification = app.ClassificationResult;
                 _loadedTotalGuaranteeAmount = app.TotalGuaranteeAmount;
+                // 保障金变更登记/分类施保变更的口径旧值：户月保障金（不含分类施保与照料费）必须在
+                // Step5 覆写前捕获，否则登记差额会把分类施保变动重复计入保障金
+                _loadedHouseholdMonthlyGuaranteeAmount = app.HouseholdMonthlyGuaranteeAmount;
+                _loadedClassifiedSubsidyAmount = app.ClassifiedSubsidyAmount;
+                _loadedCaregiverSubsidyAmount = app.CaregiverSubsidyAmount;
                 ApplicantName = app.ApplicantName;
                 ApplicantIdCard = app.ApplicantIdCard;
                 Gender = app.Gender ?? string.Empty;
@@ -744,6 +777,18 @@ public partial class ApplicationFormViewModel
                     .Where(m => !string.IsNullOrWhiteSpace(m.IdCard))
                     .GroupBy(m => m.IdCard.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First().Name ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+
+                // 身份类型快照：同一身份证的 member_category（归一化后比对）。
+                // 历史数据存中文显示值（共同生活成员）、新数据存代码值（SharedLiving），两边都过 Normalize，
+                // 否则每一户都会被误判成"身份类型变更"而错误地停旧建新。
+                _loadedMemberCategoryByIdCard = _loadedMemberEntities
+                    .Where(m => !string.IsNullOrWhiteSpace(m.IdCard))
+                    .GroupBy(m => m.IdCard.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key,
+                        g => MemberCategoryHelper.Normalize(
+                            g.First().MemberCategory, g.First().IsApplicant, g.First().RelationshipToHead),
+                        StringComparer.OrdinalIgnoreCase);
+
                 _addedMemberReasons.Clear();
                 _removedMemberEntries.Clear();
 
@@ -835,6 +880,10 @@ public partial class ApplicationFormViewModel
                     _lockedSurveyDate = null;
                     IsSurveyDateLocked = false;
                 }
+
+                // 入户调查日期加载快照：Step4「调查日期避公示」只拦新档或本次改过的值，
+                // 存量档原值放行（历史档调查日可能本就落在当时公示窗口内）
+                _loadedSurveyDate = SurveyDate;
 
                 // 加载经济明细
                 var economicResult = await _economicDetailService.LoadAllAsync(applicationId, ct);

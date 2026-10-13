@@ -55,7 +55,8 @@
             </VerticalStackLayout>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="440,*" ColumnSpacing="0">
+        <!-- 双列（桌面/平板）：左表单440 + 右预览；手机在 code-behind 切单列并隐藏预览列 -->
+        <Grid Grid.Row="1" x:Name="ContentGrid" ColumnDefinitions="440,*" ColumnSpacing="0">
 
             <!-- 左侧面板 -->
             <ScrollView Grid.Column="0">
@@ -146,12 +147,17 @@
                     </VerticalStackLayout>
             </ScrollView>
 
-            <!-- 右侧 PDF 预览 -->
-            <Grid Grid.Column="1" Margin="16,16,16,16">
+            <!-- 右侧预览列（桌面=PDF；手机=HTML WebView，行布局由 code-behind 切换） -->
+            <Grid Grid.Column="1" x:Name="PreviewColumn" Margin="16,16,16,16">
                 <controls:PdfPreviewView PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
-                <Label Text="点击左侧按钮生成报表表单预览"
+                <WebView IsVisible="{Binding HasHtmlPreview}" VerticalOptions="Fill" HorizontalOptions="Fill">
+                    <WebView.Source>
+                        <HtmlWebViewSource Html="{Binding HtmlPreview}"/>
+                    </WebView.Source>
+                </WebView>
+                <Label Text="{OnIdiom Default='点击左侧按钮生成报表表单预览', Phone='点击上方按钮生成报表表单预览'}"
                        Style="{StaticResource EmptyStateLabel}"
-                       IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}"/>
+                       IsVisible="{Binding HasAnyPreview, Converter={StaticResource BoolToInverseConverter}}"/>
             </Grid>
 
         </Grid>
@@ -159,6 +165,7 @@
         <!-- 出席/缺席登记弹窗遮罩（含会议记录表单时按需弹出） -->
         <Grid Grid.RowSpan="2" BackgroundColor="#80000000" IsVisible="{Binding IsAttendancePopupVisible}">
             <Border BackgroundColor="White" StrokeThickness="0" StrokeShape="RoundRectangle 12"
+                    x:Name="AttendancePopupBorder"
                     WidthRequest="560" Padding="20,16">
                 <VerticalStackLayout Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">

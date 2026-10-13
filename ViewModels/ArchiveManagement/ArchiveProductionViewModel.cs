@@ -989,17 +989,36 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 applicationId, ClassificationConstants.StopCategoryCodes, CancellationToken);
             var stopRecord = stopRecordResult.IsSuccess ? stopRecordResult.Value : null;
 
-            if (stopRecord != null)
+            // 归档终结拒保兜底：CompleteArchiveAsync 对"首次申请即被拒"的独立新档直接置 Stopped
+            // （只写 stop_reason/stop_date，不写变更记录）→ stopRecord 恒 null，下方"待遇调整"
+            // 分支也落空，NOTICE_* 一个都不装配，打印出空白告知书（仲立亮 app95 实测错例）。
+            // 此场景按档案自身停保码装配"不予认定"告知：原分类=新分类=停保码 →
+            // wasInScope=false 自然成立（下述分支注释本就写明"首次申请即被拒"适用不予认定）。
+            var stopNewClassification = stopRecord?.NewClassification;
+            var stopOldClassification = stopRecord?.OldClassification;
+            if (stopRecord == null
+                && string.Equals(app.Status, ApplicationStatusCodes.STOPPED, StringComparison.Ordinal)
+                && ClassificationConstants.IsCodeStop(app.ClassificationResult ?? string.Empty))
             {
-                var newClassification = stopRecord.NewClassification;
+                stopNewClassification = app.ClassificationResult;
+                stopOldClassification = app.ClassificationResult;
+                _logger.LogBusiness("归档终结拒保：按档案自身停保码装配不予认定告知书",
+                    ("ApplicationId", applicationId.ToString()),
+                    ("ClassificationResult", app.ClassificationResult ?? ""));
+            }
+
+            if (!string.IsNullOrEmpty(stopNewClassification))
+            {
+                var newClassification = stopNewClassification;
 
                 // 判断是"停止告知"还是"不予认定告知"
                 // 停止告知：原先在低收入人口认定范围内（原分类为有效分类），因收入超标被停保
                 // 不予认定告知：首次申请即被拒（原分类为 IncomeExceeded/Ineligible 等停保类）
                 // 原分类取变更记录：成员变更输出的是停保类新档案，直接取 app 分类会误判为"不予认定"
-                var originalClassification = string.IsNullOrEmpty(stopRecord.OldClassification)
+                // （归档终结拒保无变更记录，stopOldClassification 已按上文置为档案自身停保码）
+                var originalClassification = string.IsNullOrEmpty(stopOldClassification)
                     ? (app.ClassificationResult ?? "")
-                    : stopRecord.OldClassification;
+                    : stopOldClassification;
                 bool wasInScope = !ClassificationConstants.IsCodeStop(originalClassification);
 
                 _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = wasInScope ? "停止" : "不予认定";
@@ -1013,9 +1032,13 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 _fieldData[FieldKeys.NOTICE_BENEFIT_TYPE] = wasInScope ? "停止享受" : "不予认定";
                 _fieldData[FieldKeys.NOTICE_BENEFIT_RESULT] = "社会救助保障待遇";
 
-                // 自动生成详细经济理由（H4：标准读配置，缺失显式失败，禁止 632/832 硬编码回退）
-                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] =
-                    await BuildIncomeExceededReasonAsync(app, newClassification);
+                // 自动生成详细经济理由（H4：标准读配置，缺失显式失败，禁止 632/832 硬编码回退）。
+                // 按 newClassification 分流——原实现对所有停保无差别套「收入超标」模板，
+                // 致使 IneligibleWithLabor（有劳动力）档案被写成「已超过低收入标准上限」，
+                // 与其自身数字（713.92 < 948）自相矛盾。分类是拒保理由的唯一事实来源。
+                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] = IsLaborIneligible(newClassification)
+                    ? await BuildLaborIneligibleReasonAsync(app, CancellationToken)
+                    : await BuildIncomeExceededReasonAsync(app, newClassification);
                 _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
                 _fieldData[FieldKeys.NOTICE_DELIVERER] = App.CurrentUserFullName ?? "";
                 _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
@@ -1027,10 +1050,57 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                     ("OriginalClassification", originalClassification),
                     ("NewClassification", newClassification ?? "null"));
             }
+            else
+            {
+                // ── 待遇调整场景：无停保但链上有"保障金变更登记"记录（复核/成员变更/户主死亡停旧建新，
+                //    旧/新同属低保且户月保障金差 ≥ 阈值）——告知书表达"待遇调整"而非"停止/不予认定"。
+                //    模板不改，仅按场景分支填 NOTICE_* 取值。分类施保变动不并入本场景（另有独立登记记录）。
+                var regResult = await _changeService.GetLatestFundChangeRegistrationAsync(
+                    applicationId, CancellationToken);
+                var reg = regResult.IsSuccess ? regResult.Value : null;
+
+                if (reg != null)
+                {
+                    var direction = reg.IsIncrease ? "增发" : "减发";
+                    var diff = global::System.Math.Abs(reg.NewGuaranteeAmount - reg.OldGuaranteeAmount);
+
+                    _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "变更";
+                    _fieldData[FieldKeys.NOTICE_TOWN] = app.Town ?? "";
+                    _fieldData[FieldKeys.NOTICE_VILLAGE] = app.Community ?? "";
+                    _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
+
+                    // 承办分类：新档（链尾现役档案）当前享受分类，与停保场景同口径取全称
+                    _fieldData[FieldKeys.NOTICE_HANDLING_CATEGORY] =
+                        ClassificationConstants.ConvertToFullName(
+                            string.IsNullOrEmpty(reg.NewClassification)
+                                ? app.ClassificationResult ?? ""
+                                : reg.NewClassification);
+
+                    _fieldData[FieldKeys.NOTICE_BENEFIT_TYPE] = "调整享受";
+                    _fieldData[FieldKeys.NOTICE_BENEFIT_RESULT] = "社会救助保障待遇";
+
+                    // 具体原因：面向群众的口径表述（不暴露"登记/停旧建新"等内部术语）；
+                    // 分支来源（经济复核/成员变更/户主死亡）保留在 change_reason 中供审计，不进正文
+                    _fieldData[FieldKeys.NOTICE_DETAILED_REASON] =
+                        $"经审核，你户月保障金由{reg.OldGuaranteeAmount:F2}元调整为{reg.NewGuaranteeAmount:F2}元"
+                        + $"（{direction}{diff:F2}元/月）";
+                    _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
+                    _fieldData[FieldKeys.NOTICE_DELIVERER] = App.CurrentUserFullName ?? "";
+                    _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
+                    _fieldData[FieldKeys.NOTICE_DATE] = DateTime.Now.ToString("yyyy年MM月dd日");
+
+                    _logger.LogBusiness("待遇调整告知书字段已装配",
+                        ("ApplicationId", applicationId.ToString()),
+                        ("ChangeId", reg.Id.ToString()),
+                        ("Direction", direction),
+                        ("OldAmount", reg.OldGuaranteeAmount.ToString("F2")),
+                        ("NewAmount", reg.NewGuaranteeAmount.ToString("F2")));
+                }
+            }
         }
         catch (Exception ex)
         {
-            _logger.Warn($"停保告知书字段装配失败: {ex.Message}");
+            _logger.Warn($"变更告知书字段装配失败: {ex.Message}");
         }
 
         // 一事一议申报表字段装配（申请通过一事一议时，供"档案_乡镇社会救助一事一议申报表"模板使用）

@@ -90,11 +90,7 @@
                                                 Command="{Binding OpenMonthlyReportCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
-                        <!-- 后补追缴 -->
-                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}"
-                                                IconBackgroundColor="#FFF3E0" IconColor="{StaticResource WarningDark}"
-                                                Title="后补追缴" Description="高龄津贴的后补追缴"
-                                                Command="{Binding OpenRecoveryCommand}"/>
+                        <!-- 后补追缴入口已收敛到主界面侧栏（CanAccessRecovery 权限门控），本页不再重复 -->
 
                         <!-- 高龄津贴复核 -->
                         <components:FeatureCard Grid.Row="2" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"

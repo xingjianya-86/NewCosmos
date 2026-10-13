@@ -363,8 +363,11 @@ public static class ElderlyBenefitConstants
     /// <summary>复核触发来源：导入名册</summary>
     public const string ReviewTriggerImport = "Import";
 
-    /// <summary>复核触发来源：月报「满90周岁调整备案表」自动入队</summary>
+    /// <summary>复核触发来源：满90周岁自扫描入队（复核队列侧发现名单，原月报打印入队已移除）</summary>
     public const string ReviewTriggerAge90 = "Age90Monthly";
+
+    /// <summary>满90周岁入队自扫描回溯月数（当月往前数，含当月）</summary>
+    public const int Age90ScanLookbackMonths = 3;
 
     /// <summary>调整原因：年龄档次</summary>
     public const string AdjustReasonAge = "AGE";
@@ -404,7 +407,7 @@ public static class ElderlyBenefitConstants
         ReviewTriggerArchive => "低收入归档联动",
         ReviewTriggerLowIncomeChange => "低收入信息变更",
         ReviewTriggerImport => "导入名册",
-        ReviewTriggerAge90 => "满90周岁月报",
+        ReviewTriggerAge90 => "满90周岁扫描",
         _ => trigger ?? string.Empty
     };
 

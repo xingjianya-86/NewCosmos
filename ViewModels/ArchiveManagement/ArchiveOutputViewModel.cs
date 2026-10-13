@@ -256,6 +256,28 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 判定该档案是否需出"待遇调整"告知（链上有"保障金变更登记"记录）。
+    /// 动态管理三分支（经济复核/家庭成员变更/户主死亡变更）停旧建新后，旧/新同属低保群体且
+    /// 户月保障金差 ≥ 阈值时服务端写入登记记录；本判定据此追加《档案_变更告知书》（待遇调整场景），
+    /// 与停保场景并列——有停保时按停保文案装配（字段装配端已按场景分支）。
+    /// </summary>
+    private async Task<bool> HasFundChangeRegistrationAsync(long? applicationId)
+    {
+        if (applicationId is not > 0) return false;
+        try
+        {
+            var result = await _changeService.HasFundChangeRegistrationAsync(
+                applicationId.Value, CancellationToken);
+            return result.IsSuccess && result.Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "判定保障金变更登记失败");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 加载模板清单（单飞串行，见 <see cref="_initializeGate"/>）。
     /// </summary>
     public async Task InitializeAsync()
@@ -476,10 +498,17 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 仅出文书模式：告知书若在白名单内则无条件追加（用户主动选择，不走停保三重门）
             var noticeAllowed = !IsTemplateFilterMode
                 || templateFilter!.Contains(DocumentTemplateNames.ChangeNotice, StringComparer.Ordinal);
+            // 两个场景共用《档案_变更告知书》模板（模板不改，按记录分支填字段）：
+            //   ① 停保场景：复核/成员变更收入超标停保（triggered_stop）——原有逻辑；
+            //   ② 待遇调整场景：链上有"保障金变更登记"记录（旧/新同属低保且户月差 ≥ 阈值）且无停保——
+            //      人员增减、经济状况变化导致保障金调整但仍在享受待遇时，同样需要告知书。
+            // 单人保不适用停保告知；其为非低保群体不会写登记记录，故无需为场景②单独放行。
             if (noticeAllowed
                 && businessType is "FamilyApplication" or "EconomicReview"
                 && !ClassificationConstants.IsCodeSingleRescue(classification)
-                && (IsTemplateFilterMode || await IsIncomeStopChangeAsync(businessId)))
+                && (IsTemplateFilterMode
+                    || await IsIncomeStopChangeAsync(businessId)
+                    || await HasFundChangeRegistrationAsync(businessId)))
             {
                 var changeNoticeResult = await _templateService.GetByNameAsync(DocumentTemplateNames.ChangeNotice);
                 if (changeNoticeResult.IsFailure)

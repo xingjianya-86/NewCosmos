@@ -393,14 +393,27 @@ public partial class ArchiveProductionViewModel
                     amountDiff += (newAmt - oldAmt);
                 }
 
-                // 增减金额（差额）；渐退期内待遇固定，增减员不产生增发/减发，两格都固定 0.00
+                // 增减金额（差额）——2026-10 口径改造，三个分支按优先级取数：
+                //   ① 渐退期内：待遇按渐退封顶执行，增减员不产生增发/减发 → 两格 0.00；
+                //   ② 有"保障金变更登记"记录：以登记记录为权威取数源（户月保障金口径，分类施保变动另行记录）；
+                //   ③ 兼容旧数据（无登记记录）：回退按人员变动记录金额差累加，但必须过登记阈值——
+                //      阈值以下视为不调整待遇 → 两格 0.00（与月报取数同规则，避免文书与月报口径分裂）。
                 var inGracePeriod = graceRes.IsSuccess && graceRes.Value != null && graceRes.Value.IsActive;
+                var registration = await GetFundChangeRegistrationSafeAsync(app.Id);
                 if (inGracePeriod)
                 {
-                    _fieldData[FieldKeys.ADJ_INCREASE_AMOUNT] = "0.00";
-                    _fieldData[FieldKeys.ADJ_DECREASE_AMOUNT] = "0.00";
+                    amountDiff = 0m;
                 }
-                else if (amountDiff > 0)
+                else if (registration != null)
+                {
+                    amountDiff = registration.NewGuaranteeAmount - registration.OldGuaranteeAmount;
+                }
+                else if (!FundChangeThresholdHelper.MeetsThreshold(amountDiff))
+                {
+                    amountDiff = 0m;
+                }
+
+                if (amountDiff > 0)
                 {
                     _fieldData[FieldKeys.ADJ_INCREASE_AMOUNT] = amountDiff.ToString("N2");
                     _fieldData[FieldKeys.ADJ_DECREASE_AMOUNT] = "0.00";
@@ -408,7 +421,7 @@ public partial class ArchiveProductionViewModel
                 else
                 {
                     _fieldData[FieldKeys.ADJ_INCREASE_AMOUNT] = "0.00";
-                    _fieldData[FieldKeys.ADJ_DECREASE_AMOUNT] = Math.Abs(amountDiff).ToString("N2");
+                    _fieldData[FieldKeys.ADJ_DECREASE_AMOUNT] = global::System.Math.Abs(amountDiff).ToString("N2");
                 }
 
                 // ── 逐人增减明细（增员/减员槽）──
@@ -488,6 +501,21 @@ public partial class ArchiveProductionViewModel
 
         _logger.Error($"增减员逐人明细加载失败: ApplicationId={applicationId}, ErrorCode={result.ErrorCode}, Message={result.Message}");
         return new List<MemberAdjustEntry>();
+    }
+
+    /// <summary>
+    /// 取链上"保障金变更登记"记录（增减员调整表增发/减发格的权威取数源）。
+    /// 无登记记录（差额 &lt; 阈值 / 非低保群体 / 渐退期）返回 null 走 0.00 分支；
+    /// 加载失败同样返回 null（按"未登记"处理，仅少记金额，不伪造数值）。
+    /// </summary>
+    private async Task<NewCosmos.Services.Domain.ChangeManagement.FundChangeRegistrationRecord?> GetFundChangeRegistrationSafeAsync(long applicationId)
+    {
+        var result = await _changeService.GetLatestFundChangeRegistrationAsync(applicationId, CancellationToken);
+        if (result.IsSuccess)
+            return result.Value;
+
+        _logger.Error($"保障金变更登记记录加载失败: ApplicationId={applicationId}, ErrorCode={result.ErrorCode}, Message={result.Message}");
+        return null;
     }
 
     /// <summary>

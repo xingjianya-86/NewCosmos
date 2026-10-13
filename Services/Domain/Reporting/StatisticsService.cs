@@ -415,10 +415,17 @@ public class StatisticsService : BaseService, IStatisticsService
                 FROM nc_biz_change_records
                 WHERE deleted_at IS NULL
                   -- M3：排除户主死亡附属的分类施保减除记录，避免一次事件计 2 次
-                  AND change_type <> $4";
+                  AND change_type <> $4
+                  -- 分类施保增发记录同理（与减除对称的附属记录），不单独计一次变更
+                  AND change_type <> $5
+                  -- 保障金变更登记是动态管理三分支（复核/成员变更/户主死亡）的附属登记记录，
+                  -- 主记录本身已计数，登记记录再计会造成一次事件计 2 次
+                  AND change_reason_type IS DISTINCT FROM $6";
 
             var result = await _dbService.QuerySingleAsync<ChangeStats>(sql, ct, mStart, mEnd, yStart,
-                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE);
+                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE,
+                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD,
+                ChangeReasonTypeConstants.FundChangeRegistration);
 
             if (result.IsFailure || result.Value is null)
             {

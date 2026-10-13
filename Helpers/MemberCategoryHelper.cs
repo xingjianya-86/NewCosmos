@@ -35,6 +35,24 @@ public static class MemberCategoryHelper
     }
 
     /// <summary>
+    /// 成员分类代码 → 中文显示名（变更摘要/文书输出用）。
+    /// 与 Normalize 共用 MemberCategoryConstants 的 *_DISPLAY 常量，未知值原样返回。
+    /// </summary>
+    public static string ToDisplay(string? category)
+    {
+        if (string.IsNullOrWhiteSpace(category))
+            return MemberCategoryConstants.SHARED_LIVING_DISPLAY;
+
+        return category switch
+        {
+            MemberCategoryConstants.SUPPORT => MemberCategoryConstants.SUPPORT_DISPLAY,
+            MemberCategoryConstants.HOUSEHOLD_HEAD => MemberCategoryConstants.HOUSEHOLD_HEAD_DISPLAY,
+            MemberCategoryConstants.SHARED_LIVING => MemberCategoryConstants.SHARED_LIVING_DISPLAY,
+            _ => category // 已是中文显示值或未知值，原样返回（幂等）
+        };
+    }
+
+    /// <summary>
     /// 是否为户主关系
     /// </summary>
     private static bool IsHeadRelationship(string? relationshipToHead)

@@ -322,11 +322,11 @@ public partial class MobileMainViewModel : ViewModelBase
         AddWorkspaceCard("🔄", "保障对象动态管理", "户主变更 · 成员增减 · 死亡减员", "#ECFDF5", CanAccessChange, NavigateToChangeManagementAsync);
         AddWorkspaceCard("🆘", "临时救助", "急难型 · 支出型救助办理", "#FFF7ED", CanAccessTempRelief, NavigateToTempReliefAsync);
         AddWorkspaceCard("⏳", "渐退期管理", "进行中与已到期的渐退户", "#EFF6FF", CanAccessSocialAssistance, NavigateToGracePeriodAsync);
-        AddWorkspaceCard("📁", "救助档案管理", "历史档案检索查阅", "#ECFDF5", CanAccessArchiveQuery, NavigateToArchiveQueryAsync);
+        // 救助档案管理入口仅保留「档案」Tab（MobileArchiveQueryPage 孪生页），工作台不再重复
         AddWorkspaceCard("📅", "值班管理", "按月查看值班表", "#F5F3FF", CanAccessDuty, NavigateToDutyScheduleAsync);
         AddWorkspaceCard("🖨️", "打印任务", "查看推送打印任务状态", "#EEF2FF", true, NavigateToPrintJobsAsync);
         AddWorkspaceCard("💰", "后补追缴", "停止人员追缴 · 手工录入", "#ECFDF5", CanAccessRecovery, NavigateToRecoveryAsync);
-        AddWorkspaceCard("🔍", "家庭经济状况核对", "经济核对 · 报告审核", "#FFF7ED", CanAccessAssetVerification, NavigateToAssetVerificationAsync);
+        // 家庭经济状况核对入口仅保留「核对」Tab（快速核对/月度审核/核对月报表），工作台不再重复
 
         VerifyFeatureCards.Clear();
         AddFeatureCard("⚡", "快速经济核对", "发起单户家庭经济状况核对申请", "#FFF7ED", OpenQuickVerificationAsync);
@@ -418,11 +418,6 @@ public partial class MobileMainViewModel : ViewModelBase
 
     #region 导航命令
 
-    private async Task NavigateToAssetVerificationAsync()
-    {
-        await NavigateToPageAsync<Pages.AssetVerification.AssetVerificationHomePage>("家庭经济状况核对");
-    }
-
     private async Task NavigateToSocialAssistanceAsync()
     {
         await NavigateToPageAsync<Pages.SocialAssistance.ApplicationWorkflowPage>("业务申请工作流");
@@ -446,11 +441,6 @@ public partial class MobileMainViewModel : ViewModelBase
     private async Task NavigateToGracePeriodAsync()
     {
         await NavigateToPageAsync<Pages.SocialAssistance.GracePeriodExpiringListPage>("渐退期管理");
-    }
-
-    private async Task NavigateToArchiveQueryAsync()
-    {
-        await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveQueryPage>("救助档案管理");
     }
 
     private async Task NavigateToMobileArchiveAsync()

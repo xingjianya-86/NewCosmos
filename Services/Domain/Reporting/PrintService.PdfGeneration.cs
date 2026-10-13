@@ -295,21 +295,18 @@ public partial class PrintService
     }
 
     /// <summary>
-    /// 组装「满90周岁调整备案表」逐人页字段；首次渲染时自动把名单写入待复核队列（失败不阻断打印）。
+    /// 组装「满90周岁调整备案表」逐人页字段。名单含未办理候选 + 该月已完成复核人员（纯读，不写队列；
+    /// 名单发现与入队由复核队列侧自扫描承担）。
     /// </summary>
     private async Task<Result<List<(Dictionary<string, string> Fields, string Name)>>> BuildAge90FormDataAsync(int year, int month, CancellationToken ct)
     {
-        var rowsResult = await _elderlyApplicationService.GetAge90AdjustRowsAsync(year, month, ct);
+        var rowsResult = await _elderlyApplicationService.GetAge90ReportRowsAsync(year, month, ct);
         if (rowsResult.IsFailure)
             return Result.Failure<List<(Dictionary<string, string> Fields, string Name)>>(rowsResult.ErrorCode!, rowsResult.Message!);
         var rows = rowsResult.Value ?? new List<Models.Entities.ElderlyAge90Row>();
         if (rows.Count == 0)
             return Result.Failure<List<(Dictionary<string, string> Fields, string Name)>>(
                 ErrorCodes.NOT_FOUND, "该月无满90周岁人员（无数据）");
-
-        var enqueue = await _elderlyApplicationService.EnqueueAge90ReviewsAsync(year, month, ct);
-        if (enqueue.IsFailure)
-            LogWarn($"满90周岁自动入队失败（不阻断打印）: {enqueue.Message}");
 
         var monthText = $"{year}年{month}月";
         var acceptDate = DateTime.Today.ToString("yyyy年M月d日");

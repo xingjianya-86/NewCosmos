@@ -205,8 +205,20 @@ public static class DictionaryConstants
         /// <summary>跨大类变更：新类别新增（新分类开始享受，供月报"新增救助明细"体现）</summary>
         public const string CATEGORY_ADD = "CategoryAdd";
 
-        /// <summary>户主死亡进入渐退期时的分类施保减法记录（原分类施保不再享受，挂旧档）</summary>
+        /// <summary>
+        /// 分类施保减法记录（原分类施保不再享受，挂旧档）。
+        /// 2026-10 起不限定"户主死亡进渐退期"：经济复核/成员变更/户主死亡三分支的分类施保金额减少一律登记
+        /// （change_reason_type='分类施保变更'；历史记录为 '分类施保减除'）。
+        /// 月报去向由互斥守卫决定——该链无保障金变更登记记录时进「分类施保金减发人员表」，
+        /// 否则并入「保障金增发/减发表」同行理由列，见 MonthlyReportService.GetShiBaoReductionRowsAsync。
+        /// </summary>
         public const string CLASSIFIED_SUBSIDY_REDUCE = "ClassifiedSubsidyReduce";
+
+        /// <summary>
+        /// 分类施保增加记录（与 REDUCE 对称，挂旧档；供审计与统计排除，无专用月报表——
+        /// 分类施保增发表仅收低保导入库满 60 来源）。
+        /// </summary>
+        public const string CLASSIFIED_SUBSIDY_ADD = "ClassifiedSubsidyAdd";
     }
 
     /// <summary>

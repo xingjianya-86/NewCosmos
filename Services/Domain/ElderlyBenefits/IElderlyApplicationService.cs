@@ -218,8 +218,24 @@ public interface IElderlyApplicationService
     /// <summary>
     /// 将所选月满90周岁名单写入「待复核」队列（trigger_source=Age90Monthly，按身份证去重）。
     /// 队列行携带已算好的旧→新类别/金额与应生效月，供复核办理按记录采信。
+    /// 调用方：ScanAndEnqueueAge90Async（复核队列自扫描）；月报打印不再调用。
     /// </summary>
     Task<Result<int>> EnqueueAge90ReviewsAsync(int year, int month, CancellationToken ct = default);
+
+    /// <summary>
+    /// 满90周岁入队自扫描（复核队列侧的名单发现入口，启动自检与复核列表页进页时调用）：
+    /// 从当月往前回溯 3 个月逐月调 EnqueueAge90ReviewsAsync。幂等：同一身份证仅保留一条 Pending，
+    /// 已办理（停旧增新）者不再命中候选查询，重复扫描不会重复入队。返回本区间入队总数。
+    /// </summary>
+    Task<Result<int>> ScanAndEnqueueAge90Async(CancellationToken ct = default);
+
+    /// <summary>
+    /// 满90周岁报表名单：基础候选（在享 CAT1/CAT2 + 名册未建档，尚未办理）
+    /// ∪ 该月已完成的 90 档复核（Completed+Changed，effective_month=所选月且新类别 CAT3），
+    /// 按身份证去重（基础行优先）。供《满90周岁调整备案表》打印——先复核后打印也能打全。
+    /// 注意：入队仍用 GetAge90AdjustRowsAsync（纯候选），勿混用。
+    /// </summary>
+    Task<Result<List<ElderlyAge90Row>>> GetAge90ReportRowsAsync(int year, int month, CancellationToken ct = default);
 
     #endregion
 }

@@ -355,162 +355,387 @@ public partial class ChangeService
         }
     }
 
-    /// <summary>接续链/旧档读取行（EnsureChainClassifiedSubsidyReduceAsync 用）</summary>
-    private sealed class ClassifiedReduceAppRow
+    // ─────────────────────────────────────────────────────────────────────────
+    // 保障金变更登记（动态管理三分支统一结算）
+    //
+    // 规则（2026-10 定稿）：
+    //   适用分支：经济状况复核、家庭成员变更、户主变更死亡——三个停旧建新分支。
+    //   条件：旧档与新档同属最低生活保障群体（分类码完全一致，城乡跨码不登记）。
+    //   差额口径：仅户月保障金（household_monthly_guarantee_amount，不含分类施保/照料费）。
+    //   ≥ 阈值（app.ini FundChangeThreshold，默认 10 元/月）→ 写"保障金变更登记"记录
+    //        （change_type=FundChange、reason_type=保障金变更登记、金额为户月口径、挂旧档 + new_application_id），
+    //        进月报保障金增发/减发表、《档案_增员减员调整表》增发/减发格、《档案_变更告知书》待遇调整场景。
+    //   < 阈值 → 照常停旧建新、新档按新金额，但不登记（不进月报，文书两格 0.00），审计快照保留。
+    //   分类施保：固定档位标准，不套阈值——只要有变动一律另行写分类施保变更记录（增/减双向）。
+    //   渐退期互斥：新档处于活跃渐退期时跳过登记（待遇走渐退封顶减发），避免同户同月两条 FundChange。
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>保障金/分类施保结算结果（登记记录ID 与分类施保变更记录ID，未写入为 null）</summary>
+    private sealed class FundSettlementOutcome
     {
-        public long OriginalApplicationId { get; set; }
-        public string? ChainType { get; set; }
-        public string? ClassificationResult { get; set; }
-        public decimal ClassifiedSubsidyAmount { get; set; }
-        public string? ApplicantName { get; set; }
+        public long? FundChangeRegistrationId { get; set; }
+        public long? ClassifiedSubsidyChangeId { get; set; }
     }
 
-    /// <summary>已存在的分类施保减发行（EnsureChainClassifiedSubsidyReduceAsync 幂等判定用）</summary>
-    private sealed class ClassifiedReduceExistingRow
+    /// <summary>结算读取行（旧档/新档的分类与金额快照）</summary>
+    private sealed class FundSettlementArchiveRow
+    {
+        public string? ClassificationResult { get; set; }
+        public decimal HouseholdMonthlyGuaranteeAmount { get; set; }
+        public decimal ClassifiedSubsidyAmount { get; set; }
+    }
+
+    /// <summary>已存在的保障金变更登记行（幂等判定用）</summary>
+    private sealed class FundRegistrationExistingRow
     {
         public long Id { get; set; }
         public decimal OldGuaranteeAmount { get; set; }
         public decimal NewGuaranteeAmount { get; set; }
     }
 
-    /// <inheritdoc/>
-    public async Task<Result<long?>> EnsureChainClassifiedSubsidyReduceAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    /// <summary>已存在的分类施保变更行（增/减通用幂等判定用）</summary>
+    private sealed class ClassifiedChangeExistingRow
     {
-        try
+        public long Id { get; set; }
+        public string? ChangeType { get; set; }
+        public decimal OldGuaranteeAmount { get; set; }
+        public decimal NewGuaranteeAmount { get; set; }
+    }
+
+    /// <summary>
+    /// 保障金变更登记 + 分类施保变动登记（三分支通用核心）。
+    /// 调用方须已捕获旧档真实旧值（表单覆写前快照）——经济复核/成员变更分支读库会拿到覆写后值。
+    /// 可在调用方环境事务内执行（嵌套作用域自动加入外层事务）。
+    /// </summary>
+    private async Task<Result<FundSettlementOutcome>> RegisterFundChangeCoreAsync(
+        long oldApplicationId,
+        long newApplicationId,
+        string? oldClassification,
+        string? newClassification,
+        decimal oldHouseholdMonthly,
+        decimal newHouseholdMonthly,
+        decimal oldClassified,
+        decimal newClassified,
+        string branchReasonType,
+        string operatorName,
+        CancellationToken ct)
+    {
+        var outcome = new FundSettlementOutcome();
+
+        // 无新档（未重建）→ 无链可挂；分类施保变动也无新档可比，跳过
+        if (newApplicationId <= 0 || newApplicationId == oldApplicationId)
+            return Result.Success(outcome);
+
+        // ── 1. 保障金变更登记（户月口径 + 阈值 + 渐退期互斥）──
+        // 仅低保群体同码才登记：跨大类走停保+新增明细；城乡跨码（农村低保→城市低保）不登记。
+        // 注意本门只约束保障金登记，**不约束下方第 2 步分类施保变动**——
+        // 渐退期形态恰为"低保→低收入"（新分类是低收入），若把门前置会连带挡掉分类施保登记，
+        // 使户主死亡进渐退期的分类施保减发在月报两张表都无从体现（2026-10 回归，见 docs\20261009_户主死亡渐退分类施保减发修复.md）。
+        var bothSubsistence = !string.IsNullOrEmpty(oldClassification)
+            && string.Equals(oldClassification, newClassification, StringComparison.Ordinal)
+            && ClassificationConstants.IsCodeSubsistence(newClassification!);
+        var amountDiff = newHouseholdMonthly - oldHouseholdMonthly;
+        if (!bothSubsistence)
         {
-            var appSql = @"SELECT original_application_id, chain_type, classification_result,
-                                  classified_subsidy_amount, applicant_name
-                           FROM nc_biz_applications
-                           WHERE id = $1 AND deleted_at IS NULL";
-            var appResult = await _db.QuerySingleAsync<ClassifiedReduceAppRow>(appSql, ct, applicationId);
-            if (appResult.IsFailure)
-                return Result.Failure<long?>(appResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    appResult.Message ?? "读取接续链档案失败");
+            LogInfo($"保障金变更登记跳过（非同码低保群体）: 旧档{oldApplicationId} {oldClassification} → 新档{newApplicationId} {newClassification}");
+        }
+        else if (!FundChangeThresholdHelper.MeetsThreshold(amountDiff))
+        {
+            LogInfo($"保障金变更未达登记阈值: 旧档{oldApplicationId} {oldHouseholdMonthly:F2} → 新档{newApplicationId} {newHouseholdMonthly:F2}"
+                + $"（差 {amountDiff:F2} < {FundChangeThresholdHelper.Threshold:F2}），照常重建不登记");
+        }
+        else if (await IsInActiveGracePeriodAsync(newApplicationId, ct))
+        {
+            // 渐退期待遇按封顶执行，登记会与渐退封顶减发记录在月报重复
+            LogInfo($"保障金变更登记跳过（新档处于活跃渐退期，待遇走渐退封顶减发）: 新档{newApplicationId}");
+        }
+        else
+        {
+            var registerResult = await UpsertFundChangeRegistrationAsync(
+                oldApplicationId, newApplicationId, oldClassification!, newClassification!,
+                oldHouseholdMonthly, newHouseholdMonthly, branchReasonType, operatorName, ct);
+            if (registerResult.IsFailure)
+                return Result.Failure<FundSettlementOutcome>(registerResult.ErrorCode!, registerResult.Message!);
+            outcome.FundChangeRegistrationId = registerResult.Value;
+        }
 
-            var app = appResult.Value;
-            // 仅户主死亡链 + 已判定分类参与；其余链路/未判定显式跳过（不猜测、不写入）
-            if (app == null
-                || app.OriginalApplicationId <= 0
-                || !string.Equals(app.ChainType, ChainTypeConstants.HOUSEHOLD_DEATH, StringComparison.Ordinal)
-                || string.IsNullOrEmpty(app.ClassificationResult))
-                return Result.Success<long?>(null);
+        // ── 2. 分类施保变动（不套阈值，也不套低保同码门——固定档位标准一档就是真钱）──
+        // 原"户主死亡进渐退期"专用减发记录（EnsureChainClassifiedSubsidyReduceAsync）语义由本步覆盖并放宽：
+        // 三分支的分类施保增/减一律登记；change_category=NULL（不入增减员调整表）、triggered_* 恒 false。
+        // 幂等键升级为链感知（application_id + new_application_id + change_type）：
+        // 方向翻转软删重建、金额漂移就地更新、金额一致跳过；历史记录带 new_application_id，兼容。
+        if (oldClassified != newClassified)
+        {
+            var classifiedResult = await UpsertClassifiedSubsidyChangeAsync(
+                oldApplicationId, newApplicationId, oldClassification!, newClassification!,
+                oldClassified, newClassified, operatorName, ct);
+            if (classifiedResult.IsFailure)
+                return Result.Failure<FundSettlementOutcome>(classifiedResult.ErrorCode!, classifiedResult.Message!);
+            outcome.ClassifiedSubsidyChangeId = classifiedResult.Value;
+        }
 
-            // 旧档（减发行挂载目标）：原分类施保与原户主
-            var oldSql = @"SELECT original_application_id, chain_type, classification_result,
-                                  classified_subsidy_amount, applicant_name
-                           FROM nc_biz_applications
-                           WHERE id = $1 AND deleted_at IS NULL";
-            var oldResult = await _db.QuerySingleAsync<ClassifiedReduceAppRow>(oldSql, ct, app.OriginalApplicationId);
-            if (oldResult.IsFailure)
-                return Result.Failure<long?>(oldResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    oldResult.Message ?? "读取上游档案失败");
-            var old = oldResult.Value;
-            if (old == null)
-                return Result.Success<long?>(null);
+        return Result.Success(outcome);
+    }
 
-            // 幂等：同户同类已有减发行（取最新）
-            var existSql = @"SELECT id, old_guarantee_amount, new_guarantee_amount
-                             FROM nc_biz_change_records
-                             WHERE application_id = $1 AND change_type = $2 AND deleted_at IS NULL
-                             ORDER BY id DESC LIMIT 1";
-            var exist = await _db.QuerySingleAsync<ClassifiedReduceExistingRow>(existSql, ct,
-                app.OriginalApplicationId, DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE);
-            if (exist.IsFailure)
-                return Result.Failure<long?>(exist.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    exist.Message ?? "查询分类施保减发记录失败");
+    /// <summary>新档是否处于活跃渐退期（渐退封顶减发与登记记录互斥判定用）</summary>
+    private async Task<bool> IsInActiveGracePeriodAsync(long applicationId, CancellationToken ct)
+    {
+        var grace = await _db.ExecuteScalarAsync<bool>(
+            "SELECT EXISTS(SELECT 1 FROM nc_biz_grace_periods WHERE application_id = $1 AND is_active AND deleted_at IS NULL)",
+            ct, applicationId);
+        if (grace.IsFailure)
+        {
+            // 查询失败不阻断登记：按"非渐退期"继续（宁可多记一条待人工核，不可静默丢登记）
+            LogWarn($"渐退期状态查询失败，按非渐退期继续登记: ApplicationId={applicationId}, {grace.Message}");
+            return false;
+        }
+        return grace.Value;
+    }
 
-            var oldAmount = old.ClassifiedSubsidyAmount;
-            var newAmount = app.ClassifiedSubsidyAmount;
+    /// <summary>写入/更新保障金变更登记记录（幂等：同链同额跳过，金额漂移就地更新）</summary>
+    private async Task<Result<long>> UpsertFundChangeRegistrationAsync(
+        long oldApplicationId,
+        long newApplicationId,
+        string oldClassification,
+        string newClassification,
+        decimal oldHouseholdMonthly,
+        decimal newHouseholdMonthly,
+        string branchReasonType,
+        string operatorName,
+        CancellationToken ct)
+    {
+        var existSql = @"SELECT id, old_guarantee_amount, new_guarantee_amount
+                         FROM nc_biz_change_records
+                         WHERE application_id = $1 AND new_application_id = $2
+                           AND change_type = $3 AND change_reason_type = $4
+                           AND deleted_at IS NULL
+                         ORDER BY id DESC LIMIT 1";
+        var exist = await _db.QuerySingleAsync<FundRegistrationExistingRow>(existSql, ct,
+            oldApplicationId, newApplicationId,
+            DictionaryConstants.ChangeType.FUND_CHANGE, ChangeReasonTypeConstants.FundChangeRegistration);
+        if (exist.IsFailure)
+            return Result.Failure<long>(exist.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                exist.Message ?? "查询保障金变更登记记录失败");
 
-            // 条件消失：原额 ≤ 现额（重判恢复原额等）→ 软删已有减发记录，防止月报/变更历史残留
-            if (oldAmount <= newAmount)
+        var direction = newHouseholdMonthly > oldHouseholdMonthly ? "增发" : "减发";
+        // 注意：插值字符串的 {…} 内 `global::` 的冒号会被解析成格式分隔符，故先取绝对值到局部变量
+        var registeredDiff = global::System.Math.Abs(newHouseholdMonthly - oldHouseholdMonthly);
+        var changeReason = $"保障金变更登记（{branchReasonType}）：户月保障金 原{oldHouseholdMonthly:F2}元 → 现{newHouseholdMonthly:F2}元"
+            + $"（{direction}{registeredDiff:F2}元/月）";
+
+        if (exist.Value != null)
+        {
+            if (exist.Value.OldGuaranteeAmount == oldHouseholdMonthly
+                && exist.Value.NewGuaranteeAmount == newHouseholdMonthly)
+                return Result.Success(exist.Value.Id);
+
+            var update = await _db.ExecuteNonQueryAsync(
+                @"UPDATE nc_biz_change_records SET
+                    old_guarantee_amount = $1, new_guarantee_amount = $2,
+                    change_reason = $3, operator_name = $4, changed_at = NOW()
+                  WHERE id = $5",
+                ct, oldHouseholdMonthly, newHouseholdMonthly, changeReason, operatorName, exist.Value.Id);
+            if (update.IsFailure)
+                return Result.Failure<long>(update.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    update.Message ?? "更新保障金变更登记记录失败");
+            LogInfo($"保障金变更登记更新: ChangeId={exist.Value.Id}, {oldHouseholdMonthly:F2}→{newHouseholdMonthly:F2}");
+            return Result.Success(exist.Value.Id);
+        }
+
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
+        var insertSql = @"INSERT INTO nc_biz_change_records
+            (application_id, change_no, change_type, change_category, change_reason, change_reason_type,
+             change_date, old_classification, new_classification, old_guarantee_amount, new_guarantee_amount,
+             triggered_grace_period, triggered_stop, new_application_id, operator_name, changed_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,FALSE,FALSE,$12,$13,NOW())
+            RETURNING id;";
+        var insert = await _db.ExecuteScalarAsync<long>(insertSql, ct,
+            oldApplicationId,
+            $"CHG{DateTime.Now:yyyyMMddHHmmssfff}",
+            DictionaryConstants.ChangeType.FUND_CHANGE,
+            DictionaryConstants.ChangeCategory.FUND_CHANGE,
+            changeReason,
+            ChangeReasonTypeConstants.FundChangeRegistration,
+            DateTime.Today,
+            oldClassification, newClassification,
+            oldHouseholdMonthly, newHouseholdMonthly,
+            newApplicationId,
+            operatorName);
+        if (insert.IsFailure)
+        {
+            await tx.RollbackAsync(ct);
+            return Result.Failure<long>(insert.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                insert.Message ?? "写入保障金变更登记记录失败");
+        }
+
+        await tx.CommitAsync(ct);
+        LogInfo($"保障金变更登记写入: ChangeId={insert.Value}, 挂旧档{oldApplicationId} → 新档{newApplicationId}, "
+            + $"{oldHouseholdMonthly:F2}→{newHouseholdMonthly:F2}（{direction}）");
+        return Result.Success(insert.Value);
+    }
+
+    /// <summary>
+    /// 写入/更新分类施保变更记录（增/减双向，不套阈值；幂等：同链同额同向跳过，方向翻转或金额漂移就地更新/软删重建）。
+    /// change_category=NULL（不入增减员调整表）、reason_type=分类施保变更、triggered 标志恒 false。
+    /// </summary>
+    private async Task<Result<long>> UpsertClassifiedSubsidyChangeAsync(
+        long oldApplicationId,
+        long newApplicationId,
+        string oldClassification,
+        string newClassification,
+        decimal oldClassified,
+        decimal newClassified,
+        string operatorName,
+        CancellationToken ct)
+    {
+        var isReduce = newClassified < oldClassified;
+        var changeType = isReduce
+            ? DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE
+            : DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD;
+        var direction = isReduce ? "减发" : "增发";
+
+        var existSql = @"SELECT id, change_type, old_guarantee_amount, new_guarantee_amount
+                         FROM nc_biz_change_records
+                         WHERE application_id = $1 AND new_application_id = $2
+                           AND change_type = ANY($3::text[])
+                           AND deleted_at IS NULL
+                         ORDER BY id DESC LIMIT 1";
+        var exist = await _db.QuerySingleAsync<ClassifiedChangeExistingRow>(existSql, ct,
+            oldApplicationId, newApplicationId,
+            new string[]
             {
-                if (exist.Value != null)
-                {
-                    var purge = await _db.ExecuteNonQueryAsync(
-                        @"UPDATE nc_biz_change_records SET deleted_at = NOW()
-                          WHERE id = $1 AND deleted_at IS NULL",
-                        ct, exist.Value.Id);
-                    if (purge.IsFailure)
-                        return Result.Failure<long?>(purge.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                            purge.Message ?? "清理分类施保减发记录失败");
-                    if (purge.Value > 0)
-                        LogInfo($"分类施保减发条件消失，软删记录: ChangeId={exist.Value.Id}, "
-                            + $"{oldAmount:F2}≤{newAmount:F2}");
-                }
-                return Result.Success<long?>(null);
+                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE,
+                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD
+            });
+        if (exist.IsFailure)
+            return Result.Failure<long>(exist.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                exist.Message ?? "查询分类施保变更记录失败");
+
+        var classifiedDiff = global::System.Math.Abs(newClassified - oldClassified);
+        var changeReason = $"分类施保变更（{direction}）：原{oldClassified:F2}元 → 现{newClassified:F2}元/月"
+            + $"（{direction}{classifiedDiff:F2}元/月）";
+
+        if (exist.Value != null)
+        {
+            // 方向未变且金额一致 → 幂等跳过
+            if (string.Equals(exist.Value.ChangeType, changeType, StringComparison.Ordinal)
+                && exist.Value.OldGuaranteeAmount == oldClassified
+                && exist.Value.NewGuaranteeAmount == newClassified)
+                return Result.Success(exist.Value.Id);
+
+            // 方向翻转（原减发→现增发等）：软删旧行再插入，避免月报按 change_type 取数时方向错乱
+            if (!string.Equals(exist.Value.ChangeType, changeType, StringComparison.Ordinal))
+            {
+                var purge = await _db.ExecuteNonQueryAsync(
+                    @"UPDATE nc_biz_change_records SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+                    ct, exist.Value.Id);
+                if (purge.IsFailure)
+                    return Result.Failure<long>(purge.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        purge.Message ?? "清理反向分类施保变更记录失败");
             }
-
-            // 减发成立但未进渐退（取消渐退等）→ 不创建：本记录语义限定"户主死亡进入渐退期"；
-            // 已有记录保留作事件审计（渐退期满结清后不回收）
-            var graceResult = await _db.ExecuteScalarAsync<bool>(
-                "SELECT EXISTS(SELECT 1 FROM nc_biz_grace_periods WHERE application_id = $1 AND is_active AND deleted_at IS NULL)",
-                ct, applicationId);
-            if (graceResult.IsFailure)
-                return Result.Failure<long?>(graceResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    graceResult.Message ?? "渐退期状态查询失败");
-            if (!graceResult.Value)
-                return Result.Success<long?>(exist.Value?.Id);
-
-            var changeReason = $"户主死亡进入渐退期，减发分类施保：原{oldAmount:F2}元→现{newAmount:F2}元"
-                + $"（原户主{old.ApplicantName ?? ""}死亡，减发{oldAmount - newAmount:F2}元/月）";
-
-            if (exist.Value != null)
+            else
             {
-                if (exist.Value.OldGuaranteeAmount == oldAmount
-                    && exist.Value.NewGuaranteeAmount == newAmount)
-                    return Result.Success<long?>(exist.Value.Id);
-
                 var update = await _db.ExecuteNonQueryAsync(
                     @"UPDATE nc_biz_change_records SET
                         old_guarantee_amount = $1, new_guarantee_amount = $2,
                         change_reason = $3, operator_name = $4, changed_at = NOW()
                       WHERE id = $5",
-                    ct, oldAmount, newAmount, changeReason, operatorName, exist.Value.Id);
+                    ct, oldClassified, newClassified, changeReason, operatorName, exist.Value.Id);
                 if (update.IsFailure)
-                    return Result.Failure<long?>(update.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        update.Message ?? "更新分类施保减发记录失败");
-                LogInfo($"分类施保减发记录更新: ChangeId={exist.Value.Id}, {oldAmount:F2}→{newAmount:F2}");
-                return Result.Success<long?>(exist.Value.Id);
+                    return Result.Failure<long>(update.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        update.Message ?? "更新分类施保变更记录失败");
+                LogInfo($"分类施保变更记录更新: ChangeId={exist.Value.Id}, {oldClassified:F2}→{newClassified:F2}（{direction}）");
+                return Result.Success(exist.Value.Id);
             }
+        }
 
-            await using var tx = await _db.BeginTransactionScopeAsync(ct);
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
-            var insertSql = @"INSERT INTO nc_biz_change_records
-                (application_id, change_no, change_type, change_category, change_reason, change_reason_type,
-                 change_date, old_classification, new_classification, old_guarantee_amount, new_guarantee_amount,
-                 triggered_grace_period, triggered_stop, original_application_id, new_application_id,
-                 operator_name, changed_at)
-                VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,$10,FALSE,FALSE,$11,$12,$13,NOW())
-                RETURNING id;";
-            var insert = await _db.ExecuteScalarAsync<long>(insertSql, ct,
-                app.OriginalApplicationId,
-                $"CHG{DateTime.Now:yyyyMMddHHmmssfff}",
-                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE,
-                changeReason,
-                ChangeReasonTypeConstants.ClassifiedSubsidyReduce,
-                DateTime.Today,
-                old.ClassificationResult, app.ClassificationResult,
-                oldAmount, newAmount,
-                app.OriginalApplicationId, applicationId,
-                operatorName);
-            if (insert.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<long?>(insert.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    insert.Message ?? "写入分类施保减发记录失败");
-            }
+        var insertSql = @"INSERT INTO nc_biz_change_records
+            (application_id, change_no, change_type, change_category, change_reason, change_reason_type,
+             change_date, old_classification, new_classification, old_guarantee_amount, new_guarantee_amount,
+             triggered_grace_period, triggered_stop, original_application_id, new_application_id,
+             operator_name, changed_at)
+            VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,$10,FALSE,FALSE,$11,$12,$13,NOW())
+            RETURNING id;";
+        var insert = await _db.ExecuteScalarAsync<long>(insertSql, ct,
+            oldApplicationId,
+            $"CHG{DateTime.Now:yyyyMMddHHmmssfff}",
+            changeType,
+            changeReason,
+            ChangeReasonTypeConstants.ClassifiedSubsidyChange,
+            DateTime.Today,
+            oldClassification, newClassification,
+            oldClassified, newClassified,
+            oldApplicationId, newApplicationId,
+            operatorName);
+        if (insert.IsFailure)
+        {
+            await tx.RollbackAsync(ct);
+            return Result.Failure<long>(insert.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                insert.Message ?? "写入分类施保变更记录失败");
+        }
 
-            await tx.CommitAsync(ct);
+        await tx.CommitAsync(ct);
+        LogInfo($"分类施保变更记录写入: ChangeId={insert.Value}, 挂旧档{oldApplicationId} → 新档{newApplicationId}, "
+            + $"{oldClassified:F2}→{newClassified:F2}（{direction}）");
+        return Result.Success(insert.Value);
+    }
 
-            LogInfo($"分类施保减发记录写入: ChangeId={insert.Value}, 挂旧档{app.OriginalApplicationId}, "
-                + $"{oldAmount:F2}→{newAmount:F2}");
-            return Result.Success<long?>(insert.Value);
+    /// <inheritdoc/>
+    public async Task<Result<long?>> EnsureChainFundChangeSettlementAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    {
+        try
+        {
+            // 本档（链尾新档）：Step5 判定已落库，户月/分类施保为最终值
+            var newSql = @"SELECT classification_result, household_monthly_guarantee_amount, classified_subsidy_amount
+                           FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            var newResult = await _db.QuerySingleAsync<FundSettlementArchiveRow>(newSql, ct, applicationId);
+            if (newResult.IsFailure)
+                return Result.Failure<long?>(newResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    newResult.Message ?? "读取接续链新档失败");
+
+            var current = newResult.Value;
+            // 非链档案/未判定分类 → 无上游可比，显式跳过（不猜测、不写入）
+            if (current == null || string.IsNullOrEmpty(current.ClassificationResult))
+                return Result.Success<long?>(null);
+
+            var upstreamSql = @"SELECT original_application_id FROM nc_biz_applications
+                                WHERE id = $1 AND deleted_at IS NULL";
+            var upstreamIdResult = await _db.QuerySingleAsync<long?>(upstreamSql, ct, applicationId);
+            if (upstreamIdResult.IsFailure)
+                return Result.Failure<long?>(upstreamIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    upstreamIdResult.Message ?? "读取上游档案ID失败");
+            var upstreamId = upstreamIdResult.Value ?? 0;
+            if (upstreamId <= 0)
+                return Result.Success<long?>(null);
+
+            // 旧档（未被表单覆写，可信）：户月/分类施保/分类
+            var oldSql = @"SELECT classification_result, household_monthly_guarantee_amount, classified_subsidy_amount
+                           FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            var oldResult = await _db.QuerySingleAsync<FundSettlementArchiveRow>(oldSql, ct, upstreamId);
+            if (oldResult.IsFailure)
+                return Result.Failure<long?>(oldResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    oldResult.Message ?? "读取上游档案失败");
+            var previous = oldResult.Value;
+            if (previous == null)
+                return Result.Success<long?>(null);
+
+            var settlement = await RegisterFundChangeCoreAsync(
+                upstreamId, applicationId,
+                previous.ClassificationResult, current.ClassificationResult,
+                previous.HouseholdMonthlyGuaranteeAmount, current.HouseholdMonthlyGuaranteeAmount,
+                previous.ClassifiedSubsidyAmount, current.ClassifiedSubsidyAmount,
+                ChangeReasonTypeConstants.HeadDeceased, operatorName, ct);
+            if (settlement.IsFailure)
+                return Result.Failure<long?>(settlement.ErrorCode!, settlement.Message!);
+
+            return Result.Success(settlement.Value?.FundChangeRegistrationId ?? settlement.Value?.ClassifiedSubsidyChangeId);
         }
         catch (Exception ex)
         {
-            // await using 作用域在 try 内：异常展开时 Dispose 已自动回滚，无需显式回滚
-            LogException(ex, "同步户主死亡渐退分类施保减发记录");
+            LogException(ex, "同步接续链保障金变更登记");
             return Result.FromException<long?>(ex);
         }
     }
@@ -618,7 +843,8 @@ public partial class ChangeService
     }
 
     /// <summary>
-    /// 停旧建新：复制旧档案（主表+家庭成员+经济明细+入户调查+照料人）→ 新档案（original_application_id=旧ID、Draft），
+    /// 停旧建新：复制旧档案（主表+家庭成员+经济明细+入户调查+照料人）→ 新档案
+    /// （original_application_id=旧ID、status=Draft、current_step=PENDING_ARCHIVE(5)，见下方第 3 步注释），
     /// 旧档案置 Stopped 并结清渐退期；支持对复制后的新档案 UPDATE 覆盖字段（分类/金额/收入等，如经济复核结果）。
     /// 返回新档案 ID 与旧成员ID→新成员ID 映射。同一事务内调用（应处于已开启事务的上下文）。
     /// </summary>
@@ -639,6 +865,12 @@ public partial class ChangeService
 
         // 3. 复制主表 → 新档案（application_no=新、status=Draft、original_application_id=旧ID、source_type=给定类型、
         //    清空停保/渐退期字段、data_completed_at=NULL，其余复制源值）
+        //    current_step 直接置 PENDING_ARCHIVE(5) 而非 ENTRY_START(1)：主表+家庭成员+经济明细+入户调查+照料人
+        //    已整套复制，分类/金额/收入又经 applyOverrides 覆盖为本次重判结果，五个录入步骤的数据本就齐全。
+        //    若留 1，保存后的「整套档案」出口里「完成归档」必被 ApplicationStatusService 的步骤门槛拦下
+        //    （step<5 报"档案录入未完成"），新档只能退回工作流从「草稿」重走一遍复制来的五步——
+        //    曾致成员变更/经济复核/户主死亡三条链路的新档长期卡在草稿（库内 app80/94 实证）。
+        //    5 = 已建档未提交 Tab，无任何批量任务消费该状态，仅决定列表归属与归档门槛放行。
         var newAppInsertSql = @"INSERT INTO nc_biz_applications (
                 application_no, applicant_name, applicant_id_card, applicant_phone,
                 gender, ethnicity, marital_status, hukou_type, education_level, political_status,
@@ -697,7 +929,7 @@ public partial class ChangeService
             RETURNING id;";
         var newAppResult = await _db.ExecuteScalarAsync<long?>(newAppInsertSql, ct,
             appNoResult.Value, sourceType, sourceApplicationId, operatorName ?? "System", sourceApplicationId, chainType,
-            ApplicationStatusCodes.DRAFT, WorkflowSteps.ENTRY_START);
+            ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE);
         if (newAppResult.IsFailure || newAppResult.Value is not > 0)
             return Result.Failure<(long, Dictionary<long, long>)>(newAppResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                 newAppResult.Message ?? "创建新档案失败");
@@ -753,6 +985,27 @@ public partial class ChangeService
                 memberIdMap[oldMember.Id] = match.Id;
         }
         long MapMemberId(long oldId) => oldId > 0 && memberIdMap.TryGetValue(oldId, out var nid) ? nid : 0;
+
+        // 4.5 回写大学生档案 application_id（按身份证，指向新档案）
+        //     nc_biz_college_students.application_id 此前无任何回写回路：建档、停旧建新、停保均不更新，
+        //     停旧建新换档案ID后必然指向旧档或为 0（2026-10-12 实测张宇昌/张微 =0，而其在保档案已为 90）。
+        //     此处统一指向新档，使该列随档案链同步前移；幂等（is distinct from），重复执行无副作用。
+        //     不按 member_category 过滤：学生改判为赡养抚养扶养人后仍保留在该户档案内（履行赡养义务），
+        //     该列语义是「所属户档案」而非「作为保障对象的档案」——张微改判 Support 后仍应指向 90。
+        var studentWritebackSql = @"
+            UPDATE nc_biz_college_students cs
+               SET application_id = $1, updated_at = NOW()
+             WHERE cs.deleted_at IS NULL
+               AND cs.application_id IS DISTINCT FROM $1
+               AND EXISTS (SELECT 1 FROM nc_biz_family_members m
+                            WHERE m.application_id = $1 AND m.deleted_at IS NULL
+                              AND m.id_card = cs.id_card)";
+        var studentWritebackResult = await _db.ExecuteNonQueryAsync(studentWritebackSql, ct, newApplicationId);
+        if (studentWritebackResult.IsFailure)
+            return Result.Failure<(long, Dictionary<long, long>)>(studentWritebackResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                studentWritebackResult.Message ?? "回写大学生档案 application_id 失败");
+        if (studentWritebackResult.Value > 0)
+            LogInfo($"停旧建新回写大学生档案: 新档={newApplicationId}, 更新 {studentWritebackResult.Value} 人");
 
         // 5. 复制经济明细（LoadAll → 重映射 member_id → SaveAll）
         var econLoadResult = await _economicDetailService.LoadAllAsync(sourceApplicationId, ct);
@@ -1091,6 +1344,29 @@ public partial class ChangeService
                 LogInfo($"经济复核无金额/分类/停保变化，跳过停旧建新: ApplicationId={context.ApplicationId}");
             }
 
+            // 7.5 保障金变更登记 + 分类施保变动登记（低保同码 + 户月差 ≥ 阈值；分类施保不套阈值）
+            //     旧值必须用表单加载时刻捕获的 context.Old*（本档经济数据已被覆写，读库拿不到真旧值）
+            if (needRebuild)
+            {
+                var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
+                var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
+                var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
+                    ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
+
+                var settleResult = await RegisterFundChangeCoreAsync(
+                    context.ApplicationId, newApplicationId,
+                    oldClassification, newClassification,
+                    oldHouseholdMonthly, newGuaranteeAmount,
+                    oldClassifiedForSettle, newClassifiedAmount,
+                    ChangeReasonTypeConstants.EconomicReview, context.OperatorName, ct);
+                if (settleResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(settleResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        settleResult.Message ?? "保障金变更登记失败");
+                }
+            }
+
             // 8. 创建变更记录（挂在旧档案上，After 快照含新档案ID）
             var changeContext = new ChangeContext
             {
@@ -1116,7 +1392,11 @@ public partial class ChangeService
                 OldTotalFamilyIncome = context.OldTotalFamilyIncome,
                 OldTotalAnnualIncome = context.OldTotalAnnualIncome,
                 OldPerCapitaIncome = context.OldPerCapitaIncome,
-                Components = context.OldComponents
+                Components = context.OldComponents,
+                // 户月口径旧值（月报增减发/保障金变更登记取数用：分类施保剥离后单独比）
+                OldHouseholdMonthlyGuaranteeAmount = context.OldHouseholdMonthlyGuaranteeAmount,
+                OldClassifiedSubsidyAmount = context.OldClassifiedSubsidyAmount,
+                OldCaregiverSubsidyAmount = context.OldCaregiverSubsidyAmount
             });
 
             var afterJson = JsonSerializer.Serialize(new
@@ -1413,6 +1693,28 @@ public partial class ChangeService
             }
             var newApplicationId = rebuildResult.Value.NewApplicationId;
 
+            // 7.5 保障金变更登记 + 分类施保变动登记（低保同码 + 户月差 ≥ 阈值；分类施保不套阈值）
+            //     旧值必须用表单加载时刻捕获的 context.Old*（本档经济数据已被 SaveEconomicDetailsAsync 覆写）
+            {
+                var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
+                var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
+                var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
+                    ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
+
+                var settleResult = await RegisterFundChangeCoreAsync(
+                    context.ApplicationId, newApplicationId,
+                    oldClassification, newClassification,
+                    oldHouseholdMonthly, newGuaranteeAmount,
+                    oldClassifiedForSettle, newClassifiedAmount,
+                    ChangeReasonTypeConstants.MemberChange, context.OperatorName, ct);
+                if (settleResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(settleResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        settleResult.Message ?? "保障金变更登记失败");
+                }
+            }
+
             // 8. 变更记录（挂在旧档案上；After 快照含新档案ID）
             var changeContext = new ChangeContext
             {
@@ -1432,7 +1734,11 @@ public partial class ChangeService
                 TotalIncome = oldTotalIncome,
                 PerCapitaIncome = oldPerCapitaIncome,
                 RigidExpenditure = oldRigidExpenditure,
-                FamilySize = oldFamilySize
+                FamilySize = oldFamilySize,
+                // 户月口径旧值（月报增减发/保障金变更登记取数用：分类施保剥离后单独比）
+                OldHouseholdMonthlyGuaranteeAmount = context.OldHouseholdMonthlyGuaranteeAmount,
+                OldClassifiedSubsidyAmount = context.OldClassifiedSubsidyAmount,
+                OldCaregiverSubsidyAmount = context.OldCaregiverSubsidyAmount
             });
 
             var entries = context.Entries ?? new List<MemberChangeEntry>();

@@ -153,7 +153,10 @@ public interface IApplicationService
     /// 完成归档：current_step 推进到 6 并将 status 置为 Approved（已审批/在保）。
     /// 系统无独立审批工作流，归档即视为审批通过；已 Approved/Completed 的档案仅推进步骤，不改状态。
     /// </summary>
-    Task<Result> CompleteArchiveAsync(long applicationId, CancellationToken ct = default);
+    /// <param name="applicationId">档案 ID</param>
+    /// <param name="operatorName">操作人姓名，写入 nc_biz_application_logs.operator_name。
+    /// 调用方须传真实登录名；传 "System" 会使审计不可追溯（历史缺陷）。</param>
+    Task<Result> CompleteArchiveAsync(long applicationId, string operatorName, CancellationToken ct = default);
 
     /// <summary>
     /// 为单人保成员创建草稿申请

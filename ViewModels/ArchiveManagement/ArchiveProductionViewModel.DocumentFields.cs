@@ -405,40 +405,15 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 档案时间锚定日期：数据补全完成 → 首次审批 → 更新 → 创建。
-    /// 用于按该档案自身业务时间取 B 线周期（档案编号/卷号/公示/审核/生效/调查日期），
-    /// 避免档案补打时按“当天”重算导致编号/卷号漂移。
+    /// 档案时间锚定日期：转发到 <see cref="ArchiveAnchorHelper.ResolveArchiveAnchorDate"/>（唯一事实来源）。
+    /// 表单「入户调查日期避公示」校验走同一锚点，两处必须一致，否则校验窗口与打印窗口对不上。
     /// </summary>
     private static DateTime ResolveArchiveAnchorDate(ApplicationEntity app)
-    {
-        if (app.DataCompletedAt is { } completed && completed != default) return completed;
-        if (app.FirstApprovedAt is { } approved && approved != default) return approved;
-        if (app.UpdatedAt != default) return app.UpdatedAt;
-        return ResolveApplicationDate(app);
-    }
+        => ArchiveAnchorHelper.ResolveArchiveAnchorDate(app);
 
-    /// <summary>
-    /// 申请日期（业务受理时间）解析（稳定口径）：
-    /// 申请编号内嵌日期（SA+yyyyMMdd，创建时生成）→ 创建时间 → 首次审批 → 补全完成 → 更新 → 今天。
-    /// 记录 created_at 为 NULL 时实体初值会被填成加载时刻（UtcNow），直接打印会导致每次补打都漂移，
-    /// 故以申请编号日期优先。
-    /// </summary>
+    /// <summary>申请日期解析：转发到 <see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>（唯一事实来源）</summary>
     private static DateTime ResolveApplicationDate(ApplicationEntity app)
-    {
-        var no = app.ApplicationNo;
-        if (!string.IsNullOrEmpty(no) && no.Length >= 10
-            && no.StartsWith("SA", StringComparison.Ordinal)
-            && DateTime.TryParseExact(no.Substring(2, 8), "yyyyMMdd", null,
-                System.Globalization.DateTimeStyles.None, out var fromNo))
-        {
-            return fromNo;
-        }
-        if (app.CreatedAt != default) return app.CreatedAt;
-        if (app.FirstApprovedAt is { } approved && approved != default) return approved;
-        if (app.DataCompletedAt is { } completed && completed != default) return completed;
-        if (app.UpdatedAt != default) return app.UpdatedAt;
-        return DateTime.Today;
-    }
+        => ArchiveAnchorHelper.ResolveApplicationDate(app);
 
     /// <summary>
     /// 将金额转换为中文大写（如 200.50 → "贰佰元伍角"）
@@ -1321,9 +1296,17 @@ public partial class ArchiveProductionViewModel
 
         sb.Append($"{(isRural ? "农村" : "城市")}低保标准为{standard:N0}元/月，");
         sb.Append($"低收入标准上限为{threshold:N0}元/月（{standard:N0}×1.5）。");
-        sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元已超过低收入标准上限{threshold:N2}元，");
 
-        // 刚性支出分析
+        // 治本：按实际数值决定措辞，杜绝「未超限却写成已超过」的自相矛盾文书。
+        // 历史缺陷：此处原为无条件写死「已超过」，致使人均713.92元/上限948元的档案
+        // 被写成「已超过低收入标准上限」。即便上游分支已按分类正确分流，这里仍保留
+        // 数值判断作为第二道防线——将来若有分支漏配，文案也不会与自身数字打架。
+        if (perCapitaIncome >= threshold)
+            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元已超过低收入标准上限{threshold:N2}元，");
+        else
+            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元未超过低收入标准上限{threshold:N2}元，");
+
+        // 刚性支出分析（>0 才提：0 支出并非拒保理由，硬接一句反而画蛇添足）
         if (rigidExpenditure > 0)
         {
             var perCapitaRigid = rigidExpenditure / familySize;
@@ -1339,13 +1322,107 @@ public partial class ArchiveProductionViewModel
             else
                 sb.Append("扣除刚性支出后人均收入不足低保标准，不满足刚性支出困难家庭条件。");
         }
-        else
-        {
-            sb.Append("且无刚性支出，不满足刚性支出困难家庭条件。");
-        }
 
         sb.Append("根据《牡丹江市低收入人口认定实施细则》（牡民规〔2024〕2号）相关规定，不符合低收入人口认定条件。");
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// 是否属「有劳动力且无重病重残」拒保（IneligibleWithLabor）。
+    /// 该类拒保的真实原因是家庭成员状况而非收入水平，必须与「收入超标」分流，
+    /// 否则告知书会写出与自身数字矛盾的事实性错误。
+    /// IneligibleWithLabor 为全量码（非简化码，库内 classification_result 实存该值），直接等值比较。
+    /// </summary>
+    private static bool IsLaborIneligible(string? newClassification)
+        => !string.IsNullOrEmpty(newClassification)
+           && ClassificationConstants.IneligibleWithLabor.Equals(newClassification, StringComparison.Ordinal);
+
+    /// <summary>
+    /// 生成「有劳动力且无重病重残」拒保的详细经济理由（newClassification = IneligibleWithLabor）。
+    ///
+    /// 设计要点：
+    /// ① 【按分类说，不提收入超标】该类拒保的真实原因是家庭成员状况，不是收入水平——
+    ///    库内实例：人均月收入713.92元处于632~948元的低收入区间内，却被旧模板写成
+    ///    「已超过低收入标准上限」，属事实性错误，群众一申诉即被推翻。此处必须显式点明
+    ///    「收入并未超标」，把拒保理由归位到成员状况上。
+    /// ② 【最低工资标准只作事实参照】黑政规〔2025〕1号的档位数值仅用于说明「劳动能力
+    ///    对应的收入能力」与就业引导。最低工资标准在《牡丹江市低收入人口认定实施细则》
+    ///    中只用于「就业必要成本扣减」（第十六条）与「特困照料护理标准」（第四十五条），
+    ///    **严禁**写成「按最低工资标准核定您家收入应为X元」——那属于无法定依据的收入核定，
+    ///    会连带动摇拒保决定本身（详见 WageStandardConstants 类注释）。
+    /// ③ 【标准读配置，缺失显式失败】低保标准沿用 H4 惯例（缺 632/832 时抛 CONFIG_NOT_FOUND）；
+    ///    工资标准属补充性内容，缺失时仅省略该段并记 Warn，不让文书生成整体中断——
+    ///    两者有意区别对待。
+    /// ④ 【救济告知不写入】模板《社会救助调整（终止）告知书》已含「如有异议，可自收到本
+    ///    告知书之日起15日内向我乡镇（街道）提出复查申请或60日内向__申请行政复议或行政
+    ///    诉讼」固定文本，此处再写会重复。
+    /// ⑤ 【刚性支出 >0 才提】0 支出并非本类拒保理由。
+    /// </summary>
+    private async Task<string> BuildLaborIneligibleReasonAsync(ApplicationEntity app, CancellationToken ct)
+    {
+        var sb = new StringBuilder();
+        var familySize = app.FamilySize;
+        var totalIncome = app.TotalFamilyIncome;
+        var perCapitaIncome = app.PerCapitaIncome;
+        var rigidExpenditure = app.RigidExpenditure;
+        var isRural = ClassificationConstants.HukouType.IsHukouRural(app.HukouType);
+
+        // ── 第一段：客观核算 + 显式澄清「收入未超标」──
+        sb.Append($"经核算，您家庭共同生活成员{familySize}口人，家庭月总收入{totalIncome:N2}元，人均月收入{perCapitaIncome:N2}元。");
+
+        var stdType = isRural ? "RuralSubsistenceStandard" : "UrbanSubsistenceStandard";
+        var stdHukou = isRural ? "Rural" : "Urban";
+        var stdResult = await _standardConfigService.GetStandardValueAsync(stdType, stdHukou, ct: ct);
+        if (!stdResult.IsSuccess || stdResult.Value <= 0)
+        {
+            _logger.Error($"有劳动力拒保告知书：低保标准配置缺失或无效（{stdType}/{stdHukou}），禁止使用硬编码回退值");
+            return $"低保标准配置缺失或无效（{stdType}/{stdHukou}），请在「数据中心-标准配置管理」中维护有效标准后重新生成告知书。";
+        }
+        var standard = stdResult.Value;
+        var threshold = standard * ClassificationConstants.LowIncomeMultiplier;
+
+        sb.Append($"本市{(isRural ? "农村" : "城市")}最低生活保障标准为{standard:N0}元/月，最低生活保障边缘标准上限为{threshold:N0}元/月（{standard:N0}×{ClassificationConstants.LowIncomeMultiplier}）。");
+        sb.Append(perCapitaIncome >= threshold
+            ? $"经核对，您家庭人均月收入{perCapitaIncome:N2}元已超过最低生活保障边缘标准上限{threshold:N2}元。"
+            : $"经核对，您家庭人均月收入处于上述标准区间内，并未超过最低生活保障边缘标准上限。");
+
+        // ── 第二段：真实拒保理由归位到成员状况 ──
+        sb.Append("本次不予认定的原因不在收入水平，而在家庭成员状况：经核查，您家庭共同生活成员中存在劳动年龄内具有劳动能力的人员，且家庭成员中无重病、重残人员。");
+        sb.Append($"按照《牡丹江市低收入人口认定实施细则》（牡民规〔2024〕2号）关于{(isRural ? "农村" : "城市")}最低生活保障边缘家庭认定条件的相关规定，家庭虽处于边缘收入区间，但有劳动能力成员且无重病、重残情形的，不予认定为最低生活保障边缘家庭。");
+
+        // 刚性支出 >0 才提（0 支出并非本类拒保理由）
+        if (rigidExpenditure > 0)
+        {
+            var perCapitaRigid = rigidExpenditure / familySize;
+            var ratio = perCapitaIncome > 0 ? perCapitaRigid / perCapitaIncome : 0;
+            sb.Append($"另经核算，您家庭刚性支出{rigidExpenditure:N2}元/月（人均{perCapitaRigid:N2}元/月，占比{ratio:P0}），亦不满足刚性支出困难家庭的认定条件。");
+        }
+
+        // ── 第三段：最低工资标准（仅事实参照 + 就业引导）──
+        // 配置缺失时省略本段并记 Warn：工资标准属补充性内容，不让文书生成整体中断。
+        var levelType = WageStandardConstants.ResolveLevelType(app.District);
+        var wageResult = await _standardConfigService.GetStandardValueAsync(levelType, ct: ct);
+        if (wageResult.IsSuccess && wageResult.Value > 0)
+        {
+            var scopeText = string.IsNullOrWhiteSpace(app.District) ? "本市" : app.District.Trim();
+            sb.Append($"另按照{WageStandardConstants.PolicyDocument}，{scopeText}执行月最低工资标准{wageResult.Value:N0}元（{WageStandardConstants.PolicyDocument}第{LevelOrdinal(levelType)}档，{WageStandardConstants.EffectiveDate}起执行）。");
+            sb.Append("具有劳动能力的家庭成员具备通过就业取得相应劳动报酬的能力。建议配合人力资源社会保障部门的就业介绍，通过就业改善家庭生活状况。");
+        }
+        else
+        {
+            // 缺失/无效：省略该段，记 Warn 便于运维补配（区别于低保标准的显式失败）
+            _logger.Warn($"有劳动力拒保告知书：最低工资标准配置缺失或无效（{levelType}），已省略工资标准段落。District={app.District}");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>档位序数（一/二/三），用于文书中「第X档」的中文表述</summary>
+    private static string LevelOrdinal(string levelType) => levelType switch
+    {
+        WageStandardConstants.Level1Type => "一",
+        WageStandardConstants.Level2Type => "二",
+        _ => "三"
+    };
 }

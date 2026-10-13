@@ -5,11 +5,14 @@
              x:Class="NewCosmos.Pages.Auth.LoginPage"
              x:DataType="LoginViewModel"
              Title="登录"
-             NavigationPage.HasNavigationBar="False">
+             NavigationPage.HasNavigationBar="False"
+             SafeAreaEdges="None">
 
-    <Grid>
+    <!-- SafeAreaEdges=None：页面与根 Grid 全幅延伸（背景图覆盖状态栏区域）；
+         内层内容 Grid 保持布局默认 Container，自动避开状态栏/导航条 -->
+    <Grid SafeAreaEdges="None">
         <!-- 背景层 -->
-        <Grid>
+        <Grid SafeAreaEdges="None">
             <!-- 背景图片 - 直接绑定当前背景图 -->
             <Image Source="{Binding CurrentBackgroundImage}"
                    Aspect="AspectFill"

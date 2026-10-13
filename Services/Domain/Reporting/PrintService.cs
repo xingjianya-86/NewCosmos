@@ -154,6 +154,98 @@ public partial class PrintService : BaseService, IPrintService
     }
 
     /// <summary>
+    /// 组装勾选月报表单的预览数据（表头字段 + ConfigJson 列定义 + 行数据；无数据表单自动跳过）。
+    /// 手机端 HTML 预览专用：只查数据不渲染模板，绕开 Office COM（Android 无 PDF 能力）。
+    /// </summary>
+    public async Task<Result<List<MonthlyFormPreviewData>>> BuildMonthlyFormsPreviewDataAsync(int year, int month, IEnumerable<string> formKeys, string town, CancellationToken ct = default)
+    {
+        LogInfo($"组装月报预览数据: 表单数={formKeys.Count()}");
+
+        var sections = new List<MonthlyFormPreviewData>();
+        var skipped = new List<string>();
+        foreach (var formKey in formKeys.Distinct())
+        {
+            var (baseForm, category) = SplitMonthlyFormKey(formKey);
+            var templateResult = await ResolveMonthlyTemplateIdAsync(baseForm, category, ct);
+            if (templateResult.IsFailure)
+                return Result.Failure<List<MonthlyFormPreviewData>>(templateResult.ErrorCode!, templateResult.Message!);
+
+            var configResult = await GetTemplateConfigAsync(templateResult.Value, ct);
+            if (configResult.IsFailure)
+                return Result.Failure<List<MonthlyFormPreviewData>>(configResult.ErrorCode!, configResult.Message!);
+            var config = configResult.Value;
+
+            var pagesResult = await BuildMonthlyFormDataAsync(year, month, baseForm, category, town, ct);
+            if (pagesResult.IsFailure)
+            {
+                if (pagesResult.ErrorCode == ErrorCodes.NOT_FOUND && pagesResult.Message?.Contains("无数据") == true)
+                {
+                    skipped.Add(formKey);
+                    continue;
+                }
+                return Result.Failure<List<MonthlyFormPreviewData>>(pagesResult.ErrorCode!, pagesResult.Message!);
+            }
+            if (pagesResult.Value.Count == 0)
+            {
+                skipped.Add(formKey);
+                continue;
+            }
+
+            foreach (var page in pagesResult.Value)
+            {
+                var section = new MonthlyFormPreviewData
+                {
+                    Title = page.Fields.GetValueOrDefault("REPORT_TITLE", formKey) + page.TitleSuffix,
+                    Unit = page.Fields.GetValueOrDefault("REPORT_UNIT", string.Empty),
+                    Date = page.Fields.GetValueOrDefault("REPORT_DATE", string.Empty)
+                };
+
+                if (page.Rows.Count > 0)
+                {
+                    // 列顺序与表头取模板 ConfigJson（与 xlsx 渲染同源）；无配置时按行键兜底
+                    var rowKeys = new HashSet<string>(page.Rows.SelectMany(r => r.Keys), StringComparer.Ordinal);
+                    var columns = config?.Tables.FirstOrDefault()?.Columns
+                        .Where(c => !string.IsNullOrEmpty(c.FieldKey) && rowKeys.Contains(c.FieldKey))
+                        .Select(c => new MonthlyFormPreviewColumn
+                        {
+                            FieldKey = c.FieldKey,
+                            Header = StripPlaceholderBraces(c.Placeholder, c.FieldKey)
+                        })
+                        .ToList();
+                    if (columns == null || columns.Count == 0)
+                        columns = rowKeys.Select(k => new MonthlyFormPreviewColumn { FieldKey = k, Header = k }).ToList();
+                    section.Columns = columns;
+                    section.Rows = page.Rows;
+                }
+                else
+                {
+                    // 段落型表单（会议记录 docx）：用 ConfigJson 字段映射的中文占位符做标签，跳过报表文头三件套
+                    foreach (var f in config?.Fields ?? Enumerable.Empty<TemplateFieldMapping>())
+                    {
+                        if (string.IsNullOrEmpty(f.FieldKey) || f.FieldKey.StartsWith("REPORT_", StringComparison.Ordinal))
+                            continue;
+                        if (!page.Fields.TryGetValue(f.FieldKey, out var v) || string.IsNullOrWhiteSpace(v))
+                            continue;
+                        section.Paragraphs.Add(new(StripPlaceholderBraces(f.Placeholder, f.FieldKey), v));
+                    }
+                }
+                sections.Add(section);
+            }
+        }
+
+        if (skipped.Count > 0)
+            LogInfo($"无数据已跳过: {string.Join(",", skipped)}");
+        return Result.Success(sections);
+    }
+
+    /// <summary>占位符去花括号作表头/标签，空占位符回退字段KEY</summary>
+    private static string StripPlaceholderBraces(string placeholder, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(placeholder)) return fallback;
+        return placeholder.Trim().Trim('{', '}');
+    }
+
+    /// <summary>
     /// 渲染月报表单为源文件字节（xlsx/docx，供导出；双页表单拆多页文件）
     /// </summary>
     public async Task<Result<List<MonthlySourceFile>>> RenderMonthlyFormToSourceAsync(int year, int month, string formKey, string town, CancellationToken ct = default)

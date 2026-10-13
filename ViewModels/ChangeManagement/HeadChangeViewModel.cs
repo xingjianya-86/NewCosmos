@@ -179,58 +179,46 @@ public partial class HeadChangeViewModel : ViewModelBase
                 OldHeadName = CurrentHeadName,
                 NewHeadName = SelectedNewHead.Name,
                 ChangeReason = ChangeReason,
-                OperatorName = "System"
+                // 审计记真实操作人（原硬编码 "System"，致 nc_biz_change_records 操作人不可追溯；
+                // 与 ApplicationFormViewModel/UserManagementViewModel 同型，一次修全）
+                OperatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
             }, CancellationToken);
 
             if (changeResult.IsSuccess)
             {
                 await _dialogService.DisplayAlertAsync("成功", "户主变更已完成", "确定");
 
-                // 出口三选一：整套档案 / 仅出文书 / 稍后
-                var choice = await _dialogService.DisplayActionSheetAsync(
-                    "户主变更完成", "取消", null, "整套档案", "仅出文书", "稍后再说");
-                if (choice == "仅出文书")
-                {
-                    try
-                    {
-                        // 户主变更停旧建新：新档 ID 在 ChangeResult（若有）否则用当前档
-                        var newAppId = changeResult.Value?.NewApplicationId is long na && na > 0
-                            ? na
-                            : ApplicationId;
-                        var originalId = changeResult.Value?.NewApplicationId is long na3 && na3 > 0
-                            ? ApplicationId
-                            : (long?)null;
+                // 成功后直接进档案产出页（整档模式）。原「整套档案 / 仅出文书 / 稍后再说」三选一已合并为单一出口：
+                //  · 户主变更停旧建新的新档必须归档才算收尾——旧档已 Stopped，新档不归档则本户无在保档案；
+                //  ·「仅出文书」会设 OutputCategories/OperationOverride/PrefilterTemplateNames，
+                //    触发 ArchiveOutputViewModel 的 IsDocumentMode=true →「完成归档」按钮被隐藏、
+                //    CompleteAsync 入口直接 return，新档永远无法归档（该绑定本是为渐退草稿设的护栏，
+                //    户主变更复用同一上下文时被误伤）；
+                //  ·「稍后再说」则新档留在列表里无人认领。
+                // 三字段清空 → IsDocumentMode=false，归档能力天然可用；退路为用户直接返回、不点归档。
+                PrintNavigationData.OutputCategories = null;
+                PrintNavigationData.OperationOverride = null;
+                PrintNavigationData.PrefilterTemplateNames = null;
+                PrintNavigationData.TemplateFilter = null;
 
-                        // 预置输出文书上下文 → 进档案制作页 → 用户点「档案输出」
-                        PrintNavigationData.OutputCategories = Helpers.ArchiveCategoryResolver.DocumentOperationCategories;
-                        PrintNavigationData.OperationOverride = "户主变更";
-                        PrintNavigationData.PrefilterTemplateNames = new[]
-                        {
-                            Constants.DocumentTemplateNames.MemberChangeTable,
-                            Constants.DocumentTemplateNames.ChangeNotice
-                        };
-                        PrintNavigationData.TemplateFilter = null;
+                // 未停旧建新（NewApplicationId 为 0/null）时新旧档同为当前档，此时不该把当前档
+                // 自己当作"变更前旧档案"传入（会让停保告知书判定拿到自指的原始档）→ 置 null。
+                var newAppId = changeResult.Value?.NewApplicationId is long na && na > 0
+                    ? na
+                    : ApplicationId;
+                var originalId = changeResult.Value?.NewApplicationId is long na2 && na2 > 0
+                    ? ApplicationId
+                    : (long?)null;
 
-                        await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                            new ApplicationReviewArchiveParameter(newAppId, originalId, "户主变更"));
-                    }
-                    catch (Exception navEx)
-                    {
-                        _logger.LogError(navEx, "导航到户主变更文书输出失败");
-                        await _dialogService.DisplayAlertAsync("错误", $"打开文书输出失败: {navEx.Message}", "确定");
-                    }
-                }
-                else if (choice == "整套档案")
+                try
                 {
-                    PrintNavigationData.OutputCategories = null;
-                    PrintNavigationData.OperationOverride = null;
-                    PrintNavigationData.PrefilterTemplateNames = null;
-                    PrintNavigationData.TemplateFilter = null;
-                    var newAppId = changeResult.Value?.NewApplicationId is long na2 && na2 > 0
-                        ? na2
-                        : ApplicationId;
                     await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                        new ApplicationReviewArchiveParameter(newAppId, ApplicationId, "户主变更"));
+                        new ApplicationReviewArchiveParameter(newAppId, originalId, "户主变更"));
+                }
+                catch (Exception navEx)
+                {
+                    _logger.LogError(navEx, "导航到户主变更文书输出失败");
+                    await _dialogService.DisplayAlertAsync("错误", $"打开文书输出失败: {navEx.Message}", "确定");
                 }
             }
             else

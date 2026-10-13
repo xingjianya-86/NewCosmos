@@ -459,8 +459,8 @@ public partial class ArchiveOutputViewModel
 
     /// <summary>
     /// 完成工单：打印→保存→完成 流的「完成」动作。
-    /// 仅记录办理完成留痕（本批打印追痕 remark + 业务日志），不改档案状态、不导航；
-    /// 文档/过滤模式下替代被隐藏的「完成归档」。
+    /// 仅记录办理完成留痕（本批打印追痕 remark + 业务日志），不改档案状态；
+    /// 文档/过滤模式下替代被隐藏的「完成归档」，收尾导航与其保持一致（完成后返回首页）。
     /// </summary>
     [RelayCommand]
     private async Task CompleteWorkOrderAsync()
@@ -474,7 +474,7 @@ public partial class ArchiveOutputViewModel
         }
 
         var confirm = await _dialogService.DisplayAlertAsync(
-            "确认", "确认完成该文书办理工单？\n仅记录办理完成，不影响档案状态。", "确认", "取消");
+            "确认", "确认完成该文书办理工单？\n仅记录办理完成，不影响档案状态，完成后返回首页。", "确认", "取消");
         if (!confirm) return;
 
         try
@@ -500,6 +500,18 @@ public partial class ArchiveOutputViewModel
 
             IsWorkOrderCompleted = true;
             StatusText = "工单已完成";
+
+            // 完成即离场：收尾与 CompleteAsync（完成归档）一致。
+            // 原实现只留痕不导航，而「仅出文书/文书直出」模式下「完成归档」被 IsCompleteArchiveVisible
+            // 隐藏、本命令是该模式唯一完成出口，用户点完被留在档案输出页无路可走（只能点返回）。
+            Cleanup();
+            var navigation = Helpers.WindowNavigator.CurrentNavigation;
+            if (navigation != null)
+            {
+                await navigation.PopToRootAsync();
+                // PopToRoot 直接回到主首页，必须恢复窗口标题（历史 BUG：标题残留档案输出页）
+                RestoreWindowTitleFromNavigation();
+            }
         }
         catch (Exception ex)
         {
@@ -599,7 +611,10 @@ public partial class ArchiveOutputViewModel
                 else
                 {
                     var appService = _serviceProvider.GetRequiredService<IApplicationService>();
-                    var stepResult = await appService.CompleteArchiveAsync(bizId,
+                    // 传真实登录名写入归档审计（原签名无 operatorName，服务侧硬编码 "System"，
+                    // 致 nc_biz_application_logs 中「完成归档」操作人全部不可追溯）
+                    var archiveOperator = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+                    var stepResult = await appService.CompleteArchiveAsync(bizId, archiveOperator,
                         CancellationToken.None); // [CT 豁免] 归档完成回写属收尾落库，不可中断
                     if (stepResult.IsSuccess)
                         _logger.LogBusiness("归档完成，current_step=6 且已置已审批", ("ApplicationId", bizId));

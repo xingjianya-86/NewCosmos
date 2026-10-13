@@ -1117,12 +1117,14 @@ public class ApplicationService : BaseService, IApplicationService
     }
 
     /// <inheritdoc />
-    public async Task<Result> CompleteArchiveAsync(long applicationId, CancellationToken ct = default)
+    public async Task<Result> CompleteArchiveAsync(long applicationId, string operatorName, CancellationToken ct = default)
     {
         // 归档 = 审批通过 + 已归档完结：current_step 推进到 6 且 status 置 Approved。
         // 状态写入统一走 ApplicationStatusService（§9 状态机单一权威 + §8 审计留痕），
         // 状态机校验、first_approved_at 只写一次、已 Approved/Completed 仅推进步骤均在该服务内处理。
-        var result = await _statusService.CompleteArchiveAsync(applicationId, "System", ct);
+        // operatorName 透传给状态服务写 nc_biz_application_logs.operator_name——
+        // 原为硬编码 "System"，致「完成归档」审计日志操作人全部不可追溯。
+        var result = await _statusService.CompleteArchiveAsync(applicationId, operatorName, ct);
         if (result.IsFailure)
             return result;
 

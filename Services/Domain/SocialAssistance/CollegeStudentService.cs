@@ -29,17 +29,25 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
     /// 有停保档案 且 无在保/在途续档——停旧建新续档（旧 Stopped + 新 Draft）不算终止，不误剔。
     /// 关联键只用身份证（family_member_id 混语义必悬空、application_id 无回写回路，均不可作依据）。
     /// 状态字面量与 ApplicationStatusCodes 同步：Stopped=停保；Draft/Submitted/Approved/Completed=在保在途。
+    /// 成员身份过滤：member_category='Support'（赡养抚养扶养人）不是保障对象、不计入共同生活家庭人数，
+    ///   不得作为「该户仍在保/在途」的证据——与 DeathAndQueries/DynamicManagementRecord 的既有口径一致。
+    ///   否则学生由共同生活成员改判为赡养人后仍会滞留在保名单（2026-10-12 张微实测）。
+    /// ⚠️ EXISTS(停保)侧**故意不加** m.deleted_at IS NULL：身份变更会把旧共同生活成员行软删、再插 Support 行
+    ///   （张微：89 档案 812/815 已软删 + 818 Support 存活）。若只认存活行，则只剩 Support → EXISTS 恒 False，
+    ///   本过滤对「旧档共同生活成员→新档赡养人」整类静默失效。此处按"历史上曾是保障对象"取证，须保留软删行。
     /// 消费方：今年毕业过滤、GetAllAsync 的 is_household_stopped 计算列（已关联/已退出分栏）。
     /// </summary>
     private static string HouseholdStoppedExpr(string idCardExpr) => $@"
 (
     EXISTS (SELECT 1 FROM nc_biz_family_members m
             JOIN nc_biz_applications a ON a.id = m.application_id
-            WHERE m.id_card = {idCardExpr} AND a.deleted_at IS NULL AND a.status = 'Stopped')
+            WHERE m.id_card = {idCardExpr} AND a.deleted_at IS NULL AND a.status = 'Stopped'
+              AND (m.member_category IS NULL OR m.member_category <> 'Support'))
     AND NOT EXISTS (SELECT 1 FROM nc_biz_family_members m2
             JOIN nc_biz_applications a2 ON a2.id = m2.application_id
             WHERE m2.id_card = {idCardExpr} AND a2.deleted_at IS NULL
-              AND a2.status IN ('Draft','Submitted','Approved','Completed'))
+              AND a2.status IN ('Draft','Submitted','Approved','Completed')
+              AND (m2.member_category IS NULL OR m2.member_category <> 'Support'))
 )";
 
     /// <inheritdoc/>
@@ -69,13 +77,16 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
             LogInfo($"查询大学生档案列表: keywordLength={(kw ?? string.Empty).Length}");
 
             // is_household_stopped：保障已终止计算列（非库列）——「已关联/已退出」Tab 分栏依据
+            // ⚠️ 外层表必须取别名 cs 并传 cs.id_card：HouseholdStoppedExpr 的子查询内 m/m2 也有 id_card 列，
+            //    若传裸列名 id_card，PostgreSQL 会就近解析成 m.id_card = m.id_card（恒真），外层学生完全不参与关联，
+            //    导致该列对所有人生效同一结果（修复前实测：全体 False，「已退出」分栏永远为空）。
             var sql = $@"
                 SELECT {SelectColumns},
-                       {HouseholdStoppedExpr("id_card")} AS is_household_stopped
-                FROM nc_biz_college_students
-                WHERE deleted_at IS NULL
-                  AND ($1::text IS NULL OR student_name LIKE '%' || $1 || '%' OR id_card = $1)
-                ORDER BY student_name
+                       {HouseholdStoppedExpr("cs.id_card")} AS is_household_stopped
+                FROM nc_biz_college_students cs
+                WHERE cs.deleted_at IS NULL
+                  AND ($1::text IS NULL OR cs.student_name LIKE '%' || $1 || '%' OR cs.id_card = $1)
+                ORDER BY cs.student_name
                 LIMIT 500";
 
             var result = await _db.QueryAsync<CollegeStudent>(sql, ct, (object?)kw ?? DBNull.Value);

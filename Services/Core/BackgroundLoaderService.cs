@@ -29,7 +29,13 @@ public class BackgroundLoaderService : BaseService, IBackgroundLoaderService
         {
             var uiOptions = _configService.GetUIOptions();
 
+#if ANDROID
+            // Android: APK assets 不在 BaseDirectory，首次启动/升级缺文件时复制到 AppData 后扫描
+            var backgroundsPath = Path.Combine(FileSystem.AppDataDirectory, uiOptions.BackgroundImagesDirectory);
+            CopyBackgroundsFromAssets(backgroundsPath, uiOptions);
+#else
             var backgroundsPath = Path.Combine(AppContext.BaseDirectory, uiOptions.BackgroundImagesDirectory);
+#endif
 
             if (!Directory.Exists(backgroundsPath))
             {
@@ -117,4 +123,49 @@ public class BackgroundLoaderService : BaseService, IBackgroundLoaderService
     {
         LoadBackgrounds();
     }
+
+#if ANDROID
+    /// <summary>
+    /// Android: 从 APK assets 复制背景图到可写目录。
+    /// 只补缺失文件不覆盖已有（APK 升级新增背景图也能补齐，用户目录不被重置）。
+    /// </summary>
+    private static void CopyBackgroundsFromAssets(string targetDir, UIOptions uiOptions)
+    {
+        try
+        {
+            var assetDir = uiOptions.BackgroundImagesDirectory;
+            var assets = Android.App.Application.Context.Assets;
+            var assetNames = assets?.List(assetDir) ?? Array.Empty<string>();
+            if (assetNames.Length == 0)
+                return;
+
+            Directory.CreateDirectory(targetDir);
+
+            foreach (var assetName in assetNames)
+            {
+                if (!assetName.EndsWith(uiOptions.BackgroundImageFormat, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var targetPath = Path.Combine(targetDir, assetName);
+                if (File.Exists(targetPath))
+                    continue;
+
+                try
+                {
+                    using var assetStream = FileSystem.OpenAppPackageFileAsync($"{assetDir}/{assetName}").GetAwaiter().GetResult();
+                    using var fileStream = File.Create(targetPath);
+                    assetStream.CopyTo(fileStream);
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning("[BackgroundLoaderService] 复制背景图 {File} 失败: {Message}", assetName, ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[BackgroundLoaderService] 从 assets 复制背景图失败");
+        }
+    }
+#endif
 }

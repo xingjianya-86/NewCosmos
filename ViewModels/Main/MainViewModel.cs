@@ -451,20 +451,32 @@ public partial class MainViewModel : ViewModelBase
             CheckSchemaStatusAsync(),
             WarmupDictCacheAsync());
 
-        // 高龄身份升级自检（大学生提醒同款机制）：后台扫描"已获救助身份但高龄金额未升级"人员
-        // 并写入待复核队列，完成后刷新高龄待办横幅计数（入队成功 → Transfer 计数上升 → 横幅亮起）。
+        // 高龄复核自检（大学生提醒同款机制）：后台扫描「已获救助身份但高龄金额未升级」人员
+        // 与「当月+回溯3个月满90周岁」人员并写入待复核队列，完成后刷新高龄待办横幅计数
+        // （入队成功 → Transfer 计数上升 → 横幅亮起）。
         // 不阻塞启动；SafeFireAndForget 统一捕获记录日志。
         SafeFireAndForget(async () =>
         {
             var scan = await _elderlyApplicationService.ScanAndEnqueueIdentityUpgradesAsync();
+            var age90 = await _elderlyApplicationService.ScanAndEnqueueAge90Async();
             if (scan.IsFailure)
             {
                 _logger.Warn($"高龄身份升级自检失败: {scan.Message}");
-                return;
             }
-            if (scan.Value > 0)
+            else if (scan.Value > 0)
             {
-                _logger.Info($"高龄身份升级自检入队 {scan.Value} 人，刷新待办横幅");
+                _logger.Info($"高龄身份升级自检入队 {scan.Value} 人");
+            }
+            if (age90.IsFailure)
+            {
+                _logger.Warn($"满90周岁自扫描失败: {age90.Message}");
+            }
+            else if (age90.Value > 0)
+            {
+                _logger.Info($"满90周岁自扫描入队 {age90.Value} 人");
+            }
+            if ((scan.IsSuccess && scan.Value > 0) || (age90.IsSuccess && age90.Value > 0))
+            {
                 await LoadElderlyReminderAsync();
             }
         });

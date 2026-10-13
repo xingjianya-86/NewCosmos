@@ -81,6 +81,13 @@ public interface IBusinessTimelineService
     /// 晚于截止日（补打历史档案）兜底为截止日。特殊5/普通10两档上限一致（截止日与档位无关）。
     /// </summary>
     DateTime GetTempReliefInvestigationPrintDate(TimelineResult cLine);
+
+    /// <summary>
+    /// B线「入户调查日期」规避上限 = 公示开始前一个工作日（与 C 线 InvestigationDeadline 同口径）。
+    /// 调查必须早于公示；等于或晚于该日的调查日期打印出来即形成「调查在公示期内」的时序矛盾。
+    /// 表单默认值、Step4 校验与档案产出共用本方法，禁止调用点各自写日期运算。
+    /// </summary>
+    DateTime GetPrePublicityWorkday(TimelineResult bLine);
 }
 
 public class BusinessTimelineService : BaseService, IBusinessTimelineService
@@ -153,6 +160,10 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         var deadline = cLine.InvestigationDeadline.Date;
         return recentWorkday > deadline ? deadline : recentWorkday;
     }
+
+    /// <inheritdoc />
+    public DateTime GetPrePublicityWorkday(TimelineResult bLine)
+        => _holidayService.GetPreviousWorkDay(bLine.PublicityStartDate.Date);
 
     public Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate, bool simplified)
     {

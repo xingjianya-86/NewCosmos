@@ -126,6 +126,20 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasPdfPreview;
 
+    // HTML 预览（手机端 Android 无 PDF 能力，走 WebView + HtmlWebViewSource）
+    [ObservableProperty]
+    private string _htmlPreview = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasHtmlPreview;
+
+    /// <summary>任一预览（PDF/HTML）已生成——控制空状态提示显隐</summary>
+    public bool HasAnyPreview => HasPdfPreview || HasHtmlPreview;
+
+    partial void OnHasPdfPreviewChanged(bool value) => OnPropertyChanged(nameof(HasAnyPreview));
+
+    partial void OnHasHtmlPreviewChanged(bool value) => OnPropertyChanged(nameof(HasAnyPreview));
+
     public MonthlyReportMainViewModel(
         IMonthlyReportService reportService,
         IPrintService printService,
@@ -351,6 +365,26 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
 
         await ExecuteAsync(async ct =>
         {
+#if ANDROID
+            // Android 无 Office COM 产不出 PDF：走数据级预览（模板 ConfigJson 列定义 + 行数据 → HTML 表格）
+            var dataResult = await _printService.BuildMonthlyFormsPreviewDataAsync(SelectedYear, SelectedMonth, keys, town, ct);
+            if (dataResult.IsFailure)
+            {
+                await ShowErrorAsync(dataResult.Message);
+                return;
+            }
+            if (dataResult.Value.Count == 0)
+            {
+                await _dialogService.DisplayAlertAsync("提示", "勾选的表单本周期均无数据，未生成预览", "确定");
+                return;
+            }
+
+            // 先清空再赋值，强制 HtmlWebViewSource 重新加载（同内容时值不变不会触发刷新）
+            HtmlPreview = "";
+            HasHtmlPreview = false;
+            HtmlPreview = MonthlyReportHtmlBuilder.Build(dataResult.Value);
+            HasHtmlPreview = true;
+#else
             var result = await _printService.RenderMonthlyFormsMergedAsync(SelectedYear, SelectedMonth, keys, town, ct);
             if (result.IsFailure)
             {
@@ -372,6 +406,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             await File.WriteAllBytesAsync(filePath, result.Value, ct);
             PdfPreviewUrl = filePath;
             HasPdfPreview = true;
+#endif
         }, "正在生成预览...");
     }
 
@@ -381,6 +416,10 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(HasSelectedForms))]
     private async Task PrintSelectedAsync()
     {
+#if ANDROID
+        // Android 无 Office COM，打印链路（渲染+系统打印）不可用
+        await ShowErrorAsync("手机端不支持直接打印，请在电脑端操作（或使用推送打印）");
+#else
         var town = SelectedTown == "全部" ? "" : SelectedTown;
         var keys = Forms.Where(f => f.IsSelected).Select(f => f.FormKey).ToList();
         if (keys.Count == 0)
@@ -433,6 +472,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             var skipText = skipped.Count > 0 ? $"\n无数据跳过：{string.Join("、", skipped)}" : "";
             await _dialogService.DisplayAlertAsync("提示", $"已发送 {printed} 张表单到打印机（{printer}）{skipText}", "确定");
         }, "正在打印...");
+#endif
     }
 
     /// <summary>
@@ -501,7 +541,8 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                     savedFiles.Add(Path.GetFileName(path));
                 }
 
-                // PDF（合并预览版，所见即所得）
+#if !ANDROID
+                // PDF（合并预览版，所见即所得）；Android 无 Office COM 产不出 PDF，只落源文件
                 var pdfResult = await _printService.RenderMonthlyFormAsync(SelectedYear, SelectedMonth, key, town, ct);
                 if (pdfResult.IsFailure)
                 {
@@ -511,12 +552,18 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                 var pdfPath = Path.Combine(folder, $"{SelectedYear:D4}{SelectedMonth:D2}_{key}.pdf");
                 await File.WriteAllBytesAsync(pdfPath, pdfResult.Value, ct);
                 savedFiles.Add(Path.GetFileName(pdfPath));
+#endif
             }
         }, "正在生成...");
 
         if (savedFiles.Count > 0)
         {
             var skipText = skipped.Count > 0 ? $"无数据跳过：{string.Join("、", skipped)}" : null;
+#if ANDROID
+            skipText = skipText == null
+                ? "仅导出源文件（PDF 需电脑端生成）"
+                : skipText + "；仅导出源文件（PDF 需电脑端生成）";
+#endif
             await ShowExportSuccessAsync(folder, savedFiles, skipText);
         }
         else if (skipped.Count > 0)

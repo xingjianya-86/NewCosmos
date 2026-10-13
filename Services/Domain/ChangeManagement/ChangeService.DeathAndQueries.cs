@@ -1110,7 +1110,7 @@ public partial class ChangeService
         // nc_biz_change_records 无 created_at 列（只有 changed_at）：
         // 查询改用 changed_at，避免 42703 使环境事务进入 aborted 状态而引发后续 25P02
         var sql = @"SELECT id, application_id, change_no, change_type, change_reason, 
-                    change_date, operator_name, changed_at
+                    change_date, operator_name, changed_at, change_reason_type
                     FROM nc_biz_change_records 
                     WHERE application_id = $1 
                     ORDER BY changed_at DESC LIMIT 200;";
@@ -1146,6 +1146,40 @@ public partial class ChangeService
         return result.IsSuccess
             ? Result.Success(result.Value)
             : Result.Failure<bool>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<bool>> HasFundChangeRegistrationAsync(long applicationId, CancellationToken ct = default)
+    {
+        // 档案输出追加《档案_变更告知书》"待遇调整"场景判定：
+        // 链上（挂旧档或指向本档）存在"保障金变更登记"记录即需出告知书（与停保场景并列）。
+        var sql = @"SELECT EXISTS(SELECT 1 FROM nc_biz_change_records
+                                  WHERE (application_id = $1 OR new_application_id = $1)
+                                    AND change_type = 'FundChange'
+                                    AND change_reason_type = $2
+                                    AND deleted_at IS NULL)";
+        var result = await _db.ExecuteScalarAsync<bool>(sql, ct, applicationId, ChangeReasonTypeConstants.FundChangeRegistration);
+        return result.IsSuccess
+            ? Result.Success(result.Value)
+            : Result.Failure<bool>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<FundChangeRegistrationRecord?>> GetLatestFundChangeRegistrationAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT id, old_classification, new_classification,
+                           old_guarantee_amount, new_guarantee_amount, change_reason, change_date
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND change_type = 'FundChange'
+                      AND change_reason_type = $2
+                      AND deleted_at IS NULL
+                    ORDER BY changed_at DESC, id DESC LIMIT 1";
+        var result = await _db.QuerySingleAsync<FundChangeRegistrationRecord>(sql, ct,
+            applicationId, ChangeReasonTypeConstants.FundChangeRegistration);
+        if (result.IsFailure)
+            return Result.Failure<FundChangeRegistrationRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<FundChangeRegistrationRecord?>(result.Value);
     }
 
     /// <summary>

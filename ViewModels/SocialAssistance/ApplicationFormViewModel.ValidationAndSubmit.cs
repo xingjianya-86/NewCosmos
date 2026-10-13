@@ -17,6 +17,7 @@ using NewCosmos.Services.Domain.SocialAssistance;
 
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.System;
+using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ChangeManagement;
 using System.Collections.ObjectModel;
@@ -140,6 +141,10 @@ public partial class ApplicationFormViewModel
         if (!SurveyDate.HasValue)
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "请选择调查日期");
 
+        // 入户调查日期避公示：调查晚于公示开始前一工作日 = 打印出来「调查在公示期内」
+        var publicityCheck = ValidateSurveyDateAgainstPublicity();
+        if (publicityCheck.IsFailure) return publicityCheck;
+
         // 验证调查员
         if (string.IsNullOrWhiteSpace(SurveyorName))
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "请填写调查员姓名");
@@ -153,6 +158,43 @@ public partial class ApplicationFormViewModel
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "请填写申请原因详情");
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// 入户调查日期避公示校验：调查日不得晚于该档 B 线「公示开始前一个工作日」
+    /// （窗口上限取自 BusinessTimelineService.GetPrePublicityWorkday，与 C 线口径一致）。
+    /// 公示窗口锚点与档案产出同源（ArchiveAnchorHelper：补全完成 → 首次审批 → 草稿按今天），
+    /// 否则校验放行的日期打印时仍会落进公示期（刘明珍档 10-12 ∈ 公示 10-09~10-15 即此问题）。
+    ///
+    /// 豁免①：补全锁定档（调查日=纳入时间，历史补录不可改）；
+    /// 豁免②：已存档且本次会话未改动调查日期——存量档原值放行，
+    ///         避免历史数据（调查日恰落在当时公示窗口内）一打开就被卡死无法保存。
+    /// </summary>
+    private Result ValidateSurveyDateAgainstPublicity()
+    {
+        if (!SurveyDate.HasValue) return Result.Success();
+        if (IsSurveyDateLocked) return Result.Success();
+        if (_applicationId > 0 && SurveyDate == _loadedSurveyDate) return Result.Success();
+
+        try
+        {
+            var timeline = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
+            // 锚点稳定部分（补全完成 ?? 首次审批）由加载时捕获；草稿/新建按今天
+            var anchor = _archiveAnchorBase ?? DateTime.Today;
+            var bLine = timeline.GetTimelineForDate(anchor, TimelineType.BusinessProcess);
+            var limit = timeline.GetPrePublicityWorkday(bLine);
+            if (SurveyDate.Value.Date <= limit) return Result.Success();
+
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                $"入户调查日期 {SurveyDate.Value:yyyy-MM-dd} 不能晚于公示开始前一个工作日 {limit:yyyy-MM-dd}"
+                + $"（本档案公示期 {bLine.PublicityStartDate:yyyy-MM-dd} 至 {bLine.PublicityEndDate:yyyy-MM-dd}，入户调查须早于公示）");
+        }
+        catch (Exception ex)
+        {
+            // 时间轴为纯内存计算，异常属意外；放行并留痕，避免把用户锁死在无法保存的状态
+            _logger.Warn($"入户调查日期避公示校验异常，本次放行: {ex.Message}");
+            return Result.Success();
+        }
     }
 
     private Result ValidateStep5()
@@ -271,8 +313,14 @@ public partial class ApplicationFormViewModel
                 : CurrentStep,
             Status = status,
             IsSingleRescue = IsSingleRescueApplication,
-            UpdatedBy = "System",
-            CreatedBy = OperationMode == FormOperationMode.Create ? "System" : null,
+            // 审计字段必须记真实操作人（原为硬编码 "System"，致主表成为普通保存唯一留痕却写假值，
+            // nc_biz_application_logs 又不记普通保存——历史上 21:41 那次保存完全无法追溯到人）。
+            // 注意 App.CurrentUserName 默认是 string.Empty 而非 null，?? 拦不住空串，
+            // 须用 IsNullOrEmpty（与本文件 780/1209 行既有正确写法一致）。
+            UpdatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName,
+            CreatedBy = OperationMode == FormOperationMode.Create
+                ? (string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName)
+                : null,
             // 乐观并发令牌约定：UpdatedAt 携带"加载时的 updated_at"；
             // default 表示无令牌（UpdateAsync 将跳过并发检查）
             UpdatedAt = _loadedUpdatedAt ?? default
@@ -310,7 +358,8 @@ public partial class ApplicationFormViewModel
 
         // 经济复核模式：走经济复核专用保存（重新判定 + 记录变更），完成后返回变更页
         // 家庭成员变更模式：走成员变更专用保存（成员增删落库 + 重新判定 + 停旧建新）
-        // 家庭信息修正/编辑家庭信息模式走普通保存路径（直接更新原档案，不创建新档案）
+        // 家庭信息修正/编辑家庭信息模式走普通保存路径（直接更新原档案，不创建新档案），
+        // 但若期间发生了家庭成员增减，则自动接管为成员变更（停旧建新 + 变更记录，见 TryTakeOverMemberChangeAsync）
         if (IsReviewMode)
         {
             return await ExecuteReviewSaveAsync();
@@ -319,6 +368,9 @@ public partial class ApplicationFormViewModel
         {
             return await ExecuteMemberChangeSaveAsync();
         }
+
+        var memberChangeTakeover = await TryTakeOverMemberChangeAsync();
+        if (memberChangeTakeover != null) return memberChangeTakeover;
 
         await ExecuteAsync(async ct =>
         {
@@ -743,6 +795,10 @@ public partial class ApplicationFormViewModel
                 // Step5 判定落库会覆写 classification_result/total_guarantee_amount，读库会恒判"无变化"）
                 OldClassification = _loadedClassification,
                 OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                // 保障金变更登记口径旧值（户月保障金，不含分类施保/照料费）：Step5 覆写前捕获
+                OldHouseholdMonthlyGuaranteeAmount = _loadedHouseholdMonthlyGuaranteeAmount,
+                OldClassifiedSubsidyAmount = _loadedClassifiedSubsidyAmount,
+                OldCaregiverSubsidyAmount = _loadedCaregiverSubsidyAmount,
                 OldComponents = oldSnapshot == null ? null : new IncomeComponentValues
                 {
                     WorkIncomeTotal = oldSnapshot.WorkIncomeTotal,
@@ -799,8 +855,12 @@ public partial class ApplicationFormViewModel
                 try
                 {
                     ApplyDocumentOutputContext(docs);
+                    // 档案ID 必须用停旧建新后的新档：走到此处 result.Value.Rebuilt 必为 true（上方已拦未建新档），
+                    // 而 _applicationId 仍是被复核的旧档（已 Stopped）。原传旧档致文书取旧档数据、
+                    // 归档也作用于旧档，新档全程未被处理（与成员变更/户主变更传 NewApplicationId 对齐）。
+                    // 第二个参数 = 变更前旧档ID（停保告知书判定用）。
                     await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                        new ApplicationReviewArchiveParameter(_applicationId, null, "经济复核"));
+                        new ApplicationReviewArchiveParameter(result.Value.NewApplicationId, _applicationId, "经济复核"));
                 }
                 catch (Exception navEx)
                 {
@@ -813,7 +873,9 @@ public partial class ApplicationFormViewModel
             {
                 ClearDocumentOutputContext();
                 // 参数先于 Push 注入，替代原"Push 后 InitializeFromApplicationReviewAsync"时序
-                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(new ApplicationReviewArchiveParameter(_applicationId));
+                // 档案ID 同上用停旧建新后的新档（Rebuilt=true 必成立），第二参数为旧档ID
+                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                    new ApplicationReviewArchiveParameter(result.Value.NewApplicationId, _applicationId, "经济复核"));
             }
             catch (Exception navEx)
             {
@@ -833,6 +895,102 @@ public partial class ApplicationFormViewModel
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// 普通保存路径的成员变更自动接管：
+    /// 当前成员名单相对表单加载快照存在增员/减员时，合成默认登记理由后转入 ExecuteMemberChangeSaveAsync
+    /// （重新判定 + 停旧建新 + 变更记录），避免成员被原地覆盖而旧档案未停、无变更记录可查。
+    /// 无成员增减或不满足接管条件时返回 null，调用方继续走原普通保存路径。
+    ///
+    /// 【检测口径】与 ExecuteMemberChangeSaveAsync 的增/减员判定同源——按身份证集合比对
+    /// （增员=当前名单中加载快照没有的；减员=加载快照中当前名单没有的），不在别处另写第二套。
+    /// 仅判定名册增减；既有成员的属性修改（婚姻/健康状况等）不接管，否则任何小改动都会造出新档案。
+    ///
+    /// 【理由合成】自动接管场景下用户未经过逐人登记弹窗，统一以 AUTO/"家庭成员变更" 合成，
+    /// Remark 标注来源以便事后审计区分人工登记与自动接管；变更原因为空时同样给默认值。
+    /// </summary>
+    private async Task<Result?> TryTakeOverMemberChangeAsync()
+    {
+        // 无可比对基准时不做接管：新档/补全模式下加载快照为空，若放行会把全部成员误判为"增员"
+        if (_applicationId <= 0 || IsCompletionMode || _loadedMemberEntities.Count == 0)
+            return null;
+
+        var loadedIdCardSet = new HashSet<string>(
+            _loadedMembersByIdCard.Keys, StringComparer.OrdinalIgnoreCase);
+
+        var currentMembers = FamilyMembers
+            .Where(m => !string.IsNullOrWhiteSpace(m.IdCard))
+            .GroupBy(m => m.IdCard!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var addedMembers = currentMembers.Values
+            .Where(m => !loadedIdCardSet.Contains(m.IdCard!.Trim()))
+            .ToList();
+        var removedMembers = _loadedMemberEntities
+            .Where(m => !string.IsNullOrWhiteSpace(m.IdCard)
+                && !currentMembers.ContainsKey(m.IdCard!.Trim()))
+            .ToList();
+
+        // 身份类型变更：同一身份证仍在册、但 member_category 变了。
+        // UI 无身份类型编辑控件，实际路径是"在共同生活成员里删掉 → 在赡养抚养扶养里用同一身份证重新新增"，
+        // 此时身份证集合前后一致，只比对增减会完全漏掉（旧档案不停、无变更记录）。
+        // 只遍历当前在册成员，新成员/被删成员天然不会重复计数。
+        var categoryChangedMembers = currentMembers.Values
+            .Where(m => _loadedMemberCategoryByIdCard.TryGetValue(m.IdCard!.Trim(), out var oldCategory)
+                && !string.Equals(
+                    MemberCategoryHelper.Normalize(m.MemberCategory, m.IsApplicant, m.RelationshipToHead),
+                    oldCategory, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (addedMembers.Count == 0 && removedMembers.Count == 0 && categoryChangedMembers.Count == 0)
+            return null;
+
+        // 合成默认登记理由（增员登记 + 减员登记两处都用，避免下游逐人登记必填校验拦截）
+        var autoReason = new MemberChangeReasonResult(
+            "AUTO", "家庭成员变更", DateTime.Today,
+            "普通保存检测到家庭成员增减，系统自动转入成员变更流程");
+
+        foreach (var m in addedMembers)
+        {
+            if (!_addedMemberReasons.ContainsKey(m)) _addedMemberReasons[m] = autoReason;
+        }
+        foreach (var m in removedMembers)
+        {
+            if (!_removedMemberEntries.Any(e => ReferenceEquals(e.Member, m)))
+                _removedMemberEntries.Add((m, autoReason));
+        }
+
+        // 变更原因为 ExecuteMemberChangeSaveAsync 首道必填校验，为空时给默认值
+        if (string.IsNullOrWhiteSpace(ApplicationReasonDetail))
+            ApplicationReasonDetail = "家庭成员变更";
+
+        // 只报有变化的项：纯身份类型变更时"新增 0 人、减少 0 人"会让人困惑
+        var changeParts = new List<string>();
+        if (addedMembers.Count > 0) changeParts.Add($"新增 {addedMembers.Count} 人");
+        if (removedMembers.Count > 0) changeParts.Add($"减少 {removedMembers.Count} 人");
+        if (categoryChangedMembers.Count > 0)
+        {
+            var transitions = categoryChangedMembers.Select(m =>
+                $"{m.Name}（{MemberCategoryHelper.ToDisplay(_loadedMemberCategoryByIdCard[m.IdCard!.Trim()])}"
+                + $"→{MemberCategoryHelper.ToDisplay(m.MemberCategory)}）");
+            changeParts.Add($"身份类型变更 {categoryChangedMembers.Count} 人：{string.Join("、", transitions)}");
+        }
+
+        var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+        var proceed = await dialog.DisplayAlertAsync("家庭成员变更",
+            $"检测到家庭成员变化（{string.Join("、", changeParts)}）。"
+            + "\n该操作将停止旧档案并建立新档案，是否继续？", "继续", "取消");
+        if (!proceed)
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED, "已取消：普通档案未保存");
+
+        _logger.LogBusiness("普通保存自动接管为家庭成员变更",
+            ("ApplicationId", _applicationId),
+            ("AddedCount", addedMembers.Count),
+            ("RemovedCount", removedMembers.Count),
+            ("CategoryChangedCount", categoryChangedMembers.Count));
+
+        return await ExecuteMemberChangeSaveAsync();
     }
 
     /// <summary>
@@ -876,6 +1034,22 @@ public partial class ApplicationFormViewModel
                     && !currentMembers.ContainsKey(e.Member.IdCard.Trim()))
                 .ToList();
 
+            // 成员身份类型变更：同一身份证仍在册、但 member_category 变了
+            //（UI 无身份类型编辑控件，实际路径是删掉后按另一身份用同一身份证重新新增）。
+            // 刻意独立成列、不并入 addedMembers/removedEntries：
+            //   · blankAdded 用 ReferenceEqualityComparer 判新增，重加的成员是新对象会被误判为"未填全的新增行"
+            //   · missingReason 会把共同生活成员身份强制要求逐人登记理由，而本路径没有弹窗入口，会直接卡死
+            var categoryChangeEntries = new List<(FamilyMember Member, string OldCategory, string NewCategory)>();
+            foreach (var m in currentMembers.Values)
+            {
+                if (string.IsNullOrWhiteSpace(m.IdCard)) continue;
+                if (!_loadedMemberCategoryByIdCard.TryGetValue(m.IdCard.Trim(), out var oldCategory)) continue;
+
+                var newCategory = MemberCategoryHelper.Normalize(m.MemberCategory, m.IsApplicant, m.RelationshipToHead);
+                if (!string.Equals(newCategory, oldCategory, StringComparison.OrdinalIgnoreCase))
+                    categoryChangeEntries.Add((m, oldCategory, newCategory));
+            }
+
             // 新增行必须填全姓名/身份证号：否则会被保存静默跳过，增员登记与人数都会丢
             var blankAdded = FamilyMembers
                 .Where(m => !_loadedMemberEntities.Contains(m, ReferenceEqualityComparer.Instance))
@@ -918,13 +1092,20 @@ public partial class ApplicationFormViewModel
             {
                 summaryParts.Add($"减员 {string.Join("、", removedEntries.Select(e => $"{e.Member.Name}（{e.Reason.ReasonName}）"))}");
             }
+            if (categoryChangeEntries.Count > 0)
+            {
+                // 身份类型变更同样合成 AUTO 理由（该路径无逐人登记弹窗），方向信息写在备注里
+                summaryParts.Add($"身份变更 {string.Join("、", categoryChangeEntries.Select(c =>
+                    $"{c.Member.Name}（{MemberCategoryHelper.ToDisplay(c.OldCategory)}"
+                    + $"→{MemberCategoryHelper.ToDisplay(c.NewCategory)}）"))}");
+            }
             var changeSummary = string.Join("；", summaryParts);
 
-            // 无增员/减员不允许提交：否则会无意义地停旧建新
-            if (addedMembers.Count == 0 && removedEntries.Count == 0)
+            // 无增员/减员/身份类型变更不允许提交：否则会无意义地停旧建新
+            if (addedMembers.Count == 0 && removedEntries.Count == 0 && categoryChangeEntries.Count == 0)
             {
                 await _serviceProvider.GetRequiredService<IDialogService>()
-                    .DisplayAlertAsync("提示", "未检测到家庭成员变化（增员或减员），无需执行成员变更", "确定");
+                    .DisplayAlertAsync("提示", "未检测到家庭成员变化（增员、减员或身份类型变更），无需执行成员变更", "确定");
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED, "未检测到家庭成员变化");
             }
 
@@ -962,6 +1143,46 @@ public partial class ApplicationFormViewModel
                 Remark = e.Reason.Remark
             }));
 
+            // 身份类型变更明细：拆成"减旧身份 + 增新身份"两条。
+            // Direction 契约只允许 MemberAdd/MemberRemove——DeathAndQueries 把任何非 MemberAdd 的
+            // field_name 一律当作减员，若直接塞 MemberModify 会被误读成退出；
+            // 记录级 change_type 仍自然落成 MemberModify（上方三元表达式的兜底分支）。
+            // ReasonCode 固定 AUTO：IsDeath("AUTO")=false，不会误触发死亡减员联动写死亡记录。
+            if (categoryChangeEntries.Count > 0)
+            {
+                foreach (var c in categoryChangeEntries)
+                {
+                    var transition = $"身份类型变更：{MemberCategoryHelper.ToDisplay(c.OldCategory)}"
+                        + $"→{MemberCategoryHelper.ToDisplay(c.NewCategory)}";
+                    changeEntries.Add(new MemberChangeEntry
+                    {
+                        Direction = DictionaryConstants.ChangeType.MEMBER_REMOVE,
+                        MemberId = c.Member.Id,
+                        Name = c.Member.Name ?? string.Empty,
+                        IdCard = c.Member.IdCard ?? string.Empty,
+                        RelationshipToHead = c.Member.RelationshipToHead ?? string.Empty,
+                        MemberCategory = c.OldCategory,
+                        ReasonCode = "AUTO",
+                        ReasonName = "家庭成员变更",
+                        EventDate = DateTime.Today,
+                        Remark = transition + "（旧身份）"
+                    });
+                    changeEntries.Add(new MemberChangeEntry
+                    {
+                        Direction = DictionaryConstants.ChangeType.MEMBER_ADD,
+                        MemberId = c.Member.Id,
+                        Name = c.Member.Name ?? string.Empty,
+                        IdCard = c.Member.IdCard ?? string.Empty,
+                        RelationshipToHead = c.Member.RelationshipToHead ?? string.Empty,
+                        MemberCategory = c.NewCategory,
+                        ReasonCode = "AUTO",
+                        ReasonName = "家庭成员变更",
+                        EventDate = DateTime.Today,
+                        Remark = transition + "（新身份）"
+                    });
+                }
+            }
+
             ChangeResult? changeValue = null;
             var changeResult = await _applicationService.ExecuteInTransactionForResultAsync(async transactionCt =>
             {
@@ -981,6 +1202,10 @@ public partial class ApplicationFormViewModel
                     OldFamilySize = _loadedFamilySize,
                     OldClassification = _loadedClassification,
                     OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                    // 保障金变更登记口径旧值（户月保障金，不含分类施保/照料费）：Step5 覆写前捕获
+                    OldHouseholdMonthlyGuaranteeAmount = _loadedHouseholdMonthlyGuaranteeAmount,
+                    OldClassifiedSubsidyAmount = _loadedClassifiedSubsidyAmount,
+                    OldCaregiverSubsidyAmount = _loadedCaregiverSubsidyAmount,
                     // 复核前真旧值（入口快照）：本事务 SaveEconomicDetailsAsync 已先写回新收入，
                     // 读库拿到的是覆写后值（Before 快照 / old_per_capita_income 失真）；null 回退读库
                     OldTotalFamilyIncome = _entryApplicationSnapshot?.TotalFamilyIncome,
@@ -1021,48 +1246,30 @@ public partial class ApplicationFormViewModel
                 ("NewClassification", changeValue.NewClassification),
                 ("NewApplicationId", changeValue.NewApplicationId));
 
-            // 返回变更页，出口三选一：整套档案 / 仅出文书 / 稍后
+            // 返回变更页后直接进档案产出页（整档模式）。
+            // 原「整套档案 / 仅出文书 / 稍后再说」三选一已合并为单一出口：
+            //  · 停旧建新的新档必须归档才算收尾——旧档已 Stopped，新档若不归档，本户就没有任何在保档案；
+            //  · 而「仅出文书」会设 OutputCategories/OperationOverride/PrefilterTemplateNames，
+            //    触发 ArchiveOutputViewModel 的 IsDocumentMode=true →「完成归档」按钮被隐藏、
+            //    CompleteAsync 入口直接 return，新档永远无法从这条路径归档（该绑定本是为渐退草稿设的护栏，
+            //    成员变更复用同一上下文时被误伤）；
+            //  ·「稍后再说」则新档留在列表里无人认领。
+            // 合并后走整档模式（三个字段皆空 → IsDocumentMode=false），归档能力天然可用，无需新增开关。
+            // 退路：用户随时可直接返回、不点归档；CompleteAsync 自带护栏（须先生成文件 + 二次确认）。
             var navigationPage = Helpers.WindowNavigator.CurrentPage;
             if (navigationPage != null)
                 await navigationPage.Navigation.PopAsync();
 
-            var choice = await _serviceProvider.GetRequiredService<IDialogService>().DisplayActionSheetAsync(
-                "成员变更完成",
-                "取消",
-                null,
-                "整套档案",
-                "仅出文书",
-                "稍后再说");
-
-            if (choice == "整套档案")
+            ClearDocumentOutputContext();
+            try
             {
-                ClearDocumentOutputContext();
-                try
-                {
-                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                        new ApplicationReviewArchiveParameter(changeValue.NewApplicationId, _applicationId, "成员变更"));
-                }
-                catch (Exception navEx)
-                {
-                    _logger.Error($"导航到家庭成员变更档案输出失败: {navEx.Message}\n{navEx.StackTrace}");
-                }
+                // 第二个参数 = 变更前旧档ID（停保告知书判定用）
+                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
+                    new ApplicationReviewArchiveParameter(changeValue.NewApplicationId, _applicationId, "成员变更"));
             }
-            else if (choice == "仅出文书")
+            catch (Exception navEx)
             {
-                try
-                {
-                    ApplyDocumentOutputContext(new[]
-                    {
-                        DocumentTemplateNames.MemberChangeTable,
-                        DocumentTemplateNames.ChangeNotice
-                    });
-                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationReviewArchiveParameter>(
-                        new ApplicationReviewArchiveParameter(changeValue.NewApplicationId, _applicationId, "成员变更"));
-                }
-                catch (Exception navEx)
-                {
-                    _logger.Error($"导航到成员变更文书输出失败: {navEx.Message}");
-                }
+                _logger.Error($"导航到家庭成员变更档案输出失败: {navEx.Message}\n{navEx.StackTrace}");
             }
 
             return Result.Success();

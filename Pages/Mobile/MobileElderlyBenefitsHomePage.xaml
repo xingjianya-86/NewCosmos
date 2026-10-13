@@ -126,22 +126,6 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 14" BackgroundColor="White" StrokeThickness="0" Padding="14,12">
-                        <Border.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding OpenRecoveryCommand}"/>
-                        </Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="1*,4*" ColumnSpacing="12">
-                            <Border Grid.Column="0" HeightRequest="46" BackgroundColor="#FFF3E0"
-                                    StrokeShape="RoundRectangle 12" StrokeThickness="0" HorizontalOptions="Fill">
-                                <Label Text="💰" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="后补追缴" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="高龄津贴的后补追缴" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                            </VerticalStackLayout>
-                        </Grid>
-                    </Border>
-
                 </VerticalStackLayout>
             </VerticalStackLayout>
         </ScrollView>
