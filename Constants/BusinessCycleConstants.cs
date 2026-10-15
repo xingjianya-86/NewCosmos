@@ -2,9 +2,9 @@ namespace NewCosmos.Constants;
 
 /// <summary>
 /// B 线（业务线/月报）统计周期参数：
-/// 周期 = [上月(结算日+1)日 00:00, 本月(结算日+1)日 00:00)；
-/// 默认结算日 15（周期 [上月16, 本月16)），可由 app.ini 的 BCycleSettleDay 覆盖
-/// （上级要求业务截止 20 号 → 配置 20，周期 [上月21, 本月21)）。
+/// 周期权威口径在 Services.Utilities.BusinessTimelineService = [上月(结算日+1)日, 本月结算日]
+/// （结算日当天仍属本周期；结算日遇法定节假日提前5天）。
+/// 结算日默认 15，可由 app.ini 的 BCycleSettleDay 覆盖（上级要求业务截止 20 号 → 配置 20）。
 /// </summary>
 public static class BusinessCycleConstants
 {

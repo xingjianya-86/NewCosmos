@@ -114,6 +114,9 @@ public class WordEngine : ITemplateEngine
     /// 在 worker 线程上执行单个占位符替换（COM 失败仅记 Warn，与原行为一致）。
     /// 非空值走 Find 定位 + Range.Text 赋值：Find/Replace 的 ReplaceWith 参数上限 255 字符且不接受控制字符，
     /// 超长文本（如救助原因叙述）会抛 COM 异常导致占位符静默残留；Range.Text 赋值无长度限制。
+    /// 搜索范围 = 正文物 + 全部文本框：Word 的 Document.Content 只覆盖正文 story，
+    /// 文本框内容（w:txbxContent）是独立 story，必须经 StoryRanges(wdTextFrameStory=5) 单独遍历，
+    /// 否则模板文本框内的占位符（如照料服务协议的 {所在县}{所在镇}{诚信承诺时间}）永远无法命中。
     /// </summary>
     private void ReplaceFieldOnWorker(string placeholder, string value)
     {
@@ -126,62 +129,52 @@ public class WordEngine : ITemplateEngine
 
         try
         {
-            var maxHits = 100; // 防御异常模板导致的死循环
+            const int maxHits = 100; // 防御异常模板导致的死循环
             var replaced = 0;
 
+            // ── 1) 正文物（原实现的全部行为，语义不变） ──
             if (string.IsNullOrEmpty(valueSafe))
             {
-                // 金额占位符无值：先尝试"占位符+元/月/元整/元"整段替换为 "-"（后缀从长到短），再退化为删除占位符。
-                // 替换目标均为短文本，可安全使用 ReplaceWith。
-                var content = _doc.Content;
-                var find = content.Find;
+                var mainRange = GetStoryRange(0, 0);
                 try
                 {
-                    find.ClearFormatting();
-                    find.Forward = true;
-                    find.Wrap = 0;
-                    find.MatchCase = false;
-                    find.MatchWholeWord = false;
-
-                    foreach (var suffix in new[] { "元/月", "元整", "元" })
-                    {
-                        find.Execute(Replace: 2, FindText: placeholder + suffix, ReplaceWith: "-");
-                    }
-                    find.Execute(Replace: 2, FindText: placeholder, ReplaceWith: "");
+                    RemovePlaceholderInStory(mainRange, placeholder);
                 }
                 finally
                 {
-                    SafeRelease(find, content);
+                    SafeRelease(mainRange);
                 }
             }
             else
             {
-                // Find 命中并赋值后 Range 会收缩为局部文本，无法继续向后搜索；
-                // 因此每轮都从整篇文档重新定位、替换当前第一处，直至无匹配。
-                // （valueSafe 不含占位符原文，不会自我重复命中；同一占位符多处出现均可覆盖，
-                //  如验收报告 {日期止} 在正文与落款各出现一次）
-                while (replaced < maxHits)
+                replaced += ReplaceAllInStory(0, 0, placeholder, valueSafe, maxHits);
+            }
+
+            // ── 2) 文本框（wdTextFrameStory=5）：多文本框经 NextStoryRange 串联，逐帧处理 ──
+            for (var frameIndex = 0; ; frameIndex++)
+            {
+                if (replaced >= maxHits) break;
+
+                // 探测第 frameIndex 帧是否存在（不存在 = 链尾 / 文档无文本框）
+                var probe = GetStoryRange(5, frameIndex);
+                if (probe == null) break;
+                SafeRelease(probe);
+
+                if (string.IsNullOrEmpty(valueSafe))
                 {
-                    var searchRange = _doc.Content;
-                    var find = searchRange.Find;
+                    var frameRange = GetStoryRange(5, frameIndex);
                     try
                     {
-                        find.ClearFormatting();
-                        find.Forward = true;
-                        find.Wrap = 0; // wdFindStop
-                        find.MatchCase = false;
-                        find.MatchWholeWord = false;
-
-                        if (!find.Execute(FindText: placeholder)) break;
-
-                        searchRange.Text = valueSafe;
-                        replaced++;
+                        RemovePlaceholderInStory(frameRange, placeholder);
                     }
                     finally
                     {
-                        // 每轮的 Range/Find 都是新 RCW，循环上限 100，不释放会堆积
-                        SafeRelease(find, searchRange);
+                        SafeRelease(frameRange);
                     }
+                }
+                else
+                {
+                    replaced += ReplaceAllInStory(5, frameIndex, placeholder, valueSafe, maxHits - replaced);
                 }
             }
 
@@ -191,6 +184,130 @@ public class WordEngine : ITemplateEngine
         catch (Exception ex)
         {
             _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 取可搜索 story 范围（调用方负责 SafeRelease）。
+    /// kind 0 = 正文物（doc.Content）；kind 5 = wdTextFrameStory，第 index 个文本框（沿 NextStoryRange 链）。
+    /// 文档无对应 story 时返回 null（如无文本框时 stories[5] 抛 COMException）。
+    /// </summary>
+    private dynamic? GetStoryRange(int kind, int index = 0)
+    {
+        if (_doc is null) return null;
+
+        if (kind == 0)
+        {
+            try { return _doc.Content; }
+            catch (Exception ex) { _logger.Debug($"WordEngine: 取正文物失败（预期外）: {ex.Message}"); return null; }
+        }
+
+        dynamic? frame = null;
+        try
+        {
+            dynamic? stories = null;
+            try
+            {
+                stories = _doc.StoryRanges;
+                frame = stories[5]; // wdTextFrameStory：第一个文本框 story
+            }
+            finally
+            {
+                SafeRelease(stories);
+            }
+
+            for (var i = 0; i < index && frame != null; i++)
+            {
+                dynamic? next = null;
+                try { next = frame!.NextStoryRange; } // 循环条件已判非空，! 消除动态流程分析误报
+                catch { next = null; }
+                SafeRelease(frame);
+                frame = next;
+            }
+
+            return frame;
+        }
+        catch (Exception)
+        {
+            // 无文本框 story：索引器抛 COMException，属正常情况（静默返回 null）
+            SafeRelease(frame);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 在单个 story 内循环替换占位符（非空值路径）。
+    /// 每轮从 story 重新取 Range：Find 命中赋值后 Range 收缩为新文本，不重建则搜不到后续出现处。
+    /// </summary>
+    private int ReplaceAllInStory(int kind, int frameIndex, string placeholder, string valueSafe, int remaining)
+    {
+        var count = 0;
+        while (count < remaining)
+        {
+            dynamic? searchRange = null;
+            dynamic? find = null;
+            try
+            {
+                searchRange = GetStoryRange(kind, frameIndex);
+                if (searchRange == null) break;
+
+                find = searchRange.Find;
+                find.ClearFormatting();
+                find.Forward = true;
+                find.Wrap = 0; // wdFindStop：只在本 story 内搜索
+                find.MatchCase = false;
+                find.MatchWholeWord = false;
+
+                if (!find.Execute(FindText: placeholder)) break;
+
+                searchRange.Text = valueSafe;
+                count++;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex.Message}");
+                break;
+            }
+            finally
+            {
+                SafeRelease(find, searchRange);
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// 空值路径：金额占位符无值时先尝试"占位符+元/月/元整/元"整段替换为 "-"（后缀从长到短），再退化为删除占位符。
+    /// 替换目标均为短文本，可安全使用 ReplaceWith。
+    /// </summary>
+    private void RemovePlaceholderInStory(dynamic? storyRange, string placeholder)
+    {
+        if (storyRange == null) return;
+
+        dynamic? find = null;
+        try
+        {
+            find = storyRange.Find;
+            find.ClearFormatting();
+            find.Forward = true;
+            find.Wrap = 0;
+            find.MatchCase = false;
+            find.MatchWholeWord = false;
+
+            foreach (var suffix in new[] { "元/月", "元整", "元" })
+            {
+                find.Execute(Replace: 2, FindText: placeholder + suffix, ReplaceWith: "-");
+            }
+            find.Execute(Replace: 2, FindText: placeholder, ReplaceWith: "");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"WordEngine: 清理占位符 {placeholder} 失败: {ex.Message}");
+        }
+        finally
+        {
+            SafeRelease(find);
         }
     }
 

@@ -1,0 +1,200 @@
+# 银行流水核对 Schema 定义（2026-10 新增）
+# 来源：上级返回的《申请社会救助家庭查询金融资产核对情况表》导入。
+# 三张表：批次(imports) / 每人汇总(records) / 每银行明细(items)。
+# 银行做成 items 数据行而非固定列——未来增减银行不改表结构。
+database: cosmos_app
+version: 1.0
+description: 银行流水核对 - 导入上级金融资产查询核对表，按身份证带出各银行余额与12月最高流水
+
+tables:
+  - name: nc_biz_bank_flow_imports
+    comment: "[经济状况] 银行流水核对导入批次表 - 每次导入核对表生成一个批次"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: batch_no
+        type: VARCHAR(50)
+        nullable: false
+        comment: 批次号(如 2026-08)
+      - name: source_file_name
+        type: VARCHAR(500)
+        nullable: true
+        comment: 来源文件名
+      - name: file_hash
+        type: VARCHAR(64)
+        nullable: true
+        comment: 文件SHA256(去重用)
+      - name: total_count
+        type: INT
+        nullable: false
+        defaultValue: '0'
+        comment: 导入人数
+      - name: exceed_count
+        type: INT
+        nullable: false
+        defaultValue: '0'
+        comment: 合计余额超阈值人数(30个月低保标准×1人，仅提示不自动决策)
+      - name: invalid_id_card_count
+        type: INT
+        nullable: false
+        defaultValue: '0'
+        comment: 身份证校验位存疑人数(仍导入，标记异常)
+      - name: exceed_threshold
+        type: NUMERIC(18,2)
+        nullable: true
+        comment: 本批判定阈值(30×月低保标准，元)，留痕判定时所用标准
+      - name: created_by
+        type: BIGINT
+        nullable: true
+        comment: 导入操作人ID
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: now()
+        comment: 导入时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 软删除时间(NULL=未删除)
+    indexes:
+      - name: idx_bank_flow_imports_hash
+        columns: [file_hash]
+        unique: true
+        where: "deleted_at IS NULL"
+      - name: idx_bank_flow_imports_batch_no
+        columns: [batch_no]
+
+  - name: nc_biz_bank_flow_records
+    comment: "[经济状况] 银行流水核对每人汇总表 - 核对表中每个申请人的合计余额与最高流水"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: import_id
+        type: BIGINT
+        nullable: false
+        comment: 关联批次ID
+      - name: row_no
+        type: INT
+        nullable: true
+        comment: 源表序号
+      - name: person_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 人员姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: true
+        comment: 身份证号
+      - name: id_card_valid
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'true'
+        comment: 身份证校验位是否有效(false=存疑但仍导入)
+      - name: relationship
+        type: VARCHAR(50)
+        nullable: true
+        comment: 与户主关系
+      - name: family_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 家庭地址
+      - name: total_balance
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 各银行余额合计(截止查询日期，元)
+      - name: max_flow_amount
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 12个月内各银行最高流水发生额最大值(元)
+      - name: property_1
+        type: VARCHAR(500)
+        nullable: true
+        comment: 房产(1)源文本
+      - name: property_2
+        type: VARCHAR(500)
+        nullable: true
+        comment: 房产(2)源文本
+      - name: property_3
+        type: VARCHAR(500)
+        nullable: true
+        comment: 房产(3)源文本
+      - name: machinery_power
+        type: NUMERIC(10,2)
+        nullable: true
+        comment: 农机60功率(马力，源表为空则NULL)
+      - name: is_exceed
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'false'
+        comment: 合计余额是否超阈值(导入时按30×月低保标准×1人判定，仅红字提示)
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: now()
+        comment: 创建时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 软删除时间(NULL=未删除)
+    indexes:
+      - name: idx_bank_flow_records_import_id
+        columns: [import_id]
+      - name: idx_bank_flow_records_id_card
+        columns: [id_card]
+    foreignKeys:
+      - name: fk_bank_flow_records_import_id
+        columns: [import_id]
+        references:
+          table: nc_biz_bank_flow_imports
+          columns: [id]
+        onDelete: CASCADE
+
+  - name: nc_biz_bank_flow_items
+    comment: "[经济状况] 银行流水核对每银行明细表 - 每人在某银行的余额与12月最高流水(银行为数据行)"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: record_id
+        type: BIGINT
+        nullable: false
+        comment: 关联每人汇总ID
+      - name: bank_name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 银行名称(数据行，增减银行不改表)
+      - name: balance
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 截止查询日期余额(元)
+      - name: max_flow_amount
+        type: NUMERIC(18,2)
+        nullable: false
+        defaultValue: '0'
+        comment: 12个月内最高流水发生额(元)
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: now()
+        comment: 创建时间
+    indexes:
+      - name: idx_bank_flow_items_record_id
+        columns: [record_id]
+    foreignKeys:
+      - name: fk_bank_flow_items_record_id
+        columns: [record_id]
+        references:
+          table: nc_biz_bank_flow_records
+          columns: [id]
+        onDelete: CASCADE

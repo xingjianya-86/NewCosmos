@@ -186,6 +186,11 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
         NavigateToFeatureAsync<Pages.SocialAssistance.CollegeStudentManagementPage>(
             CanAccessSocialAssistance, "大学生管理", "大学生管理");
 
+    [RelayCommand]
+    private Task OpenNearRelativeAsync() =>
+        NavigateToFeatureAsync<Pages.SocialAssistance.NearRelativeListPage>(
+            true, "近亲属备案", "近亲属备案");
+
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
 
     #endregion

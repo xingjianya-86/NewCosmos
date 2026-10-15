@@ -305,6 +305,35 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
+    /// 协议输出用照料护理费：特困分散供养且有能力鉴定时按当地最低工资公式实时计算
+    /// （ClassificationService.CalculateCareAllowanceAsync，跟随最低工资配置更新），
+    /// 其余情形（非特困/集中供养/无鉴定/计算失败）回退落库值 app.CaregiverSubsidyAmount。
+    /// 仅用于文书输出，不写库——保障金列属审批结果（AGENTS §9.7 禁止自动重算）。
+    /// </summary>
+    private async Task<decimal> ResolveCareAllowanceForPrintAsync(ApplicationEntity app, CapabilityAssessment? capability)
+    {
+        var stored = app.CaregiverSubsidyAmount;
+        var isCentralized = app.DestituteSupportType == "Centralized"
+                            || app.DestituteSupportType == ClassificationConstants.SupportMode.CENTRALIZED;
+
+        if (!ClassificationConstants.IsCodeDestitute(app.ClassificationResult ?? "")
+            || isCentralized
+            || capability == null)
+            return stored;
+
+        try
+        {
+            var computed = await _classificationService.CalculateCareAllowanceAsync(app.Id, CancellationToken);
+            return computed > 0 ? computed : stored;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"照料护理费实时计算失败，回退落库值 {stored}: {ex.Message}");
+            return stored;
+        }
+    }
+
+    /// <summary>
     /// 构建人员类别（可组合：老年人/残疾人/未成年人）
     /// </summary>
     private string BuildPersonCategory(ApplicationEntity app)
@@ -319,15 +348,35 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 构建供养方式显示文本
+    /// 构建保障类型（特困入户调查表勾选式：☑分散供养 □集中供养 / □分散供养 ☑集中供养）。
+    /// 未确定时两框皆空，只保留"分散供养/集中供养"两个选项。
     /// </summary>
     private string BuildDestituteSupportTypeDisplay(ApplicationEntity app)
     {
         if (app.DestituteSupportType == "Centralized" || app.DestituteSupportType == ClassificationConstants.SupportMode.CENTRALIZED)
-            return "集中供养";
+            return "□分散供养 ☑集中供养";
         if (app.DestituteSupportType == "Scattered" || app.DestituteSupportType == ClassificationConstants.SupportMode.SCATTERED)
-            return "分散供养";
-        return app.DestituteSupportType ?? "未确定";
+            return "☑分散供养 □集中供养";
+        return "□分散供养 □集中供养";
+    }
+
+    /// <summary>
+    /// 构建自理能力六项明细（逐项勾选式，数据源 = 能力鉴定六项考核指标）。
+    /// 例：进食☑能□不能；穿衣☑能□不能；上下床☑能□不能；如厕□能☑不能；室内行走☑能□不能；洗澡□能☑不能
+    /// 无能力鉴定记录时返回 "-"（与模板 config_json 既有 defaultValue 一致，不打印推测结果）。
+    /// </summary>
+    private string BuildSelfCareDetail(ApplicationEntity app, CapabilityAssessment? capability = null)
+    {
+        if (capability == null) return "-";
+
+        static string Item(string label, int can) => $"{label}{(can == 1 ? "☑能□不能" : "□能☑不能")}";
+        return string.Join("；",
+            Item("进食", capability.Eating),
+            Item("穿衣", capability.Dressing),
+            Item("上下床", capability.GettingInOutOfBed),
+            Item("如厕", capability.UsingToilet),
+            Item("室内行走", capability.IndoorWalking),
+            Item("洗澡", capability.Bathing));
     }
 
     /// <summary>
@@ -392,24 +441,23 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 入户调查日期：优先用实际入户调查日；
-    /// 无调查记录（补录/未录入）时回退 B 线受理窗口起点（上月15日）
+    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日]；
+    /// 无调查记录（补录/未录入）时取申请日当天。
+    /// - 下限 = 申请日：调查不得早于建档（存量倒挂档补打自愈，如调查 10-08 早于申请 10-13 → 打印 10-13）；
+    /// - 上限 = 公示前一工作日 = 会议日（公示起 = 会议次工作日，故其前一工作日即会议日本身）：
+    ///   调查晚于该日打印出来就是「调查在公示期内」的时序矛盾，兜底压回。
     /// </summary>
-    private static string ResolveSurveyDate(TimelineResult tl, DateTime? actualSurvey)
+    private static string ResolveSurveyDate(TimelineResult tl, DateTime? actualSurvey, DateTime applicationDate)
     {
-        var windowStart = tl.CycleStartDate.Date;
+        var minDate = applicationDate.Date;
+        var maxDate = tl.MeetingDate.Date < minDate ? minDate : tl.MeetingDate.Date;
         var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
-            ? actualSurvey.Value
-            : windowStart;
+            ? actualSurvey.Value.Date
+            : minDate; // 无调查记录：默认申请日当天（调查可在申请当日完成）
+        if (baseDate < minDate) baseDate = minDate;
+        if (baseDate > maxDate) baseDate = maxDate;
         return baseDate.ToString("yyyy年M月d日");
     }
-
-    /// <summary>
-    /// 档案时间锚定日期：转发到 <see cref="ArchiveAnchorHelper.ResolveArchiveAnchorDate"/>（唯一事实来源）。
-    /// 表单「入户调查日期避公示」校验走同一锚点，两处必须一致，否则校验窗口与打印窗口对不上。
-    /// </summary>
-    private static DateTime ResolveArchiveAnchorDate(ApplicationEntity app)
-        => ArchiveAnchorHelper.ResolveArchiveAnchorDate(app);
 
     /// <summary>申请日期解析：转发到 <see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>（唯一事实来源）</summary>
     private static DateTime ResolveApplicationDate(ApplicationEntity app)

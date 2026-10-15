@@ -696,7 +696,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             var tableRows = PrintNavigationData.TableData ?? new();
             if (SelectedPreviewTemplate.IsDirectoryTemplate)
             {
-                var tl = _timelineService.GetTimelineForDate(await ResolveArchiveAnchorAsync(), TimelineType.BusinessProcess);
+                var tl = _timelineService.GetTimelineForApplicationDate(await ResolveApplicationDateForTimelineAsync(), TimelineType.BusinessProcess);
                 fields = await BuildDirectoryFieldsAsync(fields);
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
@@ -827,7 +827,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 目录模板：使用目录专属字段和行数据
             if (template.IsDirectoryTemplate)
             {
-                var tl = _timelineService.GetTimelineForDate(await ResolveArchiveAnchorAsync(), TimelineType.BusinessProcess);
+                var tl = _timelineService.GetTimelineForApplicationDate(await ResolveApplicationDateForTimelineAsync(), TimelineType.BusinessProcess);
                 fields = await BuildDirectoryFieldsAsync(fields);
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }

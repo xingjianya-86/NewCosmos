@@ -1136,20 +1136,24 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         }
     }
 
-    /// <summary>当前库正式享受时间：data_completed_at 所在 B 线周期（BusinessProcess）结算日次月1日</summary>
-    private async Task<DateTime?> CalculateEnjoyStartDateAsync(DateTime dataCompletedAt, CancellationToken ct)
+    /// <summary>
+    /// 当前库正式享受时间：data_completed_at 归属 B 线周期（BusinessProcess，按申请日期口径锚定，
+    /// 与档案卷号/公示窗口同源）结算日次月1日。
+    /// </summary>
+    private Task<DateTime?> CalculateEnjoyStartDateAsync(DateTime dataCompletedAt, CancellationToken ct)
     {
         try
         {
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
-            var tl = await timelineService.CalculateTimelineAsync(
-                dataCompletedAt.Year, dataCompletedAt.Month, Models.Enums.TimelineType.BusinessProcess);
-            return new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1);
+            var tl = timelineService.GetTimelineForApplicationDate(
+                dataCompletedAt, Models.Enums.TimelineType.BusinessProcess);
+            return Task.FromResult<DateTime?>(
+                new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "档案查询-计算正式享受时间失败");
-            return null;
+            return Task.FromResult<DateTime?>(null);
         }
     }
 

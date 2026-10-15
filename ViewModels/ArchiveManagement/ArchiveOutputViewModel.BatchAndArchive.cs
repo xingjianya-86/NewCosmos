@@ -243,7 +243,7 @@ public partial class ArchiveOutputViewModel
         // 目录模板：使用目录专属字段和行数据
         if (template.IsDirectoryTemplate)
         {
-            var tl = _timelineService.GetTimelineForDate(await ResolveArchiveAnchorAsync(), TimelineType.BusinessProcess);
+            var tl = _timelineService.GetTimelineForApplicationDate(await ResolveApplicationDateForTimelineAsync(), TimelineType.BusinessProcess);
             fields = await BuildDirectoryFieldsAsync(fields);
             tableRows = BuildDirectoryRows(tl.MeetingDate);
         }
@@ -389,7 +389,7 @@ public partial class ArchiveOutputViewModel
             // 目录模板：使用目录专属字段和行数据
             if (file.TemplateName.Contains("目录"))
             {
-                var tl = _timelineService.GetTimelineForDate(await ResolveArchiveAnchorAsync(), TimelineType.BusinessProcess);
+                var tl = _timelineService.GetTimelineForApplicationDate(await ResolveApplicationDateForTimelineAsync(), TimelineType.BusinessProcess);
                 fields = await BuildDirectoryFieldsAsync(fields);
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
@@ -1117,17 +1117,21 @@ public partial class ArchiveOutputViewModel
 
     /// <summary>
     /// B线结算日的次月1日，格式 yyyy-M-d（用于档案卷号）。
-    /// 按该档案自身业务日期锚定周期（补全完成→首次审批→更新→创建），保证档案补打时卷号稳定、不随当天漂移。
+    /// 窗口按该申请的「申请日期」锚定（申请晚于会议日顺延下一周期），
+    /// 保证卷号与公示/审核确认日同一批次，且补打时卷号稳定、不随当天漂移。
     /// </summary>
     private async Task<string> CalculateBLineVolumeDateAsync()
     {
-        var anchor = await ResolveArchiveAnchorAsync();
-        var tl = _timelineService.GetTimelineForDate(anchor, TimelineType.BusinessProcess);
+        var applicationDate = await ResolveApplicationDateForTimelineAsync();
+        var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
         return new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("yyyy-M-d");
     }
 
-    /// <summary>目录卷号锚定日期：申请类档案按该申请业务日期；其它域回退当天。</summary>
-    private async Task<DateTime> ResolveArchiveAnchorAsync()
+    /// <summary>
+    /// 目录/卷号窗口锚定日期：申请类档案取该申请的申请日期（<see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>
+    /// 稳定口径：申请编号内嵌日期→创建→首次审批→补全完成→更新→今天）；其它域回退当天。
+    /// </summary>
+    private async Task<DateTime> ResolveApplicationDateForTimelineAsync()
     {
         if (PrintNavigationData.BusinessType is "FamilyApplication" or "EconomicReview"
             && PrintNavigationData.BusinessId is > 0)
@@ -1138,12 +1142,7 @@ public partial class ArchiveOutputViewModel
                 var result = await appService.GetByIdAsync(PrintNavigationData.BusinessId.Value, CancellationToken);
                 var app = result.IsSuccess ? result.Value : null;
                 if (app != null)
-                {
-                    if (app.DataCompletedAt is { } completed && completed != default) return completed;
-                    if (app.FirstApprovedAt is { } approved && approved != default) return approved;
-                    if (app.UpdatedAt != default) return app.UpdatedAt;
-                    if (app.CreatedAt != default) return app.CreatedAt;
-                }
+                    return ArchiveAnchorHelper.ResolveApplicationDate(app);
             }
             catch (Exception ex)
             {

@@ -16,11 +16,23 @@ public static class ArchiveAnchorHelper
     /// 避免档案补打时按“当天”重算导致编号/卷号漂移。
     /// </summary>
     public static DateTime ResolveArchiveAnchorDate(ApplicationEntity app)
+        => ResolveArchiveAnchorDate(
+            app.DataCompletedAt ?? default,
+            app.FirstApprovedAt ?? default,
+            app.UpdatedAt,
+            ResolveApplicationDate(app));
+
+    /// <summary>
+    /// 值参重载：调用方只有原始列（无实体）时使用，如 ApplicationStatusService 的时序告警。
+    /// 顺序必须与实体版一致：数据补全完成 → 首次审批 → 更新 → 申请日期。
+    /// </summary>
+    public static DateTime ResolveArchiveAnchorDate(
+        DateTime dataCompletedAt, DateTime firstApprovedAt, DateTime updatedAt, DateTime applicationDate)
     {
-        if (app.DataCompletedAt is { } completed && completed != default) return completed;
-        if (app.FirstApprovedAt is { } approved && approved != default) return approved;
-        if (app.UpdatedAt != default) return app.UpdatedAt;
-        return ResolveApplicationDate(app);
+        if (dataCompletedAt != default) return dataCompletedAt;
+        if (firstApprovedAt != default) return firstApprovedAt;
+        if (updatedAt != default) return updatedAt;
+        return applicationDate;
     }
 
     /// <summary>
@@ -30,8 +42,17 @@ public static class ArchiveAnchorHelper
     /// 故以申请编号日期优先。
     /// </summary>
     public static DateTime ResolveApplicationDate(ApplicationEntity app)
+        => ResolveApplicationDate(app.ApplicationNo, app.CreatedAt, app.FirstApprovedAt,
+            app.DataCompletedAt, app.UpdatedAt);
+
+    /// <summary>
+    /// 值参重载：调用方只有原始列（无实体）时使用，解析顺序与实体版一致。
+    /// </summary>
+    public static DateTime ResolveApplicationDate(
+        string? applicationNo, DateTime createdAt, DateTime? firstApprovedAt,
+        DateTime? dataCompletedAt, DateTime updatedAt)
     {
-        var no = app.ApplicationNo;
+        var no = applicationNo;
         if (!string.IsNullOrEmpty(no) && no.Length >= 10
             && no.StartsWith("SA", StringComparison.Ordinal)
             && DateTime.TryParseExact(no.Substring(2, 8), "yyyyMMdd", null,
@@ -39,10 +60,10 @@ public static class ArchiveAnchorHelper
         {
             return fromNo;
         }
-        if (app.CreatedAt != default) return app.CreatedAt;
-        if (app.FirstApprovedAt is { } approved && approved != default) return approved;
-        if (app.DataCompletedAt is { } completed && completed != default) return completed;
-        if (app.UpdatedAt != default) return app.UpdatedAt;
+        if (createdAt != default) return createdAt;
+        if (firstApprovedAt is { } approved && approved != default) return approved;
+        if (dataCompletedAt is { } completed && completed != default) return completed;
+        if (updatedAt != default) return updatedAt;
         return DateTime.Today;
     }
 }

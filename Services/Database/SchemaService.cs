@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using NewCosmos.Constants;
@@ -683,6 +684,55 @@ public partial class SchemaService : BaseService, ISchemaService
         };
     }
 
+    /// <summary>
+    /// YAML default 拼进 SQL 前的引号兜底——建表（GenerateColumnDefinition）与补列
+    /// （FixMissingColumnAsync）共用，两处此前均为裸拼接。
+    /// 裸拼接的后果：字符串写成 default: Template 时 PostgreSQL 把它当列引用，报
+    /// "cannot use column reference in DEFAULT expression"，建表/补列恒失败
+    /// （printing.job_kind 的缺失列修复因此两轮全败）。
+    /// 规则：已带单引号 / 数字 / 含括号的函数表达式 / 白名单关键字 → 原样；
+    /// 其余（含中文、OTHER_CERT 这类全大写"像标识符"的值）按字符串字面量补单引号并转义内部单引号。
+    /// </summary>
+    private static string FormatDefaultValue(string defaultValue)
+    {
+        if (string.IsNullOrWhiteSpace(defaultValue))
+            return defaultValue ?? string.Empty;
+
+        var v = defaultValue.Trim();
+
+        // 已是 SQL 字符串字面量：'x'
+        if (v.Length >= 2 && v[0] == '\'' && v[^1] == '\'')
+            return v;
+
+        // 数字：0 / 1 / -1 / 1.5
+        if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return v;
+
+        // 函数与表达式：NOW()、nextval('seq')、(a || b)
+        if (v.Contains('('))
+            return v;
+
+        // 关键字与字面量：CURRENT_TIMESTAMP、CURRENT_DATE、FALSE、NULL …
+        switch (v.ToUpperInvariant())
+        {
+            case "CURRENT_TIMESTAMP":
+            case "CURRENT_DATE":
+            case "CURRENT_TIME":
+            case "LOCALTIME":
+            case "LOCALTIMESTAMP":
+            case "CURRENT_USER":
+            case "SESSION_USER":
+            case "CURRENT_ROLE":
+            case "USER":
+            case "NULL":
+            case "TRUE":
+            case "FALSE":
+                return v;
+        }
+
+        return "'" + v.Replace("'", "''") + "'";
+    }
+
     private string GenerateColumnDefinition(ColumnSchema column)
     {
         var parts = new List<string> { column.Name, column.Type };
@@ -694,7 +744,7 @@ public partial class SchemaService : BaseService, ISchemaService
 
         if (!string.IsNullOrEmpty(column.Default))
         {
-            parts.Add("DEFAULT " + column.Default);
+            parts.Add("DEFAULT " + FormatDefaultValue(column.Default));
         }
 
         if (column.Unique && !column.PrimaryKey)

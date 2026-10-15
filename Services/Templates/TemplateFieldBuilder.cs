@@ -51,9 +51,11 @@ public class TemplateFieldBuilder
         var config = configResult.Value;
 
         // 1. 构建基础字段（所有模板通用）
-        // 入户调查日期默认取 B 线受理窗口起点（上月15日）
-        var tl = await _timelineService.GetCurrentTimelineAsync(TimelineType.BusinessProcess);
-        var fields = BuildBaseFields(data, tl);
+        // B 线窗口按「申请日期」锚定（申请晚于会议日顺延下一周期，保证公示起日 ≥ 申请日）；
+        // 无申请日期时按今天锚定。
+        var anchorDate = data.ApplicationDate != default ? data.ApplicationDate : DateTime.Today;
+        var tl = _timelineService.GetTimelineForApplicationDate(anchorDate, TimelineType.BusinessProcess);
+        var fields = BuildBaseFields(data, tl, anchorDate);
 
         // 2. 应用 addressResolver 统一解析地址类字段
         ResolveAddresses(fields, data);
@@ -80,7 +82,7 @@ public class TemplateFieldBuilder
     /// <summary>
     /// 构建基础字段（从 RawFieldData 提取）
     /// </summary>
-    private Dictionary<string, string> BuildBaseFields(RawFieldData data, TimelineResult timeline)
+    private Dictionary<string, string> BuildBaseFields(RawFieldData data, TimelineResult timeline, DateTime applicationDate)
     {
         var fields = new Dictionary<string, string>
         {
@@ -118,22 +120,26 @@ public class TemplateFieldBuilder
             // 统一解析字段
             ["APPLICANT_GENDER"] = AddressResolver.ExtractGenderFromIdCard(data.ApplicantIdCard),
             ["APPLICANT_AGE"] = AddressResolver.ExtractAgeFromIdCard(data.ApplicantIdCard),
-            ["SURVEY_DATE"] = ResolveSurveyDate(timeline, data.SurveyDate),
+            ["SURVEY_DATE"] = ResolveSurveyDate(timeline, data.SurveyDate, applicationDate),
         };
 
         return fields;
     }
 
     /// <summary>
-    /// 入户调查日期：优先用实际入户调查日；
-    /// 无调查记录（补录/未录入）时回退 B 线受理窗口起点（上月15日）
+    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日=会议日]；
+    /// 无调查记录（补录/未录入）时取申请日当天。
+    /// 与 ArchiveProductionViewModel.ResolveSurveyDate 同口径：调查不得早于申请、不得落进公示期。
     /// </summary>
-    private static string ResolveSurveyDate(TimelineResult timeline, DateTime? actualSurvey)
+    private static string ResolveSurveyDate(TimelineResult timeline, DateTime? actualSurvey, DateTime applicationDate)
     {
-        var windowStart = timeline.CycleStartDate.Date;
+        var minDate = applicationDate.Date;
+        var maxDate = timeline.MeetingDate.Date < minDate ? minDate : timeline.MeetingDate.Date;
         var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
-            ? actualSurvey.Value
-            : windowStart;
+            ? actualSurvey.Value.Date
+            : minDate;
+        if (baseDate < minDate) baseDate = minDate;
+        if (baseDate > maxDate) baseDate = maxDate;
         return baseDate.ToString("yyyy年MM月dd日");
     }
 

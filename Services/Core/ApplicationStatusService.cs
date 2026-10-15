@@ -1,8 +1,10 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.StateMachine;
+using NewCosmos.Services.Utilities;
 
 namespace NewCosmos.Services.Core;
 
@@ -10,13 +12,15 @@ namespace NewCosmos.Services.Core;
 public class ApplicationStatusService : BaseService, IApplicationStatusService
 {
     private readonly IDatabaseService _db;
+    private readonly IBusinessTimelineService _timelineService;
 
     protected override string ServiceName => "ApplicationStatusService";
 
-    public ApplicationStatusService(IDatabaseService db, ILoggerService logger)
+    public ApplicationStatusService(IDatabaseService db, ILoggerService logger, IBusinessTimelineService timelineService)
         : base(logger)
     {
         _db = db;
+        _timelineService = timelineService;
     }
 
     /// <inheritdoc />
@@ -154,6 +158,10 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
                     : "归档完结：status=Approved、current_step=6、first_approved_at 落库",
                 current.Status, targetStatus.GetCode(), operatorName, ct);
 
+            // 时序闸口（告警不拦）：转 Approved 时检查建档/审批与受理截止、公示期的先后
+            if (targetStatus == ApplicationStatus.Approved)
+                await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
+
             Logger.LogBusiness("完成归档", ("ApplicationId", applicationId),
                 ("Status", targetStatus.GetCode()), ("Operator", operatorName ?? string.Empty));
             LogInfo($"归档完成: ApplicationId={applicationId}, {currentStatus.GetDescription()} → {targetStatus.GetDescription()}");
@@ -249,6 +257,9 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             await WriteAuditAsync(applicationId, action,
                 $"恢复在保：status=Approved、stop_reason/stop_date 清空（原停保原因：{current.StopReason ?? "无"}）",
                 currentStatus.GetDescription(), ApplicationStatus.Approved.GetDescription(), operatorName, ct);
+
+            // 时序闸口（告警不拦）：恢复在保等同转 Approved，检查建档/审批与受理截止、公示期的先后
+            await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
 
             Logger.LogBusiness(action, ("ApplicationId", applicationId),
                 ("Operator", operatorName ?? string.Empty));
@@ -348,6 +359,10 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             await WriteAuditAsync(applicationId, action, detail,
                 currentStatus.GetDescription(), target.GetDescription(), operatorName, ct);
 
+            // 时序闸口（告警不拦）：审批通过时检查建档/审批与受理截止、公示期的先后
+            if (target == ApplicationStatus.Approved)
+                await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
+
             Logger.LogBusiness(action, ("ApplicationId", applicationId),
                 ("From", currentStatus.GetDescription()), ("To", target.GetDescription()),
                 ("Operator", operatorName ?? string.Empty));
@@ -379,6 +394,58 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
         {
             LogWarn($"审计留痕写入异常: ApplicationId={applicationId}, Action={action}, {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 归档/审批时序闸口（告警不拦，AGENTS §10：低频操作日志 + 审计留痕）：
+    /// ① 建档日期 &gt; 该档案 B 线受理截止（AcceptanceDeadline）→ 逾期受理告警；
+    /// ② 审批时刻 &lt; 该档案 B 线公示结束日（PublicityEndDate）→ 审批先于公示完成告警。
+    /// 窗口按申请日期锚定（GetTimelineForApplicationDate，与文书产出/Step4 校验同源）。
+    /// 只在转 Approved（归档通过 / 审批通过 / 恢复在保）时触发；检查失败只留日志，绝不影响归档主流程。
+    /// </summary>
+    private async Task LogTimelineOrderWarningsAsync(long applicationId, string? operatorName, CancellationToken ct)
+    {
+        try
+        {
+            var rowResult = await _db.QuerySingleAsync<TimelineCheckRow>(
+                @"SELECT application_no, created_at, first_approved_at, data_completed_at, updated_at
+                  FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, applicationId);
+            var row = rowResult.IsSuccess ? rowResult.Value : null;
+            if (row == null) return;
+
+            // 窗口锚点 = 申请日期（申请编号内嵌日期优先，与文书产出同源）
+            var applicationDate = ArchiveAnchorHelper.ResolveApplicationDate(
+                row.ApplicationNo, row.CreatedAt, row.FirstApprovedAt, row.DataCompletedAt, row.UpdatedAt);
+            var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
+
+            var warnings = new List<string>();
+            if (row.CreatedAt != default && row.CreatedAt.Date > tl.AcceptanceDeadline.Date)
+                warnings.Add($"建档 {row.CreatedAt:yyyy-MM-dd} 晚于受理截止 {tl.AcceptanceDeadline:yyyy-MM-dd}（逾期受理）");
+
+            if (DateTime.Today < tl.PublicityEndDate.Date)
+                warnings.Add($"审批早于公示结束 {tl.PublicityEndDate:yyyy-MM-dd}"
+                    + $"（本档案公示期 {tl.PublicityStartDate:yyyy-MM-dd}~{tl.PublicityEndDate:yyyy-MM-dd}，先归档后公示）");
+
+            if (warnings.Count == 0) return;
+
+            var detail = string.Join("；", warnings);
+            LogWarn($"时序告警: ApplicationId={applicationId}, {detail}");
+            await WriteAuditAsync(applicationId, "时序告警", detail, null, null, operatorName, ct);
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"时序告警检查失败（不影响归档）: ApplicationId={applicationId}, {ex.Message}");
+        }
+    }
+
+    /// <summary>时序告警检查读取行（申请日期锚定所需列）</summary>
+    private sealed class TimelineCheckRow
+    {
+        public string? ApplicationNo { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? FirstApprovedAt { get; set; }
+        public DateTime? DataCompletedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 
     /// <summary>状态流转读取行</summary>

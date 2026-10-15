@@ -103,6 +103,14 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSnackBarVisible;
 
+    /// <summary>当前选中分类是否为「照料护理费」（控制计算方法公示横幅显隐）</summary>
+    [ObservableProperty]
+    private bool _isCareAllowanceCategory;
+
+    /// <summary>照料护理费计算方法公示文案（公式 + 各档最低工资实时计算结果，随配置联动）</summary>
+    [ObservableProperty]
+    private string _careAllowanceFormulaText = string.Empty;
+
     #endregion
 
     public StandardConfigManagementViewModel(
@@ -136,6 +144,7 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
         Categories.Add(new StandardCategoryView("特困供养标准", "RuralDestituteStandard", "UrbanDestituteStandard"));
         Categories.Add(new StandardCategoryView("渐退期配置", "GracePeriodMonths"));
         Categories.Add(new StandardCategoryView("系统配置", "MinWage", "RuralSingleRescue", "UrbanSingleRescue"));
+        Categories.Add(new StandardCategoryView("最低工资档位", "MinWageLevel1", "MinWageLevel2", "MinWageLevel3"));
         Categories.Add(new StandardCategoryView("照料护理费", "CaregiverAllowanceFull", "CaregiverAllowancePartial", "CaregiverAllowanceNone"));
         Categories.Add(new StandardCategoryView("土地价格", "LandSelfFarmPrice", "LandSubleasePrice", "LandContractPrice"));
         Categories.Add(new StandardCategoryView("农业补贴价格", "LandFertilityPrice", "SoybeanPrice", "CornPrice", "RotationPrice", "SurfaceWaterRicePrice", "GroundWaterRicePrice"));
@@ -181,7 +190,51 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
     {
         if (value != null)
         {
+            IsCareAllowanceCategory = value.DisplayName == "照料护理费";
+            if (IsCareAllowanceCategory)
+                SafeFireAndForget(() => RefreshCareAllowanceFormulaAsync(CancellationToken), nameof(RefreshCareAllowanceFormulaAsync));
             _ = LoadStandardsAsync();
+        }
+    }
+
+    /// <summary>
+    /// 刷新照料护理费计算方法公示文案：公式 + 三档最低工资的实时计算结果。
+    /// 数值全部经 nc_config_standards（MinWageLevel1/2/3）与单点公式 WageStandardConstants.ComputeCareAllowance 取得，
+    /// 改最低工资配置后重新进入本分类即刷新，无任何硬编码金额。
+    /// </summary>
+    private async Task RefreshCareAllowanceFormulaAsync(CancellationToken ct)
+    {
+        var level1 = await GetWageValueAsync(WageStandardConstants.Level1Type, ct);
+        var level2 = await GetWageValueAsync(WageStandardConstants.Level2Type, ct);
+        var level3 = await GetWageValueAsync(WageStandardConstants.Level3Type, ct);
+
+        static string Triple(decimal wage) => wage <= 0
+            ? "配置缺失"
+            : $"{wage:N0} 元/月 → 全自理 {WageStandardConstants.ComputeCareAllowance(wage, WageStandardConstants.CareAllowanceDivisorFullSelfCare):N0}" +
+              $" / 半护理 {WageStandardConstants.ComputeCareAllowance(wage, WageStandardConstants.CareAllowanceDivisorHalfCare):N0}" +
+              $" / 全护理 {WageStandardConstants.ComputeCareAllowance(wage, WageStandardConstants.CareAllowanceDivisorFullCare):N0}";
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            CareAllowanceFormulaText =
+                "计算方法：照料护理费 = 当地月最低工资 ÷ 10（全自理）、÷ 6（半护理）、÷ 4（全护理），四舍五入到元；" +
+                $"依据《牡丹江市低收入人口认定实施细则》第四十五条，档位按申请所在区县解析（{WageStandardConstants.PolicyDocument}）。\n" +
+                $"第一档：{Triple(level1)}；第二档：{Triple(level2)}；第三档（林口县适用）：{Triple(level3)}。\n" +
+                "修改「系统配置 → 最低工资档位」后即时生效；下方三项固定标准仅作最低工资缺配置时的回退值。";
+        });
+    }
+
+    private async Task<decimal> GetWageValueAsync(string standardType, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _standardConfigService.GetStandardValueAsync(standardType, ct: ct);
+            return result.IsSuccess ? result.Value : 0m;
+        }
+        catch
+        {
+            // 公示文案刷新失败不阻断页面（值显示"配置缺失"）
+            return 0m;
         }
     }
 

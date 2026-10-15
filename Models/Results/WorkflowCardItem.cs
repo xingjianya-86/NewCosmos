@@ -65,4 +65,7 @@ public class WorkflowCardItem
     public bool ShowEditButtons => Action == WorkflowCardAction.EditDelete;
 
     public bool ShowViewArchiveButton => Action == WorkflowCardAction.ViewArchive;
+
+    /// <summary>是否显示"近亲属备案"按钮（仅申请卡片；资产核查任务卡不显示）</summary>
+    public bool ShowNearRelativeButton => Source is NewCosmos.Models.Entities.Application;
 }

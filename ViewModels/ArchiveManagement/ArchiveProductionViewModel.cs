@@ -50,6 +50,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
     private readonly ICapabilityAssessmentService _capabilityAssessmentService = null!;
     private readonly IChangeService _changeService = null!;
     private readonly IStandardConfigService _standardConfigService = null!;
+    private readonly IClassificationService _classificationService = null!;
 
     public ArchiveProductionViewModel(
         IAssetVerificationService verificationService,
@@ -70,7 +71,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         IBusinessTimelineService timelineService,
         ICapabilityAssessmentService capabilityAssessmentService,
         IChangeService changeService,
-        IStandardConfigService standardConfigService)
+        IStandardConfigService standardConfigService,
+        IClassificationService classificationService)
     {
         _verificationService = verificationService;
         _applicationService = applicationService;
@@ -91,6 +93,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         _capabilityAssessmentService = capabilityAssessmentService;
         _changeService = changeService;
         _standardConfigService = standardConfigService;
+        _classificationService = classificationService;
         Title = "档案制作中心";
     }
 
@@ -603,6 +606,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
 
         StatusText = "正在获取经办人信息...";
         var civilAssistantName = await GetCivilAssistantNameAsync();
+        var operatorIdentity = await GetOperatorIdentityAsync();
         _logger.LogBusiness("经办人信息获取完成", ("CivilAssistantName", civilAssistantName));
 
         StatusText = "正在获取机构信息...";
@@ -659,16 +663,16 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         }
 
         // B线时间轴：公示起止/审核确认日/档案生效/卷号/入户调查日期（统一走 BusinessTimelineService）
-        // 锚定该档案自身业务日期（补全完成→首次审批→更新→创建），保证补打时编号/卷号/日期稳定，不随当天漂移
-        var archiveAnchor = ResolveArchiveAnchorDate(app);
-        var tl = _timelineService.GetTimelineForDate(archiveAnchor, TimelineType.BusinessProcess);
+        // 窗口按「申请日期」锚定（申请晚于会议日顺延下一周期），保证文书上公示起日 ≥ 申请日、不随当天漂移
+        var applicationDate = ResolveApplicationDate(app);
+        var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
         var publicityStart = tl.PublicityStartDate.ToString("yyyy-MM-dd");
         var publicityEnd = tl.PublicityEndDate.ToString("yyyy-MM-dd");
         var auditDate = tl.AuditDate.ToString("yyyy-MM-dd");
         var archiveEffective = new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("yyyy-MM-dd");
         var volumeDate = new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("yyyy-M-d");
         var reviewEffective = new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("M月d日");
-        var surveyDate = ResolveSurveyDate(tl, _cachedHouseholdSurvey?.SurveyDate);
+        var surveyDate = ResolveSurveyDate(tl, _cachedHouseholdSurvey?.SurveyDate, applicationDate);
         var hukouAddress = await ResolveHukouAddressAsync(app);
 
         _fieldData = new Dictionary<string, string>
@@ -684,6 +688,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.STATUS] = ApplicationStatusExtensions.FromCode(app.Status ?? "").GetDescription(),
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,
             [FieldKeys.OPERATOR_UNIT] = orgInfo.OperatorUnitName,
+            [FieldKeys.OPERATOR_ID_CARD] = operatorIdentity.IdCard,
+            [FieldKeys.OPERATOR_TITLE] = operatorIdentity.Position,
             [FieldKeys.IS_AGENT] = "否",
             [FieldKeys.AGENT_NAME] = "",
             [FieldKeys.AGENT_ID_CARD] = "",
@@ -914,6 +920,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.DESTITUTE_SURVEY_CONCLUSION] = BuildDestituteSurveyConclusion(app),
             [FieldKeys.DESTITUTE_INSTITUTION_INFO] = BuildDestituteInstitutionInfo(app),
             [FieldKeys.DESTITUTE_SELF_CARE_ABILITY] = BuildSelfCareAbility(app),
+            [FieldKeys.DESTITUTE_SELF_CARE_DETAIL] = BuildSelfCareDetail(app),
             [FieldKeys.DESTITUTE_CARE_LEVEL] = BuildCareLevel(app),
 
             // 特困审核确认表（模板75）专用字段
@@ -960,11 +967,16 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             ["CAREGIVER_SUBSIDY_AMOUNT"] = "",  // 延迟到计算后填充（照料护理费纯数字）
             ["CAREGIVER_SUBSIDY_UPPER"] = "",  // 延迟到计算后填充（照料护理费中文大写）
             ["AGREEMENT_PERIOD"] = "1年",
+            // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
+            [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
+            [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
+            // 分散供养协议 {审核确认时间}：业务审核确认日（B线时间轴口径），格式 2026年10月15日
+            [FieldKeys.SCATTERED_AUDIT_TIME] = tl.AuditDate.ToString("yyyy年M月d日"),
             // 照料服务协议：无数据源字段留空（占位符替换为空，避免残留）
-            ["OPERATOR_TITLE"] = "",
-            ["OPERATOR_ID_CARD"] = "",
-            ["CAREGIVER_BANK_NAME"] = "",
-            ["CAREGIVER_BANK_ACCOUNT"] = "",
+            // 经办人职务/身份证已有数据源（登录用户 IdentityCard/Position），见上方 OPERATOR_TITLE/OPERATOR_ID_CARD
+            [FieldKeys.CAREGIVER_BANK_NAME] = "",  // 延迟到加载照料人后填充（分散照料开户行）
+            [FieldKeys.CAREGIVER_BANK_ACCOUNT] = "",  // 延迟到加载照料人后填充（分散照料银行卡号）
             ["CAREGIVER_ORG_LEGAL"] = "",
             ["CAREGIVER_ORG_ADDRESS"] = "",
             ["CAREGIVER_ORG_POSTAL"] = "",
@@ -1404,8 +1416,9 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         _fieldData[FieldKeys.DESTITUTE_HEALTH_ASSESSMENT] = BuildDestituteHealthAssessment(app, membersResult.Value);
         _fieldData[FieldKeys.DESTITUTE_FAMILY_STATUS] = BuildDestituteFamilyStatus(app, membersResult.Value);
 
-        // 自理能力三档（优先使用能力鉴定结论）
+        // 自理能力三档（优先使用能力鉴定结论）+ 六项明细（逐项勾选式）
         _fieldData[FieldKeys.DESTITUTE_SELF_CARE_ABILITY] = BuildSelfCareAbility(app, capability);
+        _fieldData[FieldKeys.DESTITUTE_SELF_CARE_DETAIL] = BuildSelfCareDetail(app, capability);
         _fieldData[FieldKeys.DESTITUTE_CARE_LEVEL] = BuildCareLevel(app, capability);
 
         // 能力鉴定字段（特困审核确认表"生活自理情况"）
@@ -1426,9 +1439,13 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             _fieldData["CAREGIVER_AGE"] = cg.Age > 0 ? cg.Age.ToString() : "";
             _fieldData["CAREGIVER_ADDRESS"] = cg.Address ?? "";
             _fieldData["CAREGIVER_WORK_UNIT"] = cg.WorkUnit ?? "";
-            _fieldData["CAREGIVER_SUBSIDY"] = app.CaregiverSubsidyAmount > 0 ? $"{FormatDecimal(app.CaregiverSubsidyAmount)}元" : "";
-            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = app.CaregiverSubsidyAmount > 0 ? FormatDecimal(app.CaregiverSubsidyAmount) : "";
-            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = app.CaregiverSubsidyAmount > 0 ? ConvertToChineseAmount(app.CaregiverSubsidyAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_BANK_NAME] = cg.BankName ?? "";
+            _fieldData[FieldKeys.CAREGIVER_BANK_ACCOUNT] = cg.BankAccount ?? "";
+            // 照料护理费：分散供养+能力鉴定时按最低工资公式实时计算（跟随配置更新），否则用落库值
+            var careAmount = await ResolveCareAllowanceForPrintAsync(app, capability);
+            _fieldData["CAREGIVER_SUBSIDY"] = careAmount > 0 ? $"{FormatDecimal(careAmount)}元" : "";
+            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = careAmount > 0 ? FormatDecimal(careAmount) : "";
+            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
         }
         _fieldData["APPLICANT_PHONE"] = app.ApplicantPhone ?? "";
 
@@ -1729,6 +1746,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         var app = _cachedApplication;
 
         var civilAssistantName = await GetCivilAssistantNameAsync();
+        var operatorIdentity = await GetOperatorIdentityAsync();
         var orgInfo = await GetOrganizationInfoAsync();
 
         var fullAddress = await _addressResolver.BuildAddressAsync(app.Community, app.Address, CancellationToken);
@@ -1746,14 +1764,14 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         catch { }
 
         // B线时间轴：公示起止/审核确认日/卷号/入户调查日期（统一走 BusinessTimelineService）
-        // 锚定该档案自身业务日期，保证补打时编号/卷号/日期稳定，不随当天漂移
-        var archiveAnchor = ResolveArchiveAnchorDate(app);
-        var tl = _timelineService.GetTimelineForDate(archiveAnchor, TimelineType.BusinessProcess);
+        // 窗口按「申请日期」锚定（申请晚于会议日顺延下一周期），保证文书上公示起日 ≥ 申请日、不随当天漂移
+        var applicationDate = ResolveApplicationDate(app);
+        var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
         var publicityStart = tl.PublicityStartDate.ToString("yyyy-MM-dd");
         var publicityEnd = tl.PublicityEndDate.ToString("yyyy-MM-dd");
         var auditDate = tl.AuditDate.ToString("yyyy-MM-dd");
         var volumeDate = new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("yyyy-M-d");
-        var surveyDate = ResolveSurveyDate(tl, _cachedHouseholdSurvey?.SurveyDate);
+        var surveyDate = ResolveSurveyDate(tl, _cachedHouseholdSurvey?.SurveyDate, applicationDate);
         var reviewEffective = new DateTime(tl.CycleEndDate.Year, tl.CycleEndDate.Month, 1).AddMonths(1).ToString("M月d日");
         var hukouAddress = await ResolveHukouAddressAsync(app);
 
@@ -1770,6 +1788,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.STATUS] = "草稿",
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,
             [FieldKeys.OPERATOR_UNIT] = orgInfo.OperatorUnitName,
+            [FieldKeys.OPERATOR_ID_CARD] = operatorIdentity.IdCard,
+            [FieldKeys.OPERATOR_TITLE] = operatorIdentity.Position,
             [FieldKeys.APPLICANT_COUNT] = app.FamilySize.ToString(),
             [FieldKeys.HEAD_FAMILY_SIZE] = $"{app.FamilySize}口人",
             [FieldKeys.REPORT_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
@@ -1859,6 +1879,60 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             },
             [FieldKeys.FAMILY_VILLAGE] = app.Community ?? "",
             [FieldKeys.COPYRIGHT_INFO] = CopyrightHelper.BuildCopyrightInfo(app.ApplicantIdCard),
+
+            // 特困入户调查表（模板23）字段（与主路径 LoadApplicationDataAsync 对齐——分步路径此前缺整组键）
+            [FieldKeys.DESTITUTE_SUPPORT_TYPE] = BuildDestituteSupportTypeDisplay(app),
+            [FieldKeys.DESTITUTE_CAREGIVER_SITUATION] = BuildDestituteCaregiverSituation(app, _cachedCaregivers),
+            [FieldKeys.DESTITUTE_HEALTH_ASSESSMENT] = BuildDestituteHealthAssessment(app, _cachedFamilyMembers),
+            [FieldKeys.DESTITUTE_LIVING_CONDITION] = BuildDestituteLivingCondition(app, economicDetail),
+            [FieldKeys.DESTITUTE_DAILY_CARE] = BuildDestituteDailyCare(app, _cachedCaregivers),
+            [FieldKeys.DESTITUTE_MEDICAL_SITUATION] = BuildDestituteMedicalSituation(app),
+            [FieldKeys.DESTITUTE_FAMILY_STATUS] = BuildDestituteFamilyStatus(app, _cachedFamilyMembers),
+            [FieldKeys.DESTITUTE_PROPERTY_SITUATION] = BuildDestitutePropertySituation(app, economicDetail),
+            [FieldKeys.DESTITUTE_SURVEY_CONCLUSION] = BuildDestituteSurveyConclusion(app),
+            [FieldKeys.DESTITUTE_INSTITUTION_INFO] = BuildDestituteInstitutionInfo(app),
+            [FieldKeys.DESTITUTE_SELF_CARE_ABILITY] = BuildSelfCareAbility(app, _cachedCapabilityAssessment),
+            [FieldKeys.DESTITUTE_SELF_CARE_DETAIL] = BuildSelfCareDetail(app, _cachedCapabilityAssessment),
+            [FieldKeys.DESTITUTE_CARE_LEVEL] = BuildCareLevel(app, _cachedCapabilityAssessment),
+
+            // 能力鉴定字段（无鉴定记录时也保证键存在，避免占位符残留）
+            [FieldKeys.CAPABILITY_SELF_CARE_LEVEL] = "",
+            [FieldKeys.CAPABILITY_COMPLETED_ITEMS] = "",
+            [FieldKeys.CAPABILITY_ASSESSMENT_DATE] = "",
+            [FieldKeys.CAPABILITY_ASSESSOR] = "",
+
+            // 集中供养协议字段（与主路径对齐）
+            ["INSTITUTION_NAME"] = "",
+            ["INSTITUTION_ADDRESS"] = "",
+            ["INSTITUTION_PHONE"] = "",
+            ["INSTITUTION_TOTAL_FEE"] = "",
+            ["SUPPORT_START_DATE"] = DateTime.Now.ToString("yyyy-MM-dd"),
+            ["SUPPORT_END_DATE"] = DateTime.Now.AddYears(1).ToString("yyyy-MM-dd"),
+
+            // 照料服务协议字段（初值；照料人/银行卡由下方缓存回填块覆盖）
+            ["CAREGIVER_NAME"] = "",
+            ["CAREGIVER_ID_CARD"] = "",
+            ["CAREGIVER_RELATIONSHIP"] = "",
+            ["CAREGIVER_PHONE"] = "",
+            ["CAREGIVER_GENDER"] = "",
+            ["CAREGIVER_AGE"] = "",
+            ["CAREGIVER_ADDRESS"] = "",
+            ["CAREGIVER_WORK_UNIT"] = "",
+            [FieldKeys.CAREGIVER_BANK_NAME] = "",
+            [FieldKeys.CAREGIVER_BANK_ACCOUNT] = "",
+            ["CARE_CONTENT"] = "日常生活照料",
+            ["CARE_FREQUENCY"] = "每日",
+            ["CAREGIVER_SUBSIDY"] = "",
+            ["CAREGIVER_SUBSIDY_AMOUNT"] = "",
+            ["CAREGIVER_SUBSIDY_UPPER"] = "",
+            ["AGREEMENT_PERIOD"] = "1年",
+
+            // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
+            [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
+            [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
+            // 分散供养协议 {审核确认时间}：业务审核确认日（B线时间轴口径），格式 2026年10月15日
+            [FieldKeys.SCATTERED_AUDIT_TIME] = tl.AuditDate.ToString("yyyy年M月d日"),
         };
 
         // 分步路径：装配能力鉴定/照料人/特困字段（复用已加载缓存）
@@ -1882,9 +1956,13 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             _fieldData["CAREGIVER_AGE"] = cg.Age > 0 ? cg.Age.ToString() : "";
             _fieldData["CAREGIVER_ADDRESS"] = cg.Address ?? "";
             _fieldData["CAREGIVER_WORK_UNIT"] = cg.WorkUnit ?? "";
-            _fieldData["CAREGIVER_SUBSIDY"] = app.CaregiverSubsidyAmount > 0 ? $"{FormatDecimal(app.CaregiverSubsidyAmount)}元" : "";
-            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = app.CaregiverSubsidyAmount > 0 ? FormatDecimal(app.CaregiverSubsidyAmount) : "";
-            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = app.CaregiverSubsidyAmount > 0 ? ConvertToChineseAmount(app.CaregiverSubsidyAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_BANK_NAME] = cg.BankName ?? "";
+            _fieldData[FieldKeys.CAREGIVER_BANK_ACCOUNT] = cg.BankAccount ?? "";
+            // 照料护理费：分散供养+能力鉴定时按最低工资公式实时计算（跟随配置更新），否则用落库值
+            var careAmount = await ResolveCareAllowanceForPrintAsync(app, _cachedCapabilityAssessment);
+            _fieldData["CAREGIVER_SUBSIDY"] = careAmount > 0 ? $"{FormatDecimal(careAmount)}元" : "";
+            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = careAmount > 0 ? FormatDecimal(careAmount) : "";
+            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
             _fieldData[FieldKeys.DESTITUTE_CAREGIVER_SITUATION] = BuildDestituteCaregiverSituation(app, _cachedCaregivers);
             _fieldData[FieldKeys.DESTITUTE_DAILY_CARE] = BuildDestituteDailyCare(app, _cachedCaregivers);
         }

@@ -161,14 +161,17 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 入户调查日期避公示校验：调查日不得晚于该档 B 线「公示开始前一个工作日」
-    /// （窗口上限取自 BusinessTimelineService.GetPrePublicityWorkday，与 C 线口径一致）。
-    /// 公示窗口锚点与档案产出同源（ArchiveAnchorHelper：补全完成 → 首次审批 → 草稿按今天），
-    /// 否则校验放行的日期打印时仍会落进公示期（刘明珍档 10-12 ∈ 公示 10-09~10-15 即此问题）。
+    /// Step4 入户调查日期时序校验（窗口与档案产出同源，按「申请日期」锚定）：
+    /// ① 硬校验：调查日不得早于申请日期（否则文书上出现"调查早于建档"的倒挂）；
+    /// ② 硬校验：调查日不得晚于该档 B 线「公示开始前一个工作日」
+    ///    （上限取自 BusinessTimelineService.GetPrePublicityWorkday，与 C 线口径一致）。
+    /// 窗口锚点 = ArchiveAnchorHelper.ResolveApplicationDate（申请编号内嵌日期→创建→…→今天），
+    /// 与档案产出 GetTimelineForApplicationDate 同一口径，否则校验放行的日期打印时仍会落进公示期。
     ///
     /// 豁免①：补全锁定档（调查日=纳入时间，历史补录不可改）；
     /// 豁免②：已存档且本次会话未改动调查日期——存量档原值放行，
-    ///         避免历史数据（调查日恰落在当时公示窗口内）一打开就被卡死无法保存。
+    ///         避免历史数据（调查日恰落在当时公示窗口内，或存量倒挂如仲立亮调查 10-08 早于建档）
+    ///         一打开就被卡死无法保存。
     /// </summary>
     private Result ValidateSurveyDateAgainstPublicity()
     {
@@ -179,20 +182,26 @@ public partial class ApplicationFormViewModel
         try
         {
             var timeline = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
-            // 锚点稳定部分（补全完成 ?? 首次审批）由加载时捕获；草稿/新建按今天
-            var anchor = _archiveAnchorBase ?? DateTime.Today;
-            var bLine = timeline.GetTimelineForDate(anchor, TimelineType.BusinessProcess);
+            // 窗口与下限都按申请日期锚定（新建/草稿 = 今天），与档案产出完全同口径
+            var applicationDate = (_applicationDateBase ?? DateTime.Today).Date;
+            var bLine = timeline.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
+
+            var surveyDay = SurveyDate.Value.Date;
+            if (surveyDay < applicationDate)
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                    $"入户调查日期 {surveyDay:yyyy-MM-dd} 不能早于申请日期 {applicationDate:yyyy-MM-dd}（时序倒挂）");
+
             var limit = timeline.GetPrePublicityWorkday(bLine);
-            if (SurveyDate.Value.Date <= limit) return Result.Success();
+            if (surveyDay <= limit) return Result.Success();
 
             return Result.Failure(ErrorCodes.VALIDATION_FAILED,
-                $"入户调查日期 {SurveyDate.Value:yyyy-MM-dd} 不能晚于公示开始前一个工作日 {limit:yyyy-MM-dd}"
+                $"入户调查日期 {surveyDay:yyyy-MM-dd} 不能晚于公示开始前一个工作日 {limit:yyyy-MM-dd}"
                 + $"（本档案公示期 {bLine.PublicityStartDate:yyyy-MM-dd} 至 {bLine.PublicityEndDate:yyyy-MM-dd}，入户调查须早于公示）");
         }
         catch (Exception ex)
         {
             // 时间轴为纯内存计算，异常属意外；放行并留痕，避免把用户锁死在无法保存的状态
-            _logger.Warn($"入户调查日期避公示校验异常，本次放行: {ex.Message}");
+            _logger.Warn($"入户调查日期时序校验异常，本次放行: {ex.Message}");
             return Result.Success();
         }
     }

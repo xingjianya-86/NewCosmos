@@ -13,25 +13,29 @@ using NewCosmos.Services.System;
 namespace NewCosmos.Services.Domain.Reporting;
 
 /// <summary>
-/// 月报表服务实现（统计基准：nc_biz_applications 状态流转；周期 B 线＝[上月(结算日+1)日, 本月(结算日+1)日)，默认结算日 15）
+/// 月报表服务实现（统计基准：nc_biz_applications 状态流转；周期 B 线口径统一走 BusinessTimelineService，
+/// 起点 = 上月(结算日+1)日、终点 = 本月结算日，遇法定节假日提前，见 GetCycleRangeAsync）
 /// </summary>
 public partial class MonthlyReportService : BaseService, IMonthlyReportService
 {
     protected override string ServiceName => "MonthlyReportService";
     private readonly IDatabaseService _db;
     private readonly IStandardConfigService _standardConfigService;
+    private readonly Services.Utilities.IBusinessTimelineService _timelineService;
 
-    public MonthlyReportService(IDatabaseService db, ILoggerService logger, IStandardConfigService standardConfigService) : base(logger)
+    public MonthlyReportService(IDatabaseService db, ILoggerService logger, IStandardConfigService standardConfigService,
+        Services.Utilities.IBusinessTimelineService timelineService) : base(logger)
     {
         _db = db;
         _standardConfigService = standardConfigService;
+        _timelineService = timelineService;
     }
 
     // ─────────────────────────── 周期与展示辅助 ───────────────────────────
 
     /// <summary>
-    /// B 线统计周期：上月(结算日+1) 00:00（含）~ 本月(结算日+1) 00:00（不含）。
-    /// 默认结算日 15（例：2026-08 → [2026-07-16, 2026-08-16)）；上级业务截止 20 号时结算日=20（[上月21, 本月21)）。
+    /// B 线统计周期：起点 = 上月(结算日+1)日，终点 = 本月结算日 + 1 天（半开区间，结算日遇法定节假日提前）。
+    /// 与文书侧 BusinessTimelineService 同源（唯一事实来源），保证月报统计与档案公示/卷号落在同一批次。
     /// </summary>
     public async Task<Result<MonthlyCycleRange>> GetCycleRangeAsync(int year, int month, CancellationToken ct = default)
     {
@@ -39,9 +43,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         if (year is < 1 or > 9999 || month is < 1 or > 12)
             return Result.Failure<MonthlyCycleRange>(ErrorCodes.VALIDATION_FAILED, $"无效的统计周期: {year}年{month}月");
 
-        // 日期运算统一收敛到 BusinessCycleHelper（唯一事实来源）
-        var start = Helpers.BusinessCycleHelper.GetStart(year, month);
-        var end = Helpers.BusinessCycleHelper.GetEnd(year, month);
+        // 周期口径统一走 B 线时间轴（含结算日节假日惩罚），禁止调用点内联日期运算
+        var tl = await _timelineService.CalculateTimelineAsync(year, month, Models.Enums.TimelineType.BusinessProcess);
+        var start = tl.CycleStartDate.Date;
+        var end = tl.CycleEndDate.Date.AddDays(1); // 半开区间：结算日当天仍属本周期
         LogInfo($"统计周期: {start:yyyy-MM-dd} ~ {end.AddDays(-1):yyyy-MM-dd}");
         return Result.Success(new MonthlyCycleRange { Start = start, End = end });
     }

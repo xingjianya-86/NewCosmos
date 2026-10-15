@@ -164,6 +164,13 @@ public partial class Caregiver : ObservableObject
     public string WorkUnit { get; set; } = string.Empty;
     public string Position { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
+
+    /// <summary>分散照料银行卡开户行（特困分散供养协议 {分散照料银行卡号} 配套）</summary>
+    public string BankName { get; set; } = string.Empty;
+
+    /// <summary>分散照料银行卡号</summary>
+    public string BankAccount { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime DeletedAt { get; set; }
 

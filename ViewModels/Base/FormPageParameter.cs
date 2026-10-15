@@ -40,6 +40,17 @@ public sealed record AssetCheckFormParameter(long AssetCheckId);
 public sealed record ApplicationScopedParameter(long ApplicationId);
 
 /// <summary>
+/// 近亲属备案录入页导航参数。
+/// StaffId > 0 = 编辑已有备案（列表页入口）；
+/// ApplicationId = 工作流卡片级入口，携带户主上下文，打开后自动填关联申请ID与户主姓名/身份证到对象行。
+/// </summary>
+public sealed record NearRelativeEntryParameter(
+    long StaffId = 0,
+    long? ApplicationId = null,
+    string? ApplicantName = null,
+    string? ApplicantIdCard = null);
+
+/// <summary>
 /// 档案产出页初始化来源参数（三选一：资产核查 / 申请档案 / 经济复核归档）。
 /// </summary>
 public sealed record AssetCheckArchiveParameter(long VerificationId);

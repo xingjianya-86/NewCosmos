@@ -159,6 +159,19 @@
                                         <Label Text="工作单位" Style="{StaticResource FormFieldLabelStyle}"/>
                                         <Entry Text="{Binding WorkUnit}" Style="{StaticResource FormFieldEntryStyle}"/>
                                     </VerticalStackLayout>
+                                    <!-- 分散照料银行卡 + 照料人住址（分散供养协议数据源） -->
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}"/>
+                                        <Entry Text="{Binding BankName}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}"/>
+                                        <Entry Text="{Binding BankAccount}" Style="{StaticResource FormFieldEntryStyle}" Keyboard="Numeric"/>
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="家庭住址" Style="{StaticResource FormFieldLabelStyle}"/>
+                                        <Entry Text="{Binding Address}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    </VerticalStackLayout>
                                     <HorizontalStackLayout Spacing="8" HorizontalOptions="End" Padding="0,8">
                                         <Button Text="删除" Style="{StaticResource ButtonDanger}" HeightRequest="34" Padding="16,0"
                                                 Command="{Binding BindingContext.RemoveCaregiverCommand, Source={x:Reference StepRoot}}"

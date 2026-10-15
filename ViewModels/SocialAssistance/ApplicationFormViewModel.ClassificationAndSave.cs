@@ -1214,6 +1214,9 @@ public partial class ApplicationFormViewModel
     /// </summary>
     private async Task SaveEconomicDetailsAsync(CancellationToken ct)
     {
+        // 金融资产：Step3 单对象绑定确保集合有载体行（新建户首次编辑也能落库）
+        EnsureFinancialAssetRow();
+
         var result = await _economicDetailService.SaveAllAsync(_applicationId,
             LaborIncomes.ToList(),
             BusinessIncomes.ToList(),

@@ -534,11 +534,14 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     #region 近亲属备案
 
     /// <summary>
-    /// 打开近亲属备案录入页（权限 NEAR_RELATIVE_MANAGE 校验）
+    /// 卡片级"近亲属备案"入口（权限 NEAR_RELATIVE_MANAGE 校验）：
+    /// 带户主上下文（申请ID/姓名/身份证）打开录入页，自动填关联对象行。
     /// </summary>
     [RelayCommand]
-    private async Task OpenNearRelativeAsync()
+    private async Task OpenNearRelativeForAsync(WorkflowCardItem? item)
     {
+        if (item?.Source is not ApplicationEntity app) return;
+
         var userId = App.CurrentUserId;
         if (!userId.HasValue)
         {
@@ -553,7 +556,11 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
             return;
         }
 
-        await NavigateToPageAsync<Pages.SocialAssistance.NearRelativeEntryPage>();
+        await NavigateToPageAsync<Pages.SocialAssistance.NearRelativeEntryPage, NearRelativeEntryParameter>(
+            new NearRelativeEntryParameter(
+                ApplicationId: app.Id,
+                ApplicantName: app.ApplicantName,
+                ApplicantIdCard: app.ApplicantIdCard));
     }
 
     #endregion

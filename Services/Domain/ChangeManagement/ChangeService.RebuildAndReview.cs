@@ -1052,14 +1052,15 @@ public partial class ChangeService
         var caregivers = caregiversResult.Value ?? new List<Caregiver>();
         if (caregivers.Count > 0)
         {
-            // 分批多行 VALUES 单语句（19 参数/行 + 行内 NOW()/NULL 字面量；500 行/批防参数上限）
-            const int caregiverParamsPerRow = 19;
+            // 分批多行 VALUES 单语句（21 参数/行 + 行内 NOW()/NULL 字面量；500 行/批防参数上限）
+            const int caregiverParamsPerRow = 21;
             const int caregiverBatchSize = 500;
             var caregiverInsertSql = @"INSERT INTO nc_biz_caregivers
                 (application_id, cared_member_id, name, id_card, phone, relationship,
                  gender, age, ethnicity, health_status, employment_status, main_income_source,
                  work_unit, position, address,
                  marital_status, hukou_type, education_level, political_status,
+                 bank_name, bank_account,
                  created_at, deleted_at)
                 VALUES ";
             for (var offset = 0; offset < caregivers.Count; offset += caregiverBatchSize)
@@ -1077,7 +1078,8 @@ public partial class ChangeService
                             cg.Gender, cg.Age, cg.Ethnicity, cg.HealthStatus,
                             cg.EmploymentStatus, cg.MainIncomeSource,
                             cg.WorkUnit, cg.Position, cg.Address,
-                            cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus
+                            cg.MaritalStatus, cg.HukouType, cg.EducationLevel, cg.PoliticalStatus,
+                            cg.BankName, cg.BankAccount
                         };
                     },
                     o => "(" + string.Join(",", Enumerable.Range(o, caregiverParamsPerRow).Select(n => "$" + n)) + ",NOW(),NULL)");

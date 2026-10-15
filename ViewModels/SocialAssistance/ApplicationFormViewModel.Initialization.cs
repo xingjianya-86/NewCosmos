@@ -283,10 +283,10 @@ public partial class ApplicationFormViewModel
 
     /// <summary>
     /// 新档「入户调查日期」默认值：今天；今天已进入（或晚于）当月 B 线公示窗口时回退
-    /// 公示开始前一个工作日——口径与 C 线 GetTempReliefInvestigationPrintDate 一致
-    /// （min(今日最近工作日, 公示前一工作日)），否则新建档打出来就是「调查在公示期内」
-    /// （刘明珍档：10-12 建档 → 调查日 10-12 落入公示 10-09~10-15）。
-    /// 窗口按「今天」锚定（草稿档的档案产出锚点 = updated_at = 保存时刻 ≈ 今天，两者同口径）。
+    /// 公示开始前一个工作日——口径与 C 线 GetTempReliefInvestigationPrintDate 一致。
+    /// 窗口按「申请日期=今天」锚定（GetTimelineForApplicationDate：今天晚于当月会议日自动顺延下月窗口），
+    /// 与档案产出打印的公示窗口同口径——如此刻已过本月会议日（如 10-12 > 10-08），新档窗口即顺延到
+    /// 下月（公示 11-09~11-15），调查默认今天不会再落进本月公示期（刘明珍档 10-12 调查落 10-09~10-15 的根因）。
     /// </summary>
     private DateTime ResolveDefaultSurveyDate()
     {
@@ -294,7 +294,7 @@ public partial class ApplicationFormViewModel
         {
             var today = DateTime.Today;
             var timeline = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
-            var bLine = timeline.GetTimelineForDate(today, TimelineType.BusinessProcess);
+            var bLine = timeline.GetTimelineForApplicationDate(today, TimelineType.BusinessProcess);
             var prePublicity = timeline.GetPrePublicityWorkday(bLine);
             return today > prePublicity ? prePublicity : today;
         }
@@ -524,7 +524,8 @@ public partial class ApplicationFormViewModel
                 _loadedCurrentStep = app.CurrentStep;
                 // B 线周期锚点稳定部分（补全完成 ?? 首次审批；草稿 = null → 校验按今天锚定）：
                 // Step4「调查日期避公示」必须用与档案产出相同的公示窗口，见 ArchiveAnchorHelper
-                _archiveAnchorBase = app.DataCompletedAt ?? app.FirstApprovedAt;
+                // 申请日期（申请编号内嵌日期优先）：Step4「调查日期时序」校验与档案产出同口径锚定
+                _applicationDateBase = ArchiveAnchorHelper.ResolveApplicationDate(app);
                 // 覆写前真旧值：Step5 分类判定会覆写 classification_result/total_guarantee_amount，
                 // 变更流程的新旧对比必须用此处捕获值，否则恒判"无变化"
                 _loadedClassification = app.ClassificationResult;
@@ -980,6 +981,8 @@ public partial class ApplicationFormViewModel
                     // 加载金融资产
                     FinancialAssets.Clear();
                     foreach (var item in economicResult.Value.FinancialAssets) FinancialAssets.Add(item);
+                    // Step3 金融资产区块绑定单对象：与集合首行同引用（改动即入集合，保存链路不变）
+                    FinancialAsset = FinancialAssets.FirstOrDefault() ?? new FinancialAsset();
 
                     // 加载土地详情
                     LandRegistrations.Clear();

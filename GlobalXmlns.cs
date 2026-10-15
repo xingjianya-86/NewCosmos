@@ -30,6 +30,7 @@ using XmlnsPrefixAttribute = Microsoft.Maui.Controls.XmlnsPrefixAttribute;
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.ArchiveManagement")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.AssetVerification")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Auth")]
+[assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.BankFlow")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.ChangeManagement")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.Config")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.ViewModels.DatabaseManagement")]

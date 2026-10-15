@@ -98,6 +98,14 @@ tables:
         type: TEXT
         nullable: true
         comment: 主要收入来源
+      - name: bank_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 分散照料银行卡开户行
+      - name: bank_account
+        type: VARCHAR(50)
+        nullable: true
+        comment: 分散照料银行卡号
     indexes:
       - name: idx_caregivers_application_id
         columns: [application_id]

@@ -276,6 +276,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<LandContractImportService>();
         builder.Services.AddSingleton<SoybeanSubsidyImportService>();
         builder.Services.AddSingleton<RotationSubsidyImportService>();
+        builder.Services.AddSingleton<BankFlowImportService>();
 
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<ElderlySubsidyImportService>());
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<AgriculturalSubsidyImportService>());
@@ -283,8 +284,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<LandContractImportService>());
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<SoybeanSubsidyImportService>());
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<RotationSubsidyImportService>());
+        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<BankFlowImportService>());
 
         builder.Services.AddSingleton<IImportServiceManager, ImportServiceManager>();
+
+        // 银行流水核对查询（查看页 + 经济状况界面按身份证带出）
+        builder.Services.AddSingleton<Services.Domain.BankFlow.IBankFlowQueryService, Services.Domain.BankFlow.BankFlowQueryService>();
 
         #endregion
 
@@ -397,6 +402,7 @@ public static class MauiProgram
         builder.Services.AddTransient<ElderlyStopListViewModel>();
         builder.Services.AddTransient<ElderlyStopViewModel>();
         builder.Services.AddTransient<GracePeriodExpiringListViewModel>();
+        builder.Services.AddTransient<NewCosmos.ViewModels.BankFlow.BankFlowViewViewModel>();
         builder.Services.AddTransient<ElderlyReportViewModel>();
         builder.Services.AddTransient<ElderlyPendingListViewModel>();
         builder.Services.AddTransient<ElderlyReviewListViewModel>();
@@ -405,6 +411,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TempReliefListViewModel>();
         builder.Services.AddTransient<TempReliefFormViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.NearRelativeEntryViewModel>();
+        builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.NearRelativeListViewModel>();
 
         // ── 统一补打中心（五域 Provider + 三栏按人补打/跨户批量） ──
         // 注意：必须注册接口 IReprintDomainProvider——UnifiedReprintViewModel 注入的是 IEnumerable<IReprintDomainProvider>，
@@ -513,6 +520,7 @@ public static class MauiProgram
         builder.Services.AddTransient<OrganizationImportPage>();
         builder.Services.AddTransient<DatabaseManagementPage>();
         builder.Services.AddTransient<DataImportPage>();
+        builder.Services.AddTransient<Pages.BankFlow.BankFlowViewPage>();
           builder.Services.AddTransient<Pages.DatabaseManagement.DictionaryManagementPage>();
         builder.Services.AddTransient<Pages.DatabaseManagement.StandardConfigManagementPage>();
         builder.Services.AddTransient<Pages.DatabaseManagement.RegionManagementPage>();
@@ -548,6 +556,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TempReliefListPage>();
         builder.Services.AddTransient<TempReliefFormPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.NearRelativeEntryPage>();
+        builder.Services.AddTransient<Pages.SocialAssistance.NearRelativeListPage>();
 
         builder.Services.AddTransient<RecoverySearchPage>();
         builder.Services.AddTransient<RecoveryFormPage>();

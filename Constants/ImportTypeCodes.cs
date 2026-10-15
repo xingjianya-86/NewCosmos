@@ -14,6 +14,7 @@ public static class ImportTypeCodes
     public const string LAND_CONTRACT = "LAND_CONTRACT";
     public const string SOYBEAN_SUBSIDY = "SOYBEAN_SUBSIDY";
     public const string ROTATION_SUBSIDY = "ROTATION_SUBSIDY";
+    public const string BANK_FLOW_VERIFY = "BANK_FLOW_VERIFY";
 
     public static readonly string[] All =
     {
@@ -27,7 +28,8 @@ public static class ImportTypeCodes
         PLANTING_SUBSIDY,
         LAND_CONTRACT,
         SOYBEAN_SUBSIDY,
-        ROTATION_SUBSIDY
+        ROTATION_SUBSIDY,
+        BANK_FLOW_VERIFY
     };
 
     public static readonly string[] Implemented =
@@ -58,6 +60,7 @@ public static class ImportTypeCodes
         LAND_CONTRACT => "土地承包导入",
         SOYBEAN_SUBSIDY => "大豆补贴导入",
         ROTATION_SUBSIDY => "轮作补贴导入",
+        BANK_FLOW_VERIFY => "银行流水核对导入",
         _ => code
     };
 
@@ -78,7 +81,8 @@ public static class ImportTypeCodes
         PLANTING_SUBSIDY,
         LAND_CONTRACT,
         SOYBEAN_SUBSIDY,
-        ROTATION_SUBSIDY
+        ROTATION_SUBSIDY,
+        BANK_FLOW_VERIFY
     };
 
     public static bool IsSingleFileType(string code) => code switch
@@ -89,6 +93,7 @@ public static class ImportTypeCodes
         LAND_CONTRACT => true,
         SOYBEAN_SUBSIDY => true,
         ROTATION_SUBSIDY => true,
+        BANK_FLOW_VERIFY => true,
         _ => false
     };
 

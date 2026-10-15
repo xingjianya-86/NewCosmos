@@ -751,6 +751,13 @@ public partial class DatabaseManagementViewModel : ViewModelBase
         await PushPageAsync<DataImportPage>();
     }
 
+    /// <summary>银行流水核对查看页（数据中心 → 快捷入口）</summary>
+    [RelayCommand]
+    private async Task NavigateToBankFlowAsync()
+    {
+        await PushPageAsync<Pages.BankFlow.BankFlowViewPage>();
+    }
+
     [RelayCommand]
     private async Task NavigateToRegionManagementAsync()
     {

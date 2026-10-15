@@ -28,7 +28,7 @@ tables:
       - name: photo_category
         type: character varying(30)
         nullable: false
-        default: OTHER_CERT
+        default: "'OTHER_CERT'"
         comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/OTHER_CERT其他证件）
       - name: photo_name
         type: character varying(200)

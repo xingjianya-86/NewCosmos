@@ -112,7 +112,7 @@
             <!-- 右侧：标准列表 + 编辑面板 -->
             <Grid Grid.Column="1">
                 <Border Style="{StaticResource CardBorderElevated}" Padding="0" Margin="0,16,16,16">
-                    <Grid RowDefinitions="Auto,Auto,*,Auto">
+                    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
 
                         <!-- 标准列表标题 + 操作按钮 -->
                         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="16" Margin="0,0,0,8">
@@ -124,8 +124,27 @@
                             </HorizontalStackLayout>
                         </Grid>
 
+                        <!-- 照料护理费计算方法公示：公式 + 三档最低工资实时计算结果（改配置即时跟随） -->
+                        <Border Grid.Row="1"
+                                IsVisible="{Binding IsCareAllowanceCategory}"
+                                BackgroundColor="{StaticResource InfoSoft}"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="12,10"
+                                Margin="16,0">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="🧮 照料护理费计算方法公示"
+                                       FontSize="14" FontAttributes="Bold"
+                                       TextColor="{StaticResource PrimaryDark}"/>
+                                <Label Text="{Binding CareAllowanceFormulaText}"
+                                       FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       LineHeight="1.4"/>
+                            </VerticalStackLayout>
+                        </Border>
+
                         <!-- 表头 -->
-                        <Grid Grid.Row="1" ColumnDefinitions="*,100,80,60" Padding="12,8" Margin="16,0" BackgroundColor="{StaticResource Gray100}">
+                        <Grid Grid.Row="2" ColumnDefinitions="*,100,80,60" Padding="12,8" Margin="16,0" BackgroundColor="{StaticResource Gray100}">
                             <Label Grid.Column="0" Text="标准名称" Style="{StaticResource TableHeaderLabel}"/>
                             <Label Grid.Column="1" Text="标准值" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="End"/>
                             <Label Grid.Column="2" Text="单位" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="End"/>
@@ -133,7 +152,7 @@
                         </Grid>
 
                         <!-- 标准列表 -->
-                        <CollectionView Grid.Row="2" ItemsSource="{Binding ConfigStandards}" SelectionMode="Single" SelectedItem="{Binding SelectedStandard}" Margin="16,0">
+                        <CollectionView Grid.Row="3" ItemsSource="{Binding ConfigStandards}" SelectionMode="Single" SelectedItem="{Binding SelectedStandard}" Margin="16,0">
                             <CollectionView.EmptyView>
                                 <Label Text="请选择分类或点击初始化" Style="{StaticResource EmptyStateLabel}"/>
                             </CollectionView.EmptyView>
@@ -174,7 +193,7 @@
                         </CollectionView>
 
                         <!-- 编辑面板（完整字段） -->
-                        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Padding="16" IsVisible="{Binding IsEditing}" BackgroundColor="{StaticResource Gray100}">
+                        <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Padding="16" IsVisible="{Binding IsEditing}" BackgroundColor="{StaticResource Gray100}">
                             <VerticalStackLayout Grid.Column="0" Spacing="8">
                                 <Entry Text="{Binding EditStandardName}" Placeholder="标准名称" WidthRequest="200"/>
                                 <HorizontalStackLayout Spacing="8">

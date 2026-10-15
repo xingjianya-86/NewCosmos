@@ -35,6 +35,8 @@ public static class FieldKeys
     // 经办人
     public const string OPERATOR_NAME = "OPERATOR_NAME";
     public const string OPERATOR_UNIT = "OPERATOR_UNIT";
+    public const string OPERATOR_ID_CARD = "OPERATOR_ID_CARD";                      // 经办人身份证号（登录用户 IdentityCard）
+    public const string OPERATOR_TITLE = "OPERATOR_TITLE";                          // 经办人职务（登录用户 Position）
     public const string REPORT_DATE = "REPORT_DATE";
     public const string CIVIL_ASSISTANT_NAME = "CIVIL_ASSISTANT_NAME";
 
@@ -280,8 +282,17 @@ public static class FieldKeys
     public const string DESTITUTE_PROPERTY_SITUATION = "DESTITUTE_PROPERTY_SITUATION"; // 财产状况
     public const string DESTITUTE_SURVEY_CONCLUSION = "DESTITUTE_SURVEY_CONCLUSION"; // 调查结论
     public const string DESTITUTE_INSTITUTION_INFO = "DESTITUTE_INSTITUTION_INFO";   // 供养机构信息
-    public const string DESTITUTE_SELF_CARE_ABILITY = "DESTITUTE_SELF_CARE_ABILITY"; // 自理能力
+    public const string DESTITUTE_SELF_CARE_ABILITY = "DESTITUTE_SELF_CARE_ABILITY"; // 自理能力（三档：自理/半自理/不能自理）
+    public const string DESTITUTE_SELF_CARE_DETAIL = "DESTITUTE_SELF_CARE_DETAIL";  // 自理能力六项明细（逐项勾选式：进食☑能□不能；…）
     public const string DESTITUTE_CARE_LEVEL = "DESTITUTE_CARE_LEVEL";              // 照料等级
+
+    // 照料服务协议（模板77）/ 分散供养协议（协议期按自然年，起=生成日、止=本年12月31日）
+    public const string CARE_AGREEMENT_PROMISE_TIME = "CARE_AGREEMENT_PROMISE_TIME"; // 诚信承诺时间（生成日 yyyy年M月d日）
+    public const string CARE_AGREEMENT_START_DATE = "CARE_AGREEMENT_START_DATE";     // 协议期起（生成日 yyyy-MM-dd）
+    public const string CARE_AGREEMENT_END_DATE = "CARE_AGREEMENT_END_DATE";         // 协议期止（本年12月31日）
+    public const string CAREGIVER_BANK_NAME = "CAREGIVER_BANK_NAME";                 // 分散照料人开户行
+    public const string CAREGIVER_BANK_ACCOUNT = "CAREGIVER_BANK_ACCOUNT";           // 分散照料银行卡号
+    public const string SCATTERED_AUDIT_TIME = "SCATTERED_AUDIT_TIME";               // 分散供养协议审核确认时间（业务审核确认日 yyyy年M月d日）
 
     // 特困审核确认表（模板75）专用
     public const string DESTITUTE_AUDIT_CATEGORY = "DESTITUTE_AUDIT_CATEGORY";       // 人员类别（特困全称）

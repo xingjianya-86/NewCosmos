@@ -42,7 +42,10 @@ public class TimelineResult
 }
 
 /// <summary>
-/// 业务时间线服    /// A线（经济核查）：每月10号结算，上月11日~本月10    /// B线（业务线）：每月15号结算，受理窗口上月15日~本月15日，会议7    /// </summary>
+/// 业务时间线服    /// A线（经济核查）：每月10号结算，上月11日~本月10    /// B线（业务线）：结算日由 BusinessCycleHelper.SettleDay 提供（app.ini BCycleSettleDay，默认15）；
+/// 周期起点 = 上月(结算日+1)日，终点 = 本月结算日（遇法定节假日提前5天、周末再前移至工作日）；
+/// 会议7日（顺延工作日），受理截止 = 会议前3个工作日，公示 = 会议次日起7天。
+/// </summary>
 public interface IBusinessTimelineService
 {
     Task<TimelineResult> CalculateTimelineAsync(int year, int month, TimelineType type);
@@ -53,6 +56,14 @@ public interface IBusinessTimelineService
     /// 用于档案补打等需按“该档案自身业务日期”锚定周期、避免每次按当天重算导致编号/卷号漂移的场景。
     /// </summary>
     TimelineResult GetTimelineForDate(DateTime date, TimelineType type);
+
+    /// <summary>
+    /// 单档案文书窗口（B 线专用，A/C 线直接转发 <see cref="GetTimelineForDate"/>）：
+    /// 申请日期晚于该月会议日 → 顺延下一周期（该申请赶不上本月会议与公示批次）。
+    /// 档案产出、目录、卷号、表单调查日期默认值与「调查避公示」校验统一走本方法，
+    /// 保证文书上公示起日 ≥ 申请日、调查日不早于申请日；禁止调用点各自写顺延运算。
+    /// </summary>
+    TimelineResult GetTimelineForApplicationDate(DateTime applicationDate, TimelineType type);
 
     /// <summary>
     /// C线（临时救助验收线）：按年月直算。simplified=true 时入户调查核实期为5个工作日（特殊群体），否则10个。
@@ -126,6 +137,22 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     }
 
     public TimelineResult GetTimelineForDate(DateTime date, TimelineType type) => GetForDateCore(date, type);
+
+    /// <inheritdoc />
+    public TimelineResult GetTimelineForApplicationDate(DateTime applicationDate, TimelineType type)
+    {
+        var line = GetForDateCore(applicationDate, type);
+
+        // B 线：申请日超过会议日说明赶不上本月会议/公示批次，顺延下一周期
+        if (type == TimelineType.BusinessProcess && applicationDate.Date > line.MeetingDate.Date)
+        {
+            var nextMonth = line.Month == 12 ? 1 : line.Month + 1;
+            var nextYear = line.Month == 12 ? line.Year + 1 : line.Year;
+            line = CalculateBLine(nextYear, nextMonth);
+        }
+
+        return line;
+    }
 
     public Task<TimelineResult> CalculateTempReliefAsync(int year, int month, bool simplified)
     {
@@ -267,10 +294,12 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         bool isHolidayAffected = false;
         var endDay = BusinessCycleHelper.SettleDay;
 
-        // 检查结算日前5天至结算日是否有节假日（如20号结算则检查15~20号）
+        // 检查结算日前5天至结算日是否有**法定节假日**（如20号结算则检查15~20号）。
+        // 只认法定节假日：周末由下方 GetPreviousWorkDay 统一处理；
+        // 若把周末也算进本窗口，6 天窗口内必含周末 → 惩罚恒触发 → 结算日永远被压到 settle-5。
         for (int d = Math.Max(1, endDay - 5); d <= endDay; d++)
         {
-            if (_holidayService.IsHoliday(new DateTime(year, month, d)))
+            if (_holidayService.IsLegalHoliday(new DateTime(year, month, d)))
             {
                 isHolidayAffected = true;
                 endDay = Math.Max(1, endDay - 5);
@@ -282,8 +311,8 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         if (!_holidayService.IsWorkDay(endDate))
             endDate = _holidayService.GetPreviousWorkDay(endDate);
 
-        // 受理窗口：上月(结算日+1)日~本月(结算日+1)日
-        var startDate = new DateTime(year, month, 1).AddMonths(-1).AddDays(BusinessCycleHelper.SettleDay);
+        // 受理窗口：上月(结算日+1)日~本月结算日（周期起止与 BusinessCycleHelper 同源）
+        var startDate = BusinessCycleHelper.GetStart(year, month);
         // 会议日：本月7日，避开周末
         var meetingDate = new DateTime(year, month, B_MEETING_DAY);
         if (!_holidayService.IsWorkDay(meetingDate))

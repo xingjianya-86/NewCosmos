@@ -63,6 +63,21 @@
                         </VerticalStackLayout>
                     </Border>
 
+                    <Border Grid.Column="1" Grid.Row="0" Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="16">
+                            <HorizontalStackLayout Spacing="12">
+                                <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#DBEAFE" StrokeShape="RoundRectangle 12">
+                                    <Label Text="{OnPlatform WinUI='&#xE82D;', Android='&#x1F3E6;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="#2563EB" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                </Border>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                    <Label Text="银行流水核对" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="查看核对表批次与人员汇总" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
+                            </HorizontalStackLayout>
+                            <Button Text="{OnPlatform WinUI='&#xE82D; 进入查看', Android='&#x1F3E6; 进入查看'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonPrimary}" Command="{Binding NavigateToBankFlowCommand}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
                     <Border Grid.Column="0" Grid.Row="1" Style="{StaticResource CardBorderElevated}">
                         <VerticalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="12">

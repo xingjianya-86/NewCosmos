@@ -29,6 +29,27 @@ public static class WageStandardConstants
     /// <summary>现行标准生效日（同上，写入文书）</summary>
     public const string EffectiveDate = "2025-12-01";
 
+    // ── 特困照料护理费除数（《牡丹江市低收入人口认定实施细则》第四十五条：标准 = 当地最低工资的 1/10、1/6、1/4） ──
+
+    /// <summary>全自理档除数：当地月最低工资 ÷ 10（林口 1910 → 191）</summary>
+    public const int CareAllowanceDivisorFullSelfCare = 10;
+
+    /// <summary>半护理档除数：当地月最低工资 ÷ 6（林口 1910 → 318）</summary>
+    public const int CareAllowanceDivisorHalfCare = 6;
+
+    /// <summary>全护理档除数：当地月最低工资 ÷ 4（林口 1910 → 478）</summary>
+    public const int CareAllowanceDivisorFullCare = 4;
+
+    /// <summary>
+    /// 照料护理费计算公式（全库唯一实现，标准配置界面与 ClassificationService 共用）：
+    /// 当地月最低工资 ÷ 除数，四舍五入到元（MidpointRounding.AwayFromZero：1910÷6=318.33→318、÷4=477.5→478）。
+    /// 最低工资数值存 nc_config_standards（MinWageLevel1/2/3），本函数只做除法——改配置即全链路联动。
+    /// </summary>
+    public static decimal ComputeCareAllowance(decimal monthlyMinimumWage, int divisor)
+        => divisor <= 0 || monthlyMinimumWage <= 0
+            ? 0m
+            : Math.Round(monthlyMinimumWage / divisor, 0, MidpointRounding.AwayFromZero);
+
     /// <summary>
     /// 区县（nc_biz_applications.district）→ standard_type 映射。
     /// 键必须与库中 district 实际存储值完全一致（含"县/区/市"后缀，区分大小写不适用）。

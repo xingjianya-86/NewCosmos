@@ -151,6 +151,18 @@
                                             <Label Grid.Column="6" Text="工作单位" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
                                             <Entry Grid.Column="7" Text="{Binding WorkUnit}" HeightRequest="38" FontSize="16" Placeholder="" Grid.ColumnSpan="5"/>
                                         </Grid>
+                                        <!-- 分散照料银行卡（特困分散供养协议 {分散照料银行卡号}{分散照料开户行} 数据源） -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4">
+                                            <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="1" Text="{Binding BankName}" HeightRequest="38" FontSize="16" Placeholder=""/>
+                                            <Label Grid.Column="2" Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="3" Text="{Binding BankAccount}" HeightRequest="38" FontSize="16" Placeholder="" Keyboard="Numeric"/>
+                                        </Grid>
+                                        <!-- 照料人家庭住址（特困分散供养协议 {特困监护人家庭住址} 数据源） -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4" RowSpacing="4">
+                                            <Label Text="家庭住址" Style="{StaticResource FormFieldLabelStyle}" FontSize="16"/>
+                                            <Entry Grid.Column="1" Text="{Binding Address}" HeightRequest="38" FontSize="16" Placeholder=""/>
+                                        </Grid>
                                     </VerticalStackLayout>
                                     <!-- 删除按钮 -->
                                     <HorizontalStackLayout Spacing="8" HorizontalOptions="End" Padding="0,8">

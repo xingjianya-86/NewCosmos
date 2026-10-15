@@ -106,12 +106,11 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private DateTime? _loadedSurveyDate;
 
     /// <summary>
-    /// B 线周期锚点的稳定部分（数据补全完成日 ?? 首次审批日；草稿/新建 = null → 按「今天」锚定）。
-    /// 与 <see cref="Helpers.ArchiveAnchorHelper.ResolveArchiveAnchorDate"/> 同口径——草稿档该函数
-    /// 取 updated_at（= 保存时刻 ≈ 今天），故校验看到的公示窗口与档案产出打印的公示窗口是同一个，
-    /// 否则校验放行的日期打印时仍会落进公示期。
+    /// 申请日期（ArchiveAnchorHelper.ResolveApplicationDate 稳定口径：申请编号内嵌日期→创建→…；新建=今天）。
+    /// Step4 校验与档案产出的 B 线窗口都按申请日期锚定（GetTimelineForApplicationDate），
+    /// 两处必须同口径，否则校验放行的日期打印时会落进公示期或早于申请日。
     /// </summary>
-    private DateTime? _archiveAnchorBase;
+    private DateTime? _applicationDateBase;
 
     /// <summary>
     /// 向导入口（LoadApplicationAsync）固化的复核前主表快照（真旧值）。

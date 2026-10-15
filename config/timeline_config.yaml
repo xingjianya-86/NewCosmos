@@ -11,16 +11,18 @@ timelines:
 
   # 业务流程时间线
   business_process:
-    # 统计结算日（月报/首页周期 = [上月(结算日+1)日, 本月(结算日+1)日)）。
+    # 统计结算日：周期 = [上月(结算日+1)日, 本月结算日]（结算日当天仍属本周期）。
     # 2026-09 起上级业务截止 20 号 → 20；实际生效值由 app.ini 的 BCycleSettleDay 注入
-    # （BusinessCycleHelper，本文件该键仅作文档描述）。
+    # （BusinessCycleHelper，本文件该键仅作文档描述）；统计/月报/档案周期口径统一走 BusinessTimelineService。
     cycle_end_day: 20              # 统计结算日（20号）；原 15 号
     cycle_start_offset: -30        # 周期开始偏移量（负数表示向前推30天）
-    meeting_day: 7                 # 会议日（每月7号）
-    acceptance_deadline_offset: -3 # 受理截止偏移量（会议日前3天）
-    publicity_days: 7              # 公示天数
-    holiday_check_days: [10, 11, 12, 13, 14, 15]  # 节假日检查日期范围
-    holiday_penalty_days: 5        # 节假日顺延天数上限
+    meeting_day: 7                 # 会议日（每月7号，遇非工作日顺延）
+    acceptance_deadline_offset: -3 # 受理截止偏移量（会议日前3个工作日）
+    publicity_days: 7              # 公示天数（会议次日起）
+    holiday_check_days: "结算日前5天~结算日"  # 惩罚检查窗口（随结算日浮动，非固定日历日）
+    holiday_penalty_days: 5        # 命中**法定节假日**时结算日提前天数（周末不触发惩罚，
+                                   # 由结算日自身的 previous_workday 调整处理——若把周末也算进惩罚
+                                   # 会因 6 天窗口必含周末而恒触发，结算日永远被压到 settle-5）
     weekend_adjust: "previous_workday"  # 周末调整策略
 
   # 临时救助验收时间线（C线；公示固定日历日，调查核实倒推）

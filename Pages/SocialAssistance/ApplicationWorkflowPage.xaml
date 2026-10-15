@@ -69,6 +69,14 @@
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="近亲属备案"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Gray500}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowNearRelativeButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenNearRelativeForCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="查看档案"
                                     FontSize="13"
                                     Padding="16,8"
@@ -187,6 +195,14 @@
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="近亲属备案"
+                                    FontSize="13"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Gray500}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowNearRelativeButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenNearRelativeForCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="查看档案"
                                     FontSize="13"
                                     Padding="16,8"
@@ -268,18 +284,6 @@
                         </HorizontalStackLayout.GestureRecognizers>
                         <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <!-- 操作按钮 -->
-                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
-                        <Button Text="近亲属备案"
-                                Command="{Binding OpenNearRelativeCommand}"
-                                BackgroundColor="#33FFFFFF"
-                                TextColor="White"
-                                FontSize="14"
-                                Padding="16,10"
-                                CornerRadius="20"
-                                VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </Grid>
 

@@ -3,6 +3,7 @@ using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Database;
 using NewCosmos.Services.System;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
@@ -18,16 +19,19 @@ public class ClassificationService : BaseService, IClassificationService
     private readonly IStandardConfigService _standardConfigService;
     private readonly ICapabilityAssessmentService _capabilityAssessmentService;
     private readonly ICollegeStudentService _collegeStudentService;
+    private readonly IDatabaseService _db;
 
     public ClassificationService(
         ILoggerService logger,
         IStandardConfigService standardConfigService,
         ICapabilityAssessmentService capabilityAssessmentService,
-        ICollegeStudentService collegeStudentService) : base(logger)
+        ICollegeStudentService collegeStudentService,
+        IDatabaseService db) : base(logger)
     {
         _standardConfigService = standardConfigService;
         _capabilityAssessmentService = capabilityAssessmentService;
         _collegeStudentService = collegeStudentService;
+        _db = db;
     }
 
     /// <summary>
@@ -835,9 +839,12 @@ public class ClassificationService : BaseService, IClassificationService
     }
 
     /// <summary>
-    /// 计算特困人员照料护理费：读取能力鉴定，按自理能力等级 5 档映射三档标准
-    /// 全自理→全自理档；轻度/中度失能→半自理档；重度/完全失能→无法自理档
-    /// 无能力鉴定记录时返回 0（不清除既有值）
+    /// 计算特困人员照料护理费（按当地最低工资实时计算，《牡丹江市低收入人口认定实施细则》第四十五条）：
+    /// 全自理 = 当地月最低工资÷10；半护理（轻/中度失能）=÷6；全护理（重度/完全失能）=÷4；四舍五入到元。
+    /// 最低工资档位按申请所在区县解析（WageStandardConstants.ResolveLevelType，林口县=第三档 1910 → 191/318/478），
+    /// 数值存 nc_config_standards——标准配置一改，此处与文书输出同步跟随。
+    /// 最低工资配置缺失时回退固定 CaregiverAllowance* 标准（平滑迁移，记 Warn）。
+    /// 无能力鉴定记录时返回 0（不清除既有值）。
     /// </summary>
     public async Task<decimal> CalculateCareAllowanceAsync(long applicationId, CancellationToken ct = default)
     {
@@ -849,15 +856,19 @@ public class ClassificationService : BaseService, IClassificationService
         }
 
         var selfCareLevel = assessmentResult.Value.SelfCareLevel;
-        var standardType = selfCareLevel switch
+        (string? standardType, int divisor) mapping = selfCareLevel switch
         {
-            DictionaryConstants.CapabilityLevel.FULL_SELF_CARE => "CaregiverAllowanceFull",
+            DictionaryConstants.CapabilityLevel.FULL_SELF_CARE
+                => ("CaregiverAllowanceFull", WageStandardConstants.CareAllowanceDivisorFullSelfCare),
             DictionaryConstants.CapabilityLevel.MILD_DISABILITY
-                or DictionaryConstants.CapabilityLevel.MODERATE_DISABILITY => "CaregiverAllowancePartial",
+                or DictionaryConstants.CapabilityLevel.MODERATE_DISABILITY
+                => ("CaregiverAllowancePartial", WageStandardConstants.CareAllowanceDivisorHalfCare),
             DictionaryConstants.CapabilityLevel.SEVERE_DISABILITY
-                or DictionaryConstants.CapabilityLevel.COMPLETE_DISABILITY => "CaregiverAllowanceNone",
-            _ => null
+                or DictionaryConstants.CapabilityLevel.COMPLETE_DISABILITY
+                => ("CaregiverAllowanceNone", WageStandardConstants.CareAllowanceDivisorFullCare),
+            _ => (null, 0)
         };
+        var (standardType, divisor) = mapping;
 
         if (standardType == null)
         {
@@ -865,12 +876,47 @@ public class ClassificationService : BaseService, IClassificationService
             return 0m;
         }
 
-        var result = await _standardConfigService.GetStandardValueAsync(standardType, ct: ct);
-        if (result.IsSuccess)
-            return result.Value;
+        // 公式优先：当地月最低工资 ÷ 除数（单点实现 WageStandardConstants.ComputeCareAllowance）
+        var district = await GetApplicationDistrictAsync(applicationId, ct);
+        var levelType = WageStandardConstants.ResolveLevelType(district);
+        if (!string.IsNullOrWhiteSpace(district) && !WageStandardConstants.IsDistrictKnown(district))
+            LogWarn($"照料护理费：区县「{district}」未收录最低工资档位映射，按第三档计算");
 
-        LogWarn($"照料护理费读取失败: {result.Message}");
+        var wageResult = await _standardConfigService.GetStandardValueAsync(levelType, ct: ct);
+        if (wageResult.IsSuccess && wageResult.Value > 0)
+        {
+            var computed = WageStandardConstants.ComputeCareAllowance(wageResult.Value, divisor);
+            LogInfo($"照料护理费：申请 {applicationId} {selfCareLevel} → {levelType}={wageResult.Value} ÷ {divisor} = {computed}");
+            return computed;
+        }
+
+        // 回退：最低工资配置缺失/无效 → 固定 CaregiverAllowance* 标准（平滑迁移）
+        LogWarn($"照料护理费：最低工资配置读取失败（{levelType}: {wageResult.Message}），回退固定标准 {standardType}");
+        var fallbackResult = await _standardConfigService.GetStandardValueAsync(standardType, ct: ct);
+        if (fallbackResult.IsSuccess)
+            return fallbackResult.Value;
+
+        LogWarn($"照料护理费读取失败: {fallbackResult.Message}");
         return 0m;
+    }
+
+    /// <summary>
+    /// 取申请所在区县（nc_biz_applications.district，供最低工资档位解析）。
+    /// 单列索引点查（非宽表）；查询失败返回 null——按第三档兜底，不阻断护理费计算。
+    /// </summary>
+    private async Task<string?> GetApplicationDistrictAsync(long applicationId, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _db.QuerySingleAsync<string>(
+                "SELECT district FROM nc_biz_applications WHERE id = $1", ct, applicationId);
+            return result.IsSuccess ? result.Value : null;
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"照料护理费：查询申请区县失败: {ex.Message}");
+            return null;
+        }
     }
 
     private static int CalculateAgeFromIdCard(string idCard)

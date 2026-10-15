@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.BankFlow.BankFlowViewPage"
+             x:DataType="BankFlowViewViewModel"
+             Title="银行流水核对"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
+
+        <!-- 渐变英雄头部 -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="16">
+
+                <!-- 返回行 -->
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    <Label Text="返回数据中心" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <!-- 标题与副标题 -->
+                <HorizontalStackLayout Spacing="14">
+                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
+                        <Label Text="{OnPlatform WinUI='&#xE82D;', Android='&#x1F3E6;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="银行流水核对" Style="{StaticResource ModuleHeroTitle}"/>
+                        <Label Text="上级返回的金融资产核对表（余额 / 12月最高流水 / 房产 / 农机），超标仅提示不自动决策" Style="{StaticResource ModuleHeroSubtitle}"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 工具栏：批次筛选 + 搜索 + 导出 -->
+        <Border Grid.Row="1"
+                BackgroundColor="{StaticResource White}"
+                StrokeThickness="0"
+                Padding="24,16">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="4" Opacity="0.06"/>
+            </Border.Shadow>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+
+                <!-- 批次选择 -->
+                <Picker Grid.Column="0"
+                        Title="全部批次"
+                        ItemsSource="{Binding Batches}"
+                        ItemDisplayBinding="{Binding BatchNo}"
+                        SelectedItem="{Binding SelectedBatch, Mode=TwoWay}"
+                        WidthRequest="160"
+                        HeightRequest="40"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Gray100}"
+                        VerticalOptions="Center"/>
+
+                <!-- 搜索 -->
+                <Border Grid.Column="1"
+                        BackgroundColor="{StaticResource Gray100}"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 24"
+                        Padding="16,8">
+                    <Grid ColumnDefinitions="Auto, *, Auto">
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                               FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
+                               FontSize="14"
+                               TextColor="{StaticResource Gray500}"
+                               VerticalOptions="Center"
+                               Margin="0,0,8,0"/>
+                        <Entry Grid.Column="1"
+                               Placeholder="搜索姓名 / 身份证 / 家庭地址"
+                               Text="{Binding SearchText}"
+                               FontSize="15"
+                               BackgroundColor="Transparent"
+                               ReturnCommand="{Binding SearchCommand}"/>
+                        <Button Grid.Column="2"
+                                Text="搜索"
+                                Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding SearchCommand}"
+                                VerticalOptions="Center"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- 仅看超阈值 -->
+                <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
+                    <Switch IsToggled="{Binding ExceedOnly, Mode=TwoWay}"/>
+                    <Label Text="仅看超30月标准"
+                           FontSize="13"
+                           TextColor="{StaticResource TextSecondary}"
+                           VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <Button Grid.Column="3"
+                        Text="导出"
+                        Style="{StaticResource ButtonOutline}"
+                        Command="{Binding ExportCommand}"
+                        VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- 统计 + 刷新 -->
+        <Grid Grid.Row="2" Padding="24,10" ColumnDefinitions="*,Auto" ColumnSpacing="12"
+              BackgroundColor="{StaticResource White}">
+            <Label Grid.Column="0"
+                   Text="{Binding SummaryText}"
+                   FontSize="14"
+                   TextColor="{StaticResource TextSecondary}"
+                   VerticalOptions="Center"/>
+            <Button Grid.Column="1"
+                    Text="刷新"
+                    Style="{StaticResource ButtonSmall}"
+                    Command="{Binding RefreshCommand}"
+                    VerticalOptions="Center"/>
+        </Grid>
+
+        <!-- 数据表格 -->
+        <Border Grid.Row="3"
+                Style="{StaticResource CardBorder}"
+                Padding="0"
+                Margin="24,16"
+                MinimumWidthRequest="900">
+
+            <Grid RowDefinitions="Auto, *, Auto">
+
+                <!-- 表头 -->
+                <Grid Grid.Row="0"
+                      Style="{StaticResource TableHeader}"
+                      Padding="16"
+                      ColumnDefinitions="50, 1*, 1.8*, 1*, 1.2*, 1.2*, 2.4*, 1.1*">
+                    <Label Text="序号" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="1" Text="姓名" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="2" Text="身份证号" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="3" Text="关系" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="4" Text="合计余额(元)" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="5" Text="12月最高流水" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="6" Text="各银行(余额/最高流水)" Style="{StaticResource TableHeaderLabel}"/>
+                    <Label Grid.Column="7" Text="标记" Style="{StaticResource TableHeaderLabel}"/>
+                </Grid>
+
+                <BoxView Grid.Row="0" Grid.ColumnSpan="8" HeightRequest="1"
+                         BackgroundColor="{StaticResource Gray300}" VerticalOptions="End"/>
+
+                <!-- 数据列表 -->
+                <CollectionView Grid.Row="1"
+                                ItemsSource="{Binding Items}">
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无核对数据，请在「数据中心 → 数据导入」选择「银行流水核对导入」导入核对表" Style="{StaticResource EmptyStateLabel}"/>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:BankFlowRecord">
+                            <Grid Padding="16"
+                                  Style="{StaticResource TableRowInteractive}"
+                                  ColumnDefinitions="50, 1*, 1.8*, 1*, 1.2*, 1.2*, 2.4*, 1.1*">
+
+                                <Label Text="{Binding RowNo}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="14" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="{Binding Relationship}" FontSize="14" VerticalOptions="Center"/>
+                                <Label Grid.Column="4" Text="{Binding TotalBalanceDisplay}" FontSize="15" VerticalOptions="Center"/>
+
+                                <!-- 超阈值仅红字提示 -->
+                                <Label Grid.Column="5"
+                                       Text="{Binding MaxFlowAmountDisplay}"
+                                       FontSize="15" VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsExceed}" Value="True">
+                                            <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                            <Setter Property="FontAttributes" Value="Bold"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+
+                                <Label Grid.Column="6"
+                                       Text="{Binding BankSummary}"
+                                       FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       LineBreakMode="TailTruncation"
+                                       VerticalOptions="Center"/>
+
+                                <!-- 标记：超阈值 / 身份证存疑 / 农机超60马力 -->
+                                <HorizontalStackLayout Grid.Column="7" Spacing="4" VerticalOptions="Center">
+                                    <Border IsVisible="{Binding IsExceed}"
+                                            BackgroundColor="#FEE2E2" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8" Padding="6,2">
+                                        <Label Text="超30月" FontSize="11" TextColor="{StaticResource Error}"/>
+                                    </Border>
+                                    <Border IsVisible="{Binding IsIdCardSuspect}"
+                                            BackgroundColor="#FEF3C7" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8" Padding="6,2">
+                                        <Label Text="证存疑" FontSize="11" TextColor="#D97706"/>
+                                    </Border>
+                                    <Border IsVisible="{Binding IsMachineryExceed}"
+                                            BackgroundColor="#FEE2E2" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8" Padding="6,2">
+                                        <Label Text="农机超60马力" FontSize="11" TextColor="{StaticResource Error}"/>
+                                    </Border>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- 分页控件 -->
+                <components:PaginationBarView Grid.Row="2" BackgroundColor="{StaticResource Gray50}"/>
+            </Grid>
+        </Border>
+
+        <!-- 加载指示器 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在加载数据..."/>
+    </Grid>
+</ContentPage>

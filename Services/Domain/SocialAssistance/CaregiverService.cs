@@ -49,22 +49,22 @@ public class CaregiverService : BaseService, ICaregiverService
             for (var chunkStart = 0; chunkStart < caregivers.Count; chunkStart += chunkSize)
             {
                 var chunk = caregivers.Skip(chunkStart).Take(chunkSize).ToList();
-                var (valuesClause, insertArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(chunk.Count, 19, i =>
+                var (valuesClause, insertArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(chunk.Count, 21, i =>
                 {
                     var c = chunk[i];
                     return new object?[] { c.ApplicationId, c.CaredMemberId, c.Name, c.IdCard, c.Phone,
                         c.Relationship, c.Gender, c.Age, c.Ethnicity, c.MaritalStatus,
                         c.HukouType, c.EducationLevel, c.PoliticalStatus,
                         c.HealthStatus, c.EmploymentStatus, c.MainIncomeSource,
-                        c.WorkUnit, c.Position, c.Address };
-                }, s => $"({string.Join(",", Enumerable.Range(0, 19).Select(k => $"${s + k}"))},NOW())");
+                        c.WorkUnit, c.Position, c.Address, c.BankName, c.BankAccount };
+                }, s => $"({string.Join(",", Enumerable.Range(0, 21).Select(k => $"${s + k}"))},NOW())");
 
                 var insSql = $@"INSERT INTO nc_biz_caregivers
                     (application_id, cared_member_id, name, id_card, phone,
                      relationship, gender, age, ethnicity, marital_status,
                      hukou_type, education_level, political_status,
                      health_status, employment_status, main_income_source,
-                     work_unit, position, address, created_at)
+                     work_unit, position, address, bank_name, bank_account, created_at)
                     VALUES {valuesClause}";
                 var insResult = await _db.ExecuteNonQueryAsync(insSql, ct, insertArgs);
                 if (insResult.IsFailure)

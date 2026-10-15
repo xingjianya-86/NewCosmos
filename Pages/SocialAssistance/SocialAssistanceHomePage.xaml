@@ -102,6 +102,13 @@
                                                 Command="{Binding OpenCollegeStudentCommand}"
                                                 Opacity="{Binding SocialAssistanceOpacity}"/>
 
+                        <!-- 近亲属备案 -->
+                        <components:FeatureCard Grid.Row="3" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE787;', Android='&#x1F4CB;'}"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="近亲属备案" Description="工作人员近亲属享受救助备案名册维护"
+                                                Command="{Binding OpenNearRelativeCommand}"
+                                                Opacity="{Binding SocialAssistanceOpacity}"/>
+
                     </Grid>
                 </VerticalStackLayout>
 

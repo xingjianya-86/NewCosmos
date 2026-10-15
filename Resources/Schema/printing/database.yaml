@@ -74,7 +74,7 @@ tables:
       - name: job_kind
         type: character varying(20)
         nullable: false
-        default: Template
+        default: "'Template'"
         comment: 任务类型：Template=模板文书, Photo=照片（手机采集照片远程打印）
       - name: photo_data
         type: bytea

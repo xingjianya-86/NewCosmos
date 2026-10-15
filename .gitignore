@@ -147,3 +147,12 @@ query_db.py
 /shot_small.png
 /ui.xml
 /build_*.log.err
+
+# 公民个人信息（PII）核对表/查询表：一律不入库（含身份证、银行余额）
+*核对表*.xls
+*核对表*.xlsx
+*核对*.xls
+*核对*.xlsx
+*查询金融资产*
+*流水*.xls
+*流水*.xlsx

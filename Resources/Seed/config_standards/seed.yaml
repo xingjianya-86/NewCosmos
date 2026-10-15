@@ -24,16 +24,22 @@ tables:
       - { standard_type: "RuralDestituteStandard", standard_name: "农村特困分散供养标准", hukou_type: "Rural", support_mode: "Scattered", standard_value: 822.00, unit: "元/月", effective_start_date: "2026-08-12", description: "农村特困人员分散供养标准（2026-08-12起）" }
       - { standard_type: "UrbanDestituteStandard", standard_name: "城市特困分散供养标准", hukou_type: "Urban", support_mode: "Scattered", standard_value: 1076.00, unit: "元/月", effective_start_date: "2026-08-12", description: "城市特困人员分散供养标准（2026-08-12起）" }
       
-      # ==================== 照料护理费标准（特困，按自理能力等级三档） ====================
-      - { standard_type: "CaregiverAllowanceFull", standard_name: "全自理照料护理费", hukou_type: null, support_mode: null, standard_value: 191.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-全自理" }
-      - { standard_type: "CaregiverAllowancePartial", standard_name: "半自理照料护理费", hukou_type: null, support_mode: null, standard_value: 319.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-半自理" }
-      - { standard_type: "CaregiverAllowanceNone", standard_name: "无法自理照料护理费", hukou_type: null, support_mode: null, standard_value: 478.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-无法自理" }
+      # ==================== 照料护理费标准（特困；公式回退值） ====================
+      # 计算口径（黑政规〔2025〕1号 + 实施细则第四十五条）：照料护理费 = 当地月最低工资 ÷ 10 / ÷ 6 / ÷ 4，四舍五入到元。
+      # 运行时由 ClassificationService 按 MinWageLevel1/2/3 实时计算，此三行仅作最低工资缺配置时的回退值（1910÷10/6/4 = 191/318/478）。
+      - { standard_type: "CaregiverAllowanceFull", standard_name: "全自理照料护理费", hukou_type: null, support_mode: null, standard_value: 191.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-全自理（回退值：当地最低工资÷10）" }
+      - { standard_type: "CaregiverAllowancePartial", standard_name: "半自理照料护理费", hukou_type: null, support_mode: null, standard_value: 318.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-半自理（回退值：当地最低工资÷6，1910÷6=318）" }
+      - { standard_type: "CaregiverAllowanceNone", standard_name: "无法自理照料护理费", hukou_type: null, support_mode: null, standard_value: 478.00, unit: "元/月", effective_start_date: "2026-08-12", description: "特困人员照料护理费-无法自理（回退值：当地最低工资÷4）" }
       
       # ==================== 渐退期配置 ====================
       - { standard_type: "GracePeriodMonths", standard_name: "渐退期月数", hukou_type: null, support_mode: null, standard_value: 6.00, unit: "月", effective_start_date: "2025-01-01", description: "低保转低收入渐退期默认月数（可选1-12）" }
       
       # ==================== 系统配置 ====================
-      - { standard_type: "MinWage", standard_name: "最低工资标准", hukou_type: null, support_mode: null, standard_value: 1850.00, unit: "元", effective_start_date: "2025-01-01", description: "最低工资标准" }
+      - { standard_type: "MinWage", standard_name: "最低工资标准", hukou_type: null, support_mode: null, standard_value: 1850.00, unit: "元", effective_start_date: "2025-01-01", effective_end_date: "2025-11-30", description: "最低工资标准（已停用：黑政规〔2024〕1号第二档，由 MinWageLevel1/2/3 取代）" }
+      # 黑政规〔2025〕1号三档（2025-12-01起执行）：照料护理费公式 = 当地月最低工资 ÷ 10 / ÷ 6 / ÷ 4
+      - { standard_type: "MinWageLevel1", standard_name: "最低工资标准（第一档）", hukou_type: null, support_mode: null, standard_value: 2270.00, unit: "元/月", effective_start_date: "2025-12-01", description: "黑政规〔2025〕1号第一档：哈尔滨市区（呼兰/阿城/双城除外）、大庆市区" }
+      - { standard_type: "MinWageLevel2", standard_name: "最低工资标准（第二档）", hukou_type: null, support_mode: null, standard_value: 2010.00, unit: "元/月", effective_start_date: "2025-12-01", description: "黑政规〔2025〕1号第二档：牡丹江市区及绥芬河市等" }
+      - { standard_type: "MinWageLevel3", standard_name: "最低工资标准（第三档）", hukou_type: null, support_mode: null, standard_value: 1910.00, unit: "元/月", effective_start_date: "2025-12-01", description: "黑政规〔2025〕1号第三档：伊春市区、黑河市区，全省其他各县（市）——林口县属本档" }
       - { standard_type: "RuralSingleRescue", standard_name: "农村单人救助金额", hukou_type: "Rural", support_mode: null, standard_value: 282.00, unit: "元", effective_start_date: "2025-01-01", effective_end_date: "2026-03-31", description: "2026年4月前农村单人保救助金额" }
       - { standard_type: "UrbanSingleRescue", standard_name: "城市单人救助金额", hukou_type: "Urban", support_mode: null, standard_value: 282.00, unit: "元", effective_start_date: "2025-01-01", effective_end_date: "2026-03-31", description: "2026年4月前城市单人保救助金额" }
       - { standard_type: "RuralSingleRescue", standard_name: "农村单人救助金额", hukou_type: "Rural", support_mode: null, standard_value: 313.00, unit: "元", effective_start_date: "2026-04-01", description: "2026年4月后农村单人保救助金额" }

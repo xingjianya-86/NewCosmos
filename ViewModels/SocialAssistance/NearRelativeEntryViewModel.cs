@@ -28,6 +28,7 @@ public partial class NearRelativeEntryViewModel : ViewModelBase
 
     private long _staffId;
     private DateTime? _loadedUpdatedAt;
+    private NearRelativeEntryParameter? _pendingParameter;
 
     #region 属性
 
@@ -87,7 +88,61 @@ public partial class NearRelativeEntryViewModel : ViewModelBase
     {
         await base.OnAppearingAsync();
         await LoadBriefsAsync();
+        await ApplyPendingParameterAsync();
     }
+
+    #region 导航参数（列表页编辑 / 工作流卡片户主上下文）
+
+    /// <summary>由页面 SetParameterAsync 注入（OnAppearing 前调用），延后到首次出现时应用。</summary>
+    public Task SetNavigationParameter(NearRelativeEntryParameter parameter)
+    {
+        _pendingParameter = parameter;
+        return Task.CompletedTask;
+    }
+
+    private async Task ApplyPendingParameterAsync()
+    {
+        var parameter = _pendingParameter;
+        _pendingParameter = null;
+        if (parameter == null) return;
+
+        // 编辑已有备案（列表页入口）：定位下拉并载入（SelectedBrief 变更自动触发 LoadEntryAsync）
+        if (parameter.StaffId > 0)
+        {
+            var brief = StaffBriefs.FirstOrDefault(b => b.Id == parameter.StaffId);
+            if (brief != null)
+                SelectedBrief = brief;
+            else
+                await LoadEntryAsync(parameter.StaffId);
+            return;
+        }
+
+        // 户主上下文（工作流卡片入口）：填关联申请ID与户主姓名/身份证到对象行
+        if (parameter.ApplicationId is > 0)
+            ApplyFilingContext(parameter.ApplicationId.Value,
+                parameter.ApplicantName ?? string.Empty,
+                parameter.ApplicantIdCard ?? string.Empty);
+    }
+
+    /// <summary>把户主填入第一个空对象行（无空行则追加），并给出关联提示。</summary>
+    private void ApplyFilingContext(long applicationId, string applicantName, string applicantIdCard)
+    {
+        var row = Links.FirstOrDefault(l => string.IsNullOrWhiteSpace(l.IdCard))
+                  ?? (Links.Count == 1 && string.IsNullOrWhiteSpace(Links[0].Name) ? Links[0] : null);
+        if (row == null)
+        {
+            row = new NearRelativeLinkRow();
+            Links.Add(row);
+        }
+
+        row.ApplicationId = applicationId.ToString();
+        row.Name = applicantName;
+        row.IdCard = applicantIdCard;
+        StatusText = $"已关联申请 #{applicationId} 户主 {applicantName}（补全关系等信息后保存）";
+        _logger.Debug($"近亲属备案已带入户主上下文: ApplicationId={applicationId}");
+    }
+
+    #endregion
 
     #region 加载
 

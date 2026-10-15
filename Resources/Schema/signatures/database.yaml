@@ -36,7 +36,7 @@ tables:
       - name: signer_role
         type: character varying(20)
         nullable: false
-        default: 本人
+        default: "'本人'"
         comment: 签名角色：本人 / 代领人 / 经办人
       - name: created_by
         type: integer

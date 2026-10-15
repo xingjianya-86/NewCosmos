@@ -677,6 +677,30 @@ public partial class ArchiveProductionViewModel
         }
     }
 
+    /// <summary>
+    /// 当前登录经办人的证件号与职务（档案 {经办身份证号}{经办人员职务} 数据源，取 users 表 IdentityCard/Position）。
+    /// 无登录态 / 查询失败时返回空串——占位符按空替换，不把"未配"之类的兜底文案打到协议上。
+    /// </summary>
+    private async Task<(string IdCard, string Position)> GetOperatorIdentityAsync()
+    {
+        try
+        {
+            var userId = App.CurrentUserId;
+            if (!userId.HasValue) return ("", "");
+
+            var userService = _serviceProvider.GetRequiredService<IUserService>();
+            var userResult = await userService.GetByIdAsync(userId.Value);
+            if (userResult.IsSuccess && userResult.Value != null)
+                return (userResult.Value.IdentityCard ?? "", userResult.Value.Position ?? "");
+
+            return ("", "");
+        }
+        catch
+        {
+            return ("", "");
+        }
+    }
+
     private async Task<OrganizationInfoDto> GetOrganizationInfoAsync()
     {
         var orgId = App.CurrentUserOrganizationId;

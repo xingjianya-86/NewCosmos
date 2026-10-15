@@ -1,5 +1,6 @@
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
+using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
@@ -10,11 +11,24 @@ public class StatisticsService : BaseService, IStatisticsService
 {
     protected override string ServiceName => "StatisticsService";
     private readonly IDatabaseService _dbService;
+    private readonly Services.Utilities.IBusinessTimelineService _timelineService;
 
-    public StatisticsService(IDatabaseService dbService, ILoggerService logger)
+    public StatisticsService(IDatabaseService dbService, ILoggerService logger,
+        Services.Utilities.IBusinessTimelineService timelineService)
         : base(logger)
     {
         _dbService = dbService;
+        _timelineService = timelineService;
+    }
+
+    /// <summary>
+    /// B 线统计周期 [起, 止)：统一走 BusinessTimelineService（含结算日节假日惩罚），
+    /// 与月报 GetCycleRangeAsync / 档案公示、卷号同源；半开区间（结算日当天仍属本周期）。
+    /// </summary>
+    private async Task<(DateTime Start, DateTime End)> GetBCycleWindowAsync(DateTime now, CancellationToken ct)
+    {
+        var tl = await _timelineService.CalculateTimelineAsync(now.Year, now.Month, TimelineType.BusinessProcess);
+        return (tl.CycleStartDate.Date, tl.CycleEndDate.Date.AddDays(1));
     }
 
     public async Task<Result<int>> GetPendingApprovalsCountAsync(CancellationToken ct = default)
@@ -110,10 +124,9 @@ public class StatisticsService : BaseService, IStatisticsService
             // - 本月总退出 = status=ApplicationStatusCodes.STOPPED 且 stop_date∈B线周期（月报"停保汇总"口径）
             // - 新申请资产核查 = nc_biz_asset_checks 中 status='0'（已申请未出授权报告）且 application_date∈B线周期
             // - 本月新增高龄老人 = nc_biz_elderly_applications 中 status∈(Confirmed,Stopped) 且 apply_date∈当月自然月
-            // B 线周期日期运算统一引用 BusinessCycleHelper（唯一事实来源，与 GetCycleRangeAsync 同源）。
+            // B 线周期统一走 BusinessTimelineService（唯一事实来源，与 GetCycleRangeAsync、档案公示/卷号同源）。
             var now = DateTime.Now;
-            var bStart = Helpers.BusinessCycleHelper.GetStart(now.Year, now.Month);  // 周期起点（默认上月16日；结算日可配置）
-            var bEnd = Helpers.BusinessCycleHelper.GetEnd(now.Year, now.Month);      // 周期终点（默认本月16日；结算日可配置）
+            var (bStart, bEnd) = await GetBCycleWindowAsync(now, ct);   // B 线周期 [起, 止)
             var mStart = new DateTime(now.Year, now.Month, 1);                        // 当月1日
             var mEnd = mStart.AddMonths(1);                                           // 次月1日
 
@@ -184,13 +197,12 @@ public class StatisticsService : BaseService, IStatisticsService
 
         try
         {
-            // 口径与 GetDashboardStatisticsAsync 完全一致（B 线周期，日期运算引用 BusinessCycleHelper）：
+            // 口径与 GetDashboardStatisticsAsync 完全一致（B 线周期，统一走 BusinessTimelineService）：
             // - 在享保障对象 = status=APPROVED
             // - 本月总新增   = status=APPROVED 且 first_approved_at∈B线周期
             // - 本月总退出   = status=STOPPED 且 stop_date∈B线周期
             var now = DateTime.Now;
-            var bStart = Helpers.BusinessCycleHelper.GetStart(now.Year, now.Month); // 周期起点（默认上月16日；结算日可配置）
-            var bEnd = Helpers.BusinessCycleHelper.GetEnd(now.Year, now.Month);     // 周期终点（默认本月16日；结算日可配置）
+            var (bStart, bEnd) = await GetBCycleWindowAsync(now, ct); // B 线周期 [起, 止)
 
             var sql = $@"
                 SELECT

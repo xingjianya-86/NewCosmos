@@ -619,7 +619,7 @@ public partial class SchemaService
             }
 
             var nullableClause = column.Nullable ? "" : " NOT NULL";
-            var defaultClause = string.IsNullOrEmpty(column.Default) ? "" : " DEFAULT " + column.Default;
+            var defaultClause = string.IsNullOrEmpty(column.Default) ? "" : " DEFAULT " + FormatDefaultValue(column.Default);
             var sql = "ALTER TABLE " + diff.TableName + " ADD COLUMN " + column.Name + " " + column.Type + nullableClause + defaultClause;
 
             var execResult = await _dbService.ExecuteNonQueryAsync(sql, ct);

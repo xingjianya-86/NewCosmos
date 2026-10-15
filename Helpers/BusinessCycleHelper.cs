@@ -3,11 +3,11 @@ using NewCosmos.Constants;
 namespace NewCosmos.Helpers;
 
 /// <summary>
-/// B 线业务统计周期（月报/仪表盘统一口径）的唯一事实来源：
-/// 周期 = [上月(结算日+1) 日 00:00（含）, 本月(结算日+1) 日 00:00（不含）)。
-/// 默认结算日 15（例：2026-08 → [2026-07-16, 2026-08-16)）；
-/// 上级业务截止 20 号时由 app.ini 的 BCycleSettleDay=20 覆盖为 [上月21, 本月21)。
-/// 所有涉及"B 线周期"的统计必须引用本类，禁止在调用点内联复制日期运算。
+/// B 线结算日参数（app.ini 的 BCycleSettleDay，启动时注入）的唯一事实来源。
+/// ⚠️ 周期权威口径在 <c>Services.Utilities.BusinessTimelineService</c>（含结算日遇法定节假日提前的惩罚）：
+/// 周期 = [上月(结算日+1)日, 本月结算日]（结算日当天仍属本周期）。
+/// 本类 GetStart/GetEnd 只是"无节假日修正"的纯日期运算；统计/月报/档案一律走 BusinessTimelineService，
+/// 禁止再引用 GetStart/GetEnd 计算统计区间（曾导致统计周期与档案公示窗口两套口径分裂）。
 /// </summary>
 public static class BusinessCycleHelper
 {
