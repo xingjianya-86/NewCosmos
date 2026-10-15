@@ -66,16 +66,22 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
                                && current.IsEligible == false;
             var targetStatus = isIneligible ? ApplicationStatus.Stopped : ApplicationStatus.Approved;
 
-            // 已 Approved/Completed：仅推进步骤（幂等），不改状态避免降级
+            // 已 Approved/Completed：仅推进步骤（幂等），不改状态避免降级。
+            // 顺带补空 first_approved_at（COALESCE，已有值不覆盖）：走「归档判停→恢复在保」路径的档案
+            // 从未经过写首审时间的分支，会永久为 NULL —— 补打中心按月查询强制
+            // first_approved_at IS NOT NULL，该档案任何年月都查不到；月报"本月新增"同样漏计。
+            // 此处是存量自愈入口：下次完成归档即补齐。
             if (currentStatus is ApplicationStatus.Approved or ApplicationStatus.Completed)
             {
                 var stepOnly = await _db.ExecuteNonQueryAsync(
-                    @"UPDATE nc_biz_applications SET current_step = $2, updated_at = NOW()
+                    @"UPDATE nc_biz_applications SET current_step = $2,
+                        first_approved_at = COALESCE(first_approved_at, NOW()), updated_at = NOW()
                       WHERE id = $1 AND deleted_at IS NULL", ct, applicationId, WorkflowSteps.ARCHIVED);
                 if (stepOnly.IsFailure)
                     return Result.Failure(stepOnly.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         stepOnly.Message ?? "归档推进步骤失败");
-                await WriteAuditAsync(applicationId, "完成归档", "已 Approved/Completed，仅推进 current_step=6",
+                await WriteAuditAsync(applicationId, "完成归档",
+                    "已 Approved/Completed，仅推进 current_step=6（first_approved_at 为空则补空，不覆盖原值）",
                     current.Status, current.Status, operatorName, ct);
                 LogInfo($"归档完成（幂等，状态未变）: ApplicationId={applicationId}, Status={current.Status}");
                 return Result.Success();
@@ -170,6 +176,91 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
         CancellationToken ct = default)
         => TransitionAsync(applicationId, ApplicationStatus.Stopped, operatorName, stopReason, stopDate,
             action: "停保", detail: stopReason, allowSubmittedOverride: allowSubmittedOverride, ct: ct);
+
+    /// <inheritdoc />
+    public async Task<Result> ResumeAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    {
+        const string action = "恢复保障";
+        try
+        {
+            var appResult = await _db.QuerySingleAsync<StatusRow>(
+                "SELECT id, status, current_step, stop_reason FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL",
+                ct, applicationId);
+            if (appResult.IsFailure)
+                return Result.Failure(appResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    appResult.Message ?? "读取申请状态失败");
+            if (appResult.Value == null)
+                return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+
+            var current = appResult.Value;
+            var currentStatus = ApplicationStatusExtensions.FromCode(current.Status ?? string.Empty);
+
+            // 幂等：已在保无需恢复
+            if (currentStatus is ApplicationStatus.Approved or ApplicationStatus.Completed)
+                return Result.Success();
+
+            // 只有已停保档案可恢复（Draft/Refused 从未进入保障，不存在"恢复"一说）
+            if (currentStatus != ApplicationStatus.Stopped)
+                return Result.Failure(ErrorCodes.INVALID_TRANSITION,
+                    $"仅已停保档案可恢复保障，当前状态：{currentStatus.GetDescription()}");
+
+            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Approved);
+            if (transition.IsFailure)
+                return Result.Failure(ErrorCodes.INVALID_TRANSITION,
+                    transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 {ApplicationStatus.Approved.GetDescription()}");
+
+            // 守卫：停旧建新链上已有未删除的下游新档 → 拒绝恢复，
+            // 否则旧档与新档同时在保，同一家庭会出现两份在保档案（统计、月报口径同时失真）。
+            var chainResult = await _db.ExecuteScalarAsync(
+                "SELECT COUNT(*) FROM nc_biz_applications WHERE original_application_id = $1 AND deleted_at IS NULL",
+                ct, applicationId);
+            if (chainResult.IsFailure)
+                return Result.Failure(chainResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    chainResult.Message ?? "恢复保障前置检查失败");
+            if (Convert.ToInt32(chainResult.Value) > 0)
+                return Result.Failure(ErrorCodes.INVALID_TRANSITION,
+                    "该停保档案已停旧建新生成新档案，不可恢复；请在新档案上办理业务");
+
+            // 状态与配套列单点写入：恢复为在保并清空停保标记（current_step 不动）。
+            // first_approved_at 只补空不覆盖（COALESCE，与 ApproveAsync/完成归档/补全同一口径）：
+            // 「归档判停 → 恢复在保」是 Approved 的旁路出口，若不补空，先判停后恢复的档案
+            // 首次审批时间永久为 NULL（补打中心按月查询、月报"本月新增"均按该列过滤，会永远漏掉它）。
+            var sets = new List<string>
+            {
+                "status = $1", "stop_reason = NULL", "stop_date = NULL",
+                "first_approved_at = COALESCE(first_approved_at, NOW())", "updated_at = NOW()"
+            };
+            var args = new List<object?> { ApplicationStatus.Approved.GetCode() };
+            if (!string.IsNullOrEmpty(operatorName))
+            {
+                args.Add(operatorName);
+                sets.Add($"updated_by = ${args.Count}");
+            }
+            args.Add(applicationId);
+            var updateSql = $@"UPDATE nc_biz_applications SET {string.Join(", ", sets)}
+                               WHERE id = ${args.Count} AND deleted_at IS NULL";
+            var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct, args.ToArray());
+            if (updateResult.IsFailure)
+                return Result.Failure(updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    updateResult.Message ?? "状态更新失败");
+            if (updateResult.Value == 0)
+                return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+
+            await WriteAuditAsync(applicationId, action,
+                $"恢复在保：status=Approved、stop_reason/stop_date 清空（原停保原因：{current.StopReason ?? "无"}）",
+                currentStatus.GetDescription(), ApplicationStatus.Approved.GetDescription(), operatorName, ct);
+
+            Logger.LogBusiness(action, ("ApplicationId", applicationId),
+                ("Operator", operatorName ?? string.Empty));
+            LogInfo($"{action}: ApplicationId={applicationId}, {currentStatus.GetDescription()} → {ApplicationStatus.Approved.GetDescription()}");
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, action);
+            return Result.FromException(ex);
+        }
+    }
 
     /// <summary>
     /// 状态流转单点实现：校验 → 写状态与配套列 → 审计留痕。
@@ -298,6 +389,7 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
         public int CurrentStep { get; set; }
         public bool? IsEligible { get; set; }
         public string? ClassificationResult { get; set; }
+        public string? StopReason { get; set; }
     }
 
     /// <summary>归档终结的停保原因（复核判定不合格），如「复核判定不合格 · 收入超标」。</summary>

@@ -100,6 +100,10 @@
                                 BorderColor="{StaticResource Primary}" BorderWidth="1"
                                 Command="{Binding ViewCurrentArchiveCommand}" IsVisible="{Binding IsCurrentLibrary}"/>
 
+                        <Button Text="档案照片（采集/查阅）" HeightRequest="42" FontSize="14" CornerRadius="10"
+                                BackgroundColor="{StaticResource SecondaryDark}" TextColor="White"
+                                Command="{Binding OpenArchivePhotosCommand}"/>
+
                         <VerticalStackLayout Spacing="8" IsVisible="{Binding IsImportedLibrary}">
                             <Label Text="数据摘要（历史库）" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding SummaryFields}" IsVisible="{Binding HasImportedDetail}">

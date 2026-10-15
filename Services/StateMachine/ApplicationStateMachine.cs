@@ -31,7 +31,11 @@ public static class ApplicationStateMachine
             ApplicationStatus.Stopped
         },
         [ApplicationStatus.Refused] = new HashSet<ApplicationStatus>(),
-        [ApplicationStatus.Stopped] = new HashSet<ApplicationStatus>()
+        // 恢复保障：已停保 → 在保（唯一出口，见 IApplicationStatusService.ResumeAsync）
+        [ApplicationStatus.Stopped] = new HashSet<ApplicationStatus>
+        {
+            ApplicationStatus.Approved
+        }
     };
 
     /// <summary>
@@ -74,9 +78,10 @@ public static class ApplicationStateMachine
     }
 
     /// <summary>
-    /// 判断是否为终    /// </summary>
+    /// 判断是否为终态（Refused 为终态；Stopped 可经"恢复保障"回到 Approved，不再是终态）
+    /// </summary>
     public static bool IsFinalState(ApplicationStatus status) =>
-        status is ApplicationStatus.Refused or ApplicationStatus.Stopped;
+        status == ApplicationStatus.Refused;
 
     /// <summary>
     /// 判断是否为活动状态    /// </summary>

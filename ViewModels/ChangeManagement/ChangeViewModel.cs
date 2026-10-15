@@ -364,7 +364,7 @@ public partial class ChangeViewModel : ViewModelBase
 
         await ShowTipAsync(status switch
         {
-            ApplicationStatusCodes.STOPPED => "已停保档案不可变更。如需调整请先办理恢复保障。",
+            ApplicationStatusCodes.STOPPED => "已停保档案不可变更。请先在上方办理「恢复保障」。",
             ApplicationStatusCodes.REFUSED => "不予受理的档案不可变更。",
             _ => "档案尚未完成归档（仍在草稿阶段），请先完成建档归档后再办理变更。"
         });
@@ -436,7 +436,8 @@ public partial class ChangeViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         Services.Domain.Reporting.IStatisticsService statisticsService,
         IGracePeriodService gracePeriodService,
-        Services.Utilities.IBusinessTimelineService businessTimelineService)
+        Services.Utilities.IBusinessTimelineService businessTimelineService,
+        IApplicationStatusService applicationStatusService)
     {
         _applicationService = applicationService;
         _changeService = changeService;
@@ -448,12 +449,14 @@ public partial class ChangeViewModel : ViewModelBase
         _statisticsService = statisticsService;
         _gracePeriodService = gracePeriodService;
         _businessTimelineService = businessTimelineService;
+        _applicationStatusService = applicationStatusService;
         Title = "保障对象动态管理";
     }
 
     private readonly Services.Domain.Reporting.IStatisticsService _statisticsService = null!;
     private readonly IGracePeriodService _gracePeriodService = null!;
     private readonly Services.Utilities.IBusinessTimelineService _businessTimelineService = null!;
+    private readonly IApplicationStatusService _applicationStatusService = null!;
 
     #region 页头统计栏
 
@@ -853,6 +856,67 @@ public partial class ChangeViewModel : ViewModelBase
 
         _logger.LogBusiness("导航到户主变更", ("ApplicationId", ApplicationId));
         await NavigateToPageAsync<Pages.ChangeManagement.HeadChangePage, long>(ApplicationId);
+    }
+
+    /// <summary>
+    /// 恢复保障：已停保档案 → 在保（Stopped → Approved，清 stop_reason/stop_date，写审计）。
+    /// 与 6 个变更入口不同，本命令只对已停保档案开放（IsApplicationStopped 门控），
+    /// 服务层另有停旧建新链守卫（已有下游新档的旧档拒绝恢复）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ResumeGuaranteeAsync()
+    {
+        if (!await EnsureApplicationSelectedAsync()) return;
+
+        // 先判停保再走 PrepareForChange：导入库档案 IsApplicationStopped 恒为 false，
+        // 提前短路可避免"自动建档"产生无谓副作用（当前库停保档 ApplicationId 已就绪，无影响）
+        if (!IsApplicationStopped)
+        {
+            await ShowTipAsync("该档案当前非已停保状态，无需恢复保障");
+            return;
+        }
+
+        if (!await PrepareForChangeAsync()) return;
+        if (!await EnsureValidApplicationIdAsync()) return;
+
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+        var confirm = await dialog.DisplayAlertAsync(
+            "恢复保障", "确定将该档案恢复为在保？恢复后可继续办理变更业务。", "确定", "取消");
+        if (!confirm) return;
+
+        try
+        {
+            IsBusy = true;
+
+            var operatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+            var result = await _applicationStatusService.ResumeAsync(ApplicationId, operatorName, CancellationToken);
+            if (result.IsFailure)
+            {
+                await ShowTipAsync(result.Message ?? "恢复保障失败");
+                return;
+            }
+
+            _logger.LogBusiness("恢复保障成功", ("ApplicationId", ApplicationId), ("Operator", operatorName));
+
+            // 刷新档案信息：状态徽标变「已审批」、IsApplicationStopped 复位 → 变更入口重新显示
+            await LoadApplicationInfoAsync(ApplicationId);
+
+            // 分类护栏：归档终结停保（判定不合格 / 分类属停保族）的档案恢复后分类仍是停保类，
+            // 不重新认定会出现「在保但分类为停保类」的脏口径 → 明确引导先办经济状况复核。
+            if (ClassificationConstants.StopCategoryCodes.Contains(CurrentClassification))
+                await ShowTipAsync("恢复成功。该档案原判定不合格，请接着办理「经济状况复核」重新认定分类后再调整待遇。");
+            else
+                await ShowTipAsync("恢复保障成功，档案已恢复为在保，可继续办理变更业务。");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"恢复保障失败: {ex.Message}");
+            await ShowTipAsync("恢复保障失败，请查看日志");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     #endregion

@@ -711,6 +711,25 @@ public partial class ArchiveQueryViewModel : ViewModelBase
 
     #endregion
 
+    #region 档案照片采集
+
+    /// <summary>进入该人员的档案照片采集页（手机端采集证件/核查照片，按人归档）</summary>
+    [RelayCommand]
+    private async Task OpenArchivePhotosAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            await ShowTipAsync("请先选择一位人员，再采集其档案照片");
+            return;
+        }
+
+        _logger.LogBusiness("档案查询-档案照片采集", ("ApplicationId", _proofBusinessId?.ToString() ?? ""));
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(ApplicantIdCard, _proofBusinessId, ApplicantName));
+    }
+
+    #endregion
+
     #region 每月公示文档输出
 
     /// <summary>进入每月公示文档输出页（公示人员以导入库为准）</summary>

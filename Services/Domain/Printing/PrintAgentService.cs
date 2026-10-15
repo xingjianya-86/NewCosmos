@@ -18,6 +18,7 @@ public class PrintAgentService : IPrintAgentService
 
     private readonly IPrintQueueService _queueService;
     private readonly IPrintExecuteService _printExecuteService;
+    private readonly IPhotoPrintService _photoPrintService;
     private readonly ILoggerService _logger;
 
     private readonly object _gate = new();
@@ -27,10 +28,12 @@ public class PrintAgentService : IPrintAgentService
     public PrintAgentService(
         IPrintQueueService queueService,
         IPrintExecuteService printExecuteService,
+        IPhotoPrintService photoPrintService,
         ILoggerService logger)
     {
         _queueService = queueService;
         _printExecuteService = printExecuteService;
+        _photoPrintService = photoPrintService;
         _logger = logger;
     }
 
@@ -108,6 +111,13 @@ public class PrintAgentService : IPrintAgentService
 
     private async Task ExecuteJobAsync(PrintJob job, CancellationToken ct)
     {
+        // 照片任务（JobKind=Photo）：直接打印内联照片，不走模板路径
+        if (string.Equals(job.JobKind, PrintJobConstants.JobKindPhoto, StringComparison.OrdinalIgnoreCase))
+        {
+            await ExecutePhotoJobAsync(job, ct);
+            return;
+        }
+
         if (job.TemplateId is null or <= 0)
         {
             await _queueService.FailAsync(job.Id, "任务缺少模板ID，无法打印", ct);
@@ -175,6 +185,57 @@ public class PrintAgentService : IPrintAgentService
         {
             _logger.LogError(ex, $"推送打印任务执行异常: JobNo={job.JobNo}");
             // [CT 豁免] 失败状态回写必须完成（取消会导致任务永久卡在 Processing）
+            await _queueService.FailAsync(job.Id, ex.Message, CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// 执行照片打印任务：照片二进制内联在队列里，直接调 <see cref="IPhotoPrintService"/> 打印。
+    /// 缺照片数据 → 显式失败（不静默跳过）。
+    /// </summary>
+    private async Task ExecutePhotoJobAsync(PrintJob job, CancellationToken ct)
+    {
+        if (job.PhotoData == null || job.PhotoData.Length == 0)
+        {
+            _logger.Error($"照片打印任务缺少照片数据: JobNo={job.JobNo}");
+            await _queueService.FailAsync(job.Id, "照片打印任务缺少照片数据，无法打印", ct);
+            return;
+        }
+
+        try
+        {
+            var result = await _photoPrintService.PrintPhotoAsync(
+                job.PhotoData,
+                job.PhotoLayout,
+                job.PrinterName,
+                job.IsDuplex,
+                job.Copies,
+                ct);
+
+            if (result.IsSuccess)
+            {
+                _logger.LogBusiness("照片打印完成",
+                    ("JobNo", job.JobNo),
+                    ("Category", job.PhotoCategory ?? ""),
+                    ("Layout", job.PhotoLayout ?? ""),
+                    ("Applicant", job.ApplicantName ?? ""));
+                await _queueService.CompleteAsync(job.Id, ct);
+            }
+            else
+            {
+                await _queueService.FailAsync(job.Id, result.Message ?? "照片打印失败", ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // [CT 豁免] 状态回写必须完成（取消会导致任务永久卡在 Processing）
+            await _queueService.FailAsync(job.Id, "照片打印任务被取消，请重试", CancellationToken.None);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"照片打印任务执行异常: JobNo={job.JobNo}");
+            // [CT 豁免] 失败状态回写必须完成
             await _queueService.FailAsync(job.Id, ex.Message, CancellationToken.None);
         }
     }

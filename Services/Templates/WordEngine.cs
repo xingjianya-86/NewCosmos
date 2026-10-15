@@ -232,6 +232,105 @@ public class WordEngine : ITemplateEngine
     }
 
     /// <summary>
+    /// 把签名等图片占位符替换为内嵌图片（docx：InlineShapes.AddPicture）。
+    /// 每个占位符写临时 PNG 后插入，随后删除临时文件（AddPicture SaveWithDocument=true 已内嵌字节）。
+    /// 插入后按固定宽度等比缩放，保证签名框观感一致。失败仅记 Warn，不阻断打印。
+    /// </summary>
+    public void ReplaceImageFields(Dictionary<string, byte[]> images)
+    {
+        if (images == null || images.Count == 0) return;
+        if (_doc == null) return;
+
+        _logger.Info($"WordEngine: 插入图片占位符 {images.Count} 个");
+
+        OfficeComWorker.Instance.Invoke<object?>($"插入图片占位符 {images.Count} 个", OfficeAppKind.Word, ctx =>
+        {
+            foreach (var kvp in images)
+            {
+                ReplaceImageFieldOnWorker(kvp.Key, kvp.Value);
+            }
+            return null;
+        });
+    }
+
+    /// <summary>单个图片占位符插入（worker 线程）：Find 定位 → 临时 PNG → InlineShapes.AddPicture。</summary>
+    private void ReplaceImageFieldOnWorker(string placeholder, byte[] imageBytes)
+    {
+        if (_doc is null || string.IsNullOrEmpty(placeholder)) return;
+        if (imageBytes == null || imageBytes.Length == 0) return;
+
+        string tempPath = string.Empty;
+        try
+        {
+            tempPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".png", prefix: "sig_");
+            File.WriteAllBytes(tempPath, imageBytes);
+
+            var maxHits = 20; // 防御异常模板死循环
+            var inserted = 0;
+
+            while (inserted < maxHits)
+            {
+                var searchRange = _doc.Content;
+                var find = searchRange.Find;
+                dynamic? shape = null;
+                try
+                {
+                    find.ClearFormatting();
+                    find.Forward = true;
+                    find.Wrap = 0;
+                    find.MatchCase = false;
+                    find.MatchWholeWord = false;
+
+                    if (!find.Execute(FindText: placeholder)) break;
+
+                    // AddPicture(FileName, LinkToFile, SaveWithDocument, Range)
+                    // SaveWithDocument=true：字节内嵌进 docx，临时文件随后可删
+                    shape = searchRange.InlineShapes.AddPicture(tempPath, false, true, searchRange);
+                    try
+                    {
+                        shape.LockAspectRatio = -1; // msoTrue：等比缩放
+                        shape.Width = 160;          // 约 2.2 英寸，签名框统一宽度
+                    }
+                    catch
+                    {
+                        // 尺寸调整失败不影响插入结果
+                    }
+
+                    inserted++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"WordEngine: 插入图片占位符 {placeholder} 失败: {ex.Message}");
+                    break;
+                }
+                finally
+                {
+                    SafeRelease(shape, find, searchRange);
+                }
+            }
+
+            if (inserted > 0)
+                _logger.Debug($"WordEngine: 插入图片占位符 {placeholder} ×{inserted}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"WordEngine: 图片占位符 {placeholder} 处理失败: {ex.Message}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch
+            {
+                // 临时文件删除失败不影响主流程
+            }
+        }
+    }
+
+    /// <summary>
     /// 删除内容仅为单个待删占位符的整段（含段落标记）。用于会议记录模板多余的成员行，
     /// 必须在 ReplaceFields 之前调用（此时段内为占位符原文，匹配最稳）。
     /// </summary>

@@ -1,0 +1,57 @@
+# 签名留痕Schema定义
+# 存储手写签名 PNG 及其业务上下文，供文书渲染时嵌入「本人签名」等占位符位置。
+database: 签名留痕
+version: 1.0
+description: 手写签名采集与留痕（生物特征留痕数据，仅存 PNG 图像，不做比对识别）
+
+tables:
+  - name: nc_biz_signatures
+    comment: 签名留痕表 - 手写签名 PNG 及关联业务上下文（本人/代领人/经办人）
+    columns:
+      - name: id
+        type: bigserial
+        nullable: false
+        primaryKey: true
+        comment: 自增主键
+      - name: signature_data
+        type: bytea
+        nullable: false
+        comment: 签名PNG二进制（灰度图，白底黑字）
+      - name: applicant_id_card
+        type: character varying(30)
+        nullable: false
+        comment: 申请人/签名关联人身份证号（跨端匹配打印任务的关键字段）
+      - name: business_type
+        type: character varying(50)
+        nullable: false
+        comment: 业务类型（与打印 businessType 同一口径，如 FamilyApplication / TempRelief）
+      - name: business_id
+        type: bigint
+        nullable: true
+        comment: 业务记录ID（如 nc_biz_applications.id）
+      - name: signer_name
+        type: character varying(100)
+        nullable: true
+        comment: 签名显示名（如"张三"），仅用于留痕展示
+      - name: signer_role
+        type: character varying(20)
+        nullable: false
+        default: 本人
+        comment: 签名角色：本人 / 代领人 / 经办人
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 采集人ID（nc_sys_users.id）
+      - name: created_by_name
+        type: character varying(100)
+        nullable: true
+        comment: 采集人姓名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 采集时间
+    indexes:
+      - name: idx_signatures_applicant_business
+        columns: [applicant_id_card, business_type, created_at]
+      - name: idx_signatures_business
+        columns: [business_type, business_id]

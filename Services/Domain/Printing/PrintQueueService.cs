@@ -36,14 +36,24 @@ public class PrintQueueService : BaseService, IPrintQueueService
             ? null
             : JsonSerializer.Serialize(request.SupporterTableData, JsonOptions);
 
+        // 照片任务校验：PhotoData 必填（PC 代理直接打印内联照片，不回查照片表）
+        var jobKind = string.IsNullOrWhiteSpace(request.JobKind)
+            ? PrintJobConstants.JobKindTemplate
+            : request.JobKind;
+        if (jobKind == PrintJobConstants.JobKindPhoto
+            && (request.PhotoData == null || request.PhotoData.Length == 0))
+            return Result.Failure<PrintJob>(ErrorCodes.VALIDATION_FAILED, "照片打印任务缺少照片数据");
+
         const string sql = @"INSERT INTO nc_biz_print_jobs
                 (job_no, business_type, business_id, classification, template_id, template_name,
                  applicant_name, applicant_id_card, printer_name, copies, is_duplex,
                  fields_json, table_rows_json, supporter_table_data_json,
+                 job_kind, photo_data, photo_layout, photo_category,
                  status, requested_by, requested_by_name, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
                         $12::jsonb, $13::jsonb, $14::jsonb,
-                        $17, $15, $16, NOW())
+                        $15, $16, $17, $18,
+                        $21, $19, $20, NOW())
                 RETURNING id, job_no, status, created_at";
 
         var result = await _db.QuerySingleAsync<PrintJob>(sql, ct,
@@ -52,6 +62,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
             request.ApplicantName, request.ApplicantIdCard, request.PrinterName,
             request.Copies, request.IsDuplex,
             fieldsJson, tableRowsJson, supporterJson,
+            jobKind, request.PhotoData, request.PhotoLayout, request.PhotoCategory,
             request.RequestedBy, request.RequestedByName,
             PrintJobConstants.StatusPending);
 
@@ -65,7 +76,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
         job.JobNo = jobNo;
         job.BusinessType = request.BusinessType;
         job.TemplateName = request.TemplateName;
-        LogInfo($"打印任务入队: {jobNo} ({request.BusinessType})");
+        LogInfo($"打印任务入队: {jobNo} ({request.BusinessType}, Kind={jobKind})");
 
         var full = await GetByIdAsync(job.Id, ct);
         return full.IsSuccess && full.Value != null ? Result.Success(full.Value) : Result.Success(job);
@@ -88,6 +99,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
                 )
                 RETURNING id, job_no, business_type, business_id, classification, template_id, template_name,
                           applicant_name, applicant_id_card, printer_name, copies, is_duplex,
+                          job_kind, photo_data, photo_layout, photo_category,
                           fields_json::text AS FieldsJson,
                           table_rows_json::text AS TableRowsJson,
                           supporter_table_data_json::text AS SupporterTableDataJson,
@@ -160,6 +172,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
 
         const string sql = @"SELECT id, job_no, business_type, business_id, classification, template_id, template_name,
                                     applicant_name, applicant_id_card, printer_name, copies, is_duplex,
+                                    job_kind, photo_category,
                                     status, error_message, requested_by, requested_by_name, agent_machine,
                                     created_at, claimed_at, completed_at
                              FROM nc_biz_print_jobs
@@ -193,6 +206,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
     {
         const string sql = @"SELECT id, job_no, business_type, business_id, classification, template_id, template_name,
                                     applicant_name, applicant_id_card, printer_name, copies, is_duplex,
+                                    job_kind, photo_data, photo_layout, photo_category,
                                     fields_json::text AS FieldsJson,
                                     table_rows_json::text AS TableRowsJson,
                                     supporter_table_data_json::text AS SupporterTableDataJson,

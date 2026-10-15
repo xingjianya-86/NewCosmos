@@ -1334,6 +1334,17 @@ public partial class ApplicationFormViewModel
                 continue;
             }
 
+            // 共同生活成员的户籍界面本就「共享只读」（显示主申请人户籍），
+            // 保存时同步为主申请人的户籍，避免库里残留建档时的旧快照
+            if (member.MemberCategory == MemberCategoryConstants.SHARED_LIVING)
+            {
+                member.HukouProvince = HukouProvince;
+                member.HukouCity = HukouCity;
+                member.HukouDistrict = HukouDistrict;
+                member.HukouTown = HukouTown;
+                member.HukouAddress = HukouAddress;
+            }
+
             var request = new FamilyMemberCreateRequest
             {
                 ApplicationId = _applicationId,

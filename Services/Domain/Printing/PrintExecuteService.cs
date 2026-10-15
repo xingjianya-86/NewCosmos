@@ -40,6 +40,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
     private readonly IPrintRecordService _printRecordService;
     private readonly IDatabaseService _db;
     private readonly INewPermissionService _permissionService;
+    private readonly Signatures.ISignatureService _signatureService;
 
     public PrintExecuteService(
         IPrintService printService,
@@ -48,6 +49,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         IPrintRecordService printRecordService,
         IDatabaseService db,
         INewPermissionService permissionService,
+        Signatures.ISignatureService signatureService,
         ILoggerService logger) : base(logger)
     {
         _printService = printService;
@@ -56,6 +58,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         _printRecordService = printRecordService;
         _db = db;
         _permissionService = permissionService;
+        _signatureService = signatureService;
     }
 
     public async Task<Result<byte[]>> GeneratePreviewPdfAsync(
@@ -205,6 +208,9 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
             // 直接从已取回的模板解析 config（原实现 GetTemplateConfigAsync 会再次 GetByIdAsync，纯冗余往返）
             var config = string.IsNullOrEmpty(template.ConfigJson) ? null : TemplateConfig.FromJson(template.ConfigJson);
 
+            // 签名嵌入准备：模板含 SIGNATURE_* 占位符时，从 nc_biz_signatures 取回最新签名 PNG（失败不阻断打印）
+            var sigImages = await BuildSignatureImageMapAsync(config, businessType, applicantIdCard, businessId, ct);
+
             var category = OutputPathHelper.GetCategoryDisplayName(businessType);
             var ext = template.FileType.ToLowerInvariant() switch
             {
@@ -247,6 +253,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
                     var spPlaceholderFields = MapFieldsToPlaceholders(mergedFields, config.Fields, config.IndexShifts);
                     spEngine.ReplaceFields(spPlaceholderFields);
+                    spEngine.ReplaceImageFields(sigImages);
 
                     await spEngine.SaveToFileAsync(supporterFilePath, ct);
 
@@ -355,6 +362,9 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     var placeholderFields = MapFieldsToPlaceholders(flattenedFields, config?.Fields!, config?.IndexShifts);
                     engine.ReplaceFields(placeholderFields);
                 }
+
+                // 签名内嵌（在文本替换之后、保存之前）：无签名或模板无占位符时自然跳过
+                engine.ReplaceImageFields(sigImages);
 
                 LogInfo($"执行操作");
                 await engine.SaveToFileAsync(chunkSourcePath, ct);
@@ -592,6 +602,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
         foreach (var mapping in mappings)
         {
+            // 签名类 FieldKey 是图片占位符，不参与文本替换（否则会被 defaultValue 污染成文字）
+            if (!string.IsNullOrEmpty(mapping.FieldKey) && IsSignatureFieldKey(mapping.FieldKey))
+                continue;
+
             if (!string.IsNullOrEmpty(mapping.FieldKey) && fieldValues.TryGetValue(mapping.FieldKey, out var rawValue))
             {
                 var formattedValue = ApplyFormatOrDefault(rawValue, mapping);
@@ -605,6 +619,66 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         }
 
         return result;
+    }
+
+    /// <summary>是否为签名类图片占位符 FieldKey（SIGNATURE_*）。</summary>
+    private static bool IsSignatureFieldKey(string? fieldKey)
+        => !string.IsNullOrEmpty(fieldKey) && fieldKey.StartsWith("SIGNATURE_", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 按模板 config 里的签名 FieldKey 映射，构建「占位符 → 签名 PNG」图。
+    /// 目前仅支持 SIGNATURE_APPLICANT（申请人本人签名，数据源 = nc_biz_signatures）。
+    /// 无签名、无签名占位符或模板未配置时返回空图（引擎侧自然跳过，不影响打印）。
+    /// </summary>
+    private async Task<Dictionary<string, byte[]>> BuildSignatureImageMapAsync(
+        TemplateConfig? config, string businessType, string? applicantIdCard, long? businessId,
+        CancellationToken ct)
+    {
+        var map = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        if (config == null || config.Fields.Count == 0) return map;
+        if (string.IsNullOrWhiteSpace(businessType) || string.IsNullOrWhiteSpace(applicantIdCard)) return map;
+
+        var hasApplicantPlaceholder = config.Fields.Any(f =>
+            f != null && string.Equals(f.FieldKey, Constants.FieldKeys.SIGNATURE_APPLICANT, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(f.Placeholder));
+        if (!hasApplicantPlaceholder) return map;
+
+        try
+        {
+            var sigResult = await _signatureService.GetLatestAsync(
+                applicantIdCard!, businessType, businessId, "本人", ct);
+
+            if (sigResult.IsFailure)
+            {
+                LogWarn($"签名查询失败，跳过签名嵌入: {sigResult.Message}");
+                return map;
+            }
+
+            var sig = sigResult.Value;
+            if (sig == null || sig.SignatureData == null || sig.SignatureData.Length == 0)
+                return map;
+
+            foreach (var f in config.Fields)
+            {
+                if (f == null || string.IsNullOrEmpty(f.Placeholder)) continue;
+                if (string.Equals(f.FieldKey, Constants.FieldKeys.SIGNATURE_APPLICANT, StringComparison.OrdinalIgnoreCase))
+                    map[f.Placeholder] = sig.SignatureData;
+            }
+
+            if (map.Count > 0)
+                LogInfo($"签名嵌入就绪: 占位符 {map.Count} 个");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // 签名环节失败绝不阻断打印
+            LogWarn($"签名嵌入准备异常，跳过: {ex.Message}");
+        }
+
+        return map;
     }
 
     private static string ApplyFormatOrDefault(string value, TemplateFieldMapping mapping)

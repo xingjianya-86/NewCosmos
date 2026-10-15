@@ -71,6 +71,23 @@ tables:
         type: jsonb
         nullable: true
         comment: 赡养人表格数据 JSON（CopiesBySupporter 模板用）
+      - name: job_kind
+        type: character varying(20)
+        nullable: false
+        default: Template
+        comment: 任务类型：Template=模板文书, Photo=照片（手机采集照片远程打印）
+      - name: photo_data
+        type: bytea
+        nullable: true
+        comment: 照片二进制（JPEG，job_kind=Photo 时有值；PC 代理直接打印，无需回查照片表）
+      - name: photo_layout
+        type: character varying(20)
+        nullable: true
+        comment: 照片打印版式（FULL_PAGE整页/HALF_PAGE半页/ID_CARD证件原寸）
+      - name: photo_category
+        type: character varying(30)
+        nullable: true
+        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/OTHER_CERT其他证件，展示/留痕用）
       - name: status
         type: character varying(20)
         nullable: false

@@ -1,0 +1,58 @@
+# 档案照片Schema定义
+# 手机端采集的证件/核查照片，按人+申请+类别归档存库（bytea）。
+database: 档案照片
+version: 1.0
+description: 手机端证件/核查照片采集存档（身份证、户口本、公示核查、其他证件；公民身份敏感信息，存库不出内网）
+
+tables:
+  - name: nc_biz_archive_photos
+    comment: 档案照片表 - 手机端采集的证件/核查照片，按人+申请+类别归档（bytea 存库）
+    columns:
+      - name: id
+        type: bigserial
+        nullable: false
+        primaryKey: true
+        comment: 自增主键
+      - name: photo_data
+        type: bytea
+        nullable: false
+        comment: 照片二进制（JPEG，长边压缩后）
+      - name: applicant_id_card
+        type: character varying(30)
+        nullable: false
+        comment: 照片所属人身份证号（跨申请按人聚合的关键字段）
+      - name: application_id
+        type: bigint
+        nullable: true
+        comment: 申请/档案ID（nc_biz_applications.id）
+      - name: photo_category
+        type: character varying(30)
+        nullable: false
+        default: OTHER_CERT
+        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/OTHER_CERT其他证件）
+      - name: photo_name
+        type: character varying(200)
+        nullable: true
+        comment: 照片备注/说明（如"户口本第2页"）
+      - name: file_size
+        type: bigint
+        nullable: false
+        default: 0
+        comment: 照片字节数（压缩后）
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 采集人ID（nc_sys_users.id）
+      - name: created_by_name
+        type: character varying(100)
+        nullable: true
+        comment: 采集人姓名
+      - name: created_at
+        type: timestamp without time zone
+        nullable: false
+        comment: 采集时间
+    indexes:
+      - name: idx_archive_photos_person
+        columns: [applicant_id_card, photo_category, created_at]
+      - name: idx_archive_photos_application
+        columns: [application_id]

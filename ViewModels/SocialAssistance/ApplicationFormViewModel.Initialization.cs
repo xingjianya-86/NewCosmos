@@ -310,6 +310,9 @@ public partial class ApplicationFormViewModel
     /// </summary>
     private async Task LoadRegionDataAsync()
     {
+        // 保护期内赋值 SelectedProvince：OnSelectedProvinceChanged 会触发 LoadCitiesAsync，
+        // 其异步返回时 Clear 掉刚加载的城市选项（“小概率城市读不进”的根因竞态），必须屏蔽
+        _isLoadingDefaults = true;
         try
         {
             ProvinceOptions.Clear();
@@ -317,26 +320,50 @@ public partial class ApplicationFormViewModel
             if (string.IsNullOrEmpty(SelectedProvince))
                 SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
 
-            var citiesResult = await _regionService.GetCitiesAsync();
-            _logger.Info($"城市数据加载结果: IsSuccess={citiesResult.IsSuccess}, Count={citiesResult.Value?.Count ?? 0}");
-            
-            if (citiesResult.IsSuccess && citiesResult.Value != null)
+            await LoadCityOptionsAsync();
+
+            if (CityOptions.Count == 0)
             {
-                CityOptions.Clear();
-                foreach (var city in citiesResult.Value)
-                {
-                    CityOptions.Add(city.CityName);
-                }
-                _logger.Info($"CityOptions 加载完成: {CityOptions.Count} 个城市");
+                // 兜底重试：本地快照缺失 + DB 瞬时故障时短延迟再拉一次
+                await Task.Delay(800);
+                await LoadCityOptionsAsync();
             }
-            else
-            {
-                _logger.Warn($"城市数据加载失败: {citiesResult.Message}");
-            }
+
+            if (CityOptions.Count == 0)
+                _logger.Warn("城市数据加载失败: 重试后 CityOptions 仍为空");
         }
         catch (Exception ex)
         {
             _logger.Error($"加载省市区数据失败: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingDefaults = false;
+        }
+    }
+
+    /// <summary>
+    /// 拉取城市列表并同步填充现住址与户籍的城市选项（同一数据源，防止户籍城市 Picker 恒空）
+    /// </summary>
+    private async Task LoadCityOptionsAsync()
+    {
+        var citiesResult = await _regionService.GetCitiesAsync();
+        _logger.Info($"城市数据加载结果: IsSuccess={citiesResult.IsSuccess}, Count={citiesResult.Value?.Count ?? 0}");
+
+        if (citiesResult.IsSuccess && citiesResult.Value is { Count: > 0 })
+        {
+            CityOptions.Clear();
+            HukouCityOptions.Clear();
+            foreach (var city in citiesResult.Value)
+            {
+                CityOptions.Add(city.CityName);
+                HukouCityOptions.Add(city.CityName);
+            }
+            _logger.Info($"CityOptions 加载完成: {CityOptions.Count} 个城市");
+        }
+        else if (citiesResult.IsFailure)
+        {
+            _logger.Warn($"城市数据加载失败: {citiesResult.Message}");
         }
     }
 
@@ -347,30 +374,39 @@ public partial class ApplicationFormViewModel
     {
         try
         {
+            // org 缺失/查询失败不再整体提前 return（原实现会连户籍级联预热一起跳过，
+            // 导致户籍四个 Picker 全空）：降级为 null，走下方“取第一个可用区划”的兜底分支
+            string? orgCity = null, orgCounty = null, orgTown = null, orgVillage = null;
             var orgId = App.CurrentUserOrganizationId;
             if (!orgId.HasValue || orgId.Value <= 0)
             {
-                _logger.Warn("当前用户未配置组织单位，跳过默认地区加载");
-                return;
+                _logger.Warn("当前用户未配置组织单位，使用可用区划兜底默认地址");
             }
-
-            var orgResult = await _organizationService.GetByIdAsync(orgId.Value);
-            if (!orgResult.IsSuccess || orgResult.Value == null)
+            else
             {
-                _logger.Warn($"组织单位查询失败: OrgId={orgId.Value}");
-                return;
+                var orgResult = await _organizationService.GetByIdAsync(orgId.Value);
+                if (orgResult.IsSuccess && orgResult.Value != null)
+                {
+                    var org = orgResult.Value;
+                    orgCity = org.CityName;
+                    orgCounty = org.CountyName;
+                    orgTown = org.TownName;
+                    orgVillage = org.VillageName;
+                    _logger.Info($"组织机构数据: CityName={org.CityName}, CountyName={org.CountyName}, TownName={org.TownName}, VillageName={org.VillageName}");
+                }
+                else
+                {
+                    _logger.Warn($"组织单位查询失败: OrgId={orgId.Value}，使用可用区划兜底默认地址");
+                }
             }
-
-            var org = orgResult.Value;
-            _logger.Info($"组织机构数据: CityName={org.CityName}, CountyName={org.CountyName}, TownName={org.TownName}, VillageName={org.VillageName}");
 
             _isLoadingDefaults = true;
 
             // 1. 设置城市
-            if (!string.IsNullOrEmpty(org.CityName))
+            if (!string.IsNullOrEmpty(orgCity))
             {
-                SelectedCity = org.CityName;
-                await LoadDistrictsAsync(org.CityName);
+                SelectedCity = orgCity;
+                await LoadDistrictsAsync(orgCity);
             }
             else if (CityOptions.Count > 0)
             {
@@ -380,10 +416,10 @@ public partial class ApplicationFormViewModel
             }
 
             // 2. 设置区县
-            if (!string.IsNullOrEmpty(org.CountyName))
+            if (!string.IsNullOrEmpty(orgCounty))
             {
-                SelectedDistrict = org.CountyName;
-                await LoadTownsForDistrictAsync(org.CountyName);
+                SelectedDistrict = orgCounty;
+                await LoadTownsForDistrictAsync(orgCounty);
             }
             else if (DistrictOptions.Count > 0)
             {
@@ -393,10 +429,10 @@ public partial class ApplicationFormViewModel
             }
 
             // 3. 设置乡镇
-            if (!string.IsNullOrEmpty(org.TownName))
+            if (!string.IsNullOrEmpty(orgTown))
             {
-                SelectedTown = org.TownName;
-                await LoadVillagesForTownAsync(org.TownName);
+                SelectedTown = orgTown;
+                await LoadVillagesForTownAsync(orgTown);
             }
             else if (TownOptions.Count > 0)
             {
@@ -406,9 +442,9 @@ public partial class ApplicationFormViewModel
             }
 
             // 4. 设置村庄
-            if (!string.IsNullOrEmpty(org.VillageName))
+            if (!string.IsNullOrEmpty(orgVillage))
             {
-                SelectedVillage = org.VillageName;
+                SelectedVillage = orgVillage;
             }
             else if (VillageOptions.Count > 0)
             {
@@ -416,13 +452,21 @@ public partial class ApplicationFormViewModel
                 SelectedVillage = VillageOptions[0];
             }
 
-            // 5. 同步设置户籍地址（与申请人地址一致）
+            // 5. 同步设置户籍地址（新建默认与现住址一致，之后各自独立）
             HukouProvince = DefaultValuesConstants.HOME_PROVINCE;
             HukouCity = SelectedCity;
             HukouDistrict = SelectedDistrict;
             HukouTown = SelectedTown;
+            HukouVillage = SelectedVillage;
 
-            // 6. 更新户籍地址
+            // 6. 预热户籍级联选项与区划 ID（Picker 需要选项集合才能回显选中值）
+            await LoadHukouDistrictsForCityAsync(HukouCity);
+            await LoadHukouTownsForDistrictAsync(HukouDistrict);
+            await LoadHukouVillagesForTownAsync(HukouTown);
+            await LoadHukouTownIdByNameAsync(HukouCity, HukouTown);
+            await LoadHukouVillageIdByNameAsync(HukouVillage);
+
+            // 7. 更新户籍地址全文
             UpdateHukouAddress();
 
             _isLoadingDefaults = false;
@@ -501,6 +545,8 @@ public partial class ApplicationFormViewModel
                 ApplicationReasonDetail = app.ApplicationReasonDetail ?? string.Empty;
 
                 // Step1 补充字段
+                // 加载的户籍地址全文一律保护：此后任何级联变更都不再覆盖（防打开旧单改村冲掉户籍）
+                _isHukouAddressManuallyEdited = true;
                 HukouAddress = app.HukouAddress ?? string.Empty;
                 BankName = app.BankName ?? string.Empty;
                 BankAccount = app.BankAccount ?? string.Empty;
@@ -532,6 +578,18 @@ public partial class ApplicationFormViewModel
                                     SelectedVillage = VillageOptions[0];
                             }
                         }
+                    }
+
+                    // 户籍级联回填：优先按已存区划 ID 解析名称并预热选项（名称+选项+ID 缓存）；
+                    // 存量数据 ID 全空时按 hukou_address 全文做市→县→镇→村前缀解析。
+                    // 全文已在此前置真保护（_isHukouAddressManuallyEdited），解析只回填级联不回写全文
+                    if (app.HukouCityId.HasValue || app.HukouCountyId.HasValue || app.HukouTownId.HasValue || app.HukouVillageId.HasValue)
+                    {
+                        await LoadHukouCascadeFromIdsAsync(app.HukouCityId, app.HukouCountyId, app.HukouTownId, app.HukouVillageId);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(app.HukouAddress))
+                    {
+                        await TryResolveHukouCascadeFromTextAsync(app.HukouAddress);
                     }
                 }
                 finally
@@ -991,6 +1049,10 @@ public partial class ApplicationFormViewModel
         OnPropertyChanged(nameof(SelectedDistrict));
         OnPropertyChanged(nameof(SelectedTown));
         OnPropertyChanged(nameof(SelectedVillage));
+        OnPropertyChanged(nameof(HukouCity));
+        OnPropertyChanged(nameof(HukouDistrict));
+        OnPropertyChanged(nameof(HukouTown));
+        OnPropertyChanged(nameof(HukouVillage));
         OnPropertyChanged(nameof(SelectedEthnicity));
         OnPropertyChanged(nameof(SelectedMaritalStatus));
         OnPropertyChanged(nameof(HukouType));
@@ -1006,6 +1068,12 @@ public partial class ApplicationFormViewModel
     /// </summary>
     private async Task EnsureRegionOptionsLoadedAsync()
     {
+        // 城市选项为空 = 首次加载失败或被竞态清空：进入步骤/校验前懒加载自愈（含户籍城市选项）
+        if (CityOptions.Count == 0)
+        {
+            await LoadRegionDataAsync();
+        }
+
         if (string.IsNullOrEmpty(SelectedCity) && CityOptions.Count > 0)
         {
             SelectedCity = CityOptions[0];
@@ -1036,6 +1104,17 @@ public partial class ApplicationFormViewModel
         return _cascadeCts.Token;
     }
 
+    /// <summary>户籍级联独立取消令牌（与现住址级联互不干扰，防止快速操作时互相取消）</summary>
+    private CancellationTokenSource? _hukouCascadeCts;
+
+    private CancellationToken ResetHukouCascadeToken()
+    {
+        _hukouCascadeCts?.Cancel();
+        _hukouCascadeCts?.Dispose();
+        _hukouCascadeCts = new CancellationTokenSource();
+        return _hukouCascadeCts.Token;
+    }
+
     partial void OnSelectedProvinceChanged(string value)
     {
         if (!string.IsNullOrEmpty(value) && !_isLoadingDefaults)
@@ -1048,8 +1127,8 @@ public partial class ApplicationFormViewModel
     {
         if (!string.IsNullOrEmpty(value) && !_isLoadingDefaults)
         {
+            // 户籍与现住址完全独立：改现住址不再触发户籍重拼
             _ = LoadDistrictsAsync(value, ResetCascadeToken());
-            UpdateHukouAddress();
         }
     }
 
@@ -1062,7 +1141,6 @@ public partial class ApplicationFormViewModel
                 if (!_isLoadingDefaults)
                 {
                     _ = LoadTownsForDistrictAsync(value, ResetCascadeToken());
-                    UpdateHukouAddress();
                 }
             }
             catch (Exception ex)
@@ -1081,7 +1159,6 @@ public partial class ApplicationFormViewModel
                 if (!_isLoadingDefaults)
                 {
                     _ = LoadVillagesForTownAsync(value, ResetCascadeToken());
-                    UpdateHukouAddress();
                 }
             }
             catch (Exception ex)
@@ -1091,35 +1168,431 @@ public partial class ApplicationFormViewModel
         }
     }
 
+    #region 户籍级联（独立于现住址）
+
+    partial void OnHukouCityChanged(string value)
+    {
+        if (_isLoadingDefaults || string.IsNullOrEmpty(value)) return;
+        try
+        {
+            _ = LoadHukouDistrictsForCityAsync(value, ResetHukouCascadeToken());
+            _ = LoadHukouTownIdByNameAsync(value);
+            UpdateHukouAddress();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"户籍城市变更处理失败: {ex.Message}");
+        }
+    }
+
+    partial void OnHukouDistrictChanged(string value)
+    {
+        if (_isLoadingDefaults || string.IsNullOrEmpty(value)) return;
+        try
+        {
+            _ = LoadHukouTownsForDistrictAsync(value, ResetHukouCascadeToken());
+            UpdateHukouAddress();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"户籍区县变更处理失败: {ex.Message}");
+        }
+    }
+
+    partial void OnHukouTownChanged(string value)
+    {
+        if (_isLoadingDefaults || string.IsNullOrEmpty(value)) return;
+        try
+        {
+            _ = LoadHukouVillagesForTownAsync(value, ResetHukouCascadeToken());
+            _ = LoadHukouTownIdByNameAsync(HukouCity, value);
+            UpdateHukouAddress();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"户籍乡镇变更处理失败: {ex.Message}");
+        }
+    }
+
+    partial void OnHukouVillageChanged(string value)
+    {
+        if (_isLoadingDefaults) return;
+        try
+        {
+            _ = LoadHukouVillageIdByNameAsync(value);
+            UpdateHukouAddress();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"户籍村社区变更处理失败: {ex.Message}");
+        }
+    }
+
     /// <summary>
-    /// 更新户籍地址（城市+区县+镇+村）
+    /// 手工编辑户籍地址全文：标记后级联重拼不再覆盖（加载数据不算手工编辑，由调用方显式置位）
+    /// </summary>
+    partial void OnHukouAddressChanged(string value)
+    {
+        if (!_isUpdatingHukouAddress)
+        {
+            _isHukouAddressManuallyEdited = true;
+        }
+    }
+
+    /// <summary>
+    /// 根据户籍城市加载户籍区县选项（独立于现住址）
+    /// </summary>
+    private async Task LoadHukouDistrictsForCityAsync(string city, CancellationToken ct = default)
+    {
+        HukouDistrictOptions.Clear();
+        var countiesResult = await _regionService.GetCountiesByCityAsync(city, ct);
+        if (ct.IsCancellationRequested) return;
+
+        if (countiesResult.IsSuccess && countiesResult.Value != null)
+        {
+            foreach (var county in countiesResult.Value)
+                HukouDistrictOptions.Add(county.CountyName);
+        }
+        else if (countiesResult.IsFailure)
+        {
+            _logger.Warn($"户籍区县选项加载失败: {countiesResult.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 根据户籍区县加载户籍乡镇选项（独立于现住址）
+    /// </summary>
+    private async Task LoadHukouTownsForDistrictAsync(string district, CancellationToken ct = default)
+    {
+        HukouTownOptions.Clear();
+        var countiesResult = await _regionService.GetCountiesAsync(ct);
+        if (ct.IsCancellationRequested) return;
+
+        if (countiesResult.IsSuccess && countiesResult.Value != null)
+        {
+            var county = countiesResult.Value.FirstOrDefault(c => c.CountyName == district);
+            if (county != null)
+            {
+                _hukouCountyId = county.Id;
+                var townsResult = await _regionService.GetTownsByCountyIdAsync(county.Id, ct);
+                if (ct.IsCancellationRequested) return;
+
+                if (townsResult.IsSuccess && townsResult.Value != null)
+                {
+                    foreach (var town in townsResult.Value)
+                        HukouTownOptions.Add(town.TownName);
+                }
+            }
+        }
+        else if (countiesResult.IsFailure)
+        {
+            _logger.Warn($"户籍乡镇选项加载失败: {countiesResult.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 根据户籍乡镇加载户籍村社区选项（独立于现住址）
+    /// </summary>
+    private async Task LoadHukouVillagesForTownAsync(string town, CancellationToken ct = default)
+    {
+        HukouVillageOptions.Clear();
+
+        // 优先用已缓存的县区 ID 定位乡镇；否则按名称全量检索
+        int? townId = null;
+        if (_hukouCountyId.HasValue)
+        {
+            var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId.Value, ct);
+            if (ct.IsCancellationRequested) return;
+            if (townsResult.IsSuccess && townsResult.Value != null)
+            {
+                townId = townsResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
+            }
+        }
+
+        if (!townId.HasValue)
+        {
+            var searchResult = await _regionService.SearchTownsAsync(town, ct);
+            if (ct.IsCancellationRequested) return;
+            if (searchResult.IsSuccess && searchResult.Value != null)
+            {
+                townId = searchResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
+            }
+        }
+
+        if (!townId.HasValue) return;
+
+        _hukouTownId = townId;
+        var villagesResult = await _regionService.GetVillagesByTownIdAsync(townId.Value, ct);
+        if (ct.IsCancellationRequested) return;
+
+        if (villagesResult.IsSuccess && villagesResult.Value != null)
+        {
+            foreach (var village in villagesResult.Value)
+                HukouVillageOptions.Add(village.VillageName);
+        }
+        else if (villagesResult.IsFailure)
+        {
+            _logger.Warn($"户籍村社区选项加载失败: {villagesResult.Message}");
+        }
+    }
+
+    /// <summary>户籍区县 ID 缓存（乡镇选项定位用）</summary>
+    private int? _hukouCountyId;
+
+    /// <summary>
+    /// 按已存区划 ID 回填户籍级联（名称+选项集合+ID 缓存），供编辑/查看模式恢复用。
+    /// 必须在 _isLoadingDefaults=true 期间调用，防止 Setter 触发级联重拼。
+    /// </summary>
+    private async Task LoadHukouCascadeFromIdsAsync(int? cityId, int? countyId, int? townId, int? villageId)
+    {
+        if (cityId.HasValue)
+        {
+            var cityResult = await _regionService.GetCityByIdAsync(cityId.Value);
+            if (cityResult.IsSuccess && cityResult.Value != null)
+            {
+                HukouCity = cityResult.Value.CityName;
+                _hukouCityId = cityId;
+                await LoadHukouDistrictsForCityAsync(HukouCity);
+            }
+            else if (cityResult.IsFailure)
+            {
+                _logger.Warn($"户籍城市-ID回填失败: CityId={cityId}, {cityResult.Message}");
+            }
+        }
+
+        if (countyId.HasValue)
+        {
+            var countyResult = await _regionService.GetCountyByIdAsync(countyId.Value);
+            if (countyResult.IsSuccess && countyResult.Value != null)
+            {
+                HukouDistrict = countyResult.Value.CountyName;
+                _hukouCountyId = countyId;
+                await LoadHukouTownsForDistrictAsync(HukouDistrict);
+            }
+            else if (countyResult.IsFailure)
+            {
+                _logger.Warn($"户籍区县-ID回填失败: CountyId={countyId}, {countyResult.Message}");
+            }
+        }
+
+        if (townId.HasValue)
+        {
+            var townResult = await _regionService.GetTownByIdAsync(townId.Value);
+            if (townResult.IsSuccess && townResult.Value != null)
+            {
+                HukouTown = townResult.Value.TownName;
+                _hukouTownId = townId;
+                await LoadHukouVillagesForTownAsync(HukouTown);
+            }
+            else if (townResult.IsFailure)
+            {
+                _logger.Warn($"户籍乡镇-ID回填失败: TownId={townId}, {townResult.Message}");
+            }
+        }
+
+        if (villageId.HasValue)
+        {
+            var villageResult = await _regionService.GetVillageByIdAsync(villageId.Value);
+            if (villageResult.IsSuccess && villageResult.Value != null)
+            {
+                HukouVillage = villageResult.Value.VillageName;
+                _hukouVillageId = villageId;
+            }
+            else if (villageResult.IsFailure)
+            {
+                _logger.Warn($"户籍村社区-ID回填失败: VillageId={villageId}, {villageResult.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 按名称解析户籍城市/乡镇 ID 并缓存（保存时写库用）
+    /// </summary>
+    private async Task LoadHukouTownIdByNameAsync(string? city, string? town = null)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(city))
+            {
+                var cityResult = await _regionService.GetCityByNameAsync(city);
+                if (cityResult.IsSuccess && cityResult.Value != null)
+                    _hukouCityId = cityResult.Value.Id;
+            }
+
+            if (!string.IsNullOrEmpty(town) && _hukouCountyId.HasValue)
+            {
+                var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId.Value);
+                if (townsResult.IsSuccess && townsResult.Value != null)
+                    _hukouTownId = townsResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"户籍区划ID解析失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 按名称解析户籍村社区 ID 并缓存（保存时写库用）
+    /// </summary>
+    private async Task LoadHukouVillageIdByNameAsync(string? village)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(village) || !_hukouTownId.HasValue)
+            {
+                _hukouVillageId = null;
+                return;
+            }
+
+            var villagesResult = await _regionService.GetVillagesByTownIdAsync(_hukouTownId.Value);
+            if (villagesResult.IsSuccess && villagesResult.Value != null)
+                _hukouVillageId = villagesResult.Value.FirstOrDefault(v => v.VillageName == village)?.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"户籍村社区ID解析失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 存量数据兜底：hukou_address 全文按 市→县→镇→村 逐级最长前缀匹配，回填级联名称、选项集合与区划 ID。
+    /// 必须在 _isLoadingDefaults=true 期间调用；调用方已置真 _isHukouAddressManuallyEdited，全文不会被回写。
+    /// 任一级匹配失败即停止（保留已匹配部分并记 Warn），绝不猜测未匹配层级。
+    /// </summary>
+    private async Task TryResolveHukouCascadeFromTextAsync(string hukouAddress)
+    {
+        try
+        {
+            var address = hukouAddress.Trim();
+            if (address.Length == 0) return;
+
+            // 市（最长前缀匹配，防同前缀城市歧义）
+            var citiesResult = await _regionService.GetCitiesAsync();
+            var city = citiesResult.Value?
+                .Where(c => !string.IsNullOrEmpty(c.CityName) && address.StartsWith(c.CityName, StringComparison.Ordinal))
+                .OrderByDescending(c => c.CityName.Length)
+                .FirstOrDefault();
+            if (city == null)
+            {
+                _logger.Warn($"户籍文本解析: 未匹配到地级市: {address}");
+                return;
+            }
+
+            HukouCity = city.CityName;
+            _hukouCityId = city.Id;
+            await LoadHukouDistrictsForCityAsync(city.CityName);
+
+            var rest = address[city.CityName.Length..];
+
+            // 县（限定在已匹配城市下）
+            var countiesResult = await _regionService.GetCountiesByCityAsync(city.CityName);
+            var county = countiesResult.Value?
+                .Where(c => !string.IsNullOrEmpty(c.CountyName) && rest.StartsWith(c.CountyName, StringComparison.Ordinal))
+                .OrderByDescending(c => c.CountyName.Length)
+                .FirstOrDefault();
+            if (county == null)
+            {
+                _logger.Warn($"户籍文本解析: 未匹配到区县: {rest}");
+                return;
+            }
+
+            HukouDistrict = county.CountyName;
+            // 该方法内部按名称回填 _hukouCountyId 并加载乡镇选项
+            await LoadHukouTownsForDistrictAsync(county.CountyName);
+            rest = rest[county.CountyName.Length..];
+
+            // 镇（限定在已匹配县区下）
+            var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId ?? county.Id);
+            var town = townsResult.Value?
+                .Where(t => !string.IsNullOrEmpty(t.TownName) && rest.StartsWith(t.TownName, StringComparison.Ordinal))
+                .OrderByDescending(t => t.TownName.Length)
+                .FirstOrDefault();
+            if (town == null)
+            {
+                _logger.Warn($"户籍文本解析: 未匹配到乡镇: {rest}");
+                return;
+            }
+
+            HukouTown = town.TownName;
+            // 该方法内部按名称回填 _hukouTownId 并加载村选项
+            await LoadHukouVillagesForTownAsync(town.TownName);
+            rest = rest[town.TownName.Length..];
+
+            // 村（限定在已匹配乡镇下，取最长前缀）
+            var villagesResult = await _regionService.GetVillagesByTownIdAsync(_hukouTownId ?? town.Id);
+            var village = villagesResult.Value?
+                .Where(v => !string.IsNullOrEmpty(v.VillageName) && rest.StartsWith(v.VillageName, StringComparison.Ordinal))
+                .OrderByDescending(v => v.VillageName.Length)
+                .FirstOrDefault();
+            if (village != null)
+            {
+                HukouVillage = village.VillageName;
+                _hukouVillageId = village.Id;
+            }
+            else
+            {
+                _logger.Warn($"户籍文本解析: 未匹配到村社区: {rest}");
+            }
+
+            _logger.Info($"户籍文本解析完成: {HukouCity}/{HukouDistrict}/{HukouTown}/{HukouVillage}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"户籍文本解析失败: {ex.Message}");
+        }
+    }
+
+    #endregion
+
+    /// <summary>
+    /// 更新户籍地址全文（省市区县乡镇村按户籍级联拼接）。
+    /// 用户手工编辑过或从库加载的记录不再覆盖（_isHukouAddressManuallyEdited 保护）。
     /// </summary>
     private void UpdateHukouAddress()
     {
-        HukouAddress = string.IsNullOrWhiteSpace(SelectedVillage)
-            ? $"{SelectedCity}{SelectedDistrict}{SelectedTown}"
-            : $"{SelectedCity}{SelectedDistrict}{SelectedTown}{SelectedVillage}";
+        if (_isHukouAddressManuallyEdited) return;
+
+        var parts = new[] { HukouProvince, HukouCity, HukouDistrict, HukouTown, HukouVillage }
+            .Where(p => !string.IsNullOrWhiteSpace(p));
+        var composed = string.Concat(parts);
+
+        _isUpdatingHukouAddress = true;
+        try
+        {
+            HukouAddress = composed;
+        }
+        finally
+        {
+            _isUpdatingHukouAddress = false;
+        }
     }
 
     private async Task LoadCitiesAsync(string province, CancellationToken cancellationToken = default)
     {
         try
         {
-            var countiesResult = await _regionService.GetCountiesByCityAsync(province, cancellationToken);
+            // 治本：城市选项必须来自地级市列表。原实现用省名查 GetCountiesByCityAsync
+            //（city_name='黑龙江省' 必空），返回后 Clear 掉刚加载的 CityOptions——
+            // 这正是“小概率申请人所在地城市读不进”的根因竞态
+            var citiesResult = await _regionService.GetCitiesAsync(cancellationToken);
             if (cancellationToken.IsCancellationRequested) return;
 
-            if (countiesResult.IsSuccess)
+            if (citiesResult.IsSuccess && citiesResult.Value is { Count: > 0 })
             {
                 CityOptions.Clear();
-                foreach (var county in countiesResult.Value)
+                HukouCityOptions.Clear();
+                foreach (var city in citiesResult.Value)
                 {
-                    CityOptions.Add(county.CountyName);
+                    CityOptions.Add(city.CityName);
+                    HukouCityOptions.Add(city.CityName);
                 }
                 if (CityOptions.Count > 0 && string.IsNullOrEmpty(SelectedCity))
                 {
                     SelectedCity = CityOptions[0];
                 }
             }
+            // 空结果不清空已有选项（保留既有数据，杜绝清空竞态）
         }
         catch (OperationCanceledException)
         {
@@ -1744,8 +2217,6 @@ public partial class ApplicationFormViewModel
             {
                 SelectedVillage = village;
             }
-
-            UpdateHukouAddress();
 
             _isLoadingDefaults = false;
         }

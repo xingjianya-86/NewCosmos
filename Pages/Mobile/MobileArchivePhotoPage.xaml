@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileArchivePhotoPage"
+             x:DataType="MobileArchivePhotoViewModel"
+             Title="档案照片"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 顶部栏 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
+            <VerticalStackLayout Spacing="8">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="档案照片" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="{Binding ApplicantName, StringFormat='申请人：{0}'}" FontSize="13" TextColor="#E6FFFFFF"/>
+                <Label Text="采集证件与核查照片，按类别归档（仅存内网）" FontSize="12" TextColor="#E6FFFFFF"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 类别选择 + 采集按钮 -->
+        <Border Grid.Row="1" BackgroundColor="White" Padding="12,10" Margin="12,8" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <Label Grid.Column="0" Text="照片类别" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Picker Grid.Column="1"
+                            ItemsSource="{Binding CategoryOptions}"
+                            ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedCategoryOption, Mode=TwoWay}"
+                            FontSize="14"
+                            TextColor="{StaticResource TextPrimary}"
+                            BackgroundColor="Transparent"
+                            HorizontalOptions="Fill"/>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="拍照" FontSize="14" BackgroundColor="{StaticResource Primary}" TextColor="White"
+                            HeightRequest="40" CornerRadius="10" Command="{Binding TakePhotoCommand}"/>
+                    <Button Grid.Column="1" Text="从相册选择" FontSize="14" BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource SecondaryDark}"
+                            HeightRequest="40" CornerRadius="10" Command="{Binding PickPhotoCommand}"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 当前类别小计 -->
+        <Label Grid.Row="2"
+               Text="{Binding SelectedCategoryName, StringFormat='当前类别：{0}'}"
+               FontSize="12" TextColor="{StaticResource TextTertiary}" Margin="16,0,16,4"/>
+
+        <!-- 照片列表 -->
+        <CollectionView Grid.Row="3" ItemsSource="{Binding Photos}" SelectionMode="None" Margin="12,4">
+            <CollectionView.EmptyView>
+                <VerticalStackLayout Padding="20" Spacing="8" VerticalOptions="Center">
+                    <Label Text="📷" FontSize="40" HorizontalOptions="Center" TextColor="{StaticResource TextTertiary}"/>
+                    <Label Text="该类别暂无照片，点击上方按钮采集" FontSize="13"
+                           TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="ent:ArchivePhoto">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" RowDefinitions="Auto,Auto" RowSpacing="4">
+                            <Label Grid.Row="0" Grid.Column="0"
+                                   Text="{Binding Id, StringFormat='照片 #{0}'}"
+                                   FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Grid.Row="1" Grid.Column="0"
+                                   Text="{Binding CreatedAt, StringFormat='采集：{0:yyyy-MM-dd HH:mm}'}"
+                                   FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+
+                            <Button Grid.Row="0" Grid.Column="1"
+                                    Text="打印" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=PrintPhotoCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Grid.Row="1" Grid.Column="1"
+                                    Text="删除" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                    BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=DeletePhotoCommand}"
+                                    CommandParameter="{Binding .}"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- 底部说明 -->
+        <Border Grid.Row="4" BackgroundColor="White" Padding="14,10" Margin="12,8" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+            <Label Text="照片属公民身份敏感信息，仅存内网数据库，不上传外网。打印功能后续开放。"
+                   FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+        </Border>
+
+    </Grid>
+</ContentPage>

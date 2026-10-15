@@ -245,6 +245,10 @@ public partial class ApplicationFormViewModel
             Community = SelectedVillage,
             Address = Address,
             HukouAddress = HukouAddress,
+            HukouCityId = _hukouCityId,
+            HukouCountyId = _hukouCountyId,
+            HukouTownId = _hukouTownId,
+            HukouVillageId = _hukouVillageId,
             BankName = BankName?.Trim() ?? string.Empty,
             BankAccount = BankAccount?.Trim() ?? string.Empty,
             Ethnicity = SelectedEthnicity?.Key ?? DefaultValuesConstants.ETHNICITY_KEY,
@@ -327,6 +331,59 @@ public partial class ApplicationFormViewModel
         };
     }
 
+    /// <summary>
+    /// 保存成功后采集申请人本人签名（生物特征留痕，非 CA 认证签名）。
+    /// 仅在有有效申请 ID + 身份证号且非查看模式时提示；用户跳过或采集失败一律静默跳过，绝不阻断保存/导航。
+    /// 签名 PNG 存入 nc_biz_signatures（businessType=FamilyApplication），文书渲染时经 PrintExecuteService 内嵌。
+    /// </summary>
+    private async Task PromptApplicantSignatureAsync()
+    {
+        try
+        {
+            // 仅手机端（Android）采集签名；PC 端不弹采集（但文书渲染嵌入对两端打印都生效）。
+            // 共用 VM 决定了必须在此做平台分流，避免桌面保存时误弹签名框。
+            if (Microsoft.Maui.Devices.DeviceInfo.Platform != Microsoft.Maui.Devices.DevicePlatform.Android)
+                return;
+
+            if (_applicationId <= 0 || IsViewMode) return;
+            if (string.IsNullOrWhiteSpace(ApplicantIdCard)) return;
+
+            var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+            var proceed = await dialog.DisplayAlertAsync(
+                "采集签名",
+                $"是否采集 {ApplicantName} 本人手写签名？\n（签名将嵌入救助文书，可稍后重新采集）",
+                "去签名", "暂不");
+
+            if (!proceed) return;
+
+            var png = await Components.SignaturePopupView.ShowAsync($"请 {ApplicantName} 本人签名", traceText: ApplicantName);
+            if (png == null || png.Length == 0) return;
+
+            var signatureService = _serviceProvider.GetRequiredService<Services.Domain.Signatures.ISignatureService>();
+            var result = await signatureService.SaveSignatureAsync(new Models.Entities.Signature
+            {
+                SignatureData = png,
+                ApplicantIdCard = ApplicantIdCard.Trim(),
+                BusinessType = "FamilyApplication",
+                BusinessId = _applicationId,
+                SignerName = ApplicantName,
+                SignerRole = "本人",
+                CreatedBy = App.CurrentUserId.HasValue ? (int?)App.CurrentUserId.Value : null,
+                CreatedByName = App.CurrentUserName
+            });
+
+            if (result.IsSuccess)
+                _logger.LogBusiness("采集申请人签名", ("ApplicationId", _applicationId), ("SignatureId", result.Value));
+            else
+                await dialog.DisplayAlertAsync("提示", $"签名保存失败：{result.Message}", "确定");
+        }
+        catch (Exception ex)
+        {
+            // 签名环节任何异常都不影响主流程
+            _logger.Warn($"采集签名异常（已跳过）: {ex.Message}");
+        }
+    }
+
     protected override async Task<Result> ExecuteSaveAsync()
     {
         // 查看模式禁止保存
@@ -403,6 +460,10 @@ public partial class ApplicationFormViewModel
                 _logger.Error($"回写核查状态'{AssetCheckStatusConstants.INCLUDED}'异常: {ex.Message}");
             }
         }
+
+        // 申请/救助文书签名：保存成功后采集申请人本人签名（生物特征留痕，非 CA 认证签名）。
+        // 失败或用户跳过均不阻断保存与后续导航。
+        await PromptApplicantSignatureAsync();
 
         // 保存成功后：补全模式返回上一页（变更页），其他模式导航到档案制作页面
         if (_applicationId > 0)

@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Options;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -29,6 +31,17 @@ public class RegionService : BaseService, IRegionService
     private readonly ConcurrentDictionary<int, List<RegionTown>> _townsByCountyCache = new();
     private readonly ConcurrentDictionary<int, List<RegionVillage>> _villagesByTownCache = new();
 
+    // ===== 本地优先区划快照（2026-10）=====
+    // 区划是静态参照数据：查询入口先加载本地快照（含真实主键，毫秒级、离线可用）填充上述缓存，
+    // 随后触发一次后台 DB 刷新（DB 为权威，成功后回写快照，stale-while-revalidate）。
+    // 快照缺失/损坏且 DB 不可达时，行为不劣于改造前——回落原有 DB 查询路径。
+    private readonly object _localCacheLock = new();
+    private volatile bool _localCacheTried;
+    private int _refreshState;              // 0=未执行 1=进行中 2=成功 3=失败（节流重试）
+    private long _lastRefreshTicks;         // 失败重试节流基准（TickCount64，10 秒间隔）
+    private string? _loadedSnapshotSignature;
+    private readonly string _snapshotPath = string.Empty;
+
     private void InvalidateRegionCaches()
     {
         _citiesCache = null;
@@ -38,17 +51,51 @@ public class RegionService : BaseService, IRegionService
         _villagesByTownCache.Clear();
         _villageCodeCache.Clear();
         LogDebug("地区缓存已清除");
+
+        // 数据已重建/清空：本地快照同步作废，防止下次启动加载陈旧数据
+        _localCacheTried = false;
+        _loadedSnapshotSignature = null;
+        Interlocked.Exchange(ref _refreshState, 0);
+        try
+        {
+            if (!string.IsNullOrEmpty(_snapshotPath) && File.Exists(_snapshotPath))
+                File.Delete(_snapshotPath);
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"地区本地快照删除失败: {ex.Message}");
+        }
     }
 
     public RegionService(
         IDatabaseService dbService,
         ISchemaSyncService schemaSync,
         ISeedMergeService seedMerge,
+        StorageOptions storageOptions,
         ILoggerService logger) : base(logger)
     {
         _dbService = dbService;
         _schemaSync = schemaSync;
         _seedMerge = seedMerge;
+        _snapshotPath = ResolveSnapshotPath(storageOptions);
+    }
+
+    /// <summary>
+    /// 本地快照与日志同目录（随 StorageOptions 的 AppData/程序目录策略走，避免安装目录不可写时写失败）。
+    /// </summary>
+    private static string ResolveSnapshotPath(StorageOptions storageOptions)
+    {
+        try
+        {
+            var logDir = Path.GetDirectoryName(storageOptions.GetLogPath());
+            if (string.IsNullOrEmpty(logDir))
+                logDir = AppContext.BaseDirectory;
+            return Path.Combine(logDir, "regions_cache.json");
+        }
+        catch
+        {
+            return Path.Combine(AppContext.BaseDirectory, "regions_cache.json");
+        }
     }
 
     private static void ReportProgress(
@@ -64,6 +111,241 @@ public class RegionService : BaseService, IRegionService
             CurrentStepName = stepName
         });
     }
+
+    #region 本地优先快照缓存
+
+    private sealed class RegionLocalSnapshot
+    {
+        public int Version { get; set; } = 1;
+        public string Signature { get; set; } = string.Empty;
+        public List<RegionCity> Cities { get; set; } = new();
+        public List<RegionCounty> Counties { get; set; } = new();
+        public List<RegionTown> Towns { get; set; } = new();
+        public List<RegionVillage> Villages { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 本地优先入口：所有表单相关查询方法在查缓存/查库之前调用。
+    /// 首次调用加载本地快照（毫秒级、离线可用），并触发一次后台 DB 刷新（DB 权威，成功后回写快照）。
+    /// </summary>
+    private void EnsureLocalCacheLoaded()
+    {
+        if (!_localCacheTried)
+        {
+            lock (_localCacheLock)
+            {
+                if (!_localCacheTried)
+                {
+                    TryLoadLocalSnapshot();
+                    _localCacheTried = true;
+                }
+            }
+        }
+        TryStartBackgroundRefresh();
+    }
+
+    private void TryLoadLocalSnapshot()
+    {
+        try
+        {
+            if (!File.Exists(_snapshotPath))
+            {
+                LogDebug("地区本地快照不存在，走 DB 查询并在后台刷新成功后生成");
+                return;
+            }
+
+            var json = File.ReadAllText(_snapshotPath);
+            var snap = JsonSerializer.Deserialize<RegionLocalSnapshot>(json);
+            if (snap == null) return;
+
+            if (snap.Cities.Count > 0)
+                _citiesCache = snap.Cities;
+
+            if (snap.Counties.Count > 0)
+            {
+                _allCountiesCache = snap.Counties;
+                foreach (var g in snap.Counties.Where(c => !string.IsNullOrEmpty(c.CityName)).GroupBy(c => c.CityName))
+                    _countiesByCityCache[g.Key] = g.OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToList();
+            }
+
+            if (snap.Towns.Count > 0)
+            {
+                foreach (var g in snap.Towns.GroupBy(t => t.CountyId))
+                    _townsByCountyCache[g.Key] = g.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToList();
+            }
+
+            if (snap.Villages.Count > 0)
+            {
+                foreach (var g in snap.Villages.GroupBy(v => v.TownId))
+                    _villagesByTownCache[g.Key] = g.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList();
+            }
+
+            _loadedSnapshotSignature = snap.Signature;
+            LogInfo($"地区本地快照已加载: 市{snap.Cities.Count} 县{snap.Counties.Count} 镇{snap.Towns.Count} 村{snap.Villages.Count}");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"地区本地快照加载失败（回退 DB 查询）: {ex.Message}");
+            try
+            {
+                if (File.Exists(_snapshotPath)) File.Delete(_snapshotPath);
+            }
+            catch { /* 删除失败不影响运行，后台刷新成功后会覆盖 */ }
+        }
+    }
+
+    private void TryStartBackgroundRefresh()
+    {
+        if (Interlocked.CompareExchange(ref _refreshState, 1, 0) != 0)
+        {
+            // 只有失败态允许节流重试；进行中/已成功直接返回
+            if (Volatile.Read(ref _refreshState) != 3) return;
+            var last = Interlocked.Read(ref _lastRefreshTicks);
+            if (Environment.TickCount64 - last < 10_000) return;
+            if (Interlocked.CompareExchange(ref _refreshState, 1, 3) != 3) return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            var ok = false;
+            try
+            {
+                ok = await RefreshCachesFromDbAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                LogWarn($"地区后台刷新异常（保留本地数据）: {ex.Message}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshState, ok ? 2 : 3);
+                if (!ok)
+                    Interlocked.Exchange(ref _lastRefreshTicks, Environment.TickCount64);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 后台从 DB 全量刷新四级区划缓存并回写本地快照。
+    /// 每级独立覆盖（成功的表以 DB 为准）；仅四级全部成功才写快照，避免把不完整数据固化。
+    /// </summary>
+    private async Task<bool> RefreshCachesFromDbAsync(CancellationToken ct)
+    {
+        // 无快照（首次运行）才做表检查：DB 不可达时避免 SyncSchema 的 DDL 噪音；有快照说明表曾存在
+        if (_loadedSnapshotSignature == null)
+        {
+            var ensure = await EnsureTablesExistAsync(ct);
+            if (ensure.IsFailure)
+            {
+                LogWarn($"地区后台刷新: 地区表检查失败（保留本地数据）: {ensure.Message}");
+                return false;
+            }
+        }
+
+        // 明确列名（AGENTS §8）；排序与既有查询口径一致
+        var cities = await _dbService.QueryAsync<RegionCity>(
+            "SELECT id, city_name, city_code, sort_order, is_active FROM nc_regions_cities WHERE is_active = TRUE ORDER BY sort_order, id", ct);
+        var counties = await _dbService.QueryAsync<RegionCounty>(
+            "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE is_active = TRUE ORDER BY sort_order, id", ct);
+        var towns = await _dbService.QueryAsync<RegionTown>(
+            "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE is_active = TRUE ORDER BY sort_order, id", ct);
+        var villages = await _dbService.QueryAsync<RegionVillage>(
+            "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE is_active = TRUE ORDER BY sort_order, id", ct);
+
+        var citiesOk = cities.IsSuccess && cities.Value is { Count: > 0 };
+        var countiesOk = counties.IsSuccess && counties.Value is { Count: > 0 };
+        var townsOk = towns.IsSuccess && towns.Value is { Count: > 0 };
+        var villagesOk = villages.IsSuccess && villages.Value is { Count: > 0 };
+
+        if (citiesOk)
+            _citiesCache = cities.Value;
+
+        if (countiesOk)
+        {
+            _allCountiesCache = counties.Value;
+            _countiesByCityCache.Clear();
+            foreach (var g in counties.Value.Where(c => !string.IsNullOrEmpty(c.CityName)).GroupBy(c => c.CityName))
+                _countiesByCityCache[g.Key] = g.OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToList();
+        }
+
+        if (townsOk)
+        {
+            _townsByCountyCache.Clear();
+            foreach (var g in towns.Value.GroupBy(t => t.CountyId))
+                _townsByCountyCache[g.Key] = g.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToList();
+        }
+
+        if (villagesOk)
+        {
+            _villagesByTownCache.Clear();
+            foreach (var g in villages.Value.GroupBy(v => v.TownId))
+                _villagesByTownCache[g.Key] = g.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList();
+            _villageCodeCache.Clear();
+        }
+
+        if (citiesOk && countiesOk && townsOk && villagesOk)
+        {
+            SaveLocalSnapshot(cities.Value!, counties.Value!, towns.Value!, villages.Value!);
+            LogInfo($"地区后台刷新完成: 市{cities.Value!.Count} 县{counties.Value!.Count} 镇{towns.Value!.Count} 村{villages.Value!.Count}");
+            return true;
+        }
+
+        LogWarn($"地区后台刷新未完整成功（市:{cities.Message} 县:{counties.Message} 镇:{towns.Message} 村:{villages.Message}），保留本地已有数据");
+        return false;
+    }
+
+    private void SaveLocalSnapshot(List<RegionCity> cities, List<RegionCounty> counties, List<RegionTown> towns, List<RegionVillage> villages)
+    {
+        try
+        {
+            var signature = ComputeSnapshotSignature(cities, counties, towns, villages);
+            if (string.Equals(signature, _loadedSnapshotSignature, StringComparison.Ordinal))
+            {
+                LogDebug("地区数据与本地快照一致，跳过写入");
+                return;
+            }
+
+            var snapshot = new RegionLocalSnapshot
+            {
+                Signature = signature,
+                Cities = cities,
+                Counties = counties,
+                Towns = towns,
+                Villages = villages,
+            };
+
+            var dir = Path.GetDirectoryName(_snapshotPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            var tmpPath = _snapshotPath + ".tmp";
+            File.WriteAllText(tmpPath, JsonSerializer.Serialize(snapshot));
+            File.Move(tmpPath, _snapshotPath, true);
+            _loadedSnapshotSignature = signature;
+            LogInfo("地区本地快照已写入");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"地区本地快照写入失败（不影响运行）: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 快照一致性签名：行数 + 主键和 + 名称长度和（跨进程稳定；string.GetHashCode 跨进程随机，不可用）。
+    /// </summary>
+    private static string ComputeSnapshotSignature(List<RegionCity> cities, List<RegionCounty> counties, List<RegionTown> towns, List<RegionVillage> villages)
+    {
+        return string.Join(':',
+            cities.Count,
+            counties.Count,
+            towns.Count,
+            villages.Count,
+            towns.Sum(t => (long)t.Id),
+            villages.Sum(v => (long)v.Id),
+            counties.Sum(c => (long)c.CountyName.Length),
+            villages.Sum(v => (long)v.VillageName.Length));
+    }
+
+    #endregion
 
     #region Schema管理
 
@@ -253,6 +535,8 @@ public class RegionService : BaseService, IRegionService
     #region 地级市查询
     public async Task<Result<List<RegionCity>>> GetCitiesAsync(CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+
         var cached = _citiesCache;
         if (cached != null)
         {
@@ -278,6 +562,14 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<RegionCity>> GetCityByIdAsync(int id, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+        var local = _citiesCache;
+        if (local != null)
+        {
+            var hit = local.FirstOrDefault(c => c.Id == id);
+            if (hit != null) return Result.Success(hit);
+        }
+
         await EnsureTablesExistAsync(ct);
 
         LogInfo($"获取地级市: Id={id}");
@@ -295,6 +587,14 @@ public class RegionService : BaseService, IRegionService
         if (string.IsNullOrWhiteSpace(cityName))
             return Result.Failure<RegionCity>(ErrorCodes.VALIDATION_FAILED, "地级市名称不能为空");
 
+        EnsureLocalCacheLoaded();
+        var local = _citiesCache;
+        if (local != null)
+        {
+            var hit = local.FirstOrDefault(c => string.Equals(c.CityName, cityName, StringComparison.Ordinal));
+            if (hit != null) return Result.Success(hit);
+        }
+
         await EnsureTablesExistAsync(ct);
 
         var sql = "SELECT * FROM nc_regions_cities WHERE city_name = $1";
@@ -311,6 +611,8 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<List<RegionCounty>>> GetCountiesAsync(CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+
         var cached = _allCountiesCache;
         if (cached != null)
         {
@@ -339,6 +641,8 @@ public class RegionService : BaseService, IRegionService
         if (string.IsNullOrWhiteSpace(cityName))
             return Result.Failure<List<RegionCounty>>(ErrorCodes.VALIDATION_FAILED, "地级市名称不能为空");
 
+        EnsureLocalCacheLoaded();
+
         if (_countiesByCityCache.TryGetValue(cityName, out var cached))
         {
             LogDebug($"从缓存获取县区: CityName={cityName}");
@@ -363,7 +667,7 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<List<RegionCounty>>> GetCountiesByCityIdAsync(int cityId, CancellationToken ct = default)
     {
-        await EnsureTablesExistAsync(ct);
+        EnsureLocalCacheLoaded();
 
         var cityResult = await GetCityByIdAsync(cityId, ct);
         if (cityResult.IsFailure || cityResult.Value == null)
@@ -374,6 +678,14 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<RegionCounty>> GetCountyByIdAsync(int id, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+        var local = _allCountiesCache;
+        if (local != null)
+        {
+            var hit = local.FirstOrDefault(c => c.Id == id);
+            if (hit != null) return Result.Success(hit);
+        }
+
         await EnsureTablesExistAsync(ct);
 
         var sql = "SELECT * FROM nc_regions_counties WHERE id = $1";
@@ -388,6 +700,14 @@ public class RegionService : BaseService, IRegionService
     {
         if (string.IsNullOrWhiteSpace(code))
             return Result.Failure<RegionCounty>(ErrorCodes.VALIDATION_FAILED, "县区编码不能为空");
+
+        EnsureLocalCacheLoaded();
+        var local = _allCountiesCache;
+        if (local != null)
+        {
+            var hit = local.FirstOrDefault(c => string.Equals(c.CountyCode, code, StringComparison.Ordinal));
+            if (hit != null) return Result.Success(hit);
+        }
 
         await EnsureTablesExistAsync(ct);
 
@@ -405,6 +725,8 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<List<RegionTown>>> GetTownsByCountyIdAsync(int countyId, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+
         if (_townsByCountyCache.TryGetValue(countyId, out var cached))
         {
             LogDebug($"从缓存获取乡镇: CountyId={countyId}");
@@ -429,6 +751,13 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<RegionTown>> GetTownByIdAsync(int id, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+        if (!_townsByCountyCache.IsEmpty)
+        {
+            var hit = _townsByCountyCache.Values.SelectMany(v => v).FirstOrDefault(t => t.Id == id);
+            if (hit != null) return Result.Success(hit);
+        }
+
         await EnsureTablesExistAsync(ct);
 
         var sql = "SELECT * FROM nc_regions_towns WHERE id = $1";
@@ -443,6 +772,19 @@ public class RegionService : BaseService, IRegionService
     {
         if (string.IsNullOrWhiteSpace(keyword))
             return Result.Failure<List<RegionTown>>(ErrorCodes.VALIDATION_FAILED, "搜索关键词不能为空");
+
+        EnsureLocalCacheLoaded();
+        if (!_townsByCountyCache.IsEmpty)
+        {
+            // 本地已有全量乡镇数据：直接内存检索（离线可用），命中口径与 LIKE '%kw%' 等价
+            var localHits = _townsByCountyCache.Values
+                .SelectMany(v => v)
+                .Where(t => !string.IsNullOrEmpty(t.TownName) && t.TownName.Contains(keyword, StringComparison.Ordinal))
+                .OrderBy(t => t.SortOrder).ThenBy(t => t.Id)
+                .Take(50)
+                .ToList();
+            return Result.Success(localHits);
+        }
 
         await EnsureTablesExistAsync(ct);
 
@@ -462,6 +804,8 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<List<RegionVillage>>> GetVillagesByTownIdAsync(int townId, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+
         if (_villagesByTownCache.TryGetValue(townId, out var cached))
         {
             LogDebug($"从缓存获取村/社区: TownId={townId}");
@@ -486,6 +830,13 @@ public class RegionService : BaseService, IRegionService
 
     public async Task<Result<RegionVillage>> GetVillageByIdAsync(int id, CancellationToken ct = default)
     {
+        EnsureLocalCacheLoaded();
+        if (!_villagesByTownCache.IsEmpty)
+        {
+            var hit = _villagesByTownCache.Values.SelectMany(v => v).FirstOrDefault(v => v.Id == id);
+            if (hit != null) return Result.Success(hit);
+        }
+
         await EnsureTablesExistAsync(ct);
 
         var sql = "SELECT * FROM nc_regions_villages WHERE id = $1";
@@ -501,8 +852,22 @@ public class RegionService : BaseService, IRegionService
         if (string.IsNullOrWhiteSpace(villageCode))
             return Result.Failure<RegionVillage>(ErrorCodes.VALIDATION_FAILED, "村/社区编码不能为空");
 
+        EnsureLocalCacheLoaded();
+
         if (_villageCodeCache.TryGetValue(villageCode, out var cached))
             return Result.Success(cached);
+
+        if (!_villagesByTownCache.IsEmpty)
+        {
+            var local = _villagesByTownCache.Values
+                .SelectMany(v => v)
+                .FirstOrDefault(v => string.Equals(v.VillageCode, villageCode, StringComparison.Ordinal));
+            if (local != null)
+            {
+                _villageCodeCache[villageCode] = local;
+                return Result.Success(local);
+            }
+        }
 
         await EnsureTablesExistAsync(ct);
 
@@ -520,6 +885,19 @@ public class RegionService : BaseService, IRegionService
     {
         if (string.IsNullOrWhiteSpace(keyword))
             return Result.Failure<List<RegionVillage>>(ErrorCodes.VALIDATION_FAILED, "搜索关键词不能为空");
+
+        EnsureLocalCacheLoaded();
+        if (!_villagesByTownCache.IsEmpty)
+        {
+            // 本地已有全量村/社区数据：直接内存检索（离线可用）
+            var localHits = _villagesByTownCache.Values
+                .SelectMany(v => v)
+                .Where(v => !string.IsNullOrEmpty(v.VillageName) && v.VillageName.Contains(keyword, StringComparison.Ordinal))
+                .OrderBy(v => v.SortOrder).ThenBy(v => v.Id)
+                .Take(50)
+                .ToList();
+            return Result.Success(localHits);
+        }
 
         await EnsureTablesExistAsync(ct);
 

@@ -359,6 +359,26 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     [ObservableProperty]
     private string _hukouTown = string.Empty;
 
+    [ObservableProperty]
+    private string _hukouVillage = string.Empty;
+
+    /// <summary>户籍级联选项：与现住址级联完全独立（各自按自己的上级加载）</summary>
+    public ObservableCollection<string> HukouCityOptions { get; } = new();
+    public ObservableCollection<string> HukouDistrictOptions { get; } = new();
+    public ObservableCollection<string> HukouTownOptions { get; } = new();
+    public ObservableCollection<string> HukouVillageOptions { get; } = new();
+
+    /// <summary>户籍级联过程中解析出的区划 ID（保存时写入 hukou_city_id/town_id/village_id）</summary>
+    private int? _hukouCityId;
+    private int? _hukouTownId;
+    private int? _hukouVillageId;
+
+    /// <summary>用户手工编辑过户籍地址全文后置 true，级联重拼不再覆盖</summary>
+    private bool _isHukouAddressManuallyEdited;
+
+    /// <summary>程序写入户籍地址全文期间置 true，防止误标为手工编辑</summary>
+    private bool _isUpdatingHukouAddress;
+
     #endregion
 
     #region 字典数据属性
@@ -1729,10 +1749,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                     HomeTown = SelectedTown ?? string.Empty,
                     HomeVillage = SelectedVillage ?? string.Empty,
                     HomeAddress = Address ?? string.Empty,
-                    HukouProvince = DefaultValuesConstants.HOME_PROVINCE,
-                    HukouCity = SelectedCity ?? string.Empty,
-                    HukouDistrict = SelectedDistrict ?? string.Empty,
-                    HukouTown = SelectedTown ?? string.Empty,
+                    HukouProvince = HukouProvince,
+                    HukouCity = HukouCity,
+                    HukouDistrict = HukouDistrict,
+                    HukouTown = HukouTown,
                     HukouAddress = HukouAddress,
                     CreatedAt = DateTime.Now
                 };

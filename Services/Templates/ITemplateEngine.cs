@@ -35,6 +35,13 @@ public interface ITemplateEngine : IDisposable
     void RemovePlaceholderParagraphs(IReadOnlyCollection<string> placeholders) { }
 
     /// <summary>
+    /// 把签名等图片占位符替换为内嵌图片（docx：InlineShapes.AddPicture）。
+    /// key=占位符（{本人签名}），value=图片字节（PNG）。占位符不存在或图片为空时跳过，不报错。
+    /// 非 Word 引擎为空实现（Excel 无签名场景）。
+    /// </summary>
+    void ReplaceImageFields(Dictionary<string, byte[]> images) { }
+
+    /// <summary>
     /// 删除指定行区间（含端行，startRow &lt;= endRow）。
     /// Excel 引擎用于"固定行数模板"分页时删除尾部空行（如公示名单每页 22 行，末页不足 22 户时删除空行）。
     /// 非 Excel 引擎为空实现。

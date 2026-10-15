@@ -7,11 +7,11 @@
     <!-- Step1（手机版）：基本信息 — 单列堆叠，字段绑定与桌面版一致 -->
     <VerticalStackLayout Spacing="14" IsEnabled="{Binding IsStep1Editable}">
 
-        <!-- 户籍所在地 -->
+        <!-- 户籍所在地（独立级联，默认来自组织机构，可修改） -->
         <Border Style="{StaticResource CardBorder}">
             <VerticalStackLayout Spacing="12">
                 <Label Text="🏠 户籍所在地" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                <Label Text="从当前用户组织机构自动获取，不可修改" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                <Label Text="默认来自组织机构，可修改" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
                 <BoxView Style="{StaticResource Divider}" Margin="0"/>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -20,18 +20,29 @@
                 </VerticalStackLayout>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}"/>
-                    <Entry Text="{Binding HukouCity}" IsReadOnly="True"
-                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    <Picker ItemsSource="{Binding HukouCityOptions}" SelectedItem="{Binding HukouCity}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
                 </VerticalStackLayout>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}"/>
-                    <Entry Text="{Binding HukouDistrict}" IsReadOnly="True"
-                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    <Picker ItemsSource="{Binding HukouDistrictOptions}" SelectedItem="{Binding HukouDistrict}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
                 </VerticalStackLayout>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="乡镇" Style="{StaticResource FormFieldLabelStyle}"/>
-                    <Entry Text="{Binding HukouTown}" IsReadOnly="True"
-                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                    <Picker ItemsSource="{Binding HukouTownOptions}" SelectedItem="{Binding HukouTown}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Picker ItemsSource="{Binding HukouVillageOptions}" SelectedItem="{Binding HukouVillage}"
+                            Style="{StaticResource FormFieldPickerStyle}" Title=""/>
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="户籍地址" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding HukouAddress}" MaxLength="200"
+                           Placeholder="自动拼接，可手工修正"
+                           Style="{StaticResource FormFieldEntryStyle}"/>
                 </VerticalStackLayout>
             </VerticalStackLayout>
         </Border>

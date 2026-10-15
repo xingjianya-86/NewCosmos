@@ -274,7 +274,10 @@ public partial class ApplicationFormViewModel
             HomeVillage = SelectedVillage ?? string.Empty,
             HomeAddress = Address ?? string.Empty,
             HukouAddress = HukouAddress,
-            HukouProvince = DefaultValuesConstants.HOME_PROVINCE,
+            HukouProvince = HukouProvince,
+            HukouCity = HukouCity,
+            HukouDistrict = HukouDistrict,
+            HukouTown = HukouTown,
             CreatedAt = DateTime.Now
         };
 

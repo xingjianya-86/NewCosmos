@@ -44,4 +44,11 @@ public interface IApplicationStatusService
         string operatorName,
         bool allowSubmittedOverride = false,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// 恢复保障：Stopped → Approved（清 stop_reason/stop_date，审计留痕）。
+    /// 仅已停保档案可恢复；存在未删除的下游新档（停旧建新/户主死亡/成员变更链）时拒绝，
+    /// 防止同一家庭出现两份在保档案。已是 Approved/Completed 幂等成功。
+    /// </summary>
+    Task<Result> ResumeAsync(long applicationId, string operatorName, CancellationToken ct = default);
 }

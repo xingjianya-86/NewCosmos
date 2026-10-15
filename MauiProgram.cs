@@ -300,6 +300,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.ITemplateService, Services.Domain.ArchiveManagement.TemplateService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchiveService, Services.Domain.ArchiveManagement.ArchiveService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IProofUnitTemplateService, Services.Domain.ArchiveManagement.ProofUnitTemplateService>();
+        builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoService, Services.Domain.ArchiveManagement.ArchivePhotoService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IPublicityOutputService, Services.Domain.ArchiveManagement.PublicityOutputService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeService, Services.Domain.ChangeManagement.ChangeService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IImportedArchiveService, Services.Domain.ChangeManagement.ImportedArchiveService>();
@@ -323,6 +324,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPrintQueueService, PrintQueueService>();
         builder.Services.AddSingleton<IPrintJobFactory, PrintJobFactory>();
         builder.Services.AddSingleton<IPrintAgentService, PrintAgentService>();
+        // 照片打印（手机采集照片 → PC 端 Word COM 排版直接打印，无模板）
+        builder.Services.AddSingleton<IPhotoPrintService, PhotoPrintService>();
+
+        // 签名留痕（手写签名 PNG 存取，供文书渲染内嵌「本人签名」占位符）
+        builder.Services.AddSingleton<Services.Domain.Signatures.ISignatureService, Services.Domain.Signatures.SignatureService>();
 
         #endregion
 
@@ -473,6 +479,9 @@ public static class MauiProgram
         // P6：推送打印任务查看
         builder.Services.AddTransient<ViewModels.Mobile.MobilePrintJobsViewModel>();
         builder.Services.AddTransient<Pages.Mobile.MobilePrintJobsPage>();
+        // 档案照片采集（手机端）
+        builder.Services.AddTransient<ViewModels.Mobile.MobileArchivePhotoViewModel>();
+        builder.Services.AddTransient<Pages.Mobile.MobileArchivePhotoPage>();
         // P7：后补追缴手机端
         builder.Services.AddTransient<Pages.Mobile.MobileRecoverySearchPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileRecoveryFormPage>();

@@ -48,6 +48,14 @@ public sealed record AssetCheckArchiveParameter(long VerificationId);
 public sealed record ApplicationArchiveParameter(long ApplicationId);
 
 /// <summary>
+/// 档案照片页导航参数：按人（身份证）+ 申请定位，采集/查阅该人的证件与核查照片。
+/// </summary>
+public sealed record ArchivePhotoParameter(
+    string ApplicantIdCard,
+    long? ApplicationId = null,
+    string? ApplicantName = null);
+
+/// <summary>
 /// 档案产出页初始化来源参数：复核/成员变更归档。
 /// ApplicationId = 待输出的档案ID（复核流程为旧档案、成员变更为停旧建新后的新档案）；
 /// OriginalApplicationId = 变更前旧档案ID（可空，停保告知书判定用）；

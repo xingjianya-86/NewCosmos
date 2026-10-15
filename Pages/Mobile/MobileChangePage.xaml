@@ -148,8 +148,26 @@
                 <Label Text="选择变更类型" Style="{StaticResource SectionTitleLabel}" Margin="0" IsVisible="{Binding HasSelectedApplication}"/>
 
                 <VerticalStackLayout Spacing="10" IsVisible="{Binding HasSelectedApplication}">
+                    <!-- 恢复保障（仅已停保档案显示） -->
                     <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
-                            IsEnabled="{Binding IsNotBusy}">
+                            IsVisible="{Binding IsApplicationStopped}">
+                        <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding ResumeGuaranteeCommand}"/></Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Border BackgroundColor="{StaticResource SuccessSoft}" WidthRequest="46" HeightRequest="46"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0">
+                                <Label Text="🔄" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="恢复保障" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="档案已停保，恢复为在保后可继续办理变更" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsEnabled="{Binding IsNotBusy}"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToEconomicReviewCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource InfoSoft}" WidthRequest="46" HeightRequest="46"
@@ -164,7 +182,8 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToFamilyCorrectionCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource WarningSoft}" WidthRequest="46" HeightRequest="46"
@@ -179,7 +198,8 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToEditFamilyInfoCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource PrimarySoft}" WidthRequest="46" HeightRequest="46"
@@ -194,7 +214,8 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToMemberChangeCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource SuccessSoft}" WidthRequest="46" HeightRequest="46"
@@ -209,7 +230,8 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToHouseholdDeathCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource DangerSoft}" WidthRequest="46" HeightRequest="46"
@@ -224,7 +246,8 @@
                         </Grid>
                     </Border>
 
-                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToHeadChangeCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource WarningSoft}" WidthRequest="46" HeightRequest="46"

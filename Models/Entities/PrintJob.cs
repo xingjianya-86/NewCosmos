@@ -1,5 +1,7 @@
 namespace NewCosmos.Models.Entities;
 
+using NewCosmos.Constants;
+
 /// <summary>
 /// 推送打印任务队列表实体（nc_biz_print_jobs）。
 /// 手机端入队（Pending），PC 打印代理认领（Processing）并回写结果（Completed/Failed）。
@@ -58,9 +60,34 @@ public class PrintJob
 
     public DateTime? DeletedAt { get; set; }
 
+    /// <summary>任务类型：Template=模板文书（默认）, Photo=照片（手机采集照片远程打印）</summary>
+    public string JobKind { get; set; } = PrintJobConstants.JobKindTemplate;
+
+    /// <summary>照片二进制（JPEG，JobKind=Photo 时有值；PC 代理直接打印，无需回查照片表）</summary>
+    public byte[]? PhotoData { get; set; }
+
+    /// <summary>照片打印版式（PhotoLayoutConstants：整页/半页/证件原寸）</summary>
+    public string? PhotoLayout { get; set; }
+
+    /// <summary>照片类别（PhotoCategoryConstants，展示/留痕用）</summary>
+    public string? PhotoCategory { get; set; }
+
     /// <summary>业务类型 + 分类展示（供界面绑定）</summary>
     public string BusinessDisplay =>
         string.IsNullOrEmpty(Classification) ? BusinessType : $"{BusinessType} / {Classification}";
+
+    /// <summary>任务类型中文名（供界面绑定）</summary>
+    public string JobKindName => PrintJobConstants.GetJobKindName(JobKind);
+
+    /// <summary>照片类别中文名（供界面绑定，非照片任务为空）</summary>
+    public string PhotoCategoryName =>
+        string.IsNullOrEmpty(PhotoCategory) ? string.Empty : PhotoCategoryConstants.GetDisplayName(PhotoCategory);
+
+    /// <summary>列表展示标题：照片任务显示「照片打印·类别」，模板任务显示模板名。</summary>
+    public string DisplayTitle =>
+        JobKind == PrintJobConstants.JobKindPhoto
+            ? $"照片打印·{PhotoCategoryName}"
+            : (TemplateName ?? "模板文书");
 
     /// <summary>状态中文名（供界面绑定）</summary>
     public string StatusName => PrintJobConstants.GetStatusName(Status);
@@ -77,6 +104,12 @@ public static class PrintJobConstants
     public const string StatusCompleted = "Completed";
     public const string StatusFailed = "Failed";
 
+    /// <summary>任务类型：模板文书（走 PrintExecuteService 模板打印路径）</summary>
+    public const string JobKindTemplate = "Template";
+
+    /// <summary>任务类型：照片（手机采集照片，PC 代理直接打印图片）</summary>
+    public const string JobKindPhoto = "Photo";
+
     public static string GetStatusName(string? status) => status switch
     {
         StatusPending => "待打印",
@@ -84,6 +117,12 @@ public static class PrintJobConstants
         StatusCompleted => "已完成",
         StatusFailed => "失败",
         _ => status ?? string.Empty
+    };
+
+    public static string GetJobKindName(string? jobKind) => jobKind switch
+    {
+        JobKindPhoto => "照片",
+        _ => "模板文书",
     };
 }
 
@@ -119,4 +158,16 @@ public class PrintJobRequest
     public int? RequestedBy { get; set; }
 
     public string? RequestedByName { get; set; }
+
+    /// <summary>任务类型：Template=模板文书（默认）, Photo=照片（手机采集照片远程打印）</summary>
+    public string JobKind { get; set; } = PrintJobConstants.JobKindTemplate;
+
+    /// <summary>照片二进制（JPEG，JobKind=Photo 时必填）</summary>
+    public byte[]? PhotoData { get; set; }
+
+    /// <summary>照片打印版式（PhotoLayoutConstants）</summary>
+    public string? PhotoLayout { get; set; }
+
+    /// <summary>照片类别（PhotoCategoryConstants，展示/留痕用）</summary>
+    public string? PhotoCategory { get; set; }
 }

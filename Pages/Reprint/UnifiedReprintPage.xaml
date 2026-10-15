@@ -88,7 +88,7 @@
                                         SelectedIndex="{Binding DomainFilterIndex}" HeightRequest="36" FontSize="13"/>
                             </Grid>
                         </Grid>
-                        <Label Text="月份按B线业务周期（上月15日~本月15日）筛选；分类可单独筛选名单" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="月份按各域自身周期筛选（低收入人口/动态管理=B线，资产核查=A线，普惠高龄=自然月，临时救助=C线），具体区间见下方提示；分类可单独筛选名单" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Border>
 

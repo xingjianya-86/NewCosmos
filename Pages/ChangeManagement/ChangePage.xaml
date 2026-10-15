@@ -203,8 +203,27 @@
                     <!-- 变更类型选择 -->
                     <Label Text="选择变更类型" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
 
+                    <!-- 恢复保障（仅已停保档案显示） -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ResumeGuaranteeCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource SuccessSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="{OnPlatform WinUI='&#xE72C;', Android='&#x1F504;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="{StaticResource Success}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="恢复保障" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="档案已停保，恢复为在保后可继续办理变更业务" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
                     <!-- 经济状况复核 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToEconomicReviewCommand}"/>
                         </Border.GestureRecognizers>
@@ -221,7 +240,8 @@
                     </Border>
 
                     <!-- 家庭信息修正 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToFamilyCorrectionCommand}"/>
                         </Border.GestureRecognizers>
@@ -238,7 +258,8 @@
                     </Border>
 
                     <!-- 编辑家庭信息 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToEditFamilyInfoCommand}"/>
                         </Border.GestureRecognizers>
@@ -255,7 +276,8 @@
                     </Border>
 
                     <!-- 家庭成员变更 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToMemberChangeCommand}"/>
                         </Border.GestureRecognizers>
@@ -272,7 +294,8 @@
                     </Border>
 
                     <!-- 户主死亡变更 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToHouseholdDeathCommand}"/>
                         </Border.GestureRecognizers>
@@ -289,7 +312,8 @@
                     </Border>
 
                     <!-- 户主变更 -->
-                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20">
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding NavigateToHeadChangeCommand}"/>
                         </Border.GestureRecognizers>

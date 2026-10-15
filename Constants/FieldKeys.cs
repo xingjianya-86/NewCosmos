@@ -38,6 +38,11 @@ public static class FieldKeys
     public const string REPORT_DATE = "REPORT_DATE";
     public const string CIVIL_ASSISTANT_NAME = "CIVIL_ASSISTANT_NAME";
 
+    // 签名（图片占位符，非文本字段——由 PrintExecuteService 取回签名 PNG 后经 ReplaceImageFields 内嵌）
+    public const string SIGNATURE_APPLICANT = "SIGNATURE_APPLICANT";               // 申请人本人签名
+    public const string SIGNATURE_AGENT = "SIGNATURE_AGENT";                       // 代理人签名
+    public const string SIGNATURE_OPERATOR = "SIGNATURE_OPERATOR";                 // 经办人签名
+
     // 代理人
     public const string AGENT_NAME = "AGENT_NAME";
     public const string AGENT_ID_CARD = "AGENT_ID_CARD";
