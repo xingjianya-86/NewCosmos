@@ -137,6 +137,14 @@ public static partial class FieldKeys
     public const string RESOLUTION_NAMES = "RESOLUTION_NAMES";                      // 人员名单
     public const string APPLY_CATEGORY = "APPLY_CATEGORY";                          // 申请分类
     public const string NEW_MEMBER_INFO = "NEW_MEMBER_INFO";                        // 新增成员信息
+
+    // 批D1c 孤儿转正（2026-10-16）：T3 档案_咨询登记台账回访三键——**仅建常量、无任何供给**（回访业务代码
+    // 全库零命中），打印值保持现状空串（转正前后输出零变化）。"回访功能缺失"为独立业务待办：
+    // 补功能=录入回访记录+供给；删列=须连同模板文档占位符一起删（只删 config 行会让 {回访情况} 等
+    // 占位符原文残留在打印件上，比空值更差——故当前保留 config 行）。
+    public const string VISIT_DATE = "VISIT_DATE";                                  // 回访时间（无供给）
+    public const string VISIT_OPERATOR = "VISIT_OPERATOR";                          // 回访经办人员（无供给）
+    public const string VISIT_STATUS = "VISIT_STATUS";                              // 回访情况（无供给）
     public const string CLASSIFICATION_RESULT = "CLASSIFICATION_RESULT";
 
     // 入户调查表新增字段
