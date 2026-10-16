@@ -28,9 +28,8 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_STAFF_PHONE] = staff.StaffPhone,
             [FieldKeys.NEAR_RELATIVE_WORK_UNIT] = staff.WorkUnit,
             [FieldKeys.NEAR_RELATIVE_POSITION] = staff.Position,
-            [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
-            // 批5 双写（2026-10-16，B/SOLO）：T153 月报批量备案 {审核确认时间}→AUDIT_DATE（月报页 fields
-            // 只有本字典、无 dict A，不供给即丢值）；同 auditTime 同值
+            // 批5 双写→清理：原 NEAR_RELATIVE_AUDIT_TIME 已删（T153 config 已迁 AUDIT_DATE，同 auditTime
+            // 同值；月报页 fields 只有本字典、无 dict A，AUDIT_DATE 供给必须保留）
             [FieldKeys.AUDIT_DATE] = auditTime,
         };
 
@@ -64,10 +63,9 @@ public static class NearRelativePrintDataBuilder
     {
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [FieldKeys.NEAR_RELATIVE_REPORT_DATE] = reportDate,
-            [FieldKeys.NEAR_RELATIVE_REPORT_UNIT] = reportUnit,
-            // 批5 双写（2026-10-16，B/SOLO）：T154 月报汇总表 {填报单位}→REPORT_UNIT（月报页 fields 只有
-            // 本字典；同 reportUnit 同值——L847 传入 fillUnit）
+            [FieldKeys.NEAR_RELATIVE_REPORT_DATE] = reportDate, // 未迁移（月报期间口径 C 类），键与行保留
+            // 批5 双写→清理：原 NEAR_RELATIVE_REPORT_UNIT 已删（T154 config 已迁 REPORT_UNIT，同值；
+            // 月报页 fields 只有本字典，REPORT_UNIT 供给必须保留——L847 传入 fillUnit）
             [FieldKeys.REPORT_UNIT] = reportUnit,
         };
 
@@ -108,20 +106,13 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_WORK_UNIT] = s.WorkUnit,
             [FieldKeys.NEAR_RELATIVE_POSITION] = s.Position,
             [FieldKeys.NEAR_RELATIVE_RELATION] = l.Relation,
-            [FieldKeys.NEAR_RELATIVE_NAME] = l.Name,
-            [FieldKeys.NEAR_RELATIVE_GENDER] = l.Gender,
-            [FieldKeys.NEAR_RELATIVE_BIRTH_DATE] = l.BirthDate,
-            [FieldKeys.NEAR_RELATIVE_FAMILY_ADDRESS] = l.FamilyAddress,
-            [FieldKeys.NEAR_RELATIVE_FAMILY_SIZE] = l.FamilySize?.ToString() ?? string.Empty,
+            [FieldKeys.NEAR_RELATIVE_BIRTH_DATE] = l.BirthDate, // 未迁移（无合并候选），保留
             [FieldKeys.NEAR_RELATIVE_APPLY_REASON] = l.ApplyReason,
             [FieldKeys.NEAR_RELATIVE_APPLY_TIME] = l.ApplyTime,
             [FieldKeys.NEAR_RELATIVE_ECONOMY_INVESTIGATE] = l.EconomyInvestigate,
-            [FieldKeys.NEAR_RELATIVE_TOWN_OPINION] = l.TownOpinion,
-            [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
-            // 批5 双写（2026-10-16，B/SOLO）：T151 关联信息表 config 迁到通用键前先并行供给——
-            // 与上方各 NEAR_RELATIVE_ 同 pair 同源同值（l = 户主对象）。注意：当前 fields 路径
-            // 取 PrintNavigationData.FieldData（dict A），本 pair 字典只进 tableRows 且该模板
-            // 无索引/无 tables 而被 Flatten 忽略（既有断链）；此处双写供断链修复后即正确生效。
+            // 批5 双写→批D2 清理（2026-10-16）：原 NEAR_RELATIVE_NAME/GENDER/FAMILY_ADDRESS/FAMILY_SIZE/
+            // TOWN_OPINION/AUDIT_TIME 六行已删（T151 config 已迁通用键，同 pair 同源同值；D4 修复后
+            // 本 pair 字典经 copiesBySupporter 覆盖 dict A 生效）
             [FieldKeys.APPLICANT_NAME] = l.Name,
             [FieldKeys.APPLICANT_GENDER] = l.Gender,
             [FieldKeys.FAMILY_ADDRESS] = l.FamilyAddress,
@@ -144,23 +135,16 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_STAFF_ID_CARD] = s.StaffIdCard,
             [FieldKeys.NEAR_RELATIVE_WORK_UNIT] = s.WorkUnit,
             [FieldKeys.NEAR_RELATIVE_POSITION] = s.Position,
-            [FieldKeys.NEAR_RELATIVE_NAME] = l.Name,
-            [FieldKeys.NEAR_RELATIVE_ID_CARD] = l.IdCard,
-            [FieldKeys.NEAR_RELATIVE_HUKOU_ADDRESS] = l.HukouAddress,
-            [FieldKeys.NEAR_RELATIVE_RESIDENCE_ADDRESS] = l.ResidenceAddress,
-            [FieldKeys.NEAR_RELATIVE_FAMILY_SIZE] = l.FamilySize?.ToString() ?? string.Empty,
             [FieldKeys.NEAR_RELATIVE_HELP_TYPE] = l.HelpType,
             [FieldKeys.NEAR_RELATIVE_MONTH_AMOUNT] = l.MonthAmount?.ToString("F2") ?? string.Empty,
             [FieldKeys.NEAR_RELATIVE_RELATION] = l.Relation,
             [FieldKeys.NEAR_RELATIVE_START_TIME] = l.StartTime,
             [FieldKeys.NEAR_RELATIVE_FAMILY_RELATION] = l.FamilyRelation,
             [FieldKeys.NEAR_RELATIVE_FAMILY_DIFFICULTY] = l.FamilyDifficulty,
-            [FieldKeys.NEAR_RELATIVE_TOWN_OPINION] = l.TownOpinion,
             [FieldKeys.NEAR_RELATIVE_DYNAMIC_RECORD] = l.DynamicRecord,
-            [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
-            // 批5 双写（2026-10-16，B/SOLO）：T152 救助对象信息表 config 迁到通用键前先并行供给——
-            // 与上方各 NEAR_RELATIVE_ 同 pair 同源同值（l = 户主对象）；说明同 dict3（当前 fields 路径
-            // 不经 pair，断链修复后即生效）。
+            // 批5 双写→批D2 清理（2026-10-16）：原 NEAR_RELATIVE_NAME/ID_CARD/HUKOU_ADDRESS/
+            // RESIDENCE_ADDRESS/FAMILY_SIZE/TOWN_OPINION/AUDIT_TIME 七行已删（T152 config 已迁通用键，
+            // 同 pair 同源同值；D4 copiesBySupporter 修复后本字典覆盖 dict A 生效）
             [FieldKeys.APPLICANT_NAME] = l.Name,
             [FieldKeys.APPLICANT_ID_CARD] = l.IdCard,
             [FieldKeys.HUKOU_ADDRESS] = l.HukouAddress,

@@ -240,18 +240,13 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
                 [FieldKeys.DM_CURRENT_UNIT] = unitName,
                 [FieldKeys.DM_REPORT_YEAR] = DateTime.Now.Year.ToString(CultureInfo.InvariantCulture),
                 [FieldKeys.DM_CURRENT_USER] = App.CurrentUserFullName ?? "",
-                [FieldKeys.DM_CURRENT_DATE] = DateTime.Now.ToString("yyyy年M月d日"),
-                // 批4 双写（2026-10-16，A/SOLO）：T248 config 迁到通用键前先并行供给，与上方 DM_ 旧键同源同值；
-                //    观察期（下个发版）后 config 稳定再删旧键行。
+                // 批4 双写 → 批D2 清理（2026-10-16）：T248 config 已迁本键（与原 DM_ 旧键同源同值），旧键供给行已删
                 [FieldKeys.CURRENT_DATE] = DateTime.Now.ToString("yyyy年M月d日"),
 
-                [FieldKeys.DM_HEAD_NAME] = app.ApplicantName ?? "",
-                [FieldKeys.APPLICANT_NAME] = app.ApplicantName ?? "", // 批4 双写（同源同值）
                 [FieldKeys.DM_FAMILY_SIZE] = familySize.ToString(CultureInfo.InvariantCulture),
-                [FieldKeys.DM_HEAD_HUKOU] = app.HukouAddress ?? "",
-                [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress ?? "", // 批4 双写（同源同值）
-                [FieldKeys.DM_HEAD_RESIDENCE] = $"{app.Town}{app.Community}{app.Address}",
-                // 批5 双写（2026-10-16，B/SOLO）：T248 config 迁到通用键前先并行供给（同源同值）
+                [FieldKeys.APPLICANT_NAME] = app.ApplicantName ?? "", // 批4 双写→清理：原 DM_HEAD_NAME 已删（同源同值）
+                [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress ?? "", // 批4 双写→清理：原 DM_HEAD_HUKOU 已删（同源同值）
+                // 批5 双写→清理：原 DM_HEAD_RESIDENCE 已删（同源同值）
                 [FieldKeys.RESIDENCE_ADDRESS] = $"{app.Town}{app.Community}{app.Address}",
                 [FieldKeys.DM_CATEGORY] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
                 [FieldKeys.DM_CYCLE] = CycleText,
@@ -269,8 +264,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
 
                 [FieldKeys.DM_NEAR_RELATIVE] = BuildNearRelativeText(nearRelativeResult.Value),
                 [FieldKeys.DM_OTHER_SITUATION] = "",
-                [FieldKeys.DM_TOWN_OPINION] = townOpinion,
-                // 批5 双写（2026-10-16，B/SOLO）：T248 config 迁到通用键前先并行供给（同源同值）
+                // 批5 双写→清理：原 DM_TOWN_OPINION 已删（同源同值，T248 config 已迁本键）
                 [FieldKeys.TOWN_OPINION] = townOpinion,
             };
 
@@ -373,7 +367,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
         if (pdfResult.IsFailure) return Result.Failure<string>(pdfResult.ErrorCode!, pdfResult.Message!);
 
         var path = OutputPathHelper.GetFilePath(OutputCategory,
-            MaskNameForPath(fieldsResult.Value.GetValueOrDefault(FieldKeys.DM_HEAD_NAME)),
+            MaskNameForPath(fieldsResult.Value.GetValueOrDefault(FieldKeys.APPLICANT_NAME)),
             latestId.ToString(CultureInfo.InvariantCulture),
             "社会救助对象动态管理记录", ".pdf");
         var writeResult = WriteFile(path, pdfResult.Value);

@@ -1014,7 +1014,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                 [FieldKeys.APPLICANT_NAME] = head.ApplicantName,
                 [FieldKeys.APPLICANT_ID_CARD] = head.ApplicantIdCard,
                 [FieldKeys.FAMILY_ADDRESS] = FamilyAddress,
-                [FieldKeys.FAMILY_VILLAGE] = SelectedVillage,
+                // 批D2 清理：原 FAMILY_VILLAGE 供给已删（全库 config 读取 0）
                 [FieldKeys.FAMILY_DETAIL_ADDRESS] = FamilyAddressDetail,
                 [FieldKeys.APPLICATION_REASON] = SelectedApplicationReason,
                 [FieldKeys.APPLICATION_DATE] = ApplicationDate.ToString("yyyy-MM-dd"),

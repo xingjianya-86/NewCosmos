@@ -326,25 +326,8 @@ public partial class ArchiveProductionViewModel
                     : $"渐退期自{gpStartText}起，至{gpEndText}为止";
                 _fieldData[FieldKeys.GP_EXIT_SITUATION] = await BuildGraceExitSituationAsync(app, graceRes.Value);
 
-                // 档案_保障金减少：渐退封顶减发时填充（原额 > 现应发额）
-                var graceOriginal = graceRes.Value.OriginalGuaranteeAmount ?? 0;
-                var graceCurrent = graceRes.Value.GraceGrantAmount ?? app.HouseholdMonthlyGuaranteeAmount;
-                if (graceOriginal > 0 && graceCurrent < graceOriginal)
-                {
-                    var decrease = graceOriginal - graceCurrent;
-                    var capBasis = $"{(app.HukouType?.Contains("Urban") == true ? "城市" : "农村")}低保标准×{app.FamilySize}人";
-                    _fieldData[FieldKeys.GR_HEAD_NAME] = app.ApplicantName ?? "";
-                    _fieldData[FieldKeys.GR_ID_CARD] = app.ApplicantIdCard ?? "";
-                    _fieldData[FieldKeys.GR_FAMILY_SIZE] = app.FamilySize.ToString();
-                    _fieldData[FieldKeys.GR_OLD_AMOUNT] = FormatDecimal(graceOriginal);
-                    _fieldData[FieldKeys.GR_NEW_AMOUNT] = FormatDecimal(graceCurrent);
-                    _fieldData[FieldKeys.GR_DECREASE_AMOUNT] = FormatDecimal(decrease);
-                    _fieldData[FieldKeys.GR_CAP_BASIS] = capBasis;
-                    _fieldData[FieldKeys.GR_GRACE_START] = graceRes.Value.StartDate?.ToString("yyyy年M月d日") ?? "";
-                    _fieldData[FieldKeys.GR_GRACE_END] = graceRes.Value.EndDate?.ToString("yyyy年M月d日") ?? "";
-                    _fieldData[FieldKeys.GR_REASON] = "原保障金超过本户口类型最低保障额上限，渐退期内封顶减发";
-                    _fieldData[FieldKeys.GR_AUDIT_TIME] = DateTime.Now.ToString("yyyy年M月d日");
-                }
+                // （已删除 2026-10-16 · D5 用户授权）档案_保障金减少 GR_* 填充块：模板不在库、
+                // config 引用 0、代码读取 0（三问全过）；找回指引见 FieldKeys.Recovery.cs 墓碑注释。
             }
 
             // 增减员调整表：人员变动类变更（MemberChange 类别 + HouseholdDeath 等类型兜底；

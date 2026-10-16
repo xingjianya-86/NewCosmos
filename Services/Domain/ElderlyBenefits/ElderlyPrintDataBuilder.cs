@@ -13,16 +13,10 @@ public static class ElderlyPrintDataBuilder
     {
         var f = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [FieldKeys.ELDERLY_NAME] = app.Name,
-            [FieldKeys.ELDERLY_AGE] = app.Age?.ToString() ?? string.Empty,
-            [FieldKeys.ELDERLY_PHONE] = app.Phone,
-            [FieldKeys.ELDERLY_ID_CARD] = app.IdCard,
-            [FieldKeys.ELDERLY_HUKOU_ADDRESS] = app.HukouAddress,
-            // 批4 双写（2026-10-16，A/SOLO）：T140 登记表 / T143 停止表 config 迁到通用键前先并行供给，同源同值
+            // 批4/批5 双写 → 批D2 清理（2026-10-16）：T140/141/143 config 已迁通用键（原 ELDERLY_NAME/AGE/
+            // PHONE/ID_CARD/HUKOU_ADDRESS/FAMILY_ADDRESS 同源同值），旧键供给行已删；
+            // 下方 BuildDetailFields 的 ELDERLY_*_N 槽位行不受影响（常量保留、另键另语义）
             [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress,
-            [FieldKeys.ELDERLY_FAMILY_ADDRESS] = app.FamilyAddress,
-            // 批5 双写（2026-10-16，B/SOLO）：T140/141/143 config 迁到 APPLICANT_NAME / APPLICANT_AGE /
-            // CONTACT_PHONE / APPLICANT_ID_CARD / FAMILY_ADDRESS 前先并行供给（与上方 ELDERLY_ 同源同值）
             [FieldKeys.APPLICANT_NAME] = app.Name,
             [FieldKeys.APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
             [FieldKeys.CONTACT_PHONE] = app.Phone,
@@ -134,10 +128,9 @@ public static class ElderlyPrintDataBuilder
     {
         return new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [FieldKeys.ELDERLY_ADJUST_NAME] = row.Name,
-            [FieldKeys.ELDERLY_ADJUST_ID_CARD] = row.IdCard,
-            [FieldKeys.ELDERLY_ADJUST_HUKOU_ADDRESS] = row.HukouAddress,
-            [FieldKeys.ELDERLY_ADJUST_FAMILY_ADDRESS] = row.FamilyAddress,
+            // 批D2 清理（2026-10-16）：原 ELDERLY_ADJUST_NAME/ID_CARD/HUKOU_ADDRESS/FAMILY_ADDRESS 四键
+            // 供给已删（全库 config 读取 0）；下方 REASON/TIME/AMOUNT/PAYBACK_*/ACCEPT_DATE 为 C 类
+            // 保留键（满90月报继续读取），勿动。
             [FieldKeys.ELDERLY_ADJUST_REASON] = ElderlyBenefitConstants.BuildAdjustReasonCheckText(
                 ElderlyBenefitConstants.AdjustReasonAge, false),
             [FieldKeys.ELDERLY_ADJUST_TIME] = monthText,

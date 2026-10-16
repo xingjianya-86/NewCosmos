@@ -103,7 +103,7 @@ public class TemplateFieldBuilder
             [FieldKeys.APPLICATION_DATE] = applicationDate != default ? applicationDate.ToString("yyyy-MM-dd") : DateTime.Now.ToString("yyyy-MM-dd"), // 业务锚点（=调查日新口径），见 BuildFieldsAsync
             [FieldKeys.CONTACT_PHONE] = data.ContactPhone ?? "",
             [FieldKeys.FAMILY_ADDRESS] = "",  // 统一由 ResolveAddresses 填充
-            [FieldKeys.FAMILY_VILLAGE] = data.Community ?? "",
+            // 批D2 清理：原 FAMILY_VILLAGE 供给已删（全库 config 读取 0；同源同值 COMMUNITY 保留）
             [FieldKeys.COMMUNITY] = data.Community ?? "",
             [FieldKeys.FAMILY_DETAIL_ADDRESS] = data.DetailAddress ?? "",
             [FieldKeys.HEAD_FAMILY_SIZE] = data.FamilySize.ToString(),

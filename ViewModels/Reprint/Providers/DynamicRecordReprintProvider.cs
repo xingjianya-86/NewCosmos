@@ -94,8 +94,9 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
             return Result.Failure<ReprintArchivePayload>(fieldsResult.ErrorCode!, fieldsResult.Message!);
         var fields = fieldsResult.Value;
 
-        fields.TryGetValue(NewCosmos.Constants.FieldKeys.DM_HEAD_NAME, out var name);
-        fields.TryGetValue(NewCosmos.Constants.FieldKeys.DM_HEAD_HUKOU, out _);
+        // 批D2 清理（2026-10-16）：改读双写键 APPLICANT_NAME（与 DM_HEAD_NAME 同源同值 app.ApplicantName）；
+        // 原第二行 DM_HEAD_HUKOU out _ 为死行（读取即丢弃、零依赖）一并删除。
+        fields.TryGetValue(NewCosmos.Constants.FieldKeys.APPLICANT_NAME, out var name);
 
         return Result.Success(new ReprintArchivePayload(
             DomainKey,

@@ -818,20 +818,6 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.GP_EXIT_SITUATION] = "",
             [FieldKeys.GP_AUDIT_TIME] = "",
 
-            // 档案_保障金减少字段（初始空值，侧栏渐退封顶时填充）
-            [FieldKeys.GR_HEAD_NAME] = "",
-            [FieldKeys.GR_ID_CARD] = "",
-            [FieldKeys.GR_FAMILY_SIZE] = "",
-            [FieldKeys.GR_OLD_AMOUNT] = "",
-            [FieldKeys.GR_NEW_AMOUNT] = "",
-            [FieldKeys.GR_DECREASE_AMOUNT] = "",
-            [FieldKeys.GR_CAP_BASIS] = "",
-            [FieldKeys.GR_GRACE_START] = "",
-            [FieldKeys.GR_GRACE_END] = "",
-            [FieldKeys.GR_DEATH_DATE] = "",
-            [FieldKeys.GR_REASON] = "",
-            [FieldKeys.GR_AUDIT_TIME] = "",
-
             // 增减员调整表字段（初始空值，侧栏加载时填充）
             [FieldKeys.ADJ_FILL_UNIT] = "",
             [FieldKeys.ADJ_HEAD_NAME] = "",
@@ -935,7 +921,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 "urban" => "城市户口",
                 _ => app.HukouType ?? ""
             },
-            [FieldKeys.FAMILY_VILLAGE] = app.Community ?? "",
+            // 批D2 清理（2026-10-16）：原 FAMILY_VILLAGE 行已删——其值 app.Community 与同字典上方
+            // COMMUNITY 行同源同值，T222 config 迁移后读上方行即可（重复键行就此消除）
             [FieldKeys.COPYRIGHT_INFO] = CopyrightHelper.BuildCopyrightInfo(app.ApplicantIdCard),
 
             // 能力鉴定字段
@@ -971,8 +958,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
-            // 分散供养协议 {审核确认时间}：业务审核确认日（B线时间轴口径），格式 2026年10月15日
-            [FieldKeys.SCATTERED_AUDIT_TIME] = tl.AuditDate.ToString("yyyy年M月d日"),
+            // 批D2 清理（2026-10-16）：原 SCATTERED_AUDIT_TIME 供给已删——T222 config 已迁 AUDIT_DATE
+            //（dict A/B 本有 AUDIT_DATE=tl.AuditDate ISO + config format=yyyy年M月d日，同源同值）
             // 照料服务协议：无数据源字段留空（占位符替换为空，避免残留）
             // 经办人职务/身份证已有数据源（登录用户 IdentityCard/Position），见上方 OPERATOR_TITLE/OPERATOR_ID_CARD
             [FieldKeys.CAREGIVER_BANK_NAME] = "",  // 延迟到加载照料人后填充（分散照料开户行）
@@ -1034,10 +1021,9 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 bool wasInScope = !ClassificationConstants.IsCodeStop(originalClassification);
 
                 _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = wasInScope ? "停止" : "不予认定";
-                _fieldData[FieldKeys.NOTICE_TOWN] = app.Town ?? "";
-                _fieldData[FieldKeys.NOTICE_VILLAGE] = app.Community ?? "";
-                // 批4 双写（2026-10-16，A/SOLO）：T241 告知书 config 迁到 COMMUNITY 前先并行供给（同源同值，
-                // 同字典 684/1783 行本有同值赋，此处冗余无害——保证告知分支独立成立）
+                // 批4 双写→批D2 清理（2026-10-16）：原 NOTICE_TOWN/NOTICE_VILLAGE 已删（T241 config 已迁
+                // TOWN=dict A orgInfo.Town(L704)、COMMUNITY 同源 app.Community；本分支 COMMUNITY 与同字典
+                // L684 行同值，保留以保证告知分支独立成立）
                 _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
                 _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
 
@@ -1080,9 +1066,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                     var diff = global::System.Math.Abs(reg.NewGuaranteeAmount - reg.OldGuaranteeAmount);
 
                     _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "变更";
-                    _fieldData[FieldKeys.NOTICE_TOWN] = app.Town ?? "";
-                    _fieldData[FieldKeys.NOTICE_VILLAGE] = app.Community ?? "";
-                    // 批4 双写（2026-10-16，A/SOLO）：待遇调整分支同上——T241 config 迁 COMMUNITY 前并行供给
+                    // 批4 双写→批D2 清理（2026-10-16）：原 NOTICE_TOWN/NOTICE_VILLAGE 已删（同上，同源同值）
                     _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
                     _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
 
@@ -1132,7 +1116,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                     _fieldData[FieldKeys.SPECIAL_APPROVAL_BASIC_SITUATION] = spForm.BasicSituation;
                     _fieldData[FieldKeys.SPECIAL_APPROVAL_MATTERS] = spForm.SpecialMatters;
                     _fieldData[FieldKeys.SPECIAL_APPROVAL_AUDIT_RESULT] = spForm.AuditResult;
-                    _fieldData[FieldKeys.SPECIAL_APPROVAL_AUDIT_DATE] = spForm.AuditDate?.ToString("yyyy-MM-dd") ?? "";
+                    // 批D2 清理：原 SPECIAL_APPROVAL_AUDIT_DATE 已删（T138 config 已迁 AUDIT_DATE，
+                    // 取 dict A/B 的 tl.AuditDate ISO——批5 决策留痕 conf=H，spForm 源就此放弃）
                     _fieldData[FieldKeys.APPLICANT_ID_CARD] = app.ApplicantIdCard;
                     _fieldData[FieldKeys.CONTACT_PHONE] = app.ApplicantPhone;
                     _fieldData[FieldKeys.HEAD_FAMILY_SIZE] = $"{app.FamilySize}口人";
@@ -1452,7 +1437,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             _fieldData[FieldKeys.CAREGIVER_SUBSIDY_AMOUNT] = careAmount > 0 ? FormatDecimal(careAmount) : "";
             _fieldData[FieldKeys.CAREGIVER_SUBSIDY_UPPER] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
         }
-        _fieldData["APPLICANT_PHONE"] = app.ApplicantPhone ?? "";
+        // 批D2 清理：原 APPLICANT_PHONE 裸串供给已删（T221 config 已迁 CONTACT_PHONE，dict A/B L688/1792 同源同值）
 
         // 声明类模板专用字段：配偶信息、户主所在市、当前日期
         _fieldData[FieldKeys.SPOUSE_NAME] = "";
@@ -1881,7 +1866,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
                 "urban" => "城市户口",
                 _ => app.HukouType ?? ""
             },
-            [FieldKeys.FAMILY_VILLAGE] = app.Community ?? "",
+            // 批D2 清理（2026-10-16）：原 FAMILY_VILLAGE 行已删——其值 app.Community 与同字典上方
+            // COMMUNITY 行同源同值，T222 config 迁移后读上方行即可（重复键行就此消除）
             [FieldKeys.COPYRIGHT_INFO] = CopyrightHelper.BuildCopyrightInfo(app.ApplicantIdCard),
 
             // 特困入户调查表（模板23）字段（与主路径 LoadApplicationDataAsync 对齐——分步路径此前缺整组键）
@@ -1935,8 +1921,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
-            // 分散供养协议 {审核确认时间}：业务审核确认日（B线时间轴口径），格式 2026年10月15日
-            [FieldKeys.SCATTERED_AUDIT_TIME] = tl.AuditDate.ToString("yyyy年M月d日"),
+            // 批D2 清理（2026-10-16）：原 SCATTERED_AUDIT_TIME 供给已删——T222 config 已迁 AUDIT_DATE
+            //（dict A/B 本有 AUDIT_DATE=tl.AuditDate ISO + config format=yyyy年M月d日，同源同值）
         };
 
         // 分步路径：装配能力鉴定/照料人/特困字段（复用已加载缓存）
@@ -1970,7 +1956,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             _fieldData[FieldKeys.DESTITUTE_CAREGIVER_SITUATION] = BuildDestituteCaregiverSituation(app, _cachedCaregivers);
             _fieldData[FieldKeys.DESTITUTE_DAILY_CARE] = BuildDestituteDailyCare(app, _cachedCaregivers);
         }
-        _fieldData["APPLICANT_PHONE"] = app.ApplicantPhone ?? "";
+        // 批D2 清理：原 APPLICANT_PHONE 裸串供给已删（T221 config 已迁 CONTACT_PHONE，dict A/B L688/1792 同源同值）
         if (_cachedFamilyMembers != null)
         {
             _fieldData[FieldKeys.DESTITUTE_HEALTH_ASSESSMENT] = BuildDestituteHealthAssessment(app, _cachedFamilyMembers);

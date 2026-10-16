@@ -44,20 +44,8 @@ public static partial class FieldKeys
     public const string GP_EXIT_SITUATION = "GP_EXIT_SITUATION";           // 退出说明（分型拼句，未退出留空）{退出渐退期情况}
     public const string GP_AUDIT_TIME = "GP_AUDIT_TIME";                   // 审核确认时间（config 未引用）
 
-    // ── 档案_保障金减少（渐退超限封顶减发专用） ── 值为模板实际中文占位符
-    // ⚠️ 遗留债（2026-10-16 批2 刻意不动）：该模板不在 nc_biz_templates 库内（73 模板中无此名），
-    //    本族 12 键的 config 引用数 = 0，供给属死供给 → 改值零收益、且有"死供给变活"风险。
-    //    待该模板入库配 fields 时，须先按批2 同法把值迁为 ASCII（= 常量名）再配 config。
-    public const string GR_HEAD_NAME = "户主姓名";                        // 户主姓名
-    public const string GR_ID_CARD = "身份证号";                          // 身份证号
-    public const string GR_FAMILY_SIZE = "家庭人口";                      // 家庭人口
-    public const string GR_OLD_AMOUNT = "原保障金额";                     // 渐退前原月保障金
-    public const string GR_NEW_AMOUNT = "现保障金额";                     // 渐退期内封顶后月保障金
-    public const string GR_DECREASE_AMOUNT = "减发金额";                  // 原-现
-    public const string GR_CAP_BASIS = "封顶依据";                        // 户口类型标准×人数
-    public const string GR_GRACE_START = "渐退期起";                      // 渐退开始
-    public const string GR_GRACE_END = "渐退期止";                        // 渐退结束
-    public const string GR_DEATH_DATE = "死亡日期";                       // 原户主死亡日期（可空）
-    public const string GR_REASON = "减发原因";                          // 减发原因说明
-    public const string GR_AUDIT_TIME = "审核确认时间";                   // 审核确认时间
+    // ── （已删除 2026-10-16 · 清偿方案 D5 用户授权）档案_保障金减少族 GR_* 12 键 ──
+    // 删除依据（三问全过）：① 模板不在 nc_biz_templates（库/项目/本地三处文件搜索均空）；
+    // ② config 引用 0（NonAscii=0 等价证明）；③ 代码读取方 0（仅 Sidebar 填充与 dict 空值初始化，均随删）。
+    // 若该模板后续入库：从 git 历史找回本族常量与供给，先按批2 同法把值迁为 ASCII（= 常量名）再配 config。
 }

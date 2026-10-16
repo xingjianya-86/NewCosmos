@@ -37,8 +37,8 @@ public static class TempReliefPrintDataBuilder
         {
             [FieldKeys.TEMP_APPLICATION_NO] = app.ApplicationNo,
             [FieldKeys.TEMP_RELIEF_TYPE_NAME] = TempReliefConstants.GetReliefTypeName(app.ReliefType),
-            [FieldKeys.TEMP_REPORT_UNIT] = app.ReportUnit,
-            // 批5 双写（2026-10-16，B/SOLO）：T226 config 迁到通用键前先并行供给（同源同值）
+            // 批5 双写→清理：原 TEMP_REPORT_UNIT 已删（同源同值，T226 config 已迁本键；
+            // BatchAndArchive:934 的兜底读取方已同步改读 REPORT_UNIT）
             [FieldKeys.REPORT_UNIT] = app.ReportUnit,
             [FieldKeys.TEMP_REPORT_TIME] = app.ReportTime?.ToString("yyyy年M月d日") ?? string.Empty,
             // ── 2026-10-16 批3（MIRROR 合并，config 侧 5 规则/18 行已迁新键）──
@@ -48,13 +48,9 @@ public static class TempReliefPrintDataBuilder
             // 故此处供给必须保留——不是 config 冗余，勿连同已删行一起清理。
             // 已删除的真冗余（迁移后代码读取方 = 0）：TEMP_FAMILY_ADDRESS、TEMP_HUKOU_ADDRESS。
             [FieldKeys.TEMP_APPLICANT_NAME] = app.ApplicantName,
-            [FieldKeys.TEMP_APPLICANT_GENDER] = app.Gender,
-            [FieldKeys.TEMP_APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
-            [FieldKeys.TEMP_APPLICANT_ID_CARD] = app.ApplicantIdCard,
-            [FieldKeys.TEMP_APPLICANT_PHONE] = app.Phone,
-            // 批5 双写（2026-10-16，B/SOLO）：T226/230/235/237/249 与 T235/238/249 config 迁到
-            // APPLICANT_GENDER / APPLICANT_AGE / CONTACT_PHONE 前先并行供给（与上方 TEMP_ 同源同值；
-            // CONTACT_PHONE 取申请人电话 app.Phone，非 L97 的公示异议反馈电话）
+            [FieldKeys.TEMP_APPLICANT_ID_CARD] = app.ApplicantIdCard, // 批3 保留：ArchiveOutputViewModel:937 版权信息读取
+            // 批5 双写→清理（2026-10-16）：原 TEMP_APPLICANT_GENDER/AGE/PHONE 已删（同源同值，config 已迁）；
+            // CONTACT_PHONE 取申请人电话 app.Phone，非 TEMP_CONTACT_PHONE 的公示异议反馈电话
             [FieldKeys.APPLICANT_GENDER] = app.Gender,
             [FieldKeys.APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
             [FieldKeys.CONTACT_PHONE] = app.Phone,
@@ -82,8 +78,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_ACCIDENT_DETAILS] = BuildAccidentDetails(app.Accidents),
             [FieldKeys.TEMP_EDUCATION_DETAILS] = BuildEducationDetails(app.Educations),
             [FieldKeys.TEMP_APPLY_DATE] = app.ApplyDate?.ToString("yyyy年M月d日") ?? string.Empty,
-            [FieldKeys.TEMP_FAMILY_SIZE] = app.FamilySize?.ToString() ?? string.Empty,
-            // 批4 双写（2026-10-16，A/SOLO）：T229/T230/T235/T237/T249 config 迁到通用键前先并行供给，同源同值
+            // 批4 双写→清理：原 TEMP_FAMILY_SIZE 已删（同源同值，config 已迁本键）
             [FieldKeys.FAMILY_SIZE] = app.FamilySize?.ToString() ?? string.Empty,
             [FieldKeys.TEMP_FAMILY_CATEGORY] = app.FamilyCategory,
             [FieldKeys.TEMP_VERIFY_RESULT] = "情况属实",
@@ -99,9 +94,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_PUBLICIZE_RANGE] = BuildPublicizeRange(app),
             [FieldKeys.TEMP_PUBLICIZE_START] = FormatCnDate(app.PublicizeStartDate),
             [FieldKeys.TEMP_PUBLICIZE_END] = FormatCnDate(app.PublicizeEndDate),
-            [FieldKeys.TEMP_VILLAGE] = app.Village,
-            [FieldKeys.TEMP_TOWN] = app.Town,
-            // 批5 双写（2026-10-16，B/SOLO）：T229/T236 → COMMUNITY、T229 → TOWN 前先并行供给（同源同值）
+            // 批5 双写→清理：原 TEMP_VILLAGE/TEMP_TOWN 已删（同源同值，config 已迁本键）
             [FieldKeys.COMMUNITY] = app.Village,
             [FieldKeys.TOWN] = app.Town,
             [FieldKeys.TEMP_ACCEPTANCE_PERSON] = app.AcceptancePerson,

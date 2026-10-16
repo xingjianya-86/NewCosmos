@@ -930,8 +930,9 @@ public partial class ArchiveOutputViewModel
         fields[FieldKeys.ARCHIVE_VOLUME] = volumeDate;
 
         // 组卷单位：填报单位
+        // 批D2 清理（2026-10-16）：兜底键改读双写键 REPORT_UNIT（与 TEMP_REPORT_UNIT 同源同值 app.ReportUnit）
         if (!fields.TryGetValue(FieldKeys.OPERATOR_UNIT, out var opUnit) || string.IsNullOrWhiteSpace(opUnit))
-            fields[FieldKeys.OPERATOR_UNIT] = fields.TryGetValue(FieldKeys.TEMP_REPORT_UNIT, out var ru) ? ru : string.Empty;
+            fields[FieldKeys.OPERATOR_UNIT] = fields.TryGetValue(FieldKeys.REPORT_UNIT, out var ru) ? ru : string.Empty;
 
         // 版权信息：按申请人身份证出生月映射
         fields.TryGetValue(FieldKeys.TEMP_APPLICANT_ID_CARD, out var idCard);
