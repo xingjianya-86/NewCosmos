@@ -87,6 +87,43 @@ public static partial class FieldKeys
     public const string TOWN_OPINION = "TOWN_OPINION";                              // 乡镇（街道）意见
     public const string REPORT_UNIT = "REPORT_UNIT";                                // 填报单位
     public const string APPLICANT_AGE = "APPLICANT_AGE";                            // 申请人年龄
+
+    // 批D1a 孤儿转正（2026-10-16）：以下 30 键原为「config 有行、代码仅裸串供给」（体检 Unknown 桶A），
+    // 建常量纳入白名单；同日 ArchiveProductionViewModel 内裸串 ["X"] 全量改为 [FieldKeys.X]（同值重构，输出零变化）。
+    // 照料服务协议族（T221/T222）
+    public const string CAREGIVER_NAME = "CAREGIVER_NAME";                          // 照料服务人姓名
+    public const string CAREGIVER_ID_CARD = "CAREGIVER_ID_CARD";                    // 照料服务人身份证号
+    public const string CAREGIVER_RELATIONSHIP = "CAREGIVER_RELATIONSHIP";          // 监护人关系
+    public const string CAREGIVER_PHONE = "CAREGIVER_PHONE";                        // 监护人联系电话
+    public const string CAREGIVER_GENDER = "CAREGIVER_GENDER";                      // 丙方性别
+    public const string CAREGIVER_AGE = "CAREGIVER_AGE";                            // 丙方年龄
+    public const string CAREGIVER_ADDRESS = "CAREGIVER_ADDRESS";                    // 丙方/监护人家庭住址
+    public const string CAREGIVER_WORK_UNIT = "CAREGIVER_WORK_UNIT";                // 丙方单位名称
+    public const string CAREGIVER_SUBSIDY_AMOUNT = "CAREGIVER_SUBSIDY_AMOUNT";      // 照料护理费（纯数字）
+    public const string CAREGIVER_SUBSIDY_UPPER = "CAREGIVER_SUBSIDY_UPPER";        // 照料护理费（中文大写）
+    public const string CAREGIVER_ORG_LEGAL = "CAREGIVER_ORG_LEGAL";                // 照料单位法人
+    public const string CAREGIVER_ORG_ADDRESS = "CAREGIVER_ORG_ADDRESS";            // 照料单位通讯地址
+    public const string CAREGIVER_ORG_POSTAL = "CAREGIVER_ORG_POSTAL";              // 照料单位邮政编码
+    public const string CAREGIVER_ORG_PHONE = "CAREGIVER_ORG_PHONE";                // 照料单位联系电话
+    // 邻里访问/申请书/复核表收入财财产族（T162/T170/T224/T254）
+    public const string INCOME_SOURCE = "INCOME_SOURCE";                            // 收入来源
+    public const string INCOME_BREEDING_DESC = "INCOME_BREEDING_DESC";              // 生产/养殖收入
+    public const string INCOME_BUSINESS_DESC = "INCOME_BUSINESS_DESC";              // 营业/经营收入
+    public const string INCOME_LABOR_DESC = "INCOME_LABOR_DESC";                    // 劳务/务工收入
+    public const string INCOME_SITUATION = "INCOME_SITUATION";                      // 经济收入状况
+    public const string PROPERTY_FARM_EQUIPMENT = "PROPERTY_FARM_EQUIPMENT";        // 农机具
+    public const string PROPERTY_HOUSE_DESC = "PROPERTY_HOUSE_DESC";                // 房屋情况
+    public const string APPLICANT_LIFE_SITUATION = "APPLICANT_LIFE_SITUATION";      // 申请人生活情况
+    public const string FAMILY_MEMBER_INFO = "FAMILY_MEMBER_INFO";                  // 户主及家庭成员
+    // 户口性质显示（T219/T222/T255）
+    public const string HUKOU_TYPE_DISPLAY = "HUKOU_TYPE_DISPLAY";                  // 户口类型/住房类别显示
+    // 集中供养协议/照料协议期（T220/T221）
+    public const string INSTITUTION_NAME = "INSTITUTION_NAME";                      // 供养机构名称
+    public const string INSTITUTION_ADDRESS = "INSTITUTION_ADDRESS";                // 机构地址
+    public const string INSTITUTION_PHONE = "INSTITUTION_PHONE";                    // 机构电话
+    public const string SUPPORT_START_DATE = "SUPPORT_START_DATE";                  // 协议开始日期
+    public const string SUPPORT_END_DATE = "SUPPORT_END_DATE";                      // 协议结束日期
+    public const string AGREEMENT_PERIOD = "AGREEMENT_PERIOD";                      // 协议期限
     public const string CLASSIFICATION_RESULT = "CLASSIFICATION_RESULT";
 
     // 入户调查表新增字段

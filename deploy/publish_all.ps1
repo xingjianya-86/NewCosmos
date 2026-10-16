@@ -142,7 +142,7 @@ if ($DryRun) {
     Write-Host ("  Android : dotnet publish -f net10.0-android36.0 -c Release -r android-arm64 -p:RunAOTCompilation=true" + $(if ($WithPatch) { "（并生成增量补丁）" } else { "" }))
     Write-Host ("  上一版  : {0}" -f $(if ($prevResolved) { $prevResolved } else { "（未解析到）" }))
     Write-Host ("  回环校验: {0}" -f $(if ($SkipDownloadVerify) { "跳过" } else { "执行（下载两端安装包）" }))
-    Write-Host ("  模板体检: {0}" -f $(if ($SkipTemplateCheck) { "跳过" } else { "执行（check_template_fields -FailOn NonAscii,MultiSource -MaxUnknown 71，命中即中断）" }))
+    Write-Host ("  模板体检: {0}" -f $(if ($SkipTemplateCheck) { "跳过" } else { "执行（check_template_fields -FailOn NonAscii,MultiSource -MaxUnknown 30，命中即中断）" }))
     Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
     Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
     Write-Host ("  版本同步: {0}（csproj/app.ini/iss；DryRun 不写入）" -f $Version)
@@ -154,7 +154,7 @@ if ($DryRun) {
 # $TemplateUnknownBaseline = 既存孤儿行数（docs\20261016_模板字段体检报告.md 的 Unknown），
 # 只防新增不清存量；孤儿清理后同步下调该基线直至 0。
 # NonInteractive 且无 NEWCOSMOS_DB_PASSWORD 时脚本无法交互取密 → 显式警告跳过，避免卡死无人值守发版。
-$TemplateUnknownBaseline = 71
+$TemplateUnknownBaseline = 30
 if (-not $SkipTemplateCheck) {
     if ([string]::IsNullOrEmpty($env:NEWCOSMOS_DB_PASSWORD) -and $NonInteractive) {
         Write-Host "警告：NonInteractive 且未设置 NEWCOSMOS_DB_PASSWORD，跳过模板字段体检" -ForegroundColor Yellow

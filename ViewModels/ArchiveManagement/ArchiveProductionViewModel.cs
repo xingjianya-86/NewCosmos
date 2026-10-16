@@ -566,7 +566,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.HEAD_ID_CARD] = detail.HeadIdCard,
             [FieldKeys.APPLICATION_NO] = "",
             [FieldKeys.HUKOU_ADDRESS] = fullAddress,
-            ["FAMILY_MEMBER_INFO"] = BuildAssetCheckFamilyMemberInfo(detail),
+            [FieldKeys.FAMILY_MEMBER_INFO] = BuildAssetCheckFamilyMemberInfo(detail),
         };
 
         // 构建 _tableData：户主始终在第 1 位
@@ -730,22 +730,22 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             // 模板10 需要的字段
             ["APPLICANT_GENDER"] = AddressResolver.ExtractGenderFromIdCard(app.ApplicantIdCard),
             ["APPLICANT_AGE"] = AddressResolver.ExtractAgeFromIdCard(app.ApplicantIdCard),
-            ["INCOME_SITUATION"] = BuildIncomeSituationText(app, economicDetail),
-            ["FAMILY_MEMBER_INFO"] = "",  // 延迟到加载家庭成员后填充
+            [FieldKeys.INCOME_SITUATION] = BuildIncomeSituationText(app, economicDetail),
+            [FieldKeys.FAMILY_MEMBER_INFO] = "",  // 延迟到加载家庭成员后填充
             // 模板10（最低生活保障申请书）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
             [FieldKeys.APPLY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
             // 定期复核审批表：享受类别缩写（低保/低保边缘/特困/刚性支出）
             [FieldKeys.CLASSIFICATION_MAJOR] = ClassificationConstants.ConvertToMajorCategoryName(app.ClassificationResult ?? ""),
 
             // 模板8（邻里访问调查表）需要的字段
-            ["INCOME_SOURCE"] = BuildIncomeSourceSummary(app, economicDetail),
-            ["INCOME_BREEDING_DESC"] = BuildBreedingIncomeDesc(economicDetail),
-            ["INCOME_BUSINESS_DESC"] = BuildBusinessIncomeDesc(economicDetail),
-            ["INCOME_LABOR_DESC"] = BuildLaborIncomeDesc(economicDetail),
-            ["PROPERTY_FARM_EQUIPMENT"] = BuildFarmEquipmentDesc(economicDetail),
+            [FieldKeys.INCOME_SOURCE] = BuildIncomeSourceSummary(app, economicDetail),
+            [FieldKeys.INCOME_BREEDING_DESC] = BuildBreedingIncomeDesc(economicDetail),
+            [FieldKeys.INCOME_BUSINESS_DESC] = BuildBusinessIncomeDesc(economicDetail),
+            [FieldKeys.INCOME_LABOR_DESC] = BuildLaborIncomeDesc(economicDetail),
+            [FieldKeys.PROPERTY_FARM_EQUIPMENT] = BuildFarmEquipmentDesc(economicDetail),
             ["PROPERTY_VEHICLE"] = BuildVehicleDesc(economicDetail),
-            ["PROPERTY_HOUSE_DESC"] = BuildHouseDesc(economicDetail),
-            ["APPLICANT_LIFE_SITUATION"] = "",  // 延迟到加载家庭成员后填充
+            [FieldKeys.PROPERTY_HOUSE_DESC] = BuildHouseDesc(economicDetail),
+            [FieldKeys.APPLICANT_LIFE_SITUATION] = "",  // 延迟到加载家庭成员后填充
             // 模板8（邻里访问调查表）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
             [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
 
@@ -929,7 +929,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.DESTITUTE_DISABILITY] = BuildDisabilityDisplay(app),
 
             // 户口性质（特困审核确认表/分散供养协议共用）
-            ["HUKOU_TYPE_DISPLAY"] = app.HukouType?.ToLowerInvariant() switch
+            [FieldKeys.HUKOU_TYPE_DISPLAY] = app.HukouType?.ToLowerInvariant() switch
             {
                 "rural" => "农村户口",
                 "urban" => "城市户口",
@@ -945,28 +945,28 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.CAPABILITY_ASSESSOR] = "",  // 延迟到加载能力鉴定后填充
 
             // 集中供养协议字段
-            ["INSTITUTION_NAME"] = "",  // 延迟到加载机构后填充
-            ["INSTITUTION_ADDRESS"] = "",  // 延迟到加载机构后填充
-            ["INSTITUTION_PHONE"] = "",  // 延迟到加载机构后填充
+            [FieldKeys.INSTITUTION_NAME] = "",  // 延迟到加载机构后填充
+            [FieldKeys.INSTITUTION_ADDRESS] = "",  // 延迟到加载机构后填充
+            [FieldKeys.INSTITUTION_PHONE] = "",  // 延迟到加载机构后填充
             ["INSTITUTION_TOTAL_FEE"] = "",  // 延迟到加载机构后填充
-            ["SUPPORT_START_DATE"] = DateTime.Now.ToString("yyyy-MM-dd"),
-            ["SUPPORT_END_DATE"] = DateTime.Now.AddYears(1).ToString("yyyy-MM-dd"),
+            [FieldKeys.SUPPORT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.SUPPORT_END_DATE] = DateTime.Now.AddYears(1).ToString("yyyy-MM-dd"),
 
             // 照料服务协议字段
-            ["CAREGIVER_NAME"] = "",  // 延迟到加载照料人后填充
-            ["CAREGIVER_ID_CARD"] = "",  // 延迟到加载照料人后填充
-            ["CAREGIVER_RELATIONSHIP"] = "",  // 延迟到加载照料人后填充
-            ["CAREGIVER_PHONE"] = "",  // 延迟到加载照料人后填充
-            ["CAREGIVER_GENDER"] = "",  // 延迟到加载照料人后填充（分散供养协议丙方性别）
-            ["CAREGIVER_AGE"] = "",  // 延迟到加载照料人后填充（丙方年龄）
-            ["CAREGIVER_ADDRESS"] = "",  // 延迟到加载照料人后填充（丙方/监护人家庭住址）
-            ["CAREGIVER_WORK_UNIT"] = "",  // 延迟到加载照料人后填充（丙方单位名称）
+            [FieldKeys.CAREGIVER_NAME] = "",  // 延迟到加载照料人后填充
+            [FieldKeys.CAREGIVER_ID_CARD] = "",  // 延迟到加载照料人后填充
+            [FieldKeys.CAREGIVER_RELATIONSHIP] = "",  // 延迟到加载照料人后填充
+            [FieldKeys.CAREGIVER_PHONE] = "",  // 延迟到加载照料人后填充
+            [FieldKeys.CAREGIVER_GENDER] = "",  // 延迟到加载照料人后填充（分散供养协议丙方性别）
+            [FieldKeys.CAREGIVER_AGE] = "",  // 延迟到加载照料人后填充（丙方年龄）
+            [FieldKeys.CAREGIVER_ADDRESS] = "",  // 延迟到加载照料人后填充（丙方/监护人家庭住址）
+            [FieldKeys.CAREGIVER_WORK_UNIT] = "",  // 延迟到加载照料人后填充（丙方单位名称）
             ["CARE_CONTENT"] = "日常生活照料",
             ["CARE_FREQUENCY"] = "每日",
             ["CAREGIVER_SUBSIDY"] = "",  // 延迟到计算后填充（照料补贴金额，带"元"）
-            ["CAREGIVER_SUBSIDY_AMOUNT"] = "",  // 延迟到计算后填充（照料护理费纯数字）
-            ["CAREGIVER_SUBSIDY_UPPER"] = "",  // 延迟到计算后填充（照料护理费中文大写）
-            ["AGREEMENT_PERIOD"] = "1年",
+            [FieldKeys.CAREGIVER_SUBSIDY_AMOUNT] = "",  // 延迟到计算后填充（照料护理费纯数字）
+            [FieldKeys.CAREGIVER_SUBSIDY_UPPER] = "",  // 延迟到计算后填充（照料护理费中文大写）
+            [FieldKeys.AGREEMENT_PERIOD] = "1年",
             // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
@@ -977,10 +977,10 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             // 经办人职务/身份证已有数据源（登录用户 IdentityCard/Position），见上方 OPERATOR_TITLE/OPERATOR_ID_CARD
             [FieldKeys.CAREGIVER_BANK_NAME] = "",  // 延迟到加载照料人后填充（分散照料开户行）
             [FieldKeys.CAREGIVER_BANK_ACCOUNT] = "",  // 延迟到加载照料人后填充（分散照料银行卡号）
-            ["CAREGIVER_ORG_LEGAL"] = "",
-            ["CAREGIVER_ORG_ADDRESS"] = "",
-            ["CAREGIVER_ORG_POSTAL"] = "",
-            ["CAREGIVER_ORG_PHONE"] = "",
+            [FieldKeys.CAREGIVER_ORG_LEGAL] = "",
+            [FieldKeys.CAREGIVER_ORG_ADDRESS] = "",
+            [FieldKeys.CAREGIVER_ORG_POSTAL] = "",
+            [FieldKeys.CAREGIVER_ORG_PHONE] = "",
 
             // 档案封面专用字段（避免与模板16的CLASSIFICATION_RESULT冲突）
             [FieldKeys.COVER_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
@@ -1307,7 +1307,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             }
 
             // 填充模板10的户主及家庭成员状况
-            _fieldData["FAMILY_MEMBER_INFO"] = BuildFamilyMemberInfoText(app, membersResult.Value);
+            _fieldData[FieldKeys.FAMILY_MEMBER_INFO] = BuildFamilyMemberInfoText(app, membersResult.Value);
 
             // 模板17/18（村级土地说明）{土地详细信息}：延迟填充。
             // 登记人数/本户人数/总台账面积从确权台账实时汇总
@@ -1436,21 +1436,21 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         if (caregivers != null && caregivers.Count > 0)
         {
             var cg = caregivers[0];
-            _fieldData["CAREGIVER_NAME"] = cg.Name ?? "";
-            _fieldData["CAREGIVER_ID_CARD"] = cg.IdCard ?? "";
-            _fieldData["CAREGIVER_RELATIONSHIP"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, cg.Relationship ?? "");
-            _fieldData["CAREGIVER_PHONE"] = cg.Phone ?? "";
-            _fieldData["CAREGIVER_GENDER"] = _dictCacheService.GetValue(DictionaryTypeCodes.Gender, cg.Gender ?? "") ?? cg.Gender ?? "";
-            _fieldData["CAREGIVER_AGE"] = cg.Age > 0 ? cg.Age.ToString() : "";
-            _fieldData["CAREGIVER_ADDRESS"] = cg.Address ?? "";
-            _fieldData["CAREGIVER_WORK_UNIT"] = cg.WorkUnit ?? "";
+            _fieldData[FieldKeys.CAREGIVER_NAME] = cg.Name ?? "";
+            _fieldData[FieldKeys.CAREGIVER_ID_CARD] = cg.IdCard ?? "";
+            _fieldData[FieldKeys.CAREGIVER_RELATIONSHIP] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, cg.Relationship ?? "");
+            _fieldData[FieldKeys.CAREGIVER_PHONE] = cg.Phone ?? "";
+            _fieldData[FieldKeys.CAREGIVER_GENDER] = _dictCacheService.GetValue(DictionaryTypeCodes.Gender, cg.Gender ?? "") ?? cg.Gender ?? "";
+            _fieldData[FieldKeys.CAREGIVER_AGE] = cg.Age > 0 ? cg.Age.ToString() : "";
+            _fieldData[FieldKeys.CAREGIVER_ADDRESS] = cg.Address ?? "";
+            _fieldData[FieldKeys.CAREGIVER_WORK_UNIT] = cg.WorkUnit ?? "";
             _fieldData[FieldKeys.CAREGIVER_BANK_NAME] = cg.BankName ?? "";
             _fieldData[FieldKeys.CAREGIVER_BANK_ACCOUNT] = cg.BankAccount ?? "";
             // 照料护理费：分散供养+能力鉴定时按最低工资公式实时计算（跟随配置更新），否则用落库值
             var careAmount = await ResolveCareAllowanceForPrintAsync(app, capability);
             _fieldData["CAREGIVER_SUBSIDY"] = careAmount > 0 ? $"{FormatDecimal(careAmount)}元" : "";
-            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = careAmount > 0 ? FormatDecimal(careAmount) : "";
-            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_SUBSIDY_AMOUNT] = careAmount > 0 ? FormatDecimal(careAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_SUBSIDY_UPPER] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
         }
         _fieldData["APPLICANT_PHONE"] = app.ApplicantPhone ?? "";
 
@@ -1817,14 +1817,14 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.KINSHIP_FILING_SITUATION] = BuildKinshipFilingSituation(),
             [FieldKeys.SURVEY_VISIT_SITUATION] = BuildSurveyVisitSituation(app),
             // 模板8（邻里访问调查表）需要的字段
-            ["INCOME_SOURCE"] = BuildIncomeSourceSummary(app, economicDetail),
-            ["INCOME_BREEDING_DESC"] = BuildBreedingIncomeDesc(economicDetail),
-            ["INCOME_BUSINESS_DESC"] = BuildBusinessIncomeDesc(economicDetail),
-            ["INCOME_LABOR_DESC"] = BuildLaborIncomeDesc(economicDetail),
-            ["PROPERTY_FARM_EQUIPMENT"] = BuildFarmEquipmentDesc(economicDetail),
+            [FieldKeys.INCOME_SOURCE] = BuildIncomeSourceSummary(app, economicDetail),
+            [FieldKeys.INCOME_BREEDING_DESC] = BuildBreedingIncomeDesc(economicDetail),
+            [FieldKeys.INCOME_BUSINESS_DESC] = BuildBusinessIncomeDesc(economicDetail),
+            [FieldKeys.INCOME_LABOR_DESC] = BuildLaborIncomeDesc(economicDetail),
+            [FieldKeys.PROPERTY_FARM_EQUIPMENT] = BuildFarmEquipmentDesc(economicDetail),
             ["PROPERTY_VEHICLE"] = BuildVehicleDesc(economicDetail),
-            ["PROPERTY_HOUSE_DESC"] = BuildHouseDesc(economicDetail),
-            ["APPLICANT_LIFE_SITUATION"] = "",  // 延迟到加载经济明细/入户调查后填充
+            [FieldKeys.PROPERTY_HOUSE_DESC] = BuildHouseDesc(economicDetail),
+            [FieldKeys.APPLICANT_LIFE_SITUATION] = "",  // 延迟到加载经济明细/入户调查后填充
             // 模板8（邻里访问调查表）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
             [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
             // 模板10（最低生活保障申请书）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
@@ -1875,7 +1875,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.DESTITUTE_DISABILITY] = BuildDisabilityDisplay(app),
 
             // 户口性质（特困审核确认表/分散供养协议共用）
-            ["HUKOU_TYPE_DISPLAY"] = app.HukouType?.ToLowerInvariant() switch
+            [FieldKeys.HUKOU_TYPE_DISPLAY] = app.HukouType?.ToLowerInvariant() switch
             {
                 "rural" => "农村户口",
                 "urban" => "城市户口",
@@ -1906,30 +1906,30 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.CAPABILITY_ASSESSOR] = "",
 
             // 集中供养协议字段（与主路径对齐）
-            ["INSTITUTION_NAME"] = "",
-            ["INSTITUTION_ADDRESS"] = "",
-            ["INSTITUTION_PHONE"] = "",
+            [FieldKeys.INSTITUTION_NAME] = "",
+            [FieldKeys.INSTITUTION_ADDRESS] = "",
+            [FieldKeys.INSTITUTION_PHONE] = "",
             ["INSTITUTION_TOTAL_FEE"] = "",
-            ["SUPPORT_START_DATE"] = DateTime.Now.ToString("yyyy-MM-dd"),
-            ["SUPPORT_END_DATE"] = DateTime.Now.AddYears(1).ToString("yyyy-MM-dd"),
+            [FieldKeys.SUPPORT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.SUPPORT_END_DATE] = DateTime.Now.AddYears(1).ToString("yyyy-MM-dd"),
 
             // 照料服务协议字段（初值；照料人/银行卡由下方缓存回填块覆盖）
-            ["CAREGIVER_NAME"] = "",
-            ["CAREGIVER_ID_CARD"] = "",
-            ["CAREGIVER_RELATIONSHIP"] = "",
-            ["CAREGIVER_PHONE"] = "",
-            ["CAREGIVER_GENDER"] = "",
-            ["CAREGIVER_AGE"] = "",
-            ["CAREGIVER_ADDRESS"] = "",
-            ["CAREGIVER_WORK_UNIT"] = "",
+            [FieldKeys.CAREGIVER_NAME] = "",
+            [FieldKeys.CAREGIVER_ID_CARD] = "",
+            [FieldKeys.CAREGIVER_RELATIONSHIP] = "",
+            [FieldKeys.CAREGIVER_PHONE] = "",
+            [FieldKeys.CAREGIVER_GENDER] = "",
+            [FieldKeys.CAREGIVER_AGE] = "",
+            [FieldKeys.CAREGIVER_ADDRESS] = "",
+            [FieldKeys.CAREGIVER_WORK_UNIT] = "",
             [FieldKeys.CAREGIVER_BANK_NAME] = "",
             [FieldKeys.CAREGIVER_BANK_ACCOUNT] = "",
             ["CARE_CONTENT"] = "日常生活照料",
             ["CARE_FREQUENCY"] = "每日",
             ["CAREGIVER_SUBSIDY"] = "",
-            ["CAREGIVER_SUBSIDY_AMOUNT"] = "",
-            ["CAREGIVER_SUBSIDY_UPPER"] = "",
-            ["AGREEMENT_PERIOD"] = "1年",
+            [FieldKeys.CAREGIVER_SUBSIDY_AMOUNT] = "",
+            [FieldKeys.CAREGIVER_SUBSIDY_UPPER] = "",
+            [FieldKeys.AGREEMENT_PERIOD] = "1年",
 
             // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
@@ -1952,21 +1952,21 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         if (_cachedCaregivers != null && _cachedCaregivers.Count > 0)
         {
             var cg = _cachedCaregivers[0];
-            _fieldData["CAREGIVER_NAME"] = cg.Name ?? "";
-            _fieldData["CAREGIVER_ID_CARD"] = cg.IdCard ?? "";
-            _fieldData["CAREGIVER_RELATIONSHIP"] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, cg.Relationship ?? "");
-            _fieldData["CAREGIVER_PHONE"] = cg.Phone ?? "";
-            _fieldData["CAREGIVER_GENDER"] = _dictCacheService.GetValue(DictionaryTypeCodes.Gender, cg.Gender ?? "") ?? cg.Gender ?? "";
-            _fieldData["CAREGIVER_AGE"] = cg.Age > 0 ? cg.Age.ToString() : "";
-            _fieldData["CAREGIVER_ADDRESS"] = cg.Address ?? "";
-            _fieldData["CAREGIVER_WORK_UNIT"] = cg.WorkUnit ?? "";
+            _fieldData[FieldKeys.CAREGIVER_NAME] = cg.Name ?? "";
+            _fieldData[FieldKeys.CAREGIVER_ID_CARD] = cg.IdCard ?? "";
+            _fieldData[FieldKeys.CAREGIVER_RELATIONSHIP] = _dictCacheService.GetValue(DictionaryTypeCodes.FamilyRelationships, cg.Relationship ?? "");
+            _fieldData[FieldKeys.CAREGIVER_PHONE] = cg.Phone ?? "";
+            _fieldData[FieldKeys.CAREGIVER_GENDER] = _dictCacheService.GetValue(DictionaryTypeCodes.Gender, cg.Gender ?? "") ?? cg.Gender ?? "";
+            _fieldData[FieldKeys.CAREGIVER_AGE] = cg.Age > 0 ? cg.Age.ToString() : "";
+            _fieldData[FieldKeys.CAREGIVER_ADDRESS] = cg.Address ?? "";
+            _fieldData[FieldKeys.CAREGIVER_WORK_UNIT] = cg.WorkUnit ?? "";
             _fieldData[FieldKeys.CAREGIVER_BANK_NAME] = cg.BankName ?? "";
             _fieldData[FieldKeys.CAREGIVER_BANK_ACCOUNT] = cg.BankAccount ?? "";
             // 照料护理费：分散供养+能力鉴定时按最低工资公式实时计算（跟随配置更新），否则用落库值
             var careAmount = await ResolveCareAllowanceForPrintAsync(app, _cachedCapabilityAssessment);
             _fieldData["CAREGIVER_SUBSIDY"] = careAmount > 0 ? $"{FormatDecimal(careAmount)}元" : "";
-            _fieldData["CAREGIVER_SUBSIDY_AMOUNT"] = careAmount > 0 ? FormatDecimal(careAmount) : "";
-            _fieldData["CAREGIVER_SUBSIDY_UPPER"] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_SUBSIDY_AMOUNT] = careAmount > 0 ? FormatDecimal(careAmount) : "";
+            _fieldData[FieldKeys.CAREGIVER_SUBSIDY_UPPER] = careAmount > 0 ? ConvertToChineseAmount(careAmount) : "";
             _fieldData[FieldKeys.DESTITUTE_CAREGIVER_SITUATION] = BuildDestituteCaregiverSituation(app, _cachedCaregivers);
             _fieldData[FieldKeys.DESTITUTE_DAILY_CARE] = BuildDestituteDailyCare(app, _cachedCaregivers);
         }
