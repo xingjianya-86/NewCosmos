@@ -124,6 +124,19 @@ public static partial class FieldKeys
     public const string SUPPORT_START_DATE = "SUPPORT_START_DATE";                  // 协议开始日期
     public const string SUPPORT_END_DATE = "SUPPORT_END_DATE";                      // 协议结束日期
     public const string AGREEMENT_PERIOD = "AGREEMENT_PERIOD";                      // 协议期限
+
+    // 批D1b 孤儿转正（2026-10-16）：月报族 10 键（体检 Unknown 桶A 第二批）。
+    // 供给在 PrintService / PrintService.PdfGeneration 的裸串，同日转 FieldKeys 引用（同值，输出零变化）。
+    public const string REPORT_TITLE = "REPORT_TITLE";                              // 月报/明细表报表标题
+    public const string MEETING_TIME = "MEETING_TIME";                              // 会议时间
+    public const string HOST = "HOST";                                              // 主持人
+    public const string RECORDER = "RECORDER";                                      // 记录人
+    public const string ATTENDEES = "ATTENDEES";                                    // 出席人员
+    public const string ABSENTEES = "ABSENTEES";                                    // 缺席人员
+    public const string MEMBER_COUNT = "MEMBER_COUNT";                              // 人员数量
+    public const string RESOLUTION_NAMES = "RESOLUTION_NAMES";                      // 人员名单
+    public const string APPLY_CATEGORY = "APPLY_CATEGORY";                          // 申请分类
+    public const string NEW_MEMBER_INFO = "NEW_MEMBER_INFO";                        // 新增成员信息
     public const string CLASSIFICATION_RESULT = "CLASSIFICATION_RESULT";
 
     // 入户调查表新增字段

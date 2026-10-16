@@ -195,7 +195,7 @@ public partial class PrintService : BaseService, IPrintService
             {
                 var section = new MonthlyFormPreviewData
                 {
-                    Title = page.Fields.GetValueOrDefault("REPORT_TITLE", formKey) + page.TitleSuffix,
+                    Title = page.Fields.GetValueOrDefault(FieldKeys.REPORT_TITLE, formKey) + page.TitleSuffix,
                     Unit = page.Fields.GetValueOrDefault("REPORT_UNIT", string.Empty),
                     Date = page.Fields.GetValueOrDefault("REPORT_DATE", string.Empty)
                 };
@@ -436,7 +436,7 @@ public partial class PrintService : BaseService, IPrintService
                     var titleSuffix = rural ? "_农村" : "_城市";
                     var fields = new Dictionary<string, string>
                     {
-                        ["REPORT_TITLE"] = isEdgeFamilyStopForm
+                        [FieldKeys.REPORT_TITLE] = isEdgeFamilyStopForm
                             ? $"林口县{titleYear}年{titleMonth}月城乡低保边缘家庭停止、减员汇总表"
                             : reportTit + areaTag,
                         ["REPORT_UNIT"] = fillUnit,
@@ -506,7 +506,7 @@ public partial class PrintService : BaseService, IPrintService
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
                 {
-                    ["REPORT_TITLE"] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
+                    [FieldKeys.REPORT_TITLE] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
                     ["REPORT_UNIT"] = fillUnit,
                     ["REPORT_DATE"] = fillDate
                 };
@@ -539,7 +539,7 @@ public partial class PrintService : BaseService, IPrintService
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
                 {
-                    ["REPORT_TITLE"] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
+                    [FieldKeys.REPORT_TITLE] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
                     ["REPORT_UNIT"] = fillUnit,
                     ["REPORT_DATE"] = fillDate
                 };
@@ -574,7 +574,7 @@ public partial class PrintService : BaseService, IPrintService
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
                 {
-                    ["REPORT_TITLE"] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
+                    [FieldKeys.REPORT_TITLE] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
                     ["REPORT_UNIT"] = fillUnit,
                     ["REPORT_DATE"] = fillDate
                 };
@@ -607,7 +607,7 @@ public partial class PrintService : BaseService, IPrintService
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
                 {
-                    ["REPORT_TITLE"] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
+                    [FieldKeys.REPORT_TITLE] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
                     ["REPORT_UNIT"] = fillUnit,
                     ["REPORT_DATE"] = fillDate
                 };
@@ -730,17 +730,17 @@ public partial class PrintService : BaseService, IPrintService
                                         .ToList();
                 var fields = new Dictionary<string, string>
                 {
-                    ["MEETING_TIME"] = m.MeetingTime,
-                    ["HOST"] = m.Host,
-                    ["RECORDER"] = m.Recorder,
+                    [FieldKeys.MEETING_TIME] = m.MeetingTime,
+                    [FieldKeys.HOST] = m.Host,
+                    [FieldKeys.RECORDER] = m.Recorder,
                     // 出席/缺席：填写时按行录入，输出时以顿号连接成一行
-                    ["ATTENDEES"] = string.Join("、", SplitLines(m.Attendees)),
-                    ["ABSENTEES"] = string.Join("、", SplitLines(m.Absentees)),
-                    ["MEMBER_COUNT"] = lines.Count.ToString(),
-                    ["APPLY_CATEGORY"] = m.ApplyCategory,
-                    ["NEW_MEMBER_INFO"] = m.MemberInfo,
+                    [FieldKeys.ATTENDEES] = string.Join("、", SplitLines(m.Attendees)),
+                    [FieldKeys.ABSENTEES] = string.Join("、", SplitLines(m.Absentees)),
+                    [FieldKeys.MEMBER_COUNT] = lines.Count.ToString(),
+                    [FieldKeys.APPLY_CATEGORY] = m.ApplyCategory,
+                    [FieldKeys.NEW_MEMBER_INFO] = m.MemberInfo,
                     // 决议段姓名列表；无新增人员时显式"无"，避免空括号
-                    ["RESOLUTION_NAMES"] = string.IsNullOrWhiteSpace(m.MemberNames) ? "无" : m.MemberNames
+                    [FieldKeys.RESOLUTION_NAMES] = string.IsNullOrWhiteSpace(m.MemberNames) ? "无" : m.MemberNames
                 };
                 // 多余成员行（模板预留 30 行，仅填实际行数）：整段删除，不留空行
                 var removeParagraphPlaceholders = new List<string>();
@@ -768,7 +768,7 @@ public partial class PrintService : BaseService, IPrintService
                 {
                     var fields = new Dictionary<string, string>
                     {
-                        ["REPORT_TITLE"] = reportTit,
+                        [FieldKeys.REPORT_TITLE] = reportTit,
                         ["REPORT_UNIT"] = fillUnit,
                         ["REPORT_DATE"] = fillDate,
                         ["OPERATOR_UNIT"] = fillUnit,
