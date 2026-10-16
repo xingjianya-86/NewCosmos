@@ -544,21 +544,24 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
     {
         var fields = new Dictionary<string, string>
         {
-            ["{所在县}"] = county,
-            ["{所在镇}"] = town,
-            ["{当前月公示周期}"] = publicityPeriod,
-            ["{所在镇电话}"] = townPhone
+            // 批D6（2026-10-16）：字面量占位符键改引 FieldKeys.PUBLICITY_* 常量（同值，输出零变化）——
+            // 此前常量零引用、字面量散落两处，违反常量单一来源。键=占位符原文，经 ReplaceFields 直替换。
+            [FieldKeys.PUBLICITY_COUNTY] = county,
+            [FieldKeys.PUBLICITY_TOWN] = town,
+            [FieldKeys.PUBLICITY_PERIOD] = publicityPeriod,
+            [FieldKeys.PUBLICITY_TOWN_PHONE] = townPhone
         };
 
         for (var i = 0; i < slice.Count; i++)
         {
             var f = slice[i];
             var n = i + 1;
-            fields[$"{{救助姓名{n}}}"] = f.ApplicantName ?? "";
-            fields[$"{{救助人所在村屯{n}}}"] = village;
-            fields[$"{{救助类型{n}}}"] = f.Category ?? "";
-            fields[$"{{救助人数{n}}}"] = Math.Max(0, f.GuaranteeSize).ToString();
-            fields[$"{{是否近亲属备案{n}}}"] = f.IsNearRelative ? "是" : "否";
+            // 行键 = 残缺花括号前缀常量 + 行号 + "}"（如 {救助姓名1}）
+            fields[FieldKeys.PUBLICITY_ROW_NAME + n + "}"] = f.ApplicantName ?? "";
+            fields[FieldKeys.PUBLICITY_ROW_VILLAGE + n + "}"] = village;
+            fields[FieldKeys.PUBLICITY_ROW_TYPE + n + "}"] = f.Category ?? "";
+            fields[FieldKeys.PUBLICITY_ROW_SIZE + n + "}"] = Math.Max(0, f.GuaranteeSize).ToString();
+            fields[FieldKeys.PUBLICITY_ROW_RELATIVE + n + "}"] = f.IsNearRelative ? "是" : "否";
         }
 
         return fields;

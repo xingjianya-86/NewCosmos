@@ -195,6 +195,10 @@ public static partial class FieldKeys
     public const string PUBLICITY_END_DATE = "PUBLICITY_END_DATE";
 
     // 每月公示名单（模板：公共_每月公示名单）表头占位符
+    // ── 公示直替换键（批D6 定性 2026-10-16，冻结）──
+    // 值 = 占位符原文 / 残缺花括号行前缀（+N+"}" 拼整键），唯一消费方 PublicityOutputService.BuildPublicityFields
+    // 构造键后 engine.ReplaceFields 直替换（不经 config fields 映射；config 若引用它们会被 NonAscii 正确拦截）。
+    // 禁改值、禁 ASCII 化、禁写入 config fields——改值即破公示单打印。
     public const string PUBLICITY_COUNTY = "{所在县}";                    // 所在县
     public const string PUBLICITY_TOWN = "{所在镇}";                      // 所在镇
     public const string PUBLICITY_PERIOD = "{当前月公示周期}";            // 公示周期（整月）
