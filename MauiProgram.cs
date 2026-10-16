@@ -161,6 +161,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IIncomeCalculationService, IncomeCalculationService>();
         builder.Services.AddSingleton<IGuaranteeAmountService, GuaranteeAmountService>();
         builder.Services.AddSingleton<IGracePeriodService, GracePeriodService>();
+        builder.Services.AddSingleton<IVisitRecordService, VisitRecordService>();
         builder.Services.AddSingleton<IPersonSearchService, PersonSearchService>();
         builder.Services.AddSingleton<ILandContractService, LandContractService>();
         builder.Services.AddSingleton<ISubsidyDataService, SubsidyDataService>();

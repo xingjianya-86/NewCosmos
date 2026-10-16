@@ -1031,6 +1031,10 @@ public partial class ApplicationFormViewModel
 
         _isLoadingData = false;
 
+        // 回访区（2026-10-16 拍板：申请详情内嵌）：加载当前申请回访历史与状态标；
+        // LoadVisitAsync 内部吞异常记日志，失败不阻断表单加载
+        await LoadVisitAsync();
+
         // 数据加载完成后刷新 Picker 绑定
         ForceRefreshPickerBindings();
 

@@ -1,0 +1,70 @@
+# 回访记录表 Schema 定义
+# 低收入人口认定流程附属回访记录（T3 档案_咨询登记台账 打印数据源）
+# 录入挂 application_id（认定通过后在申请详情补录），打印按 applicant_id_card 取最近一条
+database: cosmos_app
+version: 2.0
+description: 回访记录表 - 认定流程通过后的回访补录（回访时间/经办/情况），打印 T3 取最近一条
+
+tables:
+  - name: nc_biz_visit_records
+    comment: "[流程] 回访记录表 - 低收入人口认定流程通过后补录回访，一户可多条，打印取最近"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: application_id
+        type: BIGINT
+        nullable: false
+        comment: 关联申请ID（认定流程）
+      - name: applicant_id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 申请人身份证号（打印侧按身份证取最近回访的桥接键）
+      - name: visit_at
+        type: TIMESTAMP
+        nullable: false
+        comment: 回访时间（→ VISIT_DATE {回访时间}）
+      - name: visit_by
+        type: VARCHAR(50)
+        nullable: false
+        comment: 回访经办人员（→ VISIT_OPERATOR {回访经办人员}）
+      - name: visit_result
+        type: VARCHAR(20)
+        nullable: false
+        comment: 回访情况（→ VISIT_STATUS {回访情况}；枚举见设计稿确认点6）
+      - name: visit_remark
+        type: TEXT
+        nullable: true
+        comment: 回访备注
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 补录人
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: idx_visit_records_application_id
+        columns: [application_id]
+      - name: idx_visit_records_applicant_id_card
+        columns: [applicant_id_card]
+    foreignKeys:
+      - name: fk_visit_records_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+        onDelete: CASCADE

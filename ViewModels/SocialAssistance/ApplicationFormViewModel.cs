@@ -1802,6 +1802,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         ICaregiverService caregiverService,
         IHouseholdSurveyService householdSurveyService,
         IChangeService changeService,
+        IVisitRecordService visitRecordService,
         ILoggerService logger)
     {
         _serviceProvider = serviceProvider;
@@ -1826,6 +1827,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         _caregiverService = caregiverService;
         _householdSurveyService = householdSurveyService;
         _changeService = changeService;
+        _visitRecordService = visitRecordService;
         _logger = logger;
 
         TotalSteps = 5;

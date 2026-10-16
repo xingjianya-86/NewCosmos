@@ -134,4 +134,8 @@ public static class PermissionCodes
     public const string PRINT_TEMPRELIEF = "PRINT_TEMPRELIEF";
     public const string PRINT_RECOVERY = "PRINT_RECOVERY";
     #endregion
+
+    #region 回访（低收入人口认定流程附属回访，T3 台账数据源）
+    public const string VISIT_MANAGE = "VISIT_MANAGE";   // 回访补录/查看（申请详情内嵌回访区）
+    #endregion
 }

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 x:Class="NewCosmos.Pages.SocialAssistance.ApplicationFormPage"
                 x:Name="MainPage"
+                xmlns:entities="clr-namespace:NewCosmos.Models.Entities"
                 x:DataType="ApplicationFormViewModel"
               Title="低收入人口认定申请"
               NavigationPage.HasNavigationBar="False"
@@ -164,10 +165,67 @@
         <Grid Grid.Row="2" ColumnDefinitions="*,320" ColumnSpacing="0">
 
             <!-- 左侧：表单内容 -->
-            <Grid Grid.Column="0" RowDefinitions="Auto,*">
+            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*">
+
+            <!-- 回访记录区（2026-10-16 拍板：认定通过后补录 / 申请详情内嵌 / T3 模板名不动）
+                 数据源 nc_biz_visit_records；T3「档案_咨询登记台账」打印按身份证取最近一条 -->
+            <Border Grid.Row="0" IsVisible="{Binding HasVisitSection}"
+                    Style="{StaticResource CardBorder}" Margin="16,8,16,0" Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Grid.Column="0" Text="{Binding VisitStatusText}" FontSize="14" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding VisitStatusIsWarning}" Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                        <Button Grid.Column="1" Text="补录回访" HeightRequest="32" FontSize="13"
+                                Command="{Binding ToggleVisitPanelCommand}" Style="{StaticResource ButtonOutline}"/>
+                    </Grid>
+
+                    <!-- 展开区：补录表单 + 回访历史 -->
+                    <VerticalStackLayout IsVisible="{Binding VisitPanelVisible}" Spacing="8">
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <DatePicker Grid.Column="0" Date="{Binding NewVisitAt}"/>
+                            <Entry Grid.Column="1" Placeholder="回访经办人员" Text="{Binding NewVisitBy}"/>
+                            <Picker Grid.Column="2" Title="回访情况"
+                                    ItemsSource="{Binding VisitResultOptions}"
+                                    SelectedItem="{Binding NewVisitResult}"/>
+                        </Grid>
+                        <Entry Placeholder="回访备注（可选）" Text="{Binding NewVisitRemark}"/>
+                        <Button Text="保存回访" Command="{Binding SaveVisitCommand}"
+                                Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Label Text="回访历史" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <CollectionView ItemsSource="{Binding VisitRecords}" HeightRequest="170">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="entities:VisitRecord">
+                                    <Grid Padding="0,5" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+                                        <Label Grid.Column="0" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                                               Text="{Binding VisitAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"/>
+                                        <Label Grid.Column="1" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                               Text="{Binding VisitBy}"/>
+                                        <Label Grid.Column="2" FontSize="13" TextColor="{StaticResource TextPrimary}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding VisitResult}"/>
+                                                    <Span Text="{Binding VisitRemark, StringFormat=' · {0}'}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
 
             <!-- Fix: 收入汇总面板（仅 Step3 显示，固定不滚动） -->
-            <Border Grid.Row="0" IsVisible="{Binding IsStep3Visible}"
+            <Border Grid.Row="1" IsVisible="{Binding IsStep3Visible}"
                     Style="{StaticResource CardBorder}" Margin="16,8,16,0">
                 <Border.Shadow>
                     <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="6" Opacity="0.08"/>
@@ -280,7 +338,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <ScrollView Grid.Row="1">
+            <ScrollView Grid.Row="2">
                 <VerticalStackLayout Padding="16" Spacing="8">
 
                 <!-- ═══════════════════════════════════════════════════════════ -->

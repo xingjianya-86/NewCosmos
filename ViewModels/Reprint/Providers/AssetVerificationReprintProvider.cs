@@ -28,6 +28,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
     private readonly TemplateFieldBuilder _fieldBuilder;
     private readonly Services.Domain.Printing.IPrintRecordService _printRecordService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly Services.Domain.SocialAssistance.IVisitRecordService _visitRecordService;
     private readonly ILoggerService _logger;
 
     public AssetVerificationReprintProvider(
@@ -40,6 +41,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         TemplateFieldBuilder fieldBuilder,
         Services.Domain.Printing.IPrintRecordService printRecordService,
         IServiceProvider serviceProvider,
+        Services.Domain.SocialAssistance.IVisitRecordService visitRecordService,
         ILoggerService logger)
     {
         _verificationService = verificationService;
@@ -51,6 +53,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         _fieldBuilder = fieldBuilder;
         _printRecordService = printRecordService;
         _serviceProvider = serviceProvider;
+        _visitRecordService = visitRecordService;
         _logger = logger;
     }
 
@@ -349,13 +352,30 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                 string.IsNullOrEmpty(configResult.Message) ? "模板配置不存在或解析失败" : configResult.Message);
         var config = configResult.Value;
 
+        // 7.5 回访三键注入（T3 档案_咨询登记台账，2026-10-16 拍板功能）：
+        // 仅当模板配置引用 VISIT_* 时才查库（其余模板零开销零影响）；打印侧无 applicationId，
+        // 桥 = 户主身份证取最近一条回访；无记录置空串 = 与未注入等价（缺键补空语义），零回归。
+        if (config != null && config.Fields != null &&
+            config.Fields.Any(f => f.FieldKey == FieldKeys.VISIT_DATE
+                                || f.FieldKey == FieldKeys.VISIT_OPERATOR
+                                || f.FieldKey == FieldKeys.VISIT_STATUS))
+        {
+            var visitResult = await _visitRecordService.GetLatestByIdCardAsync(headRecord.ArchiveIdCard, ct);
+            if (visitResult.IsFailure)
+                _logger.Warn($"回访记录查询失败（打印回退空值）: {visitResult.Message}");
+            var visit = visitResult.IsSuccess ? visitResult.Value : null;
+            fields[FieldKeys.VISIT_DATE] = visit != null ? visit.VisitAt.ToString("yyyy年M月d日") : "";
+            fields[FieldKeys.VISIT_OPERATOR] = visit?.VisitBy ?? "";
+            fields[FieldKeys.VISIT_STATUS] = visit?.VisitResult ?? "";
+        }
+
         // 8. 创建引擎并填充
         var engine = await _engineFactory.CreateFromTemplateIdAsync(template.TemplateId, ct);
         engine.IsDuplex = true;
 
         if (config != null)
         {
-            var placeholderFields = MapFieldsToPlaceholders(fields, config.Fields, config.IndexShifts);
+            var placeholderFields = MapFieldsToPlaceholders(fields, config.Fields ?? new List<TemplateFieldMapping>(), config.IndexShifts);
             engine.ReplaceFields(placeholderFields);
 
             if (config.Tables.Count > 0)
