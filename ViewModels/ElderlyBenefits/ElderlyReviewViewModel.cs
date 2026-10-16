@@ -380,9 +380,15 @@ public partial class ElderlyReviewViewModel : ViewModelBase
         f[FieldKeys.ELDERLY_ADJUST_NAME] = newApp.Name;
         f[FieldKeys.ELDERLY_ADJUST_ID_CARD] = newApp.IdCard;
         f[FieldKeys.ELDERLY_ADJUST_HUKOU_ADDRESS] = newApp.HukouAddress ?? string.Empty;
-        f[FieldKeys.ELDERLY_ADJUST_FAMILY_ADDRESS] = string.IsNullOrWhiteSpace(newApp.DetailAddress)
+        var adjustFamilyAddress = string.IsNullOrWhiteSpace(newApp.DetailAddress)
             ? (newApp.FamilyAddress ?? string.Empty)
             : $"{newApp.FamilyAddress}{newApp.DetailAddress}";
+        f[FieldKeys.ELDERLY_ADJUST_FAMILY_ADDRESS] = adjustFamilyAddress;
+        // 批5 双写（2026-10-16，B/SOLO）：T250 {调整家庭地址}→FAMILY_ADDRESS。必须后写覆盖
+        // BuildSingleFields 的 plain FamilyAddress——此处是含 DetailAddress 的拼接口径（同 ADJUST 行同值）。
+        // T250 的 APPLICANT_NAME/APPLICANT_ID_CARD/HUKOU_ADDRESS 三目标键已由 BuildSingleFields
+        // （批5/批4 双写）以 newApp 同值供给，无需在此重复。
+        f[FieldKeys.FAMILY_ADDRESS] = adjustFamilyAddress;
         f[FieldKeys.ELDERLY_ADJUST_REASON] = ElderlyBenefitConstants.BuildAdjustReasonCheckText(eval.AdjustReasonCode, eval.IdentityAdd);
         f[FieldKeys.ELDERLY_ADJUST_TIME] = $"{DateTime.Today.Year}年{DateTime.Today.Month}月";
         f[FieldKeys.ELDERLY_ADJUST_AMOUNT] = $"由{eval.OldMonthlyAmount:F2}元/月调整至{eval.NewMonthlyAmount:F2}元/月";

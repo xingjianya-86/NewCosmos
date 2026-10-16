@@ -106,9 +106,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private DateTime? _loadedSurveyDate;
 
     /// <summary>
-    /// 申请日期（ArchiveAnchorHelper.ResolveApplicationDate 稳定口径：申请编号内嵌日期→创建→…；新建=今天）。
-    /// Step4 校验与档案产出的 B 线窗口都按申请日期锚定（GetTimelineForApplicationDate），
-    /// 两处必须同口径，否则校验放行的日期打印时会落进公示期或早于申请日。
+    /// 受理锚点日期（ArchiveAnchorHelper.ResolveApplicationDate 稳定口径：申请编号内嵌日期→创建→…；新建=今天）。
+    /// 专职 Step4「时间排斥」校验的窗口参照（GetTimelineForApplicationDate）——档案产出的 B 线窗口已改用
+    /// 业务锚点（申请日期=调查日，ArchiveAnchorHelper.ResolveBusinessAnchorDate，2026-10-16）；
+    /// 两者由「周期差 ∈ {0,+1}」护栏保证同批次，校验放行的调查日打印时不会落进公示期。
     /// </summary>
     private DateTime? _applicationDateBase;
 

@@ -663,9 +663,9 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         }
 
         // B线时间轴：公示起止/审核确认日/档案生效/卷号/入户调查日期（统一走 BusinessTimelineService）
-        // 窗口按「申请日期」锚定（申请晚于会议日顺延下一周期），保证文书上公示起日 ≥ 申请日、不随当天漂移
-        var applicationDate = ResolveApplicationDate(app);
-        var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
+        // 锚点 = 业务锚点（申请日期=调查日期新口径；周期差 {0,+1} 生效，否则回退受理锚点），
+        // 批次由调查日决定且与 UI 时间排斥校验同源，保证文书上公示起日 ≥ 调查日、不随当天漂移
+        var (applicationDate, tl) = ResolveBusinessAnchor(app, _cachedHouseholdSurvey?.SurveyDate);
         var publicityStart = tl.PublicityStartDate.ToString("yyyy-MM-dd");
         var publicityEnd = tl.PublicityEndDate.ToString("yyyy-MM-dd");
         var auditDate = tl.AuditDate.ToString("yyyy-MM-dd");
@@ -683,7 +683,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.FAMILY_ADDRESS] = fullAddress,
             [FieldKeys.COMMUNITY] = app.Community ?? "",
             [FieldKeys.APPLICATION_REASON] = GetApplicationReasonDisplay(app.ApplicationReason),
-            [FieldKeys.APPLICATION_DATE] = ResolveApplicationDate(app).ToString("yyyy-MM-dd"),
+            [FieldKeys.APPLICATION_DATE] = applicationDate.ToString("yyyy-MM-dd"),
+            [FieldKeys.PROMISE_DATE] = ResolvePromiseDate(tl, app.FirstApprovedAt, applicationDate),
             [FieldKeys.CONTACT_PHONE] = app.ApplicantPhone,
             [FieldKeys.STATUS] = ApplicationStatusExtensions.FromCode(app.Status ?? "").GetDescription(),
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,
@@ -709,8 +710,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.APPLICATION_NO] = app.ApplicationNo ?? "",
             [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
             [FieldKeys.HUKOU_ADDRESS] = hukouAddress,
-            [FieldKeys.SURVEY_DATE] = surveyDate,
-            [FieldKeys.SURVEY_TIME] = DateTime.Now.ToString("yyyy年M月d日 HH:mm"),
+            [FieldKeys.SURVEY_DATE] = surveyDate, // SURVEY_TIME 已于 2026-10-16 批3 并入本键（config 同批迁移，供给行随之删除）
             [FieldKeys.APPLICATION_REASON_DETAIL] = "-",  // 模板10其它困难原因：需求要求固定留空为"-"
             [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatDecimal(app.TotalAnnualIncome),
             [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatDecimal(app.PerCapitaAnnualIncome),
@@ -1036,6 +1036,9 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = wasInScope ? "停止" : "不予认定";
                 _fieldData[FieldKeys.NOTICE_TOWN] = app.Town ?? "";
                 _fieldData[FieldKeys.NOTICE_VILLAGE] = app.Community ?? "";
+                // 批4 双写（2026-10-16，A/SOLO）：T241 告知书 config 迁到 COMMUNITY 前先并行供给（同源同值，
+                // 同字典 684/1783 行本有同值赋，此处冗余无害——保证告知分支独立成立）
+                _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
                 _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
 
                 // 承办分类：显示具体救助类型
@@ -1079,6 +1082,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                     _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "变更";
                     _fieldData[FieldKeys.NOTICE_TOWN] = app.Town ?? "";
                     _fieldData[FieldKeys.NOTICE_VILLAGE] = app.Community ?? "";
+                    // 批4 双写（2026-10-16，A/SOLO）：待遇调整分支同上——T241 config 迁 COMMUNITY 前并行供给
+                    _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
                     _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
 
                     // 承办分类：新档（链尾现役档案）当前享受分类，与停保场景同口径取全称
@@ -1764,9 +1769,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         catch { }
 
         // B线时间轴：公示起止/审核确认日/卷号/入户调查日期（统一走 BusinessTimelineService）
-        // 窗口按「申请日期」锚定（申请晚于会议日顺延下一周期），保证文书上公示起日 ≥ 申请日、不随当天漂移
-        var applicationDate = ResolveApplicationDate(app);
-        var tl = _timelineService.GetTimelineForApplicationDate(applicationDate, TimelineType.BusinessProcess);
+        // 锚点 = 业务锚点（申请日期=调查日期新口径；周期差 {0,+1} 生效，否则回退受理锚点）
+        var (applicationDate, tl) = ResolveBusinessAnchor(app, _cachedHouseholdSurvey?.SurveyDate);
         var publicityStart = tl.PublicityStartDate.ToString("yyyy-MM-dd");
         var publicityEnd = tl.PublicityEndDate.ToString("yyyy-MM-dd");
         var auditDate = tl.AuditDate.ToString("yyyy-MM-dd");
@@ -1783,7 +1787,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.FAMILY_ADDRESS] = fullAddress,
             [FieldKeys.COMMUNITY] = app.Community ?? "",
             [FieldKeys.APPLICATION_REASON] = app.ApplicationReason ?? "",
-            [FieldKeys.APPLICATION_DATE] = ResolveApplicationDate(app).ToString("yyyy-MM-dd"),
+            [FieldKeys.APPLICATION_DATE] = applicationDate.ToString("yyyy-MM-dd"),
+            [FieldKeys.PROMISE_DATE] = ResolvePromiseDate(tl, app.FirstApprovedAt, applicationDate),
             [FieldKeys.CONTACT_PHONE] = app.ApplicantPhone ?? "",
             [FieldKeys.STATUS] = "草稿",
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,
@@ -1799,8 +1804,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.HEAD_ID_CARD] = app.ApplicantIdCard,
             [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
             [FieldKeys.HUKOU_ADDRESS] = hukouAddress,
-            [FieldKeys.SURVEY_DATE] = surveyDate,
-            [FieldKeys.SURVEY_TIME] = DateTime.Now.ToString("yyyy年M月d日 HH:mm"),
+            [FieldKeys.SURVEY_DATE] = surveyDate, // SURVEY_TIME 已于 2026-10-16 批3 并入本键（config 同批迁移，供给行随之删除）
             [FieldKeys.APPLICATION_REASON_DETAIL] = "-",  // 模板10其它困难原因：需求要求固定留空为"-"
             [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatDecimal(app.TotalAnnualIncome),
             [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatDecimal(app.PerCapitaAnnualIncome),

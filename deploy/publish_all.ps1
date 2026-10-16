@@ -33,6 +33,7 @@ param(
     [switch]$SkipAndroid,
     [switch]$SkipGit,
     [switch]$SkipDownloadVerify,
+    [switch]$SkipTemplateCheck,
     [switch]$NonInteractive,
     [switch]$DryRun,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
@@ -141,11 +142,31 @@ if ($DryRun) {
     Write-Host ("  Android : dotnet publish -f net10.0-android36.0 -c Release -r android-arm64 -p:RunAOTCompilation=true" + $(if ($WithPatch) { "（并生成增量补丁）" } else { "" }))
     Write-Host ("  上一版  : {0}" -f $(if ($prevResolved) { $prevResolved } else { "（未解析到）" }))
     Write-Host ("  回环校验: {0}" -f $(if ($SkipDownloadVerify) { "跳过" } else { "执行（下载两端安装包）" }))
+    Write-Host ("  模板体检: {0}" -f $(if ($SkipTemplateCheck) { "跳过" } else { "执行（check_template_fields -FailOn NonAscii,MultiSource -MaxUnknown 71，命中即中断）" }))
     Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
     Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
     Write-Host ("  版本同步: {0}（csproj/app.ini/iss；DryRun 不写入）" -f $Version)
     return
 }
+
+# ── 0-. 模板字段体检（批6 长效机制，2026-10-16）──
+# 在版本号同步之前执行（早失败，不动 csproj/app.ini/iss 三处版本文件）。命中即 throw 中断发版。
+# $TemplateUnknownBaseline = 既存孤儿行数（docs\20261016_模板字段体检报告.md 的 Unknown），
+# 只防新增不清存量；孤儿清理后同步下调该基线直至 0。
+# NonInteractive 且无 NEWCOSMOS_DB_PASSWORD 时脚本无法交互取密 → 显式警告跳过，避免卡死无人值守发版。
+$TemplateUnknownBaseline = 71
+if (-not $SkipTemplateCheck) {
+    if ([string]::IsNullOrEmpty($env:NEWCOSMOS_DB_PASSWORD) -and $NonInteractive) {
+        Write-Host "警告：NonInteractive 且未设置 NEWCOSMOS_DB_PASSWORD，跳过模板字段体检" -ForegroundColor Yellow
+    }
+    else {
+        Write-Step "模板字段体检（check_template_fields.ps1）"
+        $chk = Join-Path $Repo "Scripts\check_template_fields.ps1"
+        & $chk -FailOn NonAscii,MultiSource -MaxUnknown $TemplateUnknownBaseline
+        if ($LASTEXITCODE -ne 0) { throw "模板字段体检未通过（退出码 $LASTEXITCODE）：见上方 findings，勿强行发版" }
+    }
+}
+else { Write-Host "跳过模板字段体检（-SkipTemplateCheck）" -ForegroundColor Yellow }
 
 # ── 0. 版本号三处同步 ──
 # 必须在平台分支之前执行：原先同步只在 publish_release.ps1（Windows 分支）里做，

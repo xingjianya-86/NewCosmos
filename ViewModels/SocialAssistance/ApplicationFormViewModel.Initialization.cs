@@ -522,9 +522,9 @@ public partial class ApplicationFormViewModel
                 _loadedUpdatedAt = app.UpdatedAt == default ? null : app.UpdatedAt;
                 // 记录库中真实步骤：变更流程模式保存时回写，防止 UI 归位步数冲掉 current_step
                 _loadedCurrentStep = app.CurrentStep;
-                // B 线周期锚点稳定部分（补全完成 ?? 首次审批；草稿 = null → 校验按今天锚定）：
-                // Step4「调查日期避公示」必须用与档案产出相同的公示窗口，见 ArchiveAnchorHelper
-                // 申请日期（申请编号内嵌日期优先）：Step4「调查日期时序」校验与档案产出同口径锚定
+                // 受理锚点（申请编号内嵌日期优先）：Step4「时间排斥」校验的窗口参照
+                //（2026-10-16 起档案产出改用业务锚点=调查日，两者由周期差 {0,+1} 护栏保证同批次，
+                // 见 ArchiveAnchorHelper.ResolveBusinessAnchorDate；草稿 = null → 校验按今天锚定）
                 _applicationDateBase = ArchiveAnchorHelper.ResolveApplicationDate(app);
                 // 覆写前真旧值：Step5 分类判定会覆写 classification_result/total_guarantee_amount，
                 // 变更流程的新旧对比必须用此处捕获值，否则恒判"无变化"

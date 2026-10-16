@@ -1,8 +1,10 @@
 ﻿using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
+using NewCosmos.Services.Utilities;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
 
@@ -15,10 +17,15 @@ public class GracePeriodService : BaseService, IGracePeriodService
 {
     protected override string ServiceName => "GracePeriodService";
     private readonly IDatabaseService _db;
+    private readonly IBusinessTimelineService _businessTimelineService;
 
-    public GracePeriodService(IDatabaseService db, ILoggerService logger) : base(logger)
+    public GracePeriodService(
+        IDatabaseService db,
+        IBusinessTimelineService businessTimelineService,
+        ILoggerService logger) : base(logger)
     {
         _db = db;
+        _businessTimelineService = businessTimelineService;
     }
 
     /// <summary>
@@ -52,11 +59,10 @@ public class GracePeriodService : BaseService, IGracePeriodService
             result.OriginalClassification = oldClassification;
             result.Months = GracePeriodConstants.DEFAULT_MONTHS;
 
-            // 计算渐退期日期
-            var today = DateTime.Today;
-            var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
-            result.StartDate = nextMonth;
-            result.EndDate = nextMonth.AddMonths(result.Months).AddDays(-1);
+            // 计算渐退期日期（起算 = 业务所属月份的次月1日，见 CalculatePeriodCore）
+            var (startDate, endDate) = CalculatePeriodCore(result.Months);
+            result.StartDate = startDate;
+            result.EndDate = endDate;
 
             LogInfo($"渐退期检查: 符合条件");
         }
@@ -75,21 +81,48 @@ public class GracePeriodService : BaseService, IGracePeriodService
         // 验证月数范围
         months = Math.Clamp(months, GracePeriodConstants.MIN_MONTHS, GracePeriodConstants.MAX_MONTHS);
 
-        var today = DateTime.Today;
-        var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
+        var (startDate, endDate) = CalculatePeriodCore(months);
 
         var info = new GracePeriodInfo
         {
             IsInGracePeriod = true,
             GracePeriodMonths = months,
-            GracePeriodStartDate = nextMonth,
-            GracePeriodEndDate = nextMonth.AddMonths(months).AddDays(-1),
+            GracePeriodStartDate = startDate,
+            GracePeriodEndDate = endDate,
             OriginalGuaranteeAmount = originalGuaranteeAmount ?? 0
         };
 
-        LogInfo($"设置渐退期: 月数={months}");
+        LogInfo($"设置渐退期: 月数={months}, 开始={startDate:yyyy-MM-dd}");
 
         return info;
+    }
+
+    /// <summary>
+    /// 按给定月数算起止日（不构建完整渐退信息，供表单保存兜底等场景取数）
+    /// </summary>
+    public GracePeriodInfo CalculatePeriod(int months)
+    {
+        months = Math.Clamp(months, GracePeriodConstants.MIN_MONTHS, GracePeriodConstants.MAX_MONTHS);
+        var (startDate, endDate) = CalculatePeriodCore(months);
+        return new GracePeriodInfo
+        {
+            IsInGracePeriod = true,
+            GracePeriodMonths = months,
+            GracePeriodStartDate = startDate,
+            GracePeriodEndDate = endDate
+        };
+    }
+
+    /// <summary>
+    /// 起止日计算核心（本服务内唯一入口）：起算日 = 业务所属月份（B线归属月，与月报同源）的次月 1 日，
+    /// 结束日 = 起算日 + months 个月 − 1 天。区间公式单点在 <see cref="GracePeriodConstants.CalculatePeriod"/>。
+    /// 禁止在调用点用 DateTime.Today 的日历月另算（跨结算日登记的业务会错位，档案80 卢永华曾因此起算早一个月）。
+    /// </summary>
+    private (DateTime StartDate, DateTime EndDate) CalculatePeriodCore(int months)
+    {
+        var businessMonth = _businessTimelineService
+            .GetTimelineForDate(DateTime.Today, TimelineType.BusinessProcess);
+        return GracePeriodConstants.CalculatePeriod(businessMonth.Year, businessMonth.Month, months);
     }
 
     /// <summary>
@@ -359,6 +392,47 @@ public class GracePeriodService : BaseService, IGracePeriodService
         catch (Exception ex)
         {
             LogException(ex, "清除渐退期失败");
+            return Result.FromException<bool>(ex);
+        }
+    }
+
+    /// <summary>
+    /// 在效渐退期随档案转移（停旧建新）：同一行记录改挂新档案，值全不动。
+    /// 复核不得修改渐退期——转移只改归属，不改起止日/月数/原分类/原额/应发额。
+    /// </summary>
+    public async Task<Result<bool>> TransferAsync(long sourceApplicationId, long targetApplicationId, CancellationToken ct = default)
+    {
+        try
+        {
+            if (sourceApplicationId == targetApplicationId)
+                return Result.Success(true);
+
+            // 目标档已有在效记录 → 跳过（防重复挂载），仅告警不失败
+            var existSql = @"SELECT id FROM nc_biz_grace_periods
+                WHERE application_id = $1 AND is_active = TRUE AND deleted_at IS NULL LIMIT 1";
+            var existResult = await _db.ExecuteScalarAsync(existSql, ct, targetApplicationId);
+            if (existResult.IsFailure)
+                return Result.Failure<bool>(existResult.ErrorCode!, existResult.Message!);
+            if (existResult.Value > 0)
+            {
+                LogWarn($"渐退期转移跳过：目标档案已有在效记录, Source={sourceApplicationId}, Target={targetApplicationId}");
+                return Result.Success(false);
+            }
+
+            var sql = @"UPDATE nc_biz_grace_periods SET
+                application_id = $2,
+                updated_at = NOW()
+                WHERE application_id = $1 AND is_active = TRUE AND deleted_at IS NULL";
+            var result = await _db.ExecuteNonQueryAsync(sql, ct, sourceApplicationId, targetApplicationId);
+            if (result.IsFailure)
+                return Result.Failure<bool>(result.ErrorCode!, result.Message!);
+
+            LogInfo($"渐退期转移: {sourceApplicationId} → {targetApplicationId}（起止日/月数/原额/应发额不变）");
+            return Result.Success(true);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "转移渐退期失败");
             return Result.FromException<bool>(ex);
         }
     }

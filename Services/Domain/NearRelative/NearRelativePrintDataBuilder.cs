@@ -29,6 +29,9 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_WORK_UNIT] = staff.WorkUnit,
             [FieldKeys.NEAR_RELATIVE_POSITION] = staff.Position,
             [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
+            // 批5 双写（2026-10-16，B/SOLO）：T153 月报批量备案 {审核确认时间}→AUDIT_DATE（月报页 fields
+            // 只有本字典、无 dict A，不供给即丢值）；同 auditTime 同值
+            [FieldKeys.AUDIT_DATE] = auditTime,
         };
 
         for (var i = 0; i < NearRelativeConstants.StaffPageRowLimit; i++)
@@ -63,6 +66,9 @@ public static class NearRelativePrintDataBuilder
         {
             [FieldKeys.NEAR_RELATIVE_REPORT_DATE] = reportDate,
             [FieldKeys.NEAR_RELATIVE_REPORT_UNIT] = reportUnit,
+            // 批5 双写（2026-10-16，B/SOLO）：T154 月报汇总表 {填报单位}→REPORT_UNIT（月报页 fields 只有
+            // 本字典；同 reportUnit 同值——L847 传入 fillUnit）
+            [FieldKeys.REPORT_UNIT] = reportUnit,
         };
 
         for (var i = 0; i < NearRelativeConstants.SummaryPageRowLimit; i++)
@@ -112,6 +118,16 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_ECONOMY_INVESTIGATE] = l.EconomyInvestigate,
             [FieldKeys.NEAR_RELATIVE_TOWN_OPINION] = l.TownOpinion,
             [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
+            // 批5 双写（2026-10-16，B/SOLO）：T151 关联信息表 config 迁到通用键前先并行供给——
+            // 与上方各 NEAR_RELATIVE_ 同 pair 同源同值（l = 户主对象）。注意：当前 fields 路径
+            // 取 PrintNavigationData.FieldData（dict A），本 pair 字典只进 tableRows 且该模板
+            // 无索引/无 tables 而被 Flatten 忽略（既有断链）；此处双写供断链修复后即正确生效。
+            [FieldKeys.APPLICANT_NAME] = l.Name,
+            [FieldKeys.APPLICANT_GENDER] = l.Gender,
+            [FieldKeys.FAMILY_ADDRESS] = l.FamilyAddress,
+            [FieldKeys.FAMILY_SIZE] = l.FamilySize?.ToString() ?? string.Empty,
+            [FieldKeys.TOWN_OPINION] = l.TownOpinion,
+            [FieldKeys.AUDIT_DATE] = auditTime,
         };
     }
 
@@ -142,6 +158,16 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_TOWN_OPINION] = l.TownOpinion,
             [FieldKeys.NEAR_RELATIVE_DYNAMIC_RECORD] = l.DynamicRecord,
             [FieldKeys.NEAR_RELATIVE_AUDIT_TIME] = auditTime,
+            // 批5 双写（2026-10-16，B/SOLO）：T152 救助对象信息表 config 迁到通用键前先并行供给——
+            // 与上方各 NEAR_RELATIVE_ 同 pair 同源同值（l = 户主对象）；说明同 dict3（当前 fields 路径
+            // 不经 pair，断链修复后即生效）。
+            [FieldKeys.APPLICANT_NAME] = l.Name,
+            [FieldKeys.APPLICANT_ID_CARD] = l.IdCard,
+            [FieldKeys.HUKOU_ADDRESS] = l.HukouAddress,
+            [FieldKeys.RESIDENCE_ADDRESS] = l.ResidenceAddress,
+            [FieldKeys.FAMILY_SIZE] = l.FamilySize?.ToString() ?? string.Empty,
+            [FieldKeys.TOWN_OPINION] = l.TownOpinion,
+            [FieldKeys.AUDIT_DATE] = auditTime,
         };
     }
 

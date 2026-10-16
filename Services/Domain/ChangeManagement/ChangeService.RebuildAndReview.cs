@@ -751,13 +751,16 @@ public partial class ChangeService
     }
 
     /// <summary>
-    /// 渐退期状态重建（复核/变更后按新分类决定去留）：
-    /// - 新分类仍属低收入（IsCodeLowIncome）→ 保留：已激活维持现状（含"渐退期中间政策变动仍符合"的情形），
-    ///   判定触发新渐退期则 ActivateAsync 覆盖续接（UPSERT）；
-    /// - 新分类非低收入（回低保/特困/刚性/停保等）→ 结清既有渐退期。
+    /// 渐退期状态重建（复核/变更后按新分类决定去留）——**复核不得修改渐退期**：
+    /// - 本户已有在效渐退期 → Preserved：原样保留（起止日/月数/原分类/原额/应发额全不动，不写库）。
+    ///   历史缺陷：命中即 ActivateAsync 覆盖起止日 → 复核把渐退期整体后移（"续命"），
+    ///   且 graceGrantAmount 传 null 会把在效记录的应发额抹成 NULL；
+    /// - 无在效记录且本次判定命中渐退 → Activated：首次进入，按业务月口径创建（唯一的写入情形）；
+    /// - 新分类非低收入（回低保/特困/刚性/停保等）或强制结清 → Cleared：结清既有渐退期（退出≠改日期）。
+    /// 返回值供调用方决定 triggered_grace_period 与内存状态写入（仅 Activated 才写）。
     /// 必须在调用方已开启的环境事务内执行。
     /// </summary>
-    private async Task<Result> ReconcileGracePeriodAsync(
+    private async Task<Result<GraceReconcileOutcome>> ReconcileGracePeriodAsync(
         long applicationId, string newClassification, GracePeriodCheckResult graceCheck,
         string? oldClassification, decimal? oldGuaranteeAmount, bool forceClear = false,
         CancellationToken ct = default)
@@ -768,24 +771,37 @@ public partial class ChangeService
         {
             var clearRes = await _gracePeriodService.ClearAsync(applicationId, ct);
             if (clearRes.IsFailure)
-                return Result.Failure(clearRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                return Result.Failure<GraceReconcileOutcome>(clearRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     clearRes.Message ?? "结清渐退期失败");
-            return Result.Success();
+            return Result.Success(GraceReconcileOutcome.Cleared);
         }
 
-        if (graceCheck.IsEligible)
+        if (!graceCheck.IsEligible)
+            return Result.Success(GraceReconcileOutcome.Preserved);
+
+        // 已有在效记录 → 复核不得修改渐退期，原样保留（不再 UPSERT）
+        var activeRes = await _gracePeriodService.GetActiveAsync(applicationId, ct);
+        if (activeRes.IsFailure)
+            return Result.Failure<GraceReconcileOutcome>(activeRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                activeRes.Message ?? "读取在效渐退期失败");
+        if (activeRes.Value != null)
         {
-            var activateRes = await _gracePeriodService.ActivateAsync(
-                applicationId, graceCheck.Months,
-                graceCheck.StartDate, graceCheck.EndDate,
-                oldClassification, oldGuaranteeAmount,
-                graceGrantAmount: null, ct: ct);
-            if (activateRes.IsFailure)
-                return Result.Failure(activateRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    activateRes.Message ?? "激活渐退期失败");
+            LogInfo($"复核命中渐退但已有在效记录，原样保留: ApplicationId={applicationId}, " +
+                    $"起止={activeRes.Value.StartDate:yyyy-MM-dd}~{activeRes.Value.EndDate:yyyy-MM-dd}");
+            return Result.Success(GraceReconcileOutcome.Preserved);
         }
 
-        return Result.Success();
+        // 无在效记录 → 首次进入渐退（本流程唯一允许的写入）
+        var activateRes = await _gracePeriodService.ActivateAsync(
+            applicationId, graceCheck.Months,
+            graceCheck.StartDate, graceCheck.EndDate,
+            oldClassification, oldGuaranteeAmount,
+            graceGrantAmount: null, ct: ct);
+        if (activateRes.IsFailure)
+            return Result.Failure<GraceReconcileOutcome>(activateRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                activateRes.Message ?? "激活渐退期失败");
+
+        return Result.Success(GraceReconcileOutcome.Activated);
     }
 
     /// <summary>
@@ -845,7 +861,7 @@ public partial class ChangeService
     /// <summary>
     /// 停旧建新：复制旧档案（主表+家庭成员+经济明细+入户调查+照料人）→ 新档案
     /// （original_application_id=旧ID、status=Draft、current_step=PENDING_ARCHIVE(5)，见下方第 3 步注释），
-    /// 旧档案置 Stopped 并结清渐退期；支持对复制后的新档案 UPDATE 覆盖字段（分类/金额/收入等，如经济复核结果）。
+    /// 旧档案置 Stopped，在效渐退期随新档案续存（TransferAsync，值不变）；支持对复制后的新档案 UPDATE 覆盖字段（分类/金额/收入等，如经济复核结果）。
     /// 返回新档案 ID 与旧成员ID→新成员ID 映射。同一事务内调用（应处于已开启事务的上下文）。
     /// </summary>
     private async Task<Result<(long NewApplicationId, Dictionary<long, long> MemberIdMap)>> StopAndRebuildAsync(
@@ -1115,7 +1131,8 @@ public partial class ChangeService
                 return Result.Failure<(long, Dictionary<long, long>)>(updResult.ErrorCode!, updResult.Message ?? "更新新档案失败");
         }
 
-        // 9. 停止旧档案 + 结清渐退期
+        // 9. 停止旧档案 + 在效渐退期随新档案续存（TransferAsync：同一行改挂新档，值全不动；
+        //    源档无在效记录时为 no-op——复核不得修改/终止渐退期，档案换了家庭还在渐退）
         // 状态写入统一走 ApplicationStatusService：状态机校验（Draft/Refused→Stopped 拒绝，
         // 避免直写产生"从未进入保障却已停保"的脏状态）+ stop_reason/stop_date 落库 + 审计留痕
         var stopResult = await _statusService.StopAsync(
@@ -1123,9 +1140,9 @@ public partial class ChangeService
             allowSubmittedOverride: true, ct: ct);
         if (stopResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(stopResult.ErrorCode!, stopResult.Message ?? "停止旧档案失败");
-        var graceClearResult = await _gracePeriodService.ClearAsync(sourceApplicationId, ct);
-        if (graceClearResult.IsFailure)
-            return Result.Failure<(long, Dictionary<long, long>)>(graceClearResult.ErrorCode!, graceClearResult.Message ?? "结清旧档案渐退期失败");
+        var graceTransferResult = await _gracePeriodService.TransferAsync(sourceApplicationId, newApplicationId, ct);
+        if (graceTransferResult.IsFailure)
+            return Result.Failure<(long, Dictionary<long, long>)>(graceTransferResult.ErrorCode!, graceTransferResult.Message ?? "转移渐退期到新档案失败");
 
         return Result.Success((newApplicationId, memberIdMap));
     }
@@ -1274,9 +1291,8 @@ public partial class ChangeService
                            || newClassification != oldClassification
                            || triggeredStop;
 
-            // 6. 渐退期状态重建（同事务）：按复核后新分类决定去留——
-            //    新分类仍属低收入 → 保留/续接（含"渐退期中间政策变动仍符合"的情形）；
-            //    非低收入（回低保/停保等）→ 结清既有渐退期。
+            // 6. 渐退期状态重建（同事务）：复核不得修改渐退期——已有在效记录原样保留、
+            //    无记录且本次命中才新建（Activated）、非低收入（回低保/停保等）→ 结清。
             var reconcileResult = await ReconcileGracePeriodAsync(
                 application.Id, newClassification, classificationResult.Value.GracePeriod,
                 graceOldClassification, oldGuaranteeAmount, ct: ct);
@@ -1286,7 +1302,8 @@ public partial class ChangeService
                 return Result.Failure<ChangeResult>(reconcileResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     reconcileResult.Message ?? "渐退期状态重建失败");
             }
-            var triggeredGracePeriod = classificationResult.Value.GracePeriod.IsEligible == true;
+            // 仅"本次首次触发"记 true 并写内存；Preserved（保留既有记录）不算本次触发
+            var triggeredGracePeriod = reconcileResult.Value == GraceReconcileOutcome.Activated;
             if (triggeredGracePeriod)
             {
                 _gracePeriodService.ApplyGracePeriod(application, new GracePeriodInfo
@@ -1628,7 +1645,7 @@ public partial class ChangeService
             var newCaregiverAmount = await ResolveCaregiverSubsidyAsync(
                 newClassification, application.SupportMode, context.ApplicationId, ct);
 
-            // 5. 渐退期状态重建（同复核：新分类仍低收入 → 保留/续接；否则结清）
+            // 5. 渐退期状态重建（同复核：复核不得修改渐退期——在效记录原样保留，无记录且命中才新建）
             var reconcileResult = await ReconcileGracePeriodAsync(
                 application.Id, newClassification, classificationResult.Value.GracePeriod,
                 graceOldClassification, oldGuaranteeAmount, ct: ct);
@@ -1638,7 +1655,8 @@ public partial class ChangeService
                 return Result.Failure<ChangeResult>(reconcileResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     reconcileResult.Message ?? "渐退期状态重建失败");
             }
-            var triggeredGracePeriod = classificationResult.Value.GracePeriod.IsEligible == true;
+            // 仅"本次首次触发"记 true 并写内存；Preserved（保留既有记录）不算本次触发
+            var triggeredGracePeriod = reconcileResult.Value == GraceReconcileOutcome.Activated;
             if (triggeredGracePeriod)
             {
                 _gracePeriodService.ApplyGracePeriod(application, new GracePeriodInfo

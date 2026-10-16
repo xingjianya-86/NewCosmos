@@ -1128,8 +1128,10 @@ public partial class ArchiveOutputViewModel
     }
 
     /// <summary>
-    /// 目录/卷号窗口锚定日期：申请类档案取该申请的申请日期（<see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>
+    /// 目录/卷号窗口锚定日期：申请类档案取该申请的**业务锚点**（申请日期=调查日期新口径 2026-10-16，
+    /// 调查日周期差 {0,+1} 生效，否则回退 <see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>
     /// 稳定口径：申请编号内嵌日期→创建→首次审批→补全完成→更新→今天）；其它域回退当天。
+    /// 卷号/目录窗口必须与文书公示同批次，故与档案产出同走业务锚点。
     /// </summary>
     private async Task<DateTime> ResolveApplicationDateForTimelineAsync()
     {
@@ -1142,7 +1144,33 @@ public partial class ArchiveOutputViewModel
                 var result = await appService.GetByIdAsync(PrintNavigationData.BusinessId.Value, CancellationToken);
                 var app = result.IsSuccess ? result.Value : null;
                 if (app != null)
-                    return ArchiveAnchorHelper.ResolveApplicationDate(app);
+                {
+                    var applicationDate = ArchiveAnchorHelper.ResolveApplicationDate(app);
+
+                    // 读取入户调查日期（业务锚点判定用；读取失败按受理锚点计算，不阻断卷号）
+                    DateTime? surveyDate = null;
+                    try
+                    {
+                        var surveyService = _serviceProvider.GetRequiredService<IHouseholdSurveyService>();
+                        var surveyResult = await surveyService.GetByApplicationIdAsync(PrintNavigationData.BusinessId.Value, CancellationToken);
+                        if (surveyResult.IsSuccess && surveyResult.Value != null)
+                            surveyDate = surveyResult.Value.SurveyDate;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"目录卷号锚定读取入户调查失败，按受理锚点计算: {ex.Message}");
+                    }
+
+                    if (surveyDate.HasValue && surveyDate.Value != default)
+                    {
+                        var appCycle = _timelineService.GetTimelineForDate(applicationDate, TimelineType.BusinessProcess);
+                        var svCycle = _timelineService.GetTimelineForDate(surveyDate.Value.Date, TimelineType.BusinessProcess);
+                        return ArchiveAnchorHelper.ResolveBusinessAnchorDate(
+                            applicationDate, surveyDate,
+                            (appCycle.Year, appCycle.Month), (svCycle.Year, svCycle.Month));
+                    }
+                    return applicationDate;
+                }
             }
             catch (Exception ex)
             {

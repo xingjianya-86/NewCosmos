@@ -1087,9 +1087,12 @@ public partial class ApplicationFormViewModel
     {
         if (IsInGracePeriod)
         {
-            var start = GracePeriodStartDate ?? new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             var months = GracePeriodMonths > 0 ? GracePeriodMonths : GracePeriodConstants.DEFAULT_MONTHS;
-            var end = GracePeriodEndDate ?? start.AddMonths(months).AddDays(-1);
+            // 起止日缺失时按服务单点兜底（起算 = 业务所属月份的次月1日）。
+            // 原兜底用"今天所在日历月的1日"（当月而非次月），与判定/确认两处口径均不同，属隐藏 bug，一并收敛。
+            var fallback = _gracePeriodService.CalculatePeriod(months);
+            var start = GracePeriodStartDate ?? fallback.GracePeriodStartDate;
+            var end = GracePeriodEndDate ?? fallback.GracePeriodEndDate;
 
             var actRes = await _gracePeriodService.ActivateAsync(
                 _applicationId, months, start, end,

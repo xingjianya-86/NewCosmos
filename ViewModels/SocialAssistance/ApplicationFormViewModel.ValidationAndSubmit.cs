@@ -161,11 +161,15 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// Step4 入户调查日期时序校验（窗口与档案产出同源，按「申请日期」锚定）：
+    /// Step4 入户调查日期时序校验——「时间排斥原则」（窗口与档案产出同源，按「申请日期」受理锚点）：
     /// ① 硬校验：调查日不得早于申请日期（否则文书上出现"调查早于建档"的倒挂）；
-    /// ② 硬校验：调查日不得晚于该档 B 线「公示开始前一个工作日」
-    ///    （上限取自 BusinessTimelineService.GetPrePublicityWorkday，与 C 线口径一致）。
-    /// 窗口锚点 = ArchiveAnchorHelper.ResolveApplicationDate（申请编号内嵌日期→创建→…→今天），
+    /// ② 硬校验：调查日不得晚于今天（不倒填未来。建档晚于当月会议日时 ② 的上限会顺延下月成未来日，
+    ///    仅靠上限拦不住未来日期，故单列）；
+    /// ③ 硬校验：调查日不得晚于该档 B 线「公示开始前一个工作日」（=会议日）
+    ///    （上限取自 BusinessTimelineService.GetPrePublicityWorkday，与 C 线口径一致）——
+    ///    入户不得落进公示期、不得晚于会议日（铁律前移：新数据不可能再产生窗口外调查日，
+    ///    打印侧 ArchiveAnchorHelper.ResolveBusinessAnchorDate 的周期差护栏只服务存量/豁免数据）。
+    /// 窗口锚点 = ArchiveAnchorHelper.ResolveApplicationDate（申请编号内嵌日期→创建→…→今天，受理锚点），
     /// 与档案产出 GetTimelineForApplicationDate 同一口径，否则校验放行的日期打印时仍会落进公示期。
     ///
     /// 豁免①：补全锁定档（调查日=纳入时间，历史补录不可改）；
@@ -190,6 +194,10 @@ public partial class ApplicationFormViewModel
             if (surveyDay < applicationDate)
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED,
                     $"入户调查日期 {surveyDay:yyyy-MM-dd} 不能早于申请日期 {applicationDate:yyyy-MM-dd}（时序倒挂）");
+
+            if (surveyDay > DateTime.Today)
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                    $"入户调查日期 {surveyDay:yyyy-MM-dd} 不能晚于今天 {DateTime.Today:yyyy-MM-dd}（不倒填未来）");
 
             var limit = timeline.GetPrePublicityWorkday(bLine);
             if (surveyDay <= limit) return Result.Success();

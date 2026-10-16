@@ -1,10 +1,12 @@
 ﻿using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.System;
+using NewCosmos.Services.Utilities;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
 
@@ -20,18 +22,21 @@ public class ClassificationService : BaseService, IClassificationService
     private readonly ICapabilityAssessmentService _capabilityAssessmentService;
     private readonly ICollegeStudentService _collegeStudentService;
     private readonly IDatabaseService _db;
+    private readonly IBusinessTimelineService _businessTimelineService;
 
     public ClassificationService(
         ILoggerService logger,
         IStandardConfigService standardConfigService,
         ICapabilityAssessmentService capabilityAssessmentService,
         ICollegeStudentService collegeStudentService,
-        IDatabaseService db) : base(logger)
+        IDatabaseService db,
+        IBusinessTimelineService businessTimelineService) : base(logger)
     {
         _standardConfigService = standardConfigService;
         _capabilityAssessmentService = capabilityAssessmentService;
         _collegeStudentService = collegeStudentService;
         _db = db;
+        _businessTimelineService = businessTimelineService;
     }
 
     /// <summary>
@@ -288,11 +293,14 @@ public class ClassificationService : BaseService, IClassificationService
             result.OriginalClassification = oldClassification;
             result.Months = GracePeriodConstants.DEFAULT_MONTHS;
 
-            // 计算渐退期日期
-            var today = DateTime.Today;
-            var nextMonth = new DateTime(today.Year, today.Month, 1).AddMonths(1);
-            result.StartDate = nextMonth;
-            result.EndDate = nextMonth.AddMonths(result.Months).AddDays(-1);
+            // 计算渐退期日期：起算 = 业务所属月份（B线归属月）的次月 1 日，与月报统计同源；
+            // 禁止按"点判定当天的日历月"起算（跨结算日登记的业务会错位，见 GracePeriodConstants.CalculatePeriod 注释）
+            var businessMonth = _businessTimelineService
+                .GetTimelineForDate(DateTime.Today, TimelineType.BusinessProcess);
+            var (startDate, endDate) = GracePeriodConstants.CalculatePeriod(
+                businessMonth.Year, businessMonth.Month, result.Months);
+            result.StartDate = startDate;
+            result.EndDate = endDate;
         }
 
         return result;

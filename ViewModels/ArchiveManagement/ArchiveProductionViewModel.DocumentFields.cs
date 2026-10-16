@@ -441,27 +441,65 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日]；
+    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日=会议日]；
     /// 无调查记录（补录/未录入）时取申请日当天。
-    /// - 下限 = 申请日：调查不得早于建档（存量倒挂档补打自愈，如调查 10-08 早于申请 10-13 → 打印 10-13）；
-    /// - 上限 = 公示前一工作日 = 会议日（公示起 = 会议次工作日，故其前一工作日即会议日本身）：
-    ///   调查晚于该日打印出来就是「调查在公示期内」的时序矛盾，兜底压回。
+    /// - 上限铁律（2026-10-16 定）：入户不得落进公示期、不得晚于会议日——上限永远生效；
+    /// - 倒挂窗口（申请日 > 会议日）：两界冲突时**上限优先**，放弃"不早于申请日"下限
+    ///   （如申请 10-12、会议 10-08、调查 10-08 → 打印 10-08，而不是顶到公示期里的 10-12）；
+    /// - 正常窗口维持 [申请日, 会议日] 双钳（调查不早于建档的自愈保留）。
     /// </summary>
     private static string ResolveSurveyDate(TimelineResult tl, DateTime? actualSurvey, DateTime applicationDate)
     {
         var minDate = applicationDate.Date;
-        var maxDate = tl.MeetingDate.Date < minDate ? minDate : tl.MeetingDate.Date;
+        var maxDate = tl.MeetingDate.Date;
         var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
             ? actualSurvey.Value.Date
-            : minDate; // 无调查记录：默认申请日当天（调查可在申请当日完成）
-        if (baseDate < minDate) baseDate = minDate;
-        if (baseDate > maxDate) baseDate = maxDate;
+            : (maxDate < minDate ? maxDate : minDate); // 无调查记录：默认申请日当天（倒挂窗口取会议日，保证不落公示期）
+        if (maxDate < minDate)
+        {
+            // 倒挂窗口：只保上限（公示外铁律），不抬到申请日
+            if (baseDate > maxDate) baseDate = maxDate;
+        }
+        else
+        {
+            if (baseDate < minDate) baseDate = minDate;
+            if (baseDate > maxDate) baseDate = maxDate;
+        }
         return baseDate.ToString("yyyy年M月d日");
     }
 
-    /// <summary>申请日期解析：转发到 <see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>（唯一事实来源）</summary>
-    private static DateTime ResolveApplicationDate(ApplicationEntity app)
-        => ArchiveAnchorHelper.ResolveApplicationDate(app);
+    /// <summary>
+    /// 业务锚点（申请日期=调查日新口径）+ B 线时间轴：调查日期周期差 {0,+1} 生效
+    /// （<see cref="ArchiveAnchorHelper.ResolveBusinessAnchorDate"/>），否则回退受理锚点。
+    /// 两处字段构建器（主构建/缓存构建）统一从这里取，禁止各自重算。
+    /// </summary>
+    private (DateTime ApplicationDate, TimelineResult Timeline) ResolveBusinessAnchor(ApplicationEntity app, DateTime? surveyDate)
+    {
+        var applicationDate = ArchiveAnchorHelper.ResolveApplicationDate(app);
+        var appCycle = _timelineService.GetTimelineForDate(applicationDate, TimelineType.BusinessProcess);
+        var surveyCycle = (0, 0);
+        if (surveyDate.HasValue && surveyDate.Value != default)
+        {
+            var s = _timelineService.GetTimelineForDate(surveyDate.Value.Date, TimelineType.BusinessProcess);
+            surveyCycle = (s.Year, s.Month);
+        }
+        var businessDate = ArchiveAnchorHelper.ResolveBusinessAnchorDate(
+            applicationDate, surveyDate, (appCycle.Year, appCycle.Month), surveyCycle);
+        var tl = _timelineService.GetTimelineForApplicationDate(businessDate, TimelineType.BusinessProcess);
+        return (businessDate, tl);
+    }
+
+    /// <summary>
+    /// 诚信承诺落款日期（B 线）：首次审批日（未审批兜底申请日期=业务锚点）；
+    /// 已批档案钳下限公示开始日——承诺落款不得早于公示（2026-10-16 口径决策，保留下限）。
+    /// </summary>
+    private static string ResolvePromiseDate(TimelineResult tl, DateTime? firstApprovedAt, DateTime applicationDate)
+    {
+        var date = firstApprovedAt?.Date ?? applicationDate.Date;
+        if (firstApprovedAt.HasValue && date < tl.PublicityStartDate.Date)
+            date = tl.PublicityStartDate.Date;
+        return date.ToString("yyyy-MM-dd");
+    }
 
     /// <summary>
     /// 将金额转换为中文大写（如 200.50 → "贰佰元伍角"）

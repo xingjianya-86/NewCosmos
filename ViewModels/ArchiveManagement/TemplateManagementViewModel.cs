@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Categories;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
@@ -290,6 +291,18 @@ public partial class TemplateManagementViewModel : ViewModelBase
                 .ToArray();
 
             var config = string.IsNullOrWhiteSpace(ConfigJson) ? null : ConfigJson;
+
+            // 批6（2026-10-16）：config 字段键体检——命中仅警告不阻断（人工裁量），防「config 有键、
+            // 代码无供给」的占位符残留事故（先例 2026-10-15 {经办人}）与同占位符多键值串复发。
+            var configIssues = TemplateFieldKeyValidator.Validate(config);
+            if (configIssues.Count > 0)
+            {
+                _logger.Warn($"模板 config 字段键体检命中 {configIssues.Count} 项（不阻断上传）：{TemplateName}");
+                var text = configIssues.Count > 20
+                    ? string.Join("\n", configIssues.Take(20)) + $"\n…（共 {configIssues.Count} 项，详见日志）"
+                    : string.Join("\n", configIssues);
+                await _dialogService.DisplayAlertAsync("配置警告（不阻断上传）", text, "确定");
+            }
 
             await _templateService.SaveAsync(TemplateName, TemplateType, fileBytes, categoryArray, config!);
 

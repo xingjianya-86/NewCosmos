@@ -35,4 +35,19 @@ public static class GracePeriodConstants
     {
         return months >= MIN_MONTHS && months <= MAX_MONTHS;
     }
+
+    /// <summary>
+    /// 渐退期区间计算（唯一实现，禁止调用点另抄公式）：
+    /// 起算日 = 业务所属年月（B线归属月）的次月 1 日；结束日 = 起算日 + months 个月 − 1 天。
+    /// 业务归属月须由 BusinessTimelineService.GetTimelineForDate(date, BusinessProcess) 的 Year/Month 传入
+    /// （周期含结算日提前惩罚，与月报统计同源），禁止直接用日历月——曾因"按点判定当天的日历月起算"
+    /// 导致跨结算日登记的业务渐退期错位（档案80 卢永华：9-25 登记、10-09 办结属10月业务，
+    /// 却按 9 月日历月起算成 2026-10-01，正确应为 2026-11-01）。见 docs\20261016_渐退期起算口径改按业务月.md。
+    /// </summary>
+    public static (DateTime StartDate, DateTime EndDate) CalculatePeriod(int businessYear, int businessMonth, int months)
+    {
+        months = Math.Clamp(months, MIN_MONTHS, MAX_MONTHS);
+        var start = new DateTime(businessYear, businessMonth, 1).AddMonths(1);
+        return (start, start.AddMonths(months).AddDays(-1));
+    }
 }

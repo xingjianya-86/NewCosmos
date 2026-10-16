@@ -54,6 +54,16 @@ public class TemplateFieldBuilder
         // B 线窗口按「申请日期」锚定（申请晚于会议日顺延下一周期，保证公示起日 ≥ 申请日）；
         // 无申请日期时按今天锚定。
         var anchorDate = data.ApplicationDate != default ? data.ApplicationDate : DateTime.Today;
+        // 业务锚点（申请日期=调查日期新口径 2026-10-16）：调查日与受理日周期差 {0,+1} 时用调查日，
+        // 否则回退受理锚点——与档案产出（ArchiveProductionViewModel）同口径，禁止各自重算
+        if (data.SurveyDate is { } surveyForAnchor && surveyForAnchor != default)
+        {
+            var appCycle = _timelineService.GetTimelineForDate(anchorDate, TimelineType.BusinessProcess);
+            var svCycle = _timelineService.GetTimelineForDate(surveyForAnchor.Date, TimelineType.BusinessProcess);
+            anchorDate = ArchiveAnchorHelper.ResolveBusinessAnchorDate(
+                anchorDate, surveyForAnchor.Date,
+                (appCycle.Year, appCycle.Month), (svCycle.Year, svCycle.Month));
+        }
         var tl = _timelineService.GetTimelineForApplicationDate(anchorDate, TimelineType.BusinessProcess);
         var fields = BuildBaseFields(data, tl, anchorDate);
 
@@ -90,7 +100,7 @@ public class TemplateFieldBuilder
             [FieldKeys.APPLICANT_ID_CARD] = data.ApplicantIdCard ?? "",
             [FieldKeys.APPLICANT_ID_TYPE] = _dictCacheService.GetValue(DictionaryTypeCodes.IdTypes, data.ApplicantIdType ?? ""),
             [FieldKeys.APPLICATION_REASON] = string.IsNullOrWhiteSpace(data.ApplicationReason) ? "其他" : _dictCacheService.GetValue(DictionaryTypeCodes.ApplicationReasons, data.ApplicationReason),
-            [FieldKeys.APPLICATION_DATE] = data.ApplicationDate != default ? data.ApplicationDate.ToString("yyyy-MM-dd") : DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.APPLICATION_DATE] = applicationDate != default ? applicationDate.ToString("yyyy-MM-dd") : DateTime.Now.ToString("yyyy-MM-dd"), // 业务锚点（=调查日新口径），见 BuildFieldsAsync
             [FieldKeys.CONTACT_PHONE] = data.ContactPhone ?? "",
             [FieldKeys.FAMILY_ADDRESS] = "",  // 统一由 ResolveAddresses 填充
             [FieldKeys.FAMILY_VILLAGE] = data.Community ?? "",
@@ -129,17 +139,27 @@ public class TemplateFieldBuilder
     /// <summary>
     /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日=会议日]；
     /// 无调查记录（补录/未录入）时取申请日当天。
-    /// 与 ArchiveProductionViewModel.ResolveSurveyDate 同口径：调查不得早于申请、不得落进公示期。
+    /// 与 ArchiveProductionViewModel.ResolveSurveyDate 同口径（2026-10-16 同步）：
+    /// 上限铁律——调查不得落进公示期、不得晚于会议日；倒挂窗口（申请日 > 会议日）时上限优先，
+    /// 正常窗口维持 [申请日, 会议日] 双钳。
     /// </summary>
     private static string ResolveSurveyDate(TimelineResult timeline, DateTime? actualSurvey, DateTime applicationDate)
     {
         var minDate = applicationDate.Date;
-        var maxDate = timeline.MeetingDate.Date < minDate ? minDate : timeline.MeetingDate.Date;
+        var maxDate = timeline.MeetingDate.Date;
         var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
             ? actualSurvey.Value.Date
-            : minDate;
-        if (baseDate < minDate) baseDate = minDate;
-        if (baseDate > maxDate) baseDate = maxDate;
+            : (maxDate < minDate ? maxDate : minDate);
+        if (maxDate < minDate)
+        {
+            // 倒挂窗口：只保上限（公示外铁律），不抬到申请日
+            if (baseDate > maxDate) baseDate = maxDate;
+        }
+        else
+        {
+            if (baseDate < minDate) baseDate = minDate;
+            if (baseDate > maxDate) baseDate = maxDate;
+        }
         return baseDate.ToString("yyyy年MM月dd日");
     }
 

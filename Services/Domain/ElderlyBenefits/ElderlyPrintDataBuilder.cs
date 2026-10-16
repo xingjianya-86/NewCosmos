@@ -18,7 +18,16 @@ public static class ElderlyPrintDataBuilder
             [FieldKeys.ELDERLY_PHONE] = app.Phone,
             [FieldKeys.ELDERLY_ID_CARD] = app.IdCard,
             [FieldKeys.ELDERLY_HUKOU_ADDRESS] = app.HukouAddress,
+            // 批4 双写（2026-10-16，A/SOLO）：T140 登记表 / T143 停止表 config 迁到通用键前先并行供给，同源同值
+            [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress,
             [FieldKeys.ELDERLY_FAMILY_ADDRESS] = app.FamilyAddress,
+            // 批5 双写（2026-10-16，B/SOLO）：T140/141/143 config 迁到 APPLICANT_NAME / APPLICANT_AGE /
+            // CONTACT_PHONE / APPLICANT_ID_CARD / FAMILY_ADDRESS 前先并行供给（与上方 ELDERLY_ 同源同值）
+            [FieldKeys.APPLICANT_NAME] = app.Name,
+            [FieldKeys.APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
+            [FieldKeys.CONTACT_PHONE] = app.Phone,
+            [FieldKeys.APPLICANT_ID_CARD] = app.IdCard,
+            [FieldKeys.FAMILY_ADDRESS] = app.FamilyAddress,
             [FieldKeys.ELDERLY_BANK_NAME] = app.BankName,
             [FieldKeys.ELDERLY_BANK_ACCOUNT] = app.BankAccount,
             [FieldKeys.ELDERLY_AGENT_NAME] = app.AgentName,

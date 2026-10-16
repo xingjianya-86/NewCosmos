@@ -66,4 +66,27 @@ public static class ArchiveAnchorHelper
         if (updatedAt != default) return updatedAt;
         return DateTime.Today;
     }
+
+    /// <summary>
+    /// 业务锚点（申请日期·2026-10-16 新口径）：**调查日期优先**，仅当调查日归属周期与受理周期相差
+    /// 不超过一个周期（周期差 ∈ {0, +1}）时生效；其余回退受理锚点（<see cref="ResolveApplicationDate"/>）。
+    /// - 周期差 0：调查日与受理日同周期 → 批次不变，文书「申请日期」取调查日；
+    /// - 周期差 +1：调查日晚于受理批次（如建档 8-24、入户 9-21 跨过会议日）→ 业务顺延下一周期；
+    /// - 其余（超前/滞后 ≥2 个周期，含调查日为 2016/2019 等历史错位数据）→ 回退受理锚点，
+    ///   防止文书打出远年公示/生效/卷号。
+    /// 受理/调查周期由调用方用 IBusinessTimelineService.GetTimelineForDate 求出后传入（本类保持纯函数）。
+    /// UI 侧配套「时间排斥原则」（Step4 调查日期硬校验）保证新数据的调查日落在受理批次窗口内，
+    /// 窗口内则两锚点必同批次；本方法的周期差护栏是打印侧兜底（存量/豁免数据）。
+    /// </summary>
+    public static DateTime ResolveBusinessAnchorDate(
+        DateTime applicationDate,
+        DateTime? surveyDate,
+        (int Year, int Month) applicationCycle,
+        (int Year, int Month) surveyCycle)
+    {
+        if (surveyDate is not { } survey || survey == default) return applicationDate;
+        var gap = (surveyCycle.Year * 12 + surveyCycle.Month)
+                - (applicationCycle.Year * 12 + applicationCycle.Month);
+        return gap is 0 or 1 ? survey.Date : applicationDate;
+    }
 }

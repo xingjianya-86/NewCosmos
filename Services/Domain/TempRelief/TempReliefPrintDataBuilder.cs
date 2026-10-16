@@ -38,15 +38,27 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_APPLICATION_NO] = app.ApplicationNo,
             [FieldKeys.TEMP_RELIEF_TYPE_NAME] = TempReliefConstants.GetReliefTypeName(app.ReliefType),
             [FieldKeys.TEMP_REPORT_UNIT] = app.ReportUnit,
+            // 批5 双写（2026-10-16，B/SOLO）：T226 config 迁到通用键前先并行供给（同源同值）
+            [FieldKeys.REPORT_UNIT] = app.ReportUnit,
             [FieldKeys.TEMP_REPORT_TIME] = app.ReportTime?.ToString("yyyy年M月d日") ?? string.Empty,
+            // ── 2026-10-16 批3（MIRROR 合并，config 侧 5 规则/18 行已迁新键）──
+            // TEMP_APPLICANT_NAME / TEMP_APPLICANT_ID_CARD：config 已改指本方法尾部「通用档案键」段的
+            // APPLICANT_NAME / APPLICANT_ID_CARD（同字典同值），但 ArchiveOutputViewModel.BatchAndArchive
+            // 的档案目录题名(910/1059)与版权信息(937) 仍读这两个键（取不到回退「未知」），
+            // 故此处供给必须保留——不是 config 冗余，勿连同已删行一起清理。
+            // 已删除的真冗余（迁移后代码读取方 = 0）：TEMP_FAMILY_ADDRESS、TEMP_HUKOU_ADDRESS。
             [FieldKeys.TEMP_APPLICANT_NAME] = app.ApplicantName,
             [FieldKeys.TEMP_APPLICANT_GENDER] = app.Gender,
             [FieldKeys.TEMP_APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
             [FieldKeys.TEMP_APPLICANT_ID_CARD] = app.ApplicantIdCard,
             [FieldKeys.TEMP_APPLICANT_PHONE] = app.Phone,
+            // 批5 双写（2026-10-16，B/SOLO）：T226/230/235/237/249 与 T235/238/249 config 迁到
+            // APPLICANT_GENDER / APPLICANT_AGE / CONTACT_PHONE 前先并行供给（与上方 TEMP_ 同源同值；
+            // CONTACT_PHONE 取申请人电话 app.Phone，非 L97 的公示异议反馈电话）
+            [FieldKeys.APPLICANT_GENDER] = app.Gender,
+            [FieldKeys.APPLICANT_AGE] = app.Age?.ToString() ?? string.Empty,
+            [FieldKeys.CONTACT_PHONE] = app.Phone,
             [FieldKeys.FAMILY_ADDRESS] = BuildLivingAddress(app),
-            [FieldKeys.TEMP_FAMILY_ADDRESS] = BuildLivingAddress(app),
-            [FieldKeys.TEMP_HUKOU_ADDRESS] = app.HukouAddress,
             [FieldKeys.TEMP_POLICY_ENJOYED] = app.PolicyEnjoyed,
             [FieldKeys.TEMP_POLICY_CHECKLIST] = BuildPolicyChecklist(app.PolicyEnjoyed),
             [FieldKeys.TEMP_FAMILY_MEMBER_STATUS] = BuildFamilyMemberStatus(app),
@@ -71,6 +83,8 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_EDUCATION_DETAILS] = BuildEducationDetails(app.Educations),
             [FieldKeys.TEMP_APPLY_DATE] = app.ApplyDate?.ToString("yyyy年M月d日") ?? string.Empty,
             [FieldKeys.TEMP_FAMILY_SIZE] = app.FamilySize?.ToString() ?? string.Empty,
+            // 批4 双写（2026-10-16，A/SOLO）：T229/T230/T235/T237/T249 config 迁到通用键前先并行供给，同源同值
+            [FieldKeys.FAMILY_SIZE] = app.FamilySize?.ToString() ?? string.Empty,
             [FieldKeys.TEMP_FAMILY_CATEGORY] = app.FamilyCategory,
             [FieldKeys.TEMP_VERIFY_RESULT] = "情况属实",
             [FieldKeys.TEMP_CONFIRM_AMOUNT] = app.ReliefType == TempReliefConstants.ReliefTypeSmall && app.ConfirmAmount.HasValue
@@ -87,6 +101,9 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_PUBLICIZE_END] = FormatCnDate(app.PublicizeEndDate),
             [FieldKeys.TEMP_VILLAGE] = app.Village,
             [FieldKeys.TEMP_TOWN] = app.Town,
+            // 批5 双写（2026-10-16，B/SOLO）：T229/T236 → COMMUNITY、T229 → TOWN 前先并行供给（同源同值）
+            [FieldKeys.COMMUNITY] = app.Village,
+            [FieldKeys.TOWN] = app.Town,
             [FieldKeys.TEMP_ACCEPTANCE_PERSON] = app.AcceptancePerson,
             [FieldKeys.TEMP_CONTACT_PHONE] = contactUnitPhone ?? string.Empty,
 
@@ -96,6 +113,9 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.APPLICATION_REASON] = string.IsNullOrWhiteSpace(app.DifficultyType)
                 ? TempReliefConstants.DifficultyTypeOther : app.DifficultyType,
             [FieldKeys.APPLICATION_DATE] = (investigationDate ?? app.ApplyDate)?.ToString("yyyy-MM-dd") ?? string.Empty,
+            // 通用_申请人承诺书(174)/通用_经办人承诺书(178) 的 {诚信承诺时间}：
+            // C 线（临时救助）不套 B 线「承诺不早于公示」规则（2026-10-16 决策：维持现状值）
+            [FieldKeys.PROMISE_DATE] = (investigationDate ?? app.ApplyDate)?.ToString("yyyy-MM-dd") ?? string.Empty,
 
             // ── 通用承诺书键：通用_申请人承诺书(174) / 通用_经办人承诺书(178) 复用临时救助打印流 ──
             [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress,
