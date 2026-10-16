@@ -849,7 +849,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.ADJ_REMOVE_RELATION_3] = "", [FieldKeys.ADJ_REMOVE_HEALTH_3] = "", [FieldKeys.ADJ_REMOVE_WORKPLACE_3] = "",
             [FieldKeys.ADJ_REMOVE_REASON_3] = "", [FieldKeys.ADJ_REMOVE_INCOME_3] = "",
             [FieldKeys.ADJ_FAMILY_DETAIL] = "", [FieldKeys.ADJ_CHANGE_SUMMARY] = "",
-            [FieldKeys.ADJ_AUDIT_TIME] = "", [FieldKeys.ADJ_INCREASE_AMOUNT] = "",
+            [FieldKeys.ADJ_INCREASE_AMOUNT] = "", // 批T255：原 ADJ_AUDIT_TIME 空初值行已删（config 已迁 AUDIT_DATE+format）
             [FieldKeys.ADJ_DECREASE_AMOUNT] = "", [FieldKeys.ADJ_EFFECTIVE_DATE] = "",
             // 增/减人数：无人员变动时也须有值，否则打印端记「未映射的字段」并输出 "-"
             [FieldKeys.ADJ_ADD_COUNT] = "0", [FieldKeys.ADJ_REMOVE_COUNT] = "0",

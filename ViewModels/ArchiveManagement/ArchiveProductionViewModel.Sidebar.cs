@@ -346,9 +346,12 @@ public partial class ArchiveProductionViewModel
             _fieldData[FieldKeys.ADJ_HEAD_CLASSIFICATION] = app.ClassificationResult ?? "";
             _fieldData[FieldKeys.ADJ_HEAD_HUKOU] = await ResolveHukouAddressAsync(app);
             _fieldData[FieldKeys.ADJ_HEAD_ID_CARD] = app.ApplicantIdCard ?? "";
-            var adjAuditTime = DateTime.Now;
-            _fieldData[FieldKeys.ADJ_AUDIT_TIME] = adjAuditTime.ToString("yyyy年M月d日");
-            // 执行时间 = 审批时间的次月 1 号（与模板1 复核组 {审核次月日期} 同口径）
+            // 审批时间按 B 线时间轴审核确认日固定（2026-10-16 业务拍板：A/B/C 时间轴各按其口径，
+            // 增减员调整表属 B 线业务线 → tl.AuditDate；原 DateTime.Now=打印当天废除，补打不再漂移）。
+            // ADJ_AUDIT_TIME 供给行随 T255 config 同批迁移删除（config 现读 AUDIT_DATE + format 中文渲染）。
+            var (_, tlAdj) = ResolveBusinessAnchor(app, _cachedHouseholdSurvey?.SurveyDate);
+            var adjAuditTime = tlAdj.AuditDate;
+            // 执行时间 = 审批时间的次月 1 号（与模板1 复核组 {审核次月日期} 同口径），随审批口径同步固定
             _fieldData[FieldKeys.ADJ_EFFECTIVE_DATE] =
                 new DateTime(adjAuditTime.Year, adjAuditTime.Month, 1).AddMonths(1).ToString("yyyy年M月1日");
 
