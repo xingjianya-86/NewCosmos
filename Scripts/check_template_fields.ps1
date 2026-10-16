@@ -101,7 +101,7 @@ try {
     $templates = (Invoke-Q $tplSql) | ConvertFrom-Json
 
     Write-Step "查询占位符映射展开"
-    $mapSql = "select coalesce(json_agg(row_to_json(x)), '[]'::json) from (select t.id as template_id, t.name as template_name, f->>'fieldKey' as field_key, f->>'placeholder' as placeholder, f->>'defaultValue' as default_value, f->>'format' as fmt from nc_biz_templates t, jsonb_array_elements(coalesce(t.config_json->'fields', '[]'::jsonb)) f where t.config_json is not null order by t.id, f->>'fieldKey') x;"
+    $mapSql = "select coalesce(json_agg(row_to_json(x)), '[]'::json) from (select t.id as template_id, t.name as template_name, f->>'fieldKey' as field_key, f->>'placeholder' as placeholder, f->>'defaultValue' as default_value, f->>'format' as fmt, ff.ord as row_ord from nc_biz_templates t, jsonb_array_elements(coalesce(t.config_json->'fields', '[]'::jsonb)) with ordinality as ff(f, ord) where t.config_json is not null order by t.id, ff.ord) x;"
     $mappings = (Invoke-Q $mapSql) | ConvertFrom-Json
 }
 finally {
@@ -122,6 +122,7 @@ $findings = @{
     SlotOrphan   = New-Object System.Collections.ArrayList
     SlotIndexed  = New-Object System.Collections.ArrayList
     MultiPlaceholder = New-Object System.Collections.ArrayList
+    CompositeBeforeSub = New-Object System.Collections.ArrayList
 }
 $noFields = @($templates | Where-Object { -not $_.has_fields })
 
@@ -167,6 +168,33 @@ foreach ($g in $aliasGroups) {
         field_key = $g.Group[0].field_key; placeholder = $phs; reason = "一键多占位符" })
 }
 
+# CompositeBeforeSub：复合占位符行（placeholder 含 >=2 个 {}）必须排在其内部子占位符行**之前**。
+# 引擎按占位符做全文字符串替换，result 字典按 config 行序插入（Dictionary 枚举=插入序）——
+# 子占位符先替换会把复合串原地打散，复合行随即失配，文档残留 {xxx}…（现实样本：T142/T144 标题）。
+# 本检查防 config 重排/重存后复发；不入 -FailOn（观察一段，见清偿方案 D7）。
+$compositeRows = @($mappings | Where-Object {
+        -not [string]::IsNullOrEmpty($_.placeholder) -and
+        $null -ne $_.row_ord -and
+        ([regex]::Matches($_.placeholder, '\{[^{}]*\}')).Count -ge 2 })
+foreach ($c in $compositeRows) {
+    $cOrd = [int64]$c.row_ord
+    $innerPhs = @([regex]::Matches($c.placeholder, '\{[^{}]*\}') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+    foreach ($subPh in $innerPhs) {
+        foreach ($s in $mappings) {
+            if ($s.template_id -ne $c.template_id) { continue }
+            if ($s.placeholder -ne $subPh) { continue }
+            if ($null -eq $s.row_ord) { continue }
+            if ([int64]$s.row_ord -lt $cOrd) {
+                [void]$findings.CompositeBeforeSub.Add([pscustomobject]@{
+                    template_id = $c.template_id; template_name = $c.template_name
+                    field_key = $c.field_key; placeholder = $c.placeholder
+                    reason = ('复合行 row_ord=' + $cOrd + ' 晚于子占位符行 ' + $s.field_key +
+                              '（row_ord=' + $s.row_ord + '）——子行先替换会打散复合串致其失配') })
+            }
+        }
+    }
+}
+
 # -- 摘要 --
 $distinctKeys = $mappings | ForEach-Object { $_.field_key } | Where-Object { $_ } | Sort-Object -Unique
 $hasConfigCount = @($templates | Where-Object has_config).Count
@@ -180,6 +208,7 @@ Write-Host ("  MultiSource (危险) : {0}" -f $findings.MultiSource.Count)
 Write-Host ("  SlotOrphan         : {0}" -f $findings.SlotOrphan.Count)
 Write-Host ("  SlotIndexed (正常) : {0}" -f $findings.SlotIndexed.Count)
 Write-Host ("  MultiPlaceholder   : {0}（别名，仅报告）" -f $findings.MultiPlaceholder.Count)
+Write-Host ("  CompositeBeforeSub : {0}（复合行须先于子占位符行）" -f $findings.CompositeBeforeSub.Count)
 
 if ($ExportCsv -ne "") {
     $dir = Split-Path -Parent $ExportCsv
@@ -210,13 +239,15 @@ if ($ReportPath -ne "") {
     $L.Add(('| SlotOrphan | {0} | 槽位基键不在白名单 |' -f $findings.SlotOrphan.Count))
     $L.Add(('| SlotIndexed（正常） | {0} | `_N` 槽位，装配点循环拼接 |' -f $findings.SlotIndexed.Count))
     $L.Add(('| MultiPlaceholder | {0} | 一键多占位符，别名合法 |' -f $findings.MultiPlaceholder.Count))
+    $L.Add(('| CompositeBeforeSub | {0} | 复合行须先于其子占位符行（行序依赖） |' -f $findings.CompositeBeforeSub.Count))
 
     $sections = @(
         @{ n = "Unknown";           t = "Unknown（真孤儿，须补白名单或修配置）" },
         @{ n = "NonAscii";          t = "NonAscii（中文键，迁移为 ASCII）" },
         @{ n = "MultiSource";       t = "MultiSource（同占位符多值源，危险）" },
         @{ n = "SlotOrphan";        t = "SlotOrphan（槽位基键孤儿）" },
-        @{ n = "MultiPlaceholder";  t = "MultiPlaceholder（一键多占位符，仅报告）" }
+        @{ n = "MultiPlaceholder";  t = "MultiPlaceholder（一键多占位符，仅报告）" },
+        @{ n = "CompositeBeforeSub"; t = "CompositeBeforeSub（复合行须先于子占位符行，行序依赖）" }
     )
     foreach ($s in $sections) {
         $list = $findings[$s.n]
