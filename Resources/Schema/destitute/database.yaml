@@ -314,5 +314,8 @@ tables:
         columns: [head_id_card]
       - name: idx_destitute_persons_family_id
         columns: [family_id]
+      - name: idx_destitute_persons_caregiver_id_card
+        columns: [caregiver_id_card]
+        comment: 近亲属备案按经办人员身份证检索照料人（特困历史档案来源）
 
 views: []

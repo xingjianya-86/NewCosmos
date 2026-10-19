@@ -103,6 +103,10 @@ public class ConfigService : IConfigService
             // APK 升级不清空 AppData：旧 app.ini 会一直残留，导致显示旧版本号。
             // 启动时把 assets 里的 Version 同步进来（只改 Version 行，不动 BCycleSettleDay 等其他配置）。
             SyncAppIniVersionFromAsset(writableConfigDir);
+
+            // update.ini 同样只在首装复制一次：若不随 APK 覆盖，老手机永远读首装旧副本，
+            // 清单地址/开关变更后"检测不到更新"无法自愈（详见方法注释）。
+            SyncUpdateIniFromAsset(writableConfigDir);
         }
         return writableConfigDir;
 #else
@@ -216,6 +220,42 @@ public class ConfigService : IConfigService
         {
             // 同步失败不阻断启动（版本号显示旧值，其余功能不受影响）
             Serilog.Log.Warning("[ConfigService] 同步 app.ini Version 失败: {Message}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Android: 把 APK assets 内 update.ini 覆盖到可写目录（内容一致则跳过）。
+    /// update.ini 在运行期从不被本程序改写、手机私有目录普通用户不可见，
+    /// 覆盖不会丢本机修改；APK 升级后清单地址/开关等配置随包自愈，
+    /// 避免旧副本导致"改地址后老手机永远检测不到更新"。
+    /// </summary>
+    private static void SyncUpdateIniFromAsset(string targetDir)
+    {
+        try
+        {
+            string assetText;
+            using (var assetStream = FileSystem.OpenAppPackageFileAsync("update.ini").GetAwaiter().GetResult())
+            using (var reader = new StreamReader(assetStream))
+            {
+                assetText = reader.ReadToEnd();
+            }
+            if (string.IsNullOrWhiteSpace(assetText))
+                return;
+
+            var targetPath = Path.Combine(targetDir, "update.ini");
+            if (File.Exists(targetPath)
+                && string.Equals(File.ReadAllText(targetPath), assetText, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            File.WriteAllText(targetPath, assetText, new global::System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            Serilog.Log.Information("[ConfigService] update.ini 已从 assets 同步到 {Path}", targetPath);
+        }
+        catch (Exception ex)
+        {
+            // 同步失败不阻断启动（沿用旧配置，手动检查更新仍可用）
+            Serilog.Log.Warning("[ConfigService] 同步 update.ini 失败: {Message}", ex.Message);
         }
     }
 

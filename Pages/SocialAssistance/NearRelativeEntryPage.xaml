@@ -12,9 +12,20 @@
         <DataTemplate x:Key="NearRelativeEvenRow" x:DataType="NearRelativeLinkRow">
             <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="White">
                 <VerticalStackLayout Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding ArchiveSourceText}" FontSize="11" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
+                        </VerticalStackLayout>
                         <Button Grid.Column="1"
+                                Text="解除关联"
+                                Command="{Binding UnlinkArchiveCommand}"
+                                IsVisible="{Binding IsArchiveLinked}"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource TextSecondary}"
+                                FontSize="12"
+                                Padding="4"/>
+                        <Button Grid.Column="2"
                                 Text="✕ 删除此行"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveLinkCommand}"
                                 CommandParameter="{Binding .}"
@@ -31,58 +42,58 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
                             <Label Text="姓名" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" FontSize="13"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="身份证号" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding IdCard}" Placeholder="身份证号" FontSize="13"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="关联申请ID（可选）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" FontSize="13"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
                             <Label Text="性别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Gender}" Placeholder="性别" FontSize="13"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="出生年月" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" FontSize="13"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
                             <Label Text="户籍地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" FontSize="13"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="居住地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" FontSize="13"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭住址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" FontSize="13"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭人口/共同生活人数" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" FontSize="13"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="社会救助种类/保障类别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" FontSize="13"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
                             <Label Text="月保障金（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" FontSize="13"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="报账金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ReportAmount}" Placeholder="报账金额" Keyboard="Numeric" FontSize="13"/>
+                            <Label Text="保障金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="救助起始时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" FontSize="13"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
@@ -90,11 +101,11 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="申请时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" FontSize="13"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
                             <Label Text="申请原因" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭主要困难" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
@@ -122,9 +133,20 @@
         <DataTemplate x:Key="NearRelativeOddRow" x:DataType="NearRelativeLinkRow">
             <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="#F8F9FA">
                 <VerticalStackLayout Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                            <Label Text="救助对象" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding ArchiveSourceText}" FontSize="11" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
+                        </VerticalStackLayout>
                         <Button Grid.Column="1"
+                                Text="解除关联"
+                                Command="{Binding UnlinkArchiveCommand}"
+                                IsVisible="{Binding IsArchiveLinked}"
+                                BackgroundColor="Transparent"
+                                TextColor="{StaticResource TextSecondary}"
+                                FontSize="12"
+                                Padding="4"/>
+                        <Button Grid.Column="2"
                                 Text="✕ 删除此行"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveLinkCommand}"
                                 CommandParameter="{Binding .}"
@@ -141,58 +163,58 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
                             <Label Text="姓名" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" FontSize="13"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="身份证号" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding IdCard}" Placeholder="身份证号" FontSize="13"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="关联申请ID（可选）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" FontSize="13"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
                             <Label Text="性别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Gender}" Placeholder="性别" FontSize="13"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="出生年月" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" FontSize="13"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
                             <Label Text="户籍地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" FontSize="13"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="居住地址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" FontSize="13"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭住址" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" FontSize="13"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭人口/共同生活人数" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" FontSize="13"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="社会救助种类/保障类别" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" FontSize="13"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
                             <Label Text="月保障金（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" FontSize="13"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="报账金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ReportAmount}" Placeholder="报账金额" Keyboard="Numeric" FontSize="13"/>
+                            <Label Text="保障金额（元）" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="救助起始时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" FontSize="13"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭关系" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
@@ -200,11 +222,11 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="申请时间" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" FontSize="13"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
                             <Label Text="申请原因" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="13" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
                             <Label Text="家庭主要困难" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
@@ -256,19 +278,19 @@
                     </Border>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="2">
                         <Label Text="近亲属备案" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="同一申请人员对应一份备案信息，维护联系方式与银行账号" Style="{StaticResource ModuleHeroSubtitle}"/>
+                        <Label Text="输入身份证号自动带出档案信息；一名工作人员对应多名救助对象" Style="{StaticResource ModuleHeroSubtitle}"/>
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
 
             </VerticalStackLayout>
         </Border>
 
-        <!-- 工具栏：选择已有备案 / 新增 / 删除 -->
+        <!-- 工具栏：新增 / 删除（输入身份证号自动带出，不再选择已有备案） -->
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Padding="16,12" BackgroundColor="{StaticResource White}">
-            <Picker ItemsSource="{Binding StaffBriefs}"
-                    SelectedItem="{Binding SelectedBrief}"
-                    Title="选择已有备案（或直接新增）"
-                    FontSize="14"/>
+            <Label Text="输入经办人员身份证号自动带出工作信息（系统用户/档案照料护理人）或载入已有备案；输入救助对象身份证号自动从档案带出"
+                   FontSize="12"
+                   TextColor="{StaticResource TextSecondary}"
+                   VerticalOptions="Center"/>
             <Button Grid.Column="1"
                     Text="新增"
                     Command="{Binding NewEntryCommand}"
@@ -303,7 +325,7 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="身份证号" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding StaffIdCard}" Placeholder="身份证号" FontSize="14"/>
+                                <Entry Text="{Binding StaffIdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnStaffIdCardChanged" FontSize="14"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Spacing="4" Margin="0,8,0,0">
                                 <Label Text="联系方式" FontSize="12" TextColor="{StaticResource TextSecondary}"/>

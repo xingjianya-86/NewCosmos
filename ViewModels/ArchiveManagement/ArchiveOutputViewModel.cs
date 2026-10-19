@@ -106,11 +106,15 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDocumentMode;
 
-    /// <summary>「完成归档」按钮可见：既非过滤模式也非文档模式</summary>
-    public bool IsCompleteArchiveVisible => !IsTemplateFilterMode && !IsDocumentMode;
+    /// <summary>近亲属备案独立输出域（列表页"输出档案"入口）：无归档/工单语义，两个完成按钮均隐藏</summary>
+    private static bool IsStandaloneOutput => string.Equals(
+        PrintNavigationData.BusinessType, NearRelativeConstants.BusinessType, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>「完成工单」按钮可见：与「完成归档」互斥（文档/过滤模式下替代留痕办理完成）</summary>
-    public bool IsWorkOrderCompleteVisible => IsTemplateFilterMode || IsDocumentMode;
+    /// <summary>「完成归档」按钮可见：既非过滤模式也非文档模式，且非独立输出域</summary>
+    public bool IsCompleteArchiveVisible => !IsTemplateFilterMode && !IsDocumentMode && !IsStandaloneOutput;
+
+    /// <summary>「完成工单」按钮可见：与「完成归档」互斥（文档/过滤模式下替代留痕办理完成；独立输出域均隐藏）</summary>
+    public bool IsWorkOrderCompleteVisible => (IsTemplateFilterMode || IsDocumentMode) && !IsStandaloneOutput;
 
     partial void OnIsTemplateFilterModeChanged(bool value)
     {
@@ -342,7 +346,24 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             IsBusy = true;
             StatusText = "正在加载模板...";
 
-            var templates = await _templateService.GetByCategoriesAsync(categories);
+            // 近亲属备案独立输出（列表页"输出档案"入口）：无申请分类可依据，按模板名直取两张表
+            List<Template> templates;
+            if (string.Equals(businessType, NearRelativeConstants.BusinessType, StringComparison.OrdinalIgnoreCase))
+            {
+                templates = new List<Template>();
+                foreach (var templateName in new[] { NearRelativeConstants.TemplateLinkInfo, NearRelativeConstants.TemplateObjectInfo })
+                {
+                    var nameResult = await _templateService.GetByNameAsync(templateName);
+                    if (nameResult.IsFailure)
+                        throw new BusinessException(nameResult.ErrorCode!, nameResult.Message!);
+                    if (nameResult.Value != null)
+                        templates.Add(nameResult.Value);
+                }
+            }
+            else
+            {
+                templates = await _templateService.GetByCategoriesAsync(categories);
+            }
             Templates.Clear();
 
             foreach (var t in templates)
@@ -571,10 +592,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             {
                 var missing = IsTemplateFilterMode
                     ? $"模板未上传：{string.Join("、", templateFilter!)}"
-                    : "未找到匹配模板";
+                    : IsStandaloneOutput
+                        ? $"模板未上传：{NearRelativeConstants.TemplateLinkInfo}、{NearRelativeConstants.TemplateObjectInfo}"
+                        : "未找到匹配模板";
                 StatusText = missing;
                 await _dialogService.DisplayAlertAsync("提示",
-                    IsTemplateFilterMode ? missing : "未找到匹配的打印模板", "确定");
+                    IsTemplateFilterMode || IsStandaloneOutput ? missing : "未找到匹配的打印模板", "确定");
             }
 
             LoadPrinterList();

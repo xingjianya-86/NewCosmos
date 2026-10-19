@@ -33,6 +33,13 @@ public static class TempReliefPrintDataBuilder
     {
         var acceptance = acceptanceDate ?? app.PublicizeEndDate ?? DateTime.Today;
 
+        // 家庭人口统一口径（户主 1 人 + 有效家庭成员行数；赡养抚养扶养义务人不计入）：
+        // 打印时按实际成员明细重算，保证与逐行家庭成员自洽、不受历史快照影响；
+        // 无成员明细时退回主表存储快照（纯台账来源、历史导入记录）。
+        // 口径唯一实现见 TempReliefConstants.ResolveFamilySize。
+        var familySize = TempReliefConstants.ResolveFamilySize(
+            app.FamilySize, TempReliefConstants.CountEffectiveMembers(members?.Select(m => m.MemberName)));
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [FieldKeys.TEMP_APPLICATION_NO] = app.ApplicationNo,
@@ -62,7 +69,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_APPLY_STATEMENT] = app.DifficultyReason ?? string.Empty,
             [FieldKeys.TEMP_ACCEPTANCE_REASON] = BuildAcceptanceReason(app),
             [FieldKeys.TEMP_DIFFICULTY_SUMMARY] = BuildDifficultySummary(app),
-            [FieldKeys.TEMP_AUDIT_REASON] = BuildAuditReason(app),
+            [FieldKeys.TEMP_AUDIT_REASON] = BuildAuditReason(app, familySize),
             [FieldKeys.TEMP_BENEFICIARY_NAME] = ResolveBeneficiaryName(app),
             [FieldKeys.TEMP_BENEFICIARY_ID_CARD] = FirstNonEmpty(app.BeneficiaryIdCard, app.ApplicantIdCard),
             [FieldKeys.TEMP_BENEFICIARY_GENDER] = FirstNonEmpty(app.BeneficiaryGender, app.Gender),
@@ -79,7 +86,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_EDUCATION_DETAILS] = BuildEducationDetails(app.Educations),
             [FieldKeys.TEMP_APPLY_DATE] = app.ApplyDate?.ToString("yyyy年M月d日") ?? string.Empty,
             // 批4 双写→清理：原 TEMP_FAMILY_SIZE 已删（同源同值，config 已迁本键）
-            [FieldKeys.FAMILY_SIZE] = app.FamilySize?.ToString() ?? string.Empty,
+            [FieldKeys.FAMILY_SIZE] = familySize?.ToString() ?? string.Empty,
             [FieldKeys.TEMP_FAMILY_CATEGORY] = app.FamilyCategory,
             [FieldKeys.TEMP_VERIFY_RESULT] = "情况属实",
             [FieldKeys.TEMP_CONFIRM_AMOUNT] = app.ReliefType == TempReliefConstants.ReliefTypeSmall && app.ConfirmAmount.HasValue
@@ -112,7 +119,7 @@ public static class TempReliefPrintDataBuilder
 
             // ── 通用承诺书键：通用_申请人承诺书(174) / 通用_经办人承诺书(178) 复用临时救助打印流 ──
             [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress,
-            [FieldKeys.APPLICANT_COUNT] = app.FamilySize?.ToString() ?? string.Empty,
+            [FieldKeys.APPLICANT_COUNT] = familySize?.ToString() ?? string.Empty,
             [FieldKeys.OPERATOR_UNIT] = app.ReportUnit,
             [FieldKeys.OPERATOR_NAME] = app.AcceptancePerson,
 
@@ -174,9 +181,9 @@ public static class TempReliefPrintDataBuilder
     private static string FormatCnDate(DateTime? dt) => dt?.ToString("yyyy年M月d日") ?? string.Empty;
 
     /// <summary>
-    /// 解析打印用日期：验收日（= 公示结束的次一个工作日）与入户调查时间
-    /// （= min(今日的最近工作日, 调查截止=公示开始前一个工作日)：今日是工作日填今日、
-    /// 非工作日往回取、补打超期兜底截止日；特殊5/普通10两档上限一致）。
+    /// 解析打印用日期：验收日（= 公示止所属月份 C 线验收日，13号或其后最近工作日）与入户调查时间
+    /// （= clamp(今日的最近工作日, 窗口[A−5, 公示起])：今日是工作日填今日、非工作日往回取、
+    /// 早于窗口起日取起日、补打超期兜底窗口截止）。
     /// 月份以记录公示开始日（无则公示结束日/申请日/当天）为锚。
     /// 打印调用方统一走此方法，避免各自重抄。
     /// </summary>
@@ -185,9 +192,8 @@ public static class TempReliefPrintDataBuilder
     {
         var acceptance = timelineService.GetTempReliefAcceptanceDate(app.PublicizeEndDate);
 
-        var simplified = TempReliefConstants.IsSimplifiedProcedure(app.FamilyCategory, app.SourceTable);
         var anchor = app.PublicizeStartDate ?? app.PublicizeEndDate ?? app.ApplyDate ?? DateTime.Today;
-        var cLine = await timelineService.CalculateTempReliefAsync(anchor.Year, anchor.Month, simplified);
+        var cLine = await timelineService.CalculateTempReliefAsync(anchor.Year, anchor.Month);
 
         return (acceptance, timelineService.GetTempReliefInvestigationPrintDate(cLine));
     }
@@ -565,10 +571,10 @@ public static class TempReliefPrintDataBuilder
     /// 审核审批表{申请救助原因}精简句：本户家庭类别 + 人口 + 困难概括 + 成员姓名 + 原因词。
     /// 不含户籍分类与疾病/费用明细（详细内容见入户调查表等其它表格）。
     /// </summary>
-    private static string BuildAuditReason(TempReliefApplication app)
+    private static string BuildAuditReason(TempReliefApplication app, int? familySize)
     {
         var category = string.IsNullOrWhiteSpace(app.FamilyCategory) ? "困难群众" : app.FamilyCategory.Trim();
-        var sizeText = app.FamilySize is > 0 ? $"{app.FamilySize}口人" : string.Empty;
+        var sizeText = familySize is > 0 ? $"{familySize}口人" : string.Empty;
         var member = ResolveAuditReasonMemberName(app);
         var reasonWord = (app.DifficultyType ?? string.Empty).Trim() switch
         {

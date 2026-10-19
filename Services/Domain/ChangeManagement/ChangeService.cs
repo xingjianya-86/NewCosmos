@@ -375,7 +375,6 @@ public interface IChangeService
     /// 典型形态：户主死亡进渐退期（低保→低收入）→ 第 ① 步被渐退期跳过，第 ② 步照写分类施保减发记录，
     /// 该减发由月报「分类施保金减发人员表」承载（月保障金按原额封顶，无增减发行）。
     /// </summary>
-    /// </summary>
     Task<Result<long?>> EnsureChainFundChangeSettlementAsync(long applicationId, string operatorName, CancellationToken ct = default);
 
     /// <summary>

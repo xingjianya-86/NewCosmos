@@ -149,6 +149,11 @@
                                        FontSize="15" VerticalOptions="Center"/>
 
                                 <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
+                                    <Button Text="输出档案"
+                                            Style="{StaticResource ButtonSmall}"
+                                            BackgroundColor="{StaticResource Secondary}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type NearRelativeListViewModel}}, Path=OutputArchiveCommand}"
+                                            CommandParameter="{Binding .}"/>
                                     <Button Text="编辑"
                                             Style="{StaticResource ButtonSmall}"
                                             BackgroundColor="{StaticResource Primary}"

@@ -96,7 +96,8 @@ public class SocialAssistanceReprintProvider : IReprintDomainProvider
                 "", // Status 由统一页从记录项带入
                 data.FieldData,
                 data.TableData,
-                data.SupporterTableData));
+                data.SupporterTableData,
+                data.NearRelativePairs));
         }
         finally
         {

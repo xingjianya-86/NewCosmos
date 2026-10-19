@@ -357,7 +357,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             new Dictionary<string, string>(_fieldData, StringComparer.Ordinal),
             _tableData.ToList(),
             _supporterTableData?.ToList(),
-            ApplicantName);
+            ApplicantName,
+            _nearRelativePairs.Count > 0 ? _nearRelativePairs : null);
     }
 
     /// <summary>
@@ -754,6 +755,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.GUARANTEE_AMOUNT] = app.TotalGuaranteeAmount.ToString("N2"),
             [FieldKeys.PUBLICITY_START_DATE] = publicityStart,
             [FieldKeys.PUBLICITY_END_DATE] = publicityEnd,
+            [FieldKeys.PUBLICITY_RANGE] = BuildPublicityRange(tl),
             // 模板13（公示文件）专用：避免与模板16的CLASSIFICATION_RESULT冲突
             [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
 
@@ -957,7 +959,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
-            [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
+            // 2026-10-18：原 CARE_AGREEMENT_PROMISE_TIME 供给已删——T221 {诚信承诺时间} config 已迁 PROMISE_DATE
+            //（dict A/B 本有 PROMISE_DATE 供给 + config format=yyyy年MM月dd日），避免"打印当天"漂移。
             // 批D2 清理（2026-10-16）：原 SCATTERED_AUDIT_TIME 供给已删——T222 config 已迁 AUDIT_DATE
             //（dict A/B 本有 AUDIT_DATE=tl.AuditDate ISO + config format=yyyy年M月d日，同源同值）
             // 照料服务协议：无数据源字段留空（占位符替换为空，避免残留）
@@ -1134,6 +1137,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         // 近亲属备案字段装配（档案近亲属两表：工作人员关联信息表/救助对象信息表；按申请检索关联备案，每对一页）
         try
         {
+            // 每次装配先清空：BuildPrintDataAsync 由补打/文书直出按户重复调用（主表实例复用），防上一户对数据残留
+            _nearRelativePairs = new List<Dictionary<string, string>>();
             var nearRelativeService = _serviceProvider.GetRequiredService<INearRelativeService>();
             var pairsResult = await nearRelativeService.GetPairsByApplicationIdAsync(applicationId, CancellationToken);
             if (pairsResult.IsSuccess && pairsResult.Value != null && pairsResult.Value.Count > 0)
@@ -1821,6 +1826,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.OPERATOR_UNIT_PHONE] = orgInfo.OperatorUnitPhone,
             [FieldKeys.PUBLICITY_START_DATE] = publicityStart,
             [FieldKeys.PUBLICITY_END_DATE] = publicityEnd,
+            [FieldKeys.PUBLICITY_RANGE] = BuildPublicityRange(tl),
             // 模板13（公示文件）专用：避免与模板16的CLASSIFICATION_RESULT冲突
             [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
 
@@ -1920,7 +1926,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             // 协议期按自然年：起 = 生成日、止 = 本年12月31日（每年生成时自动滚动到当年）
             [FieldKeys.CARE_AGREEMENT_START_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
             [FieldKeys.CARE_AGREEMENT_END_DATE] = new DateTime(DateTime.Now.Year, 12, 31).ToString("yyyy-MM-dd"),
-            [FieldKeys.CARE_AGREEMENT_PROMISE_TIME] = DateTime.Now.ToString("yyyy年M月d日"),
+            // 2026-10-18：原 CARE_AGREEMENT_PROMISE_TIME 供给已删——T221 {诚信承诺时间} config 已迁 PROMISE_DATE
+            //（dict A/B 本有 PROMISE_DATE 供给 + config format=yyyy年MM月dd日），避免"打印当天"漂移。
             // 批D2 清理（2026-10-16）：原 SCATTERED_AUDIT_TIME 供给已删——T222 config 已迁 AUDIT_DATE
             //（dict A/B 本有 AUDIT_DATE=tl.AuditDate ISO + config format=yyyy年M月d日，同源同值）
         };
@@ -2131,6 +2138,7 @@ _fieldData[$"SHARED_RELATION_{idx}"] = _dictCacheService.GetValue(DictionaryType
 
 /// <summary>
 /// 历史补打打印数据（由 ArchiveProductionViewModel.BuildPrintDataAsync 产出，供填充 PrintNavigationData）
+/// NearRelativePairs = 近亲属备案对数据（无备案时为 null；补打/文书直出显式携带，见 ReprintArchivePayload）
 /// </summary>
 public sealed record ApplicationPrintData(
     string BusinessType,
@@ -2139,5 +2147,6 @@ public sealed record ApplicationPrintData(
     Dictionary<string, string> FieldData,
     List<Dictionary<string, string>> TableData,
     List<Dictionary<string, string>>? SupporterTableData,
-    string ApplicantName);
+    string ApplicantName,
+    List<Dictionary<string, string>>? NearRelativePairs = null);
 

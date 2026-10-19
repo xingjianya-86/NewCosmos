@@ -285,31 +285,22 @@ public static class TempReliefConstants
     };
 
     /// <summary>
-    /// 是否适用临时救助简化程序（入户调查核实5个工作日，普通为10个工作日）：
-    /// 依据 黑龙江省/牡丹江市 临时救助规范，已认定的低保/特困/低保边缘/建档立卡/刚性支出/重点优抚对象
-    /// 只核实必需支出、流程压缩。刚性支出经归一化并入最低生活保障边缘家庭。
+    /// 家庭人口统一口径（唯一实现，禁止各处重抄）：
+    /// 户主（1 人）+ 有效家庭成员行数；赡养/抚养/扶养义务人不计入（既非户主也非家庭成员行）。
+    /// 无成员明细（台账来源仅保障人数、历史导入数据）时退回来源快照，避免凭空归 1。
+    /// 与本系统既有口径一致（ApplicationFormViewModel.DetailCommands 的 SharedLivingMembers.Count + 1）。
     /// </summary>
-    public static bool IsSimplifiedProcedure(string? familyCategory, string? sourceTable)
-    {
-        var cat = NormalizeFamilyCategory(familyCategory);
+    /// <param name="storedFamilySize">来源快照（临时救助主表 family_size / 候选人 family_size）</param>
+    /// <param name="effectiveMemberCount">有效家庭成员行数（已剔除户主与赡养抚养扶养义务人）</param>
+    public static int? ResolveFamilySize(int? storedFamilySize, int effectiveMemberCount)
+        => effectiveMemberCount > 0 ? effectiveMemberCount + 1 : storedFamilySize;
 
-        if (cat is "最低生活保障家庭" or "特困人员" or "最低生活保障边缘家庭"
-            or "建档立卡贫困户" or "重点优抚对象")
-            return true;
-
-        // 来源台账兜底（family_category 可能未归一化/为空）
-        if (sourceTable is not null
-            && (IsSource(sourceTable, "destitute")
-                || IsSource(sourceTable, "low_income_edge")
-                || IsSource(sourceTable, "rigid_expenditure")
-                || IsSource(sourceTable, "rural_subsistence")
-                || IsSource(sourceTable, "urban_subsistence")
-                || string.Equals(sourceTable, "nc_biz_applications", StringComparison.OrdinalIgnoreCase)))
-            return true;
-
-        return cat.Contains("低保") || cat.Contains("特困") || cat.Contains("边缘")
-            || cat.Contains("建档立卡") || cat.Contains("刚性") || cat.Contains("优抚");
-    }
+    /// <summary>
+    /// 统计有效家庭成员行数：成员姓名非空的行（表单预置的空占位行、仅展示槽位不计）。
+    /// 户主行由调用方按身份证/关系剔除后再传入。
+    /// </summary>
+    public static int CountEffectiveMembers(IEnumerable<string?>? memberNames)
+        => memberNames?.Count(n => !string.IsNullOrWhiteSpace(n)) ?? 0;
 
     /// <summary>业务类型（打印导航/模板分类用）</summary>
     public const string BusinessType = "TempRelief";

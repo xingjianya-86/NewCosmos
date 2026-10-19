@@ -502,6 +502,14 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
+    /// 公示起止合成文本（T182 档案_公示文件 {公示日期} 用）："{公示起} 至 {公示止}"（中文日期）。
+    /// 与 PUBLICITY_START_DATE/PUBLICITY_END_DATE 同源拼装，补打不随打印当天漂移；
+    /// 值为整串（含"至"），config format 留空（ApplyFormat 对非单一日期串直返原值）。
+    /// </summary>
+    private static string BuildPublicityRange(TimelineResult tl)
+        => $"{tl.PublicityStartDate:yyyy年MM月dd日} 至 {tl.PublicityEndDate:yyyy年MM月dd日}";
+
+    /// <summary>
     /// 将金额转换为中文大写（如 200.50 → "贰佰元伍角"）
     /// </summary>
     private static string ConvertToChineseAmount(decimal amount)

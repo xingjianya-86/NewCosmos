@@ -11,6 +11,7 @@ using NewCosmos.Services.Domain.TempRelief;
 using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
 
@@ -425,15 +426,8 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private DateTime _applyDate = DateTime.Today;
 
-    /// <summary>申请日期变化 → 重算 C 类时间轴公示日期（固定每月10日~12日；调查截止（公示前一工作日）后即顺延下月）</summary>
+    /// <summary>申请日期变化 → 重算 C 类时间轴公示日期，并把越界申请日期自动修正到窗口内（验收日13号→公示起=验收日前3天、止=验收日前1天、入户调查窗口起=验收日前5天）</summary>
     partial void OnApplyDateChanged(DateTime value)
-    {
-        if (_suppressReload) return;
-        SafeFireAndForget(ApplyPublicizeDefaultsAsync);
-    }
-
-    /// <summary>家庭类别变化 → 重算 C 类时间轴（简化/普通程序影响调查核实工作日数）</summary>
-    partial void OnApplicantFamilyCategoryChanged(string value)
     {
         if (_suppressReload) return;
         SafeFireAndForget(ApplyPublicizeDefaultsAsync);
@@ -725,11 +719,54 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<TempReliefMember> _members = new();
 
+    /// <summary>
+    /// 家庭人口来源快照（台账 guarantee_size / 档案 family_size / 已保存记录值）：
+    /// 仅"有效家庭成员为 0"时作为兜底，避免单人户或纯台账记录被打成空/1。
+    /// </summary>
+    private int? _familySizeSeed;
+
     partial void OnMembersChanged(ObservableCollection<TempReliefMember> value)
     {
         // 集合整体替换时重挂事件（LoadAsync/选择候选人均会重建集合）
-        if (value != null) value.CollectionChanged += (_, __) => RebuildMemberNameOptions();
+        if (value != null) value.CollectionChanged += OnMembersCollectionChanged;
         RebuildMemberNameOptions();
+        RefreshApplicantFamilySize();
+    }
+
+    private void OnMembersCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // 逐行订阅姓名变更：成员姓名被就地改写（新增空行后补名字）也要刷新家庭人口
+        if (e.NewItems != null)
+            foreach (TempReliefMember m in e.NewItems) m.PropertyChanged += OnMemberPropertyChanged;
+        if (e.OldItems != null)
+            foreach (TempReliefMember m in e.OldItems) m.PropertyChanged -= OnMemberPropertyChanged;
+        // Reset（Clear）拿不到旧项：旧成员对象随集合丢弃，其订阅一并被回收，无泄漏
+
+        RebuildMemberNameOptions();
+        RefreshApplicantFamilySize();
+    }
+
+    private void OnMemberPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TempReliefMember.MemberName))
+            RefreshApplicantFamilySize();
+    }
+
+    /// <summary>
+    /// 按统一口径重算"家庭人口"（户主 1 人 + 有效家庭成员行数，赡养抚养扶养义务人不计入；
+    /// 口径唯一实现见 <see cref="TempReliefConstants.ResolveFamilySize"/>），并同步只读显示字段。
+    /// </summary>
+    /// <returns>重算后的家庭人口（保存时以此值落库）</returns>
+    private int? RefreshApplicantFamilySize()
+    {
+        var effective = TempReliefConstants.CountEffectiveMembers(Members.Select(m => m.MemberName));
+        var resolved = TempReliefConstants.ResolveFamilySize(_familySizeSeed, effective);
+        if (ApplicantFamilySize != resolved)
+        {
+            if (MainThread.IsMainThread) ApplicantFamilySize = resolved;
+            else MainThread.BeginInvokeOnMainThread(() => ApplicantFamilySize = resolved);
+        }
+        return resolved;
     }
 
     [RelayCommand]
@@ -767,8 +804,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
         // 字段初始化不经过属性 setter，OnMembersChanged 不会触发；
         // 此处显式挂集合订阅并首次重建候选，保证编辑/查看模式下成员选项可用
-        Members.CollectionChanged += (_, _) => RebuildMemberNameOptions();
+        Members.CollectionChanged += OnMembersCollectionChanged;
         RebuildMemberNameOptions();
+        RefreshApplicantFamilySize();
     }
 
     /// <summary>
@@ -808,7 +846,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     /// <summary>
     /// 新建模式默认值：填报单位=当前登录用户所属单位、乡镇验收人=本单位民政助理、
-    /// 户籍地址=当前用户组织机构、公示日期=C线固定窗口每月10日~12日（调查截止后顺延下月）、入户核实默认文本
+    /// 户籍地址=当前用户组织机构、公示日期=C线当月窗口（公示起=验收日前3天、止=验收日前1天）、入户核实默认文本
     /// </summary>
     private async Task ApplyCreateDefaultsAsync()
     {
@@ -942,13 +980,11 @@ public partial class TempReliefFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 公示日期默认值：按【申请日期】归属 C 线窗口（公示固定每月10日~12日）：
-    /// 取第一个"申请日 ≤ 该窗口调查截止日"的月份（9号及以前归当月，10号起顺延下月），否则顺延；
-    /// 低保等特殊群体调查期按5个工作日、普通按10个工作日。
-    /// 申请日期约束进调查窗口：窗口已开启（起日 ≤ 今天）且申请日早于起日时上推到起日；
-    /// 窗口未开启（起日为未来）保持原值，不写入未来日期；已在窗口内则不动。填报时间不参与计算。
-    /// 公示日期仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算
-    /// （申请日期的窗口约束见 LoadAsync 非草稿分支）。
+    /// C 线公示日期默认值 + 申请日期自动修正（新建/草稿场景）：
+    /// ① 申请日期先修正为「不晚于今日」；
+    /// ② 取修正后日期所在月的 C 线窗口（验收日13号→公示止=验收日前1天、公示起=验收日前3天，均为日历日）；
+    /// ③ 若申请日期仍晚于该月入户调查窗口起日（验收日前5天），自动钳到窗口起日（录入越界自动修正，不报错）。
+    /// 公示日期仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算。
     /// </summary>
     private async Task ApplyPublicizeDefaultsAsync()
     {
@@ -956,9 +992,10 @@ public partial class TempReliefFormViewModel : ViewModelBase
         {
             var generation = Interlocked.Increment(ref _publicizeCalcGeneration);
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
-            var applyDate = ApplyDate == default ? DateTime.Today : ApplyDate;
-            var simplified = TempReliefConstants.IsSimplifiedProcedure(ApplicantFamilyCategory, _sourceTable);
-            var timeline = await timelineService.CalculateTempReliefForApplyDateAsync(applyDate, simplified);
+
+            // 申请日期自动修正①：不晚于今日
+            var corrected = ApplyDate == default || ApplyDate.Date > DateTime.Today ? DateTime.Today : ApplyDate.Date;
+            var timeline = await timelineService.CalculateTempReliefForApplyDateAsync(corrected);
 
             // 仅最新一次计算生效：连续触发（如快速连续修改申请日期）时丢弃过期结果
             if (generation != Volatile.Read(ref _publicizeCalcGeneration))
@@ -967,11 +1004,12 @@ public partial class TempReliefFormViewModel : ViewModelBase
             _suppressReload = true;
             try
             {
+                // 申请日期自动修正②：晚于该月入户调查窗口起日 → 钳到起日
+                ApplyDate = ClampApplyDateIntoWindow(timeline, corrected);
+
                 PublicizeStartDateValue = timeline.PublicityStartDate;
                 PublicizeEndDateValue = timeline.PublicityEndDate;
                 HasPublicizeDates = true;
-
-                ClampApplyDateIntoWindow(timeline);
             }
             finally
             {
@@ -985,17 +1023,14 @@ public partial class TempReliefFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 申请日期约束进调查窗口：窗口已开启（起日 ≤ 今天）且申请日早于起日 → 上推到起日；
-    /// 窗口未开启（起日为未来）→ 不推，避免写入未来日期；已在窗口内或晚于起日 → 不动。
-    /// 上界不处理：窗口归属算法已保证申请日 ≤ 调查截止日。跨年同样生效
-    /// （12月申请归属次年1月窗口时，由"起日 ≤ 今天"这道闸决定是否上推）。
+    /// 申请日期自动修正到 C 线窗口内（录入越界自动修正，不报错）：
+    /// 晚于该月入户调查窗口起日（= 验收日前5天）→ 钳到窗口起日；否则保持原值。
+    /// 返回修正后的申请日期（由调用方在抑制联动上下文中落值）。
     /// </summary>
-    private void ClampApplyDateIntoWindow(TimelineResult timeline)
+    private static DateTime ClampApplyDateIntoWindow(TimelineResult timeline, DateTime applyDate)
     {
         var start = timeline.InvestigationStartDate.Date;
-        if (start > DateTime.Today) return;
-        if (ApplyDate.Date >= start) return;
-        ApplyDate = start;
+        return applyDate.Date > start ? start : applyDate.Date;
     }
 
 }

@@ -109,6 +109,9 @@ tables:
     indexes:
       - name: idx_caregivers_application_id
         columns: [application_id]
+      - name: idx_caregivers_id_card
+        columns: [id_card]
+        comment: 近亲属备案按经办人员身份证检索照料人（系统用户未命中时的补空来源）
     foreignKeys:
       - name: fk_caregivers_application
         columns: [application_id]

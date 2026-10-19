@@ -45,6 +45,8 @@ public static class NearRelativePrintDataBuilder
             fields[FieldKeys.NEAR_RELATIVE_ROW_HELP_TYPE + "_" + idx] = link?.HelpType ?? string.Empty;
             fields[FieldKeys.NEAR_RELATIVE_ROW_MONTH_AMOUNT + "_" + idx] =
                 link?.MonthAmount is { } amount ? amount.ToString("F2") : string.Empty;
+            fields[FieldKeys.NEAR_RELATIVE_REPORT_AMOUNT + "_" + idx] =
+                link?.ReportAmount is { } reportAmount ? reportAmount.ToString("F2") : string.Empty;
         }
 
         return fields;
@@ -82,6 +84,7 @@ public static class NearRelativePrintDataBuilder
             fields[FieldKeys.NEAR_RELATIVE_SUMMARY_NAME + "_" + idx] = link?.Name ?? string.Empty;
             fields[FieldKeys.NEAR_RELATIVE_SUMMARY_ID_CARD + "_" + idx] = link?.IdCard ?? string.Empty;
             fields[FieldKeys.NEAR_RELATIVE_SUMMARY_HUKOU + "_" + idx] = link?.HukouAddress ?? string.Empty;
+            fields[FieldKeys.NEAR_RELATIVE_SUMMARY_RESIDENCE + "_" + idx] = link?.ResidenceAddress ?? string.Empty;
             fields[FieldKeys.NEAR_RELATIVE_SUMMARY_HELP_TYPE + "_" + idx] = link?.HelpType ?? string.Empty;
             fields[FieldKeys.NEAR_RELATIVE_SUMMARY_FAMILY_SIZE + "_" + idx] =
                 link?.FamilySize is { } fs ? fs.ToString() : string.Empty;
@@ -137,6 +140,7 @@ public static class NearRelativePrintDataBuilder
             [FieldKeys.NEAR_RELATIVE_POSITION] = s.Position,
             [FieldKeys.NEAR_RELATIVE_HELP_TYPE] = l.HelpType,
             [FieldKeys.NEAR_RELATIVE_MONTH_AMOUNT] = l.MonthAmount?.ToString("F2") ?? string.Empty,
+            [FieldKeys.NEAR_RELATIVE_REPORT_AMOUNT] = l.ReportAmount?.ToString("F2") ?? string.Empty,
             [FieldKeys.NEAR_RELATIVE_RELATION] = l.Relation,
             [FieldKeys.NEAR_RELATIVE_START_TIME] = l.StartTime,
             [FieldKeys.NEAR_RELATIVE_FAMILY_RELATION] = l.FamilyRelation,

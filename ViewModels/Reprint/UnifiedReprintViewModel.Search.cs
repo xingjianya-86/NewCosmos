@@ -664,6 +664,8 @@ public partial class UnifiedReprintViewModel
         PrintNavigationData.FieldData = payload.FieldData;
         PrintNavigationData.TableData = payload.TableData;
         PrintNavigationData.SupporterTableData = payload.SupporterTableData;
+        // 近亲属备案对数据：补打两表"每对一页"行数据（显式携带，不依赖档案制作页的静态残留）
+        PrintNavigationData.NearRelativePairs = payload.NearRelativePairs;
 
         // 「变动文书」仅低收入人口域（FamilyApplication/动态记录）可用；
         // 普惠高龄/临时救助等 ArchiveSet 域切换时强制复位，防上一条记录的分类残留（防跨记录残留）。

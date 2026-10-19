@@ -331,7 +331,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPrintJobFactory, PrintJobFactory>();
         builder.Services.AddSingleton<IPrintAgentService, PrintAgentService>();
         // 照片打印（手机采集照片 → PC 端 Word COM 排版直接打印，无模板）
+        // 纯 Office COM 实现（PhotoPrintService 全文件 #if WINDOWS）；Android 端仅入队，由 PC 打印代理执行
+#if WINDOWS
         builder.Services.AddSingleton<IPhotoPrintService, PhotoPrintService>();
+#endif
 
         // 签名留痕（手写签名 PNG 存取，供文书渲染内嵌「本人签名」占位符）
         builder.Services.AddSingleton<Services.Domain.Signatures.ISignatureService, Services.Domain.Signatures.SignatureService>();

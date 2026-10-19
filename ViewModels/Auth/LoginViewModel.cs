@@ -172,8 +172,12 @@ public partial class LoginViewModel : ViewModelBase
                 return;
             }
 
-            // 安装器接管：/UPDATE=1 静默升级完成后自动重启新版
-            Application.Current?.Quit();
+            // Windows：安装器接管（/UPDATE=1 静默升级完成后自动重启新版），需退出应用以便其覆盖升级；
+            // Android：系统安装器接管，无需退出（用户取消安装时应用仍可用；与 MainViewModel 口径一致）
+            if (OperatingSystem.IsWindows())
+            {
+                Application.Current?.Quit();
+            }
         }
         finally
         {

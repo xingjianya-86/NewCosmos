@@ -130,11 +130,11 @@ tables:
       - name: month_amount
         type: NUMERIC(12,2)
         nullable: true
-        comment: 月保障金（{月保障金N}/{户主月保证金}）
+        comment: 月保障金（{月保障金N}/{户主月保障金}；2026-10-17 模板占位符"保证金"笔误已更正）
       - name: report_amount
         type: NUMERIC(12,2)
         nullable: true
-        comment: 报账金额（{救助报账金额N}）
+        comment: 保障金额（申请表 total_guarantee_amount；原"报账金额"2026-10-17 更正）
       - name: start_time
         type: VARCHAR(30)
         nullable: true
