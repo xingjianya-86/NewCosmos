@@ -42,7 +42,7 @@ public sealed record ApplicationScopedParameter(long ApplicationId);
 /// <summary>
 /// 近亲属备案录入页导航参数。
 /// StaffId > 0 = 编辑已有备案（列表页入口）；
-/// ApplicationId = 工作流卡片级入口，携带户主上下文，打开后自动填关联申请ID与户主姓名/身份证到对象行。
+/// ApplicationId = 工作流卡片级入口，携带户主上下文，打开后按申请档案完整带出对象行（未取到档案时回退填申请ID与户主姓名/身份证）。
 /// </summary>
 public sealed record NearRelativeEntryParameter(
     long StaffId = 0,

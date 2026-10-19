@@ -25,16 +25,16 @@ timelines:
                                    # 会因 6 天窗口必含周末而恒触发，结算日永远被压到 settle-5）
     weekend_adjust: "previous_workday"  # 周末调整策略
 
-  # 临时救助验收时间线（C线；公示固定日历日，调查核实倒推）
-  # 说明（2026-09）：当前实现为 BusinessTimelineService 内置常量，本段仅作文档描述。
+  # 临时救助验收时间线（C线；以验收日为锚，公示/入户调查日历日倒推）
+  # 说明（2026-10-18）：权威实现为 BusinessTimelineService.CalculateCLine，本段仅作文档描述。
+  # 验收日固定每月13号（非工作日顺延至其后最近工作日）；公示止=验收日前1天、公示起=验收日前3天
+  # （均日历日，不排工作日）；入户调查窗口=[验收日前5天, 公示起日]；申请日期≤入户调查窗口起日（越界自动钳入）。
   temp_relief:
-    publicity_start_day: 10         # 公示固定开始日（日历日，不顺延）
-    publicity_end_day: 12           # 公示固定结束日（日历日，不顺延）
-    investigation_workdays:
-      normal: 10                    # 普通群体：入户调查核实10个工作日
-      simplified: 5                 # 特殊群体（低保/特困/低保边缘/建档立卡/刚性/优抚）：5个工作日
-    acceptance_offset: "next_workday"  # 验收日期 = 公示结束的次一个工作日
-    current_roll_day: 12            # 当前周期锚点：今天>12日滚入下月
+    acceptance_day: 13               # 验收日固定日历日（必为工作日，非工作日顺延至其后最近工作日）
+    publicity_end_offset: -1         # 公示止 = 验收日 − 1（日历日，不排工作日）
+    publicity_start_offset: -3       # 公示起 = 验收日 − 3（日历日，不排工作日）
+    investigation_start_offset: -5   # 入户调查窗口起日 = 验收日 − 5（日历日）；截止 = 公示起日
+    apply_date_auto_clamp: true      # 申请日期越界自动钳到入户调查窗口起日（不报错）
 
 # ── 节假日服务配置 ──
 # 现状说明（2026-09）：节假日数据已数据化，权威来源为 nc_sys_holidays 表（值班模块维护：

@@ -201,6 +201,9 @@ public static partial class FieldKeys
     public const string GUARANTEE_TYPE_DISPLAY = "GUARANTEE_TYPE_DISPLAY";
     public const string PUBLICITY_START_DATE = "PUBLICITY_START_DATE";
     public const string PUBLICITY_END_DATE = "PUBLICITY_END_DATE";
+    // 公示起止合成（"{公示开始} 至 {公示结束}"整串，值已在代码内中文格式化，config format 留空）——
+    // T182 档案_公示文件 {公示日期} 用；由 PUBLICITY_START_DATE/END_DATE 同源拼装，避免打印当天漂移。
+    public const string PUBLICITY_RANGE = "PUBLICITY_RANGE";
 
     // 每月公示名单（模板：公共_每月公示名单）表头占位符
     // ── 公示直替换键（批D6 定性 2026-10-16，冻结）──
@@ -363,7 +366,6 @@ public static partial class FieldKeys
     public const string DESTITUTE_CARE_LEVEL = "DESTITUTE_CARE_LEVEL";              // 照料等级
 
     // 照料服务协议（模板77）/ 分散供养协议（协议期按自然年，起=生成日、止=本年12月31日）
-    public const string CARE_AGREEMENT_PROMISE_TIME = "CARE_AGREEMENT_PROMISE_TIME"; // 诚信承诺时间（生成日 yyyy年M月d日）
     public const string CARE_AGREEMENT_START_DATE = "CARE_AGREEMENT_START_DATE";     // 协议期起（生成日 yyyy-MM-dd）
     public const string CARE_AGREEMENT_END_DATE = "CARE_AGREEMENT_END_DATE";         // 协议期止（本年12月31日）
     public const string CAREGIVER_BANK_NAME = "CAREGIVER_BANK_NAME";                 // 分散照料人开户行

@@ -2,8 +2,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Enums;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.NearRelative;
+using NewCosmos.Services.Utilities;
 using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -13,7 +16,8 @@ namespace NewCosmos.ViewModels.SocialAssistance;
 /// <summary>
 /// 近亲属备案列表页 ViewModel（独立页面：全部备案名册的展示与维护入口）。
 /// 数据源 INearRelativeService.GetBriefsAsync（全量名册，无年月维度）；搜索为客户端过滤。
-/// 新增/编辑/删除均校验 NEAR_RELATIVE_MANAGE 权限；编辑跳录入页并带 StaffId。
+/// 新增/编辑/删除/输出档案均校验 NEAR_RELATIVE_MANAGE 权限；编辑跳录入页并带 StaffId；
+/// 输出档案进入档案输出页"近亲属备案独立输出"域（仅两张档案表，每对一页，无归档语义）。
 /// </summary>
 public partial class NearRelativeListViewModel : ViewModelBase
 {
@@ -22,6 +26,7 @@ public partial class NearRelativeListViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly INewPermissionService _permissionService;
+    private readonly IBusinessTimelineService _businessTimelineService;
 
     /// <summary>全量名册快照（过滤前）</summary>
     private List<NearRelativeBrief> _allItems = new();
@@ -52,13 +57,15 @@ public partial class NearRelativeListViewModel : ViewModelBase
         IDialogService dialogService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        INewPermissionService permissionService)
+        INewPermissionService permissionService,
+        IBusinessTimelineService businessTimelineService)
     {
         _nearRelativeService = nearRelativeService;
         _dialogService = dialogService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _permissionService = permissionService;
+        _businessTimelineService = businessTimelineService;
         Title = "近亲属备案";
     }
 
@@ -123,6 +130,63 @@ public partial class NearRelativeListViewModel : ViewModelBase
     {
         if (!await EnsurePermissionAsync()) return;
         await NavigateToPageAsync<Pages.SocialAssistance.NearRelativeEntryPage>();
+    }
+
+    /// <summary>
+    /// 输出备案档案：进入档案输出页"近亲属备案独立输出"域（仅两张近亲属档案表，每对一页；无归档语义）。
+    /// 数据按当前库中该备案的对象行装配；审核日期取当前 B 线审核日；打印/保存留痕 business_type=NearRelative。
+    /// </summary>
+    [RelayCommand]
+    private async Task OutputArchiveAsync(NearRelativeBrief? item)
+    {
+        if (item == null) return;
+        if (!await EnsurePermissionAsync()) return;
+
+        var entryResult = await ExecuteAsync(
+            () => _nearRelativeService.GetByIdAsync(item.Id, CancellationToken),
+            "正在装配备案档案数据...");
+        if (entryResult.IsFailure || entryResult.Value == null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", entryResult.Message ?? "备案不存在", "确定");
+            return;
+        }
+
+        var entry = entryResult.Value;
+        var pairs = NearRelativePrintDataBuilder.FlattenPairs(new List<NearRelativeEntry> { entry });
+        if (pairs.Count == 0)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "该备案没有救助对象行，无法输出档案", "确定");
+            return;
+        }
+
+        // 审核确认时间：与档案制作口径一致，取当前 B 线周期的审核日
+        var auditTime = _businessTimelineService
+            .GetTimelineForDate(DateTime.Today, TimelineType.BusinessProcess)
+            .AuditDate.ToString("yyyy-MM-dd");
+        var pairFields = pairs
+            .Select(p => NearRelativePrintDataBuilder.BuildArchivePairFields(p, auditTime))
+            .ToList();
+
+        // 独立输出上下文：清文书模式残留；HAS_DATA 门控 + 工作人员做打印记录/输出目录主体
+        PrintNavigationData.ClearDocumentMode();
+        PrintNavigationData.BusinessType = NearRelativeConstants.BusinessType;
+        PrintNavigationData.BusinessId = entry.Staff.Id;
+        PrintNavigationData.Classification = string.Empty;
+        PrintNavigationData.Status = string.Empty;
+        PrintNavigationData.FieldData = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [FieldKeys.NEAR_RELATIVE_HAS_DATA] = "1",
+            [FieldKeys.APPLICANT_NAME] = entry.Staff.StaffName,
+            [FieldKeys.APPLICANT_ID_CARD] = entry.Staff.StaffIdCard,
+        };
+        PrintNavigationData.TableData = new List<Dictionary<string, string>>();
+        PrintNavigationData.SupporterTableData = null;
+        PrintNavigationData.NearRelativePairs = pairFields;
+
+        _logger.LogBusiness("近亲属备案输出档案",
+            ("StaffId", entry.Staff.Id),
+            ("Pairs", pairs.Count));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
     }
 
     /// <summary>编辑指定备案（带 StaffId 打开录入页）</summary>

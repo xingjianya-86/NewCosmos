@@ -33,6 +33,32 @@ public class NearRelativeStaff
 }
 
 /// <summary>
+/// 经办人员身份证多来源检索结果（系统用户 + 档案照料护理人）。
+/// 合并规则：系统用户优先，档案照料人逐字段补空
+/// （新申请照料人表 nc_biz_caregivers → 特困历史档案 nc_biz_destitute_persons.caregiver_id_card）。
+/// </summary>
+public class NearRelativeStaffLookup
+{
+    /// <summary>合并后的工作信息（姓名/联系方式/工作单位/职务/乡镇；来源没有的字段为空）</summary>
+    public NearRelativeStaff Staff { get; set; } = new();
+
+    /// <summary>命中系统用户表 nc_sys_users</summary>
+    public bool FoundInUsers { get; set; }
+
+    /// <summary>命中申请档案照料人表 nc_biz_caregivers</summary>
+    public bool FoundInCaregivers { get; set; }
+
+    /// <summary>命中特困历史档案照料人（nc_biz_destitute_persons.caregiver_id_card）</summary>
+    public bool FoundInDestituteArchive { get; set; }
+
+    /// <summary>是否命中任一来源</summary>
+    public bool HasAny => FoundInUsers || FoundInCaregivers || FoundInDestituteArchive;
+
+    /// <summary>是否命中档案照料护理人任一来源（申请档案/特困历史档案）</summary>
+    public bool FoundInAnyCaregiver => FoundInCaregivers || FoundInDestituteArchive;
+}
+
+/// <summary>
 /// 近亲属备案·救助对象明细实体（对应 nc_biz_near_relative_links 表）
 /// </summary>
 public class NearRelativeLink
@@ -73,10 +99,10 @@ public class NearRelativeLink
     /// <summary>社会救助种类/保障类别</summary>
     public string HelpType { get; set; } = string.Empty;
 
-    /// <summary>月保障金</summary>
+    /// <summary>月保障金（申请表 household_monthly_guarantee_amount：户月保障金，不含分类施保）</summary>
     public decimal? MonthAmount { get; set; }
 
-    /// <summary>报账金额</summary>
+    /// <summary>保障金额（申请表 total_guarantee_amount：保障金总额/月发放合计；页面原题"报账金额"已更正）</summary>
     public decimal? ReportAmount { get; set; }
 
     /// <summary>救助起始时间</summary>
@@ -126,7 +152,38 @@ public class NearRelativePair
 }
 
 /// <summary>
-/// 下拉选择项（选择已有备案用）
+/// 档案带出结果：申请档案映射出的对象行 + 来源信息（状态栏/行内提示用）。
+/// 用于"输入身份证自动带出"与"编辑载入按档案刷新"；Link.ApplicationId 已回填（一一对应）。
+/// </summary>
+public class NearRelativeArchiveFill
+{
+    /// <summary>来源申请ID（nc_biz_applications.id）</summary>
+    public long ApplicationId { get; set; }
+
+    /// <summary>来源申请编号（提示用）</summary>
+    public string ApplicationNo { get; set; } = string.Empty;
+
+    /// <summary>来源申请状态代码（Draft/Approved/...）</summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>来源申请状态中文（提示用）</summary>
+    public string StatusDisplay { get; set; } = string.Empty;
+
+    /// <summary>来源申请创建时间（提示用）</summary>
+    public DateTime? ApplicationCreatedAt { get; set; }
+
+    /// <summary>映射后的对象行（档案来源字段已填充；无来源的手工字段为空，合并时勿覆盖）</summary>
+    public NearRelativeLink Link { get; set; } = new();
+
+    /// <summary>该申请已被其他工作人员的备案占用（保存时仍会被归属校验拦截，带出时先提示）</summary>
+    public bool OccupiedByOtherStaff { get; set; }
+
+    /// <summary>占用方工作人员姓名（未占用为空）</summary>
+    public string OccupiedByStaffName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 备案名册列表项（列表页使用）
 /// </summary>
 public class NearRelativeBrief
 {

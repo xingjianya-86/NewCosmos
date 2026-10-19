@@ -714,6 +714,8 @@ public partial class ApplicationFormViewModel
             PrintNavigationData.FieldData = new Dictionary<string, string>(printData.FieldData, StringComparer.Ordinal);
             PrintNavigationData.TableData = printData.TableData?.ToList() ?? new();
             PrintNavigationData.SupporterTableData = printData.SupporterTableData;
+            // 近亲属备案对数据：与档案制作页导航同口径显式携带（文书直出两表"每对一页"用）
+            PrintNavigationData.NearRelativePairs = printData.NearRelativePairs;
             PrintNavigationData.Status = ApplicationStatus ?? string.Empty;
             PrintNavigationData.TemplateFilter = templateNames.ToArray();
 

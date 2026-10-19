@@ -156,8 +156,15 @@ public partial class UnifiedReprintViewModel
             }
             case ReprintMonthWindow.TempReliefFull:
             {
-                var tl = await _timelineService.CalculateTempReliefAsync(year, month, simplified: false);
-                return (tl.InvestigationStartDate.Date, tl.AuditDate.Date);
+                // C 线批次窗口 = (上月验收日, 本月验收日]：
+                // 与"验收日锚定、申请日≤验收日−5"的新口径一致——申请月即归属月，但存在跨月补录
+                // （如上月22/28申请、本月10~12公示的本月批次）；若仍用 [验收日−5, 验收日]，起点被压到 8 号，
+                // 整批会被漏掉。改以上次验收日为界，批次划分完整且无重叠。
+                var tl = await _timelineService.CalculateTempReliefAsync(year, month);
+                var prevMonth = month == 1 ? 12 : month - 1;
+                var prevYear = month == 1 ? year - 1 : year;
+                var prev = await _timelineService.CalculateTempReliefAsync(prevYear, prevMonth);
+                return (prev.AuditDate.Date.AddDays(1), tl.AuditDate.Date);
             }
             default:
                 return (monthStart, monthStart.AddMonths(1).AddDays(-1));
@@ -784,6 +791,8 @@ public partial class UnifiedReprintViewModel
                 PrintNavigationData.FieldData = payload.FieldData;
                 PrintNavigationData.TableData = payload.TableData;
                 PrintNavigationData.SupporterTableData = payload.SupporterTableData;
+                // 近亲属备案对数据：批量逐户必须随 payload 显式携带（防上一户静态残留）
+                PrintNavigationData.NearRelativePairs = payload.NearRelativePairs;
 
                 await Output.InitializeAsync();
                 _logger.LogBusiness("统一补打中心·批量单户模板",

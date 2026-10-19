@@ -28,6 +28,7 @@ public partial class MobileMainViewModel : ViewModelBase
     private int _permissionRetryCount;
     private bool _hasAnyModulePermission;
     private bool _redirectingToLogin;
+    private bool _updateStartupChecked;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
@@ -128,6 +129,8 @@ public partial class MobileMainViewModel : ViewModelBase
 
             await LoadPermissionsAsync();
             _ = LoadStatsAsync();
+            // 启动静默检查更新：免登录（会话恢复）直达主页时登录页的检查不会执行，此处兜底（每次进程一次）
+            _ = CheckForUpdatesOnStartupAsync();
         }
         catch (Exception ex)
         {
@@ -385,6 +388,28 @@ public partial class MobileMainViewModel : ViewModelBase
     private async Task CheckForUpdatesAsync()
     {
         await _updateCoordinator.CheckAndPromptAsync(manual: true);
+    }
+
+    /// <summary>
+    /// 启动静默检查更新（每次进程一次）：手机端常态是免登录直达主页，
+    /// 登录页的启动检查不执行；失败仅记日志，不阻断使用（与 Windows 登录页检查同策略）。
+    /// </summary>
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        if (_updateStartupChecked) return;
+        _updateStartupChecked = true;
+
+        try
+        {
+            var options = _configService.GetUpdateOptions();
+            if (!options.Enabled || !options.CheckOnStartup) return;
+
+            await _updateCoordinator.CheckAndPromptAsync(manual: false);
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"手机端启动更新检查异常（放行）: {ex.Message}");
+        }
     }
 
     #endregion

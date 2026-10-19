@@ -234,7 +234,9 @@ public class TempReliefService : BaseService, ITempReliefService
                 $"COALESCE({p}hukou_address,'') AS hukou_address",
                 $"COALESCE({p}town,'') AS town",
                 $"COALESCE({p}community,'') AS village",
-                "NULL AS family_size",
+                // 家庭人口 seed：档案主表 family_size（为 0 时取 confirmed_family_size）；
+                // 成员明细（LoadMemberSnapshotAsync）随后按口径覆盖，赡养义务人不计入
+                $"COALESCE(NULLIF({p}family_size, 0), {p}confirmed_family_size) AS family_size",
                 $"COALESCE({p}bank_name,'') AS bank_name",
                 $"COALESCE({p}bank_account,'') AS bank_account",
                 "'' AS one_card_account"),
@@ -413,6 +415,8 @@ public class TempReliefService : BaseService, ITempReliefService
     {
         if (sourceTable == "nc_biz_applications")
         {
+            // 与家庭人口口径一致：赡养/抚养/扶养义务人（member_category='Support'）不是共同生活成员，
+            // 不进临时救助审批表的家庭成员行、也不计入家庭人口；未知/历史 NULL 值保持原行为（不排除）
             const string sql = @"SELECT name AS member_name,
                     COALESCE(gender,'') AS gender,
                     COALESCE(relationship_to_head,'') AS relation,
@@ -421,6 +425,7 @@ public class TempReliefService : BaseService, ITempReliefService
                     annual_income
                 FROM nc_biz_family_members
                 WHERE application_id = $1 AND deleted_at IS NULL
+                  AND (member_category IS NULL OR member_category <> 'Support')
                 ORDER BY is_applicant DESC, id
                 LIMIT 20";
             var result = await _db.QueryAsync<TempReliefMemberRow>(sql, ct, sourceFamilyId);

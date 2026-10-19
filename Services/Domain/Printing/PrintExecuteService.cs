@@ -32,6 +32,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         ["Recovery"] = PermissionCodes.PRINT_RECOVERY,
         // 动态管理记录打印复用"家庭收入档案"打印权限（不新增权限种子）
         ["DynamicManagementRecord"] = PermissionCodes.PRINT_FAMILYAPPLICATION,
+        // 近亲属备案档案输出复用"家庭收入档案"打印权限（不新增权限种子；持有 NEAR_RELATIVE_MANAGE 的角色均持有该权限）
+        [NearRelativeConstants.BusinessType] = PermissionCodes.PRINT_FAMILYAPPLICATION,
     };
 
     private readonly IPrintService _printService;

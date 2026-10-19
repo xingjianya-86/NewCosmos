@@ -30,6 +30,9 @@ public static class NearRelativeConstants
     /// <summary>权限码：近亲属备案管理</summary>
     public const string PermissionManage = "NEAR_RELATIVE_MANAGE";
 
+    /// <summary>打印/输出业务类型码（档案输出页"近亲属备案独立输出"域；打印留痕 business_type 用）</summary>
+    public const string BusinessType = "NearRelative";
+
     /// <summary>打印模板名：月报-批量备案信息</summary>
     public const string TemplateStaffBatch = "月报_近亲属_工作人员批量备案信息";
 

@@ -34,7 +34,7 @@ public static partial class FieldKeys
     public const string NEAR_RELATIVE_FAMILY_SIZE = "NEAR_RELATIVE_FAMILY_SIZE";     // 家庭人口/共同生活人数
     public const string NEAR_RELATIVE_HELP_TYPE = "NEAR_RELATIVE_HELP_TYPE";         // 社会救助种类/保障类别
     public const string NEAR_RELATIVE_MONTH_AMOUNT = "NEAR_RELATIVE_MONTH_AMOUNT";   // 月保障金
-    public const string NEAR_RELATIVE_REPORT_AMOUNT = "NEAR_RELATIVE_REPORT_AMOUNT"; // 报账金额
+    public const string NEAR_RELATIVE_REPORT_AMOUNT = "NEAR_RELATIVE_REPORT_AMOUNT"; // 保障金额（保障金总额口径；原"报账金额"2026-10-17 更正）
     public const string NEAR_RELATIVE_START_TIME = "NEAR_RELATIVE_START_TIME";       // 救助起始时间
     public const string NEAR_RELATIVE_FAMILY_RELATION = "NEAR_RELATIVE_FAMILY_RELATION"; // 家庭关系
     public const string NEAR_RELATIVE_APPLY_REASON = "NEAR_RELATIVE_APPLY_REASON";   // 申请原因
@@ -61,9 +61,10 @@ public static partial class FieldKeys
     public const string NEAR_RELATIVE_SUMMARY_NAME = "NEAR_RELATIVE_SUMMARY_NAME";                   // 救助姓名 {救助姓名N}
     public const string NEAR_RELATIVE_SUMMARY_ID_CARD = "NEAR_RELATIVE_SUMMARY_ID_CARD";             // 救助身份证号 {救助身份证号N}
     public const string NEAR_RELATIVE_SUMMARY_HUKOU = "NEAR_RELATIVE_SUMMARY_HUKOU";                 // 救助户籍地址 {救助户籍地址N}
+    public const string NEAR_RELATIVE_SUMMARY_RESIDENCE = "NEAR_RELATIVE_SUMMARY_RESIDENCE";         // 救助居住地址 {救助居住地址N}
     public const string NEAR_RELATIVE_SUMMARY_HELP_TYPE = "NEAR_RELATIVE_SUMMARY_HELP_TYPE";         // 救助保障类别 {救助保障类别N}
     public const string NEAR_RELATIVE_SUMMARY_FAMILY_SIZE = "NEAR_RELATIVE_SUMMARY_FAMILY_SIZE";     // 救助共同生活人数 {救助共同生活人数N}
-    public const string NEAR_RELATIVE_SUMMARY_REPORT_AMOUNT = "NEAR_RELATIVE_SUMMARY_REPORT_AMOUNT"; // 救助报账金额 {救助报账金额N}
+    public const string NEAR_RELATIVE_SUMMARY_REPORT_AMOUNT = "NEAR_RELATIVE_SUMMARY_REPORT_AMOUNT"; // 救助保障金额 {救助保障金额N}（原"救助报账金额"，2026-10-17 模板与键注释一并更正）
 
     // 档案门控标记：该申请存在关联备案（装配时置 "1"，档案输出页据此显隐近亲属模板）
     public const string NEAR_RELATIVE_HAS_DATA = "NEAR_RELATIVE_HAS_DATA";

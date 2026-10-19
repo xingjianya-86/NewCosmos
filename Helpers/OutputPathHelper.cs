@@ -136,6 +136,7 @@ public static class OutputPathHelper
             "TempRelief" => "临时救助",
             "ElderlyBenefits" => "普惠高龄",
             "LowIncomeProof" => "低保证明",
+            "NearRelative" => "近亲属备案", // 近亲属备案独立输出域（NearRelativeConstants.BusinessType）
             _ => businessType
         };
     }

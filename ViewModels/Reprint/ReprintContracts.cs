@@ -34,7 +34,7 @@ public enum ReprintMonthWindow
     /// <summary>A线经济核查 [上月11日, 本月10日]</summary>
     EconomicReview,
 
-    /// <summary>C线临时救助完整窗口 [入户调查起日, 验收日]</summary>
+    /// <summary>C线临时救助批次窗口 (上月验收日, 本月验收日]（验收日=13号或其后最近工作日）</summary>
     TempReliefFull
 }
 
@@ -98,6 +98,7 @@ public sealed class ReprintArchiveItem : ObservableObject
 
 /// <summary>
 /// 统一准备产物：选中记录后构建，供填充 PrintNavigationData 并进入 ArchiveOutput 流程。
+/// NearRelativePairs = 近亲属备案对数据（FamilyApplication 域档案补打"每对一页"用；其余域为 null）。
 /// </summary>
 public sealed record ReprintArchivePayload(
     string DomainKey,
@@ -108,7 +109,8 @@ public sealed record ReprintArchivePayload(
     string Status,
     Dictionary<string, string> FieldData,
     List<Dictionary<string, string>> TableData,
-    List<Dictionary<string, string>>? SupporterTableData);
+    List<Dictionary<string, string>>? SupporterTableData,
+    List<Dictionary<string, string>>? NearRelativePairs = null);
 
 /// <summary>
 /// 域补打策略：统一补打中心按 DomainKey 分派搜索/准备/留痕查询。

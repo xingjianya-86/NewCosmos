@@ -61,6 +61,7 @@ public partial class TempReliefFormViewModel
             {
                 ApplicantHukou = app.HukouAddress;
             }
+            _familySizeSeed = app.FamilySize;
             ApplicantFamilySize = app.FamilySize;
             ApplicantFamilyCategory = TempReliefConstants.NormalizeFamilyCategory(app.FamilyCategory);
             BankName = app.BankName;
@@ -111,28 +112,13 @@ public partial class TempReliefFormViewModel
         // 读入已有申请：救助原因取保存值，视为"已有内容"，类型/明细变化前不自动覆盖
         _reasonDirty = true;
 
-        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按 C 线固定窗口重算
+        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按 C 线窗口重算（并自动修正越界申请日期）
         if (isDraft)
         {
             await ResolveHukouFromOrganizationAsync(CancellationToken);
             await ApplyPublicizeDefaultsAsync();
         }
-        else
-        {
-            // 非草稿：公示日期保留库中原值，仅把申请日期约束进其归属调查窗口（存量档案自愈，
-            // 否则早于窗口起日的旧数据会被保存校验挡住）。须抑制联动，避免重算覆盖公示日期。
-            _suppressReload = true;
-            try
-            {
-                var simplified = TempReliefConstants.IsSimplifiedProcedure(ApplicantFamilyCategory, _sourceTable);
-                ClampApplyDateIntoWindow(_serviceProvider.GetRequiredService<IBusinessTimelineService>()
-                    .CalculateTempReliefForApplyDate(ApplyDate, simplified));
-            }
-            finally
-            {
-                _suppressReload = false;
-            }
-        }
+        // 非草稿：公示日期与申请日期均保留库中原值，不重算、不修正（申请日期越界修正仅发生在录入/草稿场景）
 
         // 小额：加载档位并回显
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
@@ -357,6 +343,8 @@ public partial class TempReliefFormViewModel
             // 家庭住址文本保留来源原始完整地址（打印模板用，避免与分列拼接重复）
             ApplicantAddress = c.FamilyAddress;
             // 户籍地址统一从当前用户组织机构获取（新建/草稿时已回填，候选人不覆盖）
+            // 家庭人口来源快照：仅"有效成员为 0"时兜底（成员明细变化时由 RefreshApplicantFamilySize 覆盖）
+            _familySizeSeed = c.FamilySize;
             ApplicantFamilySize = c.FamilySize;
             ApplicantFamilyCategory = TempReliefConstants.NormalizeFamilyCategory(c.FamilyCategory);
             // 家庭类别确定后重算公示窗口（特殊群体5个工作日/普通10个工作日会影响归属月份）
@@ -885,24 +873,16 @@ public partial class TempReliefFormViewModel
         if (HasPublicizeDates && PublicizeEndDateValue < PublicizeStartDateValue)
             return "公示结束日期不能早于开始日期";
 
-        // 申请日期：不能晚于今天，且须落在归属调查窗口 [起日, 截止日]
-        // （下界与申请日期约束同用"起日 ≤ 今天"这道闸：窗口未开启时不校验，今天新建不受挡）
-        if (ApplyDate.Date > DateTime.Today)
-            return "申请日期不能晚于今天";
-
-        var cLine = _serviceProvider.GetRequiredService<IBusinessTimelineService>()
-            .CalculateTempReliefForApplyDate(
-                ApplyDate, TempReliefConstants.IsSimplifiedProcedure(ApplicantFamilyCategory, _sourceTable));
-        if (ApplyDate.Date > cLine.InvestigationDeadline.Date)
-            return $"申请日期须早于或等于调查截止日 {cLine.InvestigationDeadline:yyyy-MM-dd}";
-        if (cLine.InvestigationStartDate.Date <= DateTime.Today && ApplyDate.Date < cLine.InvestigationStartDate.Date)
-            return $"申请日期须在入户调查窗口 {cLine.InvestigationStartDate:yyyy-MM-dd} 至 {cLine.InvestigationDeadline:yyyy-MM-dd} 之间";
-
+        // 申请日期不在此报错：录入越界由 ApplyPublicizeDefaultsAsync 自动钳入 C 线窗口（不阻断保存）
         return null;
     }
 
     private TempReliefApplication BuildApplication()
     {
+        // 家庭人口落库前按统一口径重算（户主 1 人 + 有效家庭成员行数；赡养抚养扶养义务人不计入），
+        // 口径唯一实现见 TempReliefConstants.ResolveFamilySize；此处同时刷新只读显示字段
+        var resolvedFamilySize = RefreshApplicantFamilySize();
+
         var app = new TempReliefApplication
         {
             Id = _id,
@@ -931,7 +911,7 @@ public partial class TempReliefFormViewModel
             HukouAddress = BuildHukouAddress(),
             Town = ApplicantTown,
             Village = ApplicantVillage,
-            FamilySize = ApplicantFamilySize,
+            FamilySize = resolvedFamilySize,
             FamilyCategory = ApplicantFamilyCategory,
             BankName = BankName?.Trim() ?? string.Empty,
             BankAccount = BankAccount?.Trim() ?? string.Empty,

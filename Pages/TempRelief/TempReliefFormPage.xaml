@@ -843,12 +843,12 @@
                             </VerticalStackLayout>
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
                                 <VerticalStackLayout Spacing="6">
-                                    <Label Text="公示开始日期（固定每月10日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Label Text="公示开始日期（验收日前3天）" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <DatePicker Date="{Binding PublicizeStartDateValue}" IsEnabled="False"
                                                 Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="6">
-                                    <Label Text="公示结束日期（固定每月12日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Label Text="公示结束日期（验收日前1天）" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <DatePicker Date="{Binding PublicizeEndDateValue}" IsEnabled="False"
                                                 Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>

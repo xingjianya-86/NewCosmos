@@ -567,11 +567,11 @@
                                 <Editor Text="{Binding VerifyResult}" HeightRequest="80" Placeholder="入户调查核实情况..."/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
-                                <Label Text="公示开始日期（固定每月10日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="公示开始日期（验收日前3天）" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <DatePicker Date="{Binding PublicizeStartDateValue}" IsEnabled="False" Style="{StaticResource FormFieldPickerStyle}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
-                                <Label Text="公示结束日期（固定每月12日）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Label Text="公示结束日期（验收日前1天）" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <DatePicker Date="{Binding PublicizeEndDateValue}" IsEnabled="False" Style="{StaticResource FormFieldPickerStyle}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">

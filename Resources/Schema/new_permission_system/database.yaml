@@ -62,6 +62,10 @@ tables:
         type: character varying(100)
         nullable: true
         comment: 创建人用户名
+    indexes:
+      - name: idx_nc_sys_users_identity_card
+        columns: [identity_card]
+        comment: 近亲属备案/人员检索按身份证查用户（原无索引）
 
   # ── 系统角色表 ──
   - name: nc_sys_roles

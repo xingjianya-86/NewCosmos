@@ -523,6 +523,13 @@ public partial class ArchiveOutputViewModel
     [RelayCommand]
     private async Task CompleteAsync()
     {
+        // 近亲属备案独立输出域：无归档语义（按钮已隐藏，此处兜底防命令直达）
+        if (IsStandaloneOutput)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "近亲属备案档案输出无归档语义", "确定");
+            return;
+        }
+
         // 仅出文书/文书直出文档模式：禁止完成归档（会把渐退草稿 Draft 强行置 Approved/step6）
         if (IsTemplateFilterMode || IsDocumentMode)
         {
@@ -1130,7 +1137,7 @@ public partial class ArchiveOutputViewModel
 
     /// <summary>
     /// 目录/卷号窗口锚定日期：申请类档案取该申请的**业务锚点**（申请日期=调查日期新口径 2026-10-16，
-    /// 调查日周期差 {0,+1} 生效，否则回退 <see cref="ArchiveAnchorHelper.ResolveApplicationDate"/>
+    /// 调查日周期差 {0,+1} 生效，否则回退 <see cref="ArchiveAnchorHelper.ResolveApplicationDate(NewCosmos.Models.Entities.Application)"/>
     /// 稳定口径：申请编号内嵌日期→创建→首次审批→补全完成→更新→今天）；其它域回退当天。
     /// 卷号/目录窗口必须与文书公示同批次，故与档案产出同走业务锚点。
     /// </summary>

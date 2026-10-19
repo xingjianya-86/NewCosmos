@@ -204,28 +204,37 @@ public class TempReliefApplication
 }
 
 /// <summary>
-/// 临时救助家庭成员明细实体（对应 nc_biz_temp_relief_members 表）
+/// 临时救助家庭成员明细实体（对应 nc_biz_temp_relief_members 表）。
+/// 可编辑字段用 ObservableObject：[ObservableProperty] 供成员逐行绑定，
+/// 姓名变更需通知 ViewModel 重算家庭人口（口径见 TempReliefConstants.ResolveFamilySize）。
 /// </summary>
-public class TempReliefMember
+public partial class TempReliefMember : ObservableObject
 {
     public long Id { get; set; }
 
     /// <summary>关联临时救助申请ID</summary>
     public long ApplicationId { get; set; }
 
-    public string MemberName { get; set; } = string.Empty;
-    public string Gender { get; set; } = string.Empty;
+    [ObservableProperty]
+    private string _memberName = string.Empty;
+
+    [ObservableProperty]
+    private string _gender = string.Empty;
 
     /// <summary>与户主关系</summary>
-    public string Relation { get; set; } = string.Empty;
+    [ObservableProperty]
+    private string _relation = string.Empty;
 
-    public string IdCard { get; set; } = string.Empty;
+    [ObservableProperty]
+    private string _idCard = string.Empty;
 
     /// <summary>工作单位</summary>
-    public string WorkUnit { get; set; } = string.Empty;
+    [ObservableProperty]
+    private string _workUnit = string.Empty;
 
     /// <summary>年收入（元）</summary>
-    public decimal? AnnualIncome { get; set; }
+    [ObservableProperty]
+    private decimal? _annualIncome;
 
     public int SortOrder { get; set; }
 }

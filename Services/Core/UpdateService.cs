@@ -430,7 +430,7 @@ public class UpdateService : BaseService, IUpdateService
     private async Task<Result<string>> GetOrDownloadBaseInstallerAsync(string baseVersion, Action<double>? onProgress, CancellationToken ct)
     {
         var dir = Path.Combine(UpdatesRoot, baseVersion);
-        var path = Path.Combine(dir, $"NewCosmosSetup_{baseVersion}.exe");
+        var path = Path.Combine(dir, $"NewCosmosSetup_{baseVersion}{InstallerExtension}");
         if (File.Exists(path))
             return Result.Success(path);
 
@@ -521,7 +521,7 @@ public class UpdateService : BaseService, IUpdateService
     private async Task<Result<string>> ApplyPatchToInstallerAsync(
         string patchPath, UpdateInfo info, string outputDir, Action<double>? onProgress, CancellationToken ct)
     {
-        var targetPath = Path.Combine(outputDir, $"NewCosmosSetup_{info.LatestVersion}.exe");
+        var targetPath = Path.Combine(outputDir, $"NewCosmosSetup_{info.LatestVersion}{InstallerExtension}");
         if (File.Exists(targetPath) && VerifyFileHash(targetPath, info.PackageSha256))
         {
             onProgress?.Invoke(100);
