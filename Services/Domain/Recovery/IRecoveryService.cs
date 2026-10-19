@@ -121,6 +121,15 @@ public interface IRecoveryService
     decimal CalculateRecoveryAmount(decimal monthlyAmount, int months);
 
     /// <summary>
+    /// 查询追缴分段明细（自动计算依据，按段号升序）
+    /// </summary>
+    /// <param name="recoveryId">追缴记录ID</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>分段明细列表</returns>
+    Task<Result<List<RecoverySegment>>> GetRecoverySegmentsAsync(
+        long recoveryId, CancellationToken ct = default);
+
+    /// <summary>
     /// 生成追缴编码（格式 YYYYMM-NNN，按当月已有记录数流水递增）
     /// </summary>
     /// <param name="month">所属月份（取年月部分）</param>

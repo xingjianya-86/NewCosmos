@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,18 @@ public partial class RecoveryManualViewModel : ViewModelBase
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ILoggerService _logger;
+
+    /// <summary>编辑模式下的原始记录（加载时以库中已核定总额为准）</summary>
+    private RecoveryRecord? _storedRecord;
+
+    /// <summary>库中已落库的分段明细（自动算不出时用于展示历史依据）</summary>
+    private List<RecoverySegment> _loadedSegments = new();
+
+    /// <summary>自动计算的建议来源（手工录入页无来源档案，恒为 Flat）</summary>
+    private string _autoSource = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>程序性赋值期间屏蔽"用户手改总额→转人工"的侦测</summary>
+    private bool _suppressAmountWatch;
 
     /// <summary>
     /// 人员姓名
@@ -91,10 +104,46 @@ public partial class RecoveryManualViewModel : ViewModelBase
     private int _recoveryMonths;
 
     /// <summary>
-    /// 应追缴金额（自动计算）
+    /// 应追缴总额（唯一事实来源：自动计算或人工核实的结果都写在这里）
     /// </summary>
     [ObservableProperty]
     private decimal _recoveryAmount;
+
+    /// <summary>
+    /// 自动计算的参考值（人工覆盖时保留，便于对比）
+    /// </summary>
+    [ObservableProperty]
+    private decimal _autoAmount;
+
+    /// <summary>
+    /// 金额来源：Segment=自动分段 / Flat=月标准×月数 / Manual=人工核实
+    /// </summary>
+    [ObservableProperty]
+    private string _amountSource = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>
+    /// 金额说明：人工核实时必填（填写原因）
+    /// </summary>
+    [ObservableProperty]
+    private string _amountNote = string.Empty;
+
+    /// <summary>
+    /// 无法自动计算的原因（非空时界面提示转人工填写）
+    /// </summary>
+    [ObservableProperty]
+    private string _cannotAutoReason = string.Empty;
+
+    /// <summary>
+    /// 自动计算分段明细（手工录入页通常为空，仅编辑既有自动计算记录时展示）
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<RecoverySegment> _segments = new();
+
+    /// <summary>
+    /// 分段明细是否展开
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSegmentsExpanded;
 
     /// <summary>
     /// 已追缴金额
@@ -245,7 +294,168 @@ public partial class RecoveryManualViewModel : ViewModelBase
     private void CalculateRecovery()
     {
         RecoveryMonths = _recoveryService.CalculateRecoveryMonths(StartMonth, EndMonth);
-        RecoveryAmount = _recoveryService.CalculateRecoveryAmount(MonthlyAmount, RecoveryMonths);
+
+        // 手工录入无来源档案：无历史时间轴可依据，仅「月保障额 × 月数」定额口径；
+        // 月保障额缺失即转人工填写（RecoveryAmountCalculator 统一口径）。
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, null, MonthlyAmount);
+        ApplyAutoReference(result);
+        ApplyAuto(result);
+    }
+
+    /// <summary>
+    /// 页面出现：加载已落库分段明细（编辑场景）并完成首次计算。
+    /// </summary>
+    public override async Task OnAppearingAsync()
+    {
+        await base.OnAppearingAsync();
+
+        if (_storedRecord != null)
+        {
+            var storedSegments = await _recoveryService.GetRecoverySegmentsAsync(_storedRecord.Id, CancellationToken);
+            if (storedSegments.IsSuccess)
+                _loadedSegments = storedSegments.Value;
+            else
+                Logger.Warn($"加载追缴分段明细失败: {storedSegments.Message}");
+        }
+
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, null, MonthlyAmount);
+        ApplyAutoReference(result);
+
+        if (_storedRecord != null)
+        {
+            // 编辑既有单据：回显库中已核定总额与来源（自动结果只作参考）
+            _suppressAmountWatch = true;
+            RecoveryAmount = _storedRecord.RecoveryAmount;
+            AmountSource = NormalizeAmountSource(_storedRecord.AmountSource);
+            _suppressAmountWatch = false;
+            return;
+        }
+
+        ApplyAuto(result);
+    }
+
+    private void ApplyAutoReference(RecoveryAmountResult result)
+    {
+        AutoAmount = result.TotalAmount;
+        _autoSource = result.AmountSource;
+        CannotAutoReason = result.CanCalculate ? string.Empty : result.Reason;
+
+        ReplaceSegments(result.Segments.Count > 0 ? result.Segments : _loadedSegments);
+    }
+
+    private void ApplyAuto(RecoveryAmountResult result)
+    {
+        if (IsManualAmount)
+            return;
+
+        _suppressAmountWatch = true;
+        try
+        {
+            if (result.CanCalculate)
+            {
+                AmountSource = _autoSource;
+                RecoveryAmount = result.TotalAmount;
+            }
+            else
+            {
+                AmountSource = RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+            }
+        }
+        finally
+        {
+            _suppressAmountWatch = false;
+        }
+    }
+
+    private void ReplaceSegments(IReadOnlyList<RecoverySegment> segments)
+    {
+        Segments.Clear();
+        foreach (var segment in segments)
+            Segments.Add(segment);
+
+        OnPropertyChanged(nameof(HasSegments));
+        OnPropertyChanged(nameof(SegmentsTotalText));
+    }
+
+    private static string NormalizeAmountSource(string? amountSource) => amountSource switch
+    {
+        RecoveryConstants.AMOUNT_SOURCE_SEGMENT => RecoveryConstants.AMOUNT_SOURCE_SEGMENT,
+        RecoveryConstants.AMOUNT_SOURCE_MANUAL => RecoveryConstants.AMOUNT_SOURCE_MANUAL,
+        _ => RecoveryConstants.AMOUNT_SOURCE_FLAT
+    };
+
+    /// <summary>展开/收起自动计算分段明细</summary>
+    [RelayCommand]
+    private void ToggleSegments() => IsSegmentsExpanded = !IsSegmentsExpanded;
+
+    // ── 金额来源派生显示（纯内存计算：禁止在此打 IO/日志） ──
+
+    /// <summary>当前是否为人工核实填写</summary>
+    public bool IsManualAmount => AmountSource == RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+
+    /// <summary>是否无法自动计算（界面黄条提示）</summary>
+    public bool IsCannotAuto => !string.IsNullOrEmpty(CannotAutoReason);
+
+    /// <summary>金额来源显示文字（徽标）</summary>
+    public string AmountSourceDisplay => RecoveryConstants.GetAmountSourceDisplayName(AmountSource);
+
+    /// <summary>是否有分段明细可展开</summary>
+    public bool HasSegments => Segments.Count > 0;
+
+    /// <summary>人工值与自动参考值是否不一致</summary>
+    public bool HasAutoDifference => IsManualAmount && AutoAmount > 0 && RecoveryAmount != AutoAmount;
+
+    /// <summary>自动参考值文案</summary>
+    public string AutoReferenceText => AutoAmount > 0 ? $"自动计算参考值：{AutoAmount:N2} 元" : string.Empty;
+
+    /// <summary>分段合计文案</summary>
+    public string SegmentsTotalText => Segments.Count == 0
+        ? string.Empty
+        : $"合计 {Segments.Sum(s => s.Months)} 个月 / {Segments.Sum(s => s.SegmentAmount):N2} 元";
+
+    /// <summary>分段明细展开/收起操作文案</summary>
+    public string SegmentsToggleText => IsSegmentsExpanded ? "收起" : "展开";
+
+    partial void OnIsSegmentsExpandedChanged(bool value) => OnPropertyChanged(nameof(SegmentsToggleText));
+
+    partial void OnAmountSourceChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsManualAmount));
+        OnPropertyChanged(nameof(AmountSourceDisplay));
+        OnPropertyChanged(nameof(HasAutoDifference));
+        NotifyAllCommandsCanExecuteChanged();
+    }
+
+    partial void OnCannotAutoReasonChanged(string value) => OnPropertyChanged(nameof(IsCannotAuto));
+
+    partial void OnAutoAmountChanged(decimal value)
+    {
+        OnPropertyChanged(nameof(HasAutoDifference));
+        OnPropertyChanged(nameof(AutoReferenceText));
+    }
+
+    partial void OnSegmentsChanged(ObservableCollection<RecoverySegment> value)
+    {
+        OnPropertyChanged(nameof(HasSegments));
+        OnPropertyChanged(nameof(SegmentsTotalText));
+    }
+
+    partial void OnRecoveryAmountChanged(decimal value)
+    {
+        OnPropertyChanged(nameof(HasAutoDifference));
+
+        if (_suppressAmountWatch)
+            return;
+
+        if (AutoAmount <= 0 || value != AutoAmount)
+        {
+            if (!IsManualAmount)
+                AmountSource = RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+        }
+        else if (IsManualAmount)
+        {
+            AmountSource = _autoSource;
+        }
     }
 
     /// <summary>
@@ -254,6 +464,9 @@ public partial class RecoveryManualViewModel : ViewModelBase
     public void LoadRecord(RecoveryRecord record)
     {
         if (record == null) return;
+
+        _storedRecord = record;
+        _loadedSegments = new();
 
         RecordId = record.Id;
         PersonName = record.PersonName;
@@ -282,7 +495,15 @@ public partial class RecoveryManualViewModel : ViewModelBase
             EndMonthValue = end.Month;
         }
 
+        // 应追缴总额以库中已核定值为准：加载时原样回显库值（自动结果仅作参考），
+        // 用户改动「月保障额 / 追缴周期」后才由 CalculateRecovery() 按新口径重算。
         CalculateRecovery();
+
+        _suppressAmountWatch = true;
+        RecoveryAmount = record.RecoveryAmount;
+        AmountSource = NormalizeAmountSource(record.AmountSource);
+        AmountNote = record.AmountNote ?? string.Empty;
+        _suppressAmountWatch = false;
     }
 
     /// <summary>
@@ -320,7 +541,7 @@ public partial class RecoveryManualViewModel : ViewModelBase
     private bool CanSave() => !IsBusy
         && !string.IsNullOrWhiteSpace(PersonName)
         && SelectedSourceType.HasValue
-        && MonthlyAmount > 0;
+        && RecoveryMonths > 0;
 
     /// <summary>
     /// 保存并推送打印：保存后写入推送打印队列（PC 端打印代理生成《追缴资金办理单》）。
@@ -379,7 +600,12 @@ public partial class RecoveryManualViewModel : ViewModelBase
                 MonthlyAmount = MonthlyAmount,
                 StartMonth = StartMonth,
                 EndMonth = EndMonth,
-                RecoveredAmount = RecoveredAmount
+                RecoveredAmount = RecoveredAmount,
+                RecoveryAmount = RecoveryAmount,
+                AmountSource = AmountSource,
+                AmountNote = AmountNote,
+                AutoAmount = AutoAmount,
+                Segments = Segments.ToList()
             };
 
             Result<long> result;
@@ -431,12 +657,7 @@ public partial class RecoveryManualViewModel : ViewModelBase
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "请选择追缴分类");
         }
 
-        if (MonthlyAmount <= 0)
-        {
-            ErrorMessage = "月保障额必须大于0";
-            return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "月保障额必须大于0");
-        }
-
+        // 月保障额非必填：历史数据不全时可直接人工核实填写应追缴总额（金额来源=Manual）
         if (RecoveryMonths <= 0)
         {
             ErrorMessage = "追缴月数必须大于0";
@@ -447,6 +668,12 @@ public partial class RecoveryManualViewModel : ViewModelBase
         {
             ErrorMessage = "应追缴金额必须大于0";
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "应追缴金额必须大于0");
+        }
+
+        if (IsManualAmount && string.IsNullOrWhiteSpace(AmountNote))
+        {
+            ErrorMessage = "手工填写的应追缴总额必须说明原因";
+            return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "手工填写的应追缴总额必须说明原因");
         }
 
         try
@@ -463,7 +690,12 @@ public partial class RecoveryManualViewModel : ViewModelBase
                 MonthlyAmount = MonthlyAmount,
                 StartMonth = StartMonth,
                 EndMonth = EndMonth,
-                RecoveredAmount = RecoveredAmount
+                RecoveredAmount = RecoveredAmount,
+                RecoveryAmount = RecoveryAmount,
+                AmountSource = AmountSource,
+                AmountNote = AmountNote,
+                AutoAmount = AutoAmount,
+                Segments = Segments.ToList()
             };
 
             Result<long> result;

@@ -279,3 +279,4 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
 | 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`Services\Core\ConfigService.cs`（用户级覆盖读写）、`Pages\Config\SettingsPage`（改根入口）、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照与输出根优先级见该文档 |
 | 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |
+| 追缴应追缴总额（自动分段 / 月标准×月数 / 人工核实） | `Services\Domain\Recovery\RecoveryAmountCalculator.cs`（分段唯一实现）、`RecoveryHistoryProvider.cs`（历史时间轴取数）、`Constants\RecoveryConstants.cs`、`docs\migrations\20261019_recovery_amount_source.sql`（加列 `amount_source/amount_note/auto_amount` + 分段表 `nc_biz_recovery_segments`） | `recovery_amount` 为唯一事实来源（表单/列表/打印/落库同源）；算不出必须人工填写且必填原因；口径与数据缺口见 `docs\20261019_追缴金额来源与分段计算.md` |

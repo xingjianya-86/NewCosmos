@@ -1,3 +1,5 @@
+using NewCosmos.Constants;
+
 namespace NewCosmos.Models.Entities;
 
 /// <summary>
@@ -131,6 +133,31 @@ public class RecoveryRecordDto
     /// 已追缴金额
     /// </summary>
     public decimal RecoveredAmount { get; set; }
+
+    /// <summary>
+    /// 应追缴总额（唯一事实来源；自动计算或人工核实的结果都写在这里）
+    /// </summary>
+    public decimal RecoveryAmount { get; set; }
+
+    /// <summary>
+    /// 金额来源：Segment=自动分段 / Flat=月标准×月数 / Manual=人工核实
+    /// </summary>
+    public string AmountSource { get; set; } = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>
+    /// 金额说明：Manual 时必填（人工填写原因），自动时可为计算依据说明
+    /// </summary>
+    public string? AmountNote { get; set; }
+
+    /// <summary>
+    /// 自动计算的参考值（人工覆盖时保留用于审计对比）
+    /// </summary>
+    public decimal? AutoAmount { get; set; }
+
+    /// <summary>
+    /// 自动计算分段明细（无则空）
+    /// </summary>
+    public List<RecoverySegment> Segments { get; set; } = new();
 }
 
 /// <summary>
@@ -177,4 +204,29 @@ public class ManualRecoveryRecordDto
     /// 已追缴金额
     /// </summary>
     public decimal RecoveredAmount { get; set; }
+
+    /// <summary>
+    /// 应追缴总额（唯一事实来源；自动计算或人工核实的结果都写在这里）
+    /// </summary>
+    public decimal RecoveryAmount { get; set; }
+
+    /// <summary>
+    /// 金额来源：Segment=自动分段 / Flat=月标准×月数 / Manual=人工核实
+    /// </summary>
+    public string AmountSource { get; set; } = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>
+    /// 金额说明：Manual 时必填（人工填写原因），自动时可为计算依据说明
+    /// </summary>
+    public string? AmountNote { get; set; }
+
+    /// <summary>
+    /// 自动计算的参考值（人工覆盖时保留用于审计对比）
+    /// </summary>
+    public decimal? AutoAmount { get; set; }
+
+    /// <summary>
+    /// 自动计算分段明细（无则空）
+    /// </summary>
+    public List<RecoverySegment> Segments { get; set; } = new();
 }

@@ -69,9 +69,18 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="应追缴金额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding RecoveryAmount, StringFormat='{0:N2}'}" IsReadOnly="True" BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                <Entry Text="{Binding RecoveryAmount}" Keyboard="Numeric" Placeholder="自动计算或手工填写" Style="{StaticResource FormFieldEntryStyle}"/>
                             </VerticalStackLayout>
                         </Grid>
+                        <Label Text="{Binding AmountSourceDisplay, StringFormat='金额来源：{0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding AutoReferenceText}" IsVisible="{Binding HasAutoDifference}" FontSize="12" TextColor="{StaticResource Warning}"/>
+                        <Border IsVisible="{Binding IsCannotAuto}" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
+                            <Label Text="{Binding CannotAutoReason}" FontSize="12" TextColor="{StaticResource Warning}"/>
+                        </Border>
+                        <VerticalStackLayout Spacing="4" IsVisible="{Binding IsManualAmount}">
+                            <Label Text="手工填写原因（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding AmountNote}" Placeholder="请说明手工填写原因（如：历史数据不全）" Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
                         <VerticalStackLayout Spacing="4">
                             <Label Text="已追缴金额（元）" Style="{StaticResource FormFieldLabelStyle}"/>
                             <Entry Text="{Binding RecoveredAmount, StringFormat='{0}'}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
