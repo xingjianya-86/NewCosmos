@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,12 +18,28 @@ namespace NewCosmos.ViewModels.Recovery;
 public partial class RecoveryFormViewModel : ViewModelBase
 {
     private readonly IRecoveryService _recoveryService;
+    private readonly IRecoveryHistoryProvider _historyProvider;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ILoggerService _logger;
+
+    /// <summary>历史月保障标准时间轴（进入页面时加载一次，之后本地重算，避免在属性 setter 里打 IO）</summary>
+    private List<RecoveryMonthlyStandardPoint> _timeline = new();
+
+    /// <summary>编辑模式下的原始记录（用于加载时以库中已核定总额为准）</summary>
+    private RecoveryRecord? _storedRecord;
+
+    /// <summary>库中已落库的分段明细（自动算不出时用于展示历史依据）</summary>
+    private List<RecoverySegment> _loadedSegments = new();
+
+    /// <summary>自动计算的建议来源（Segment/Flat），用于"用户改回自动值"时还原来源标记</summary>
+    private string _autoSource = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>程序性赋值期间屏蔽"用户手改总额→转人工"的侦测</summary>
+    private bool _suppressAmountWatch;
 
     /// <summary>
     /// 来源类型
@@ -91,10 +108,46 @@ public partial class RecoveryFormViewModel : ViewModelBase
     private int _recoveryMonths;
 
     /// <summary>
-    /// 应追缴金额（自动计算）
+    /// 应追缴总额（唯一事实来源：自动计算或人工核实的结果都写在这里）
     /// </summary>
     [ObservableProperty]
     private decimal _recoveryAmount;
+
+    /// <summary>
+    /// 自动计算的参考值（人工覆盖时保留，便于对比）
+    /// </summary>
+    [ObservableProperty]
+    private decimal _autoAmount;
+
+    /// <summary>
+    /// 金额来源：Segment=自动分段 / Flat=月标准×月数 / Manual=人工核实
+    /// </summary>
+    [ObservableProperty]
+    private string _amountSource = RecoveryConstants.AMOUNT_SOURCE_FLAT;
+
+    /// <summary>
+    /// 金额说明：人工核实时必填（填写原因）
+    /// </summary>
+    [ObservableProperty]
+    private string _amountNote = string.Empty;
+
+    /// <summary>
+    /// 无法自动计算的原因（非空时界面提示转人工填写）
+    /// </summary>
+    [ObservableProperty]
+    private string _cannotAutoReason = string.Empty;
+
+    /// <summary>
+    /// 自动计算分段明细
+    /// </summary>
+    [ObservableProperty]
+    private ObservableCollection<RecoverySegment> _segments = new();
+
+    /// <summary>
+    /// 分段明细是否展开
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSegmentsExpanded;
 
     /// <summary>
     /// 已追缴金额
@@ -142,11 +195,13 @@ public partial class RecoveryFormViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         ILoggerService logger,
         IRecoveryService recoveryService,
+        IRecoveryHistoryProvider historyProvider,
         Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
+        _historyProvider = historyProvider;
         _printJobFactory = printJobFactory;
 
         // 初始化年份和月份列表
@@ -164,11 +219,15 @@ public partial class RecoveryFormViewModel : ViewModelBase
     private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
 
     /// <summary>
-    /// 加载人员信息
+    /// 加载人员信息（页面参数注入；历史取数在 OnAppearingAsync 统一执行，属性 setter 里不打 IO）
     /// </summary>
     public void LoadPersonInfo(StoppedPersonDto parameter)
     {
         if (parameter == null) return;
+
+        _storedRecord = null;
+        _loadedSegments = new();
+        _timeline = new();
 
         SourceType = parameter.SourceType;
         SourceDisplay = parameter.SourceDisplay;
@@ -182,8 +241,7 @@ public partial class RecoveryFormViewModel : ViewModelBase
         StartMonth = $"{now.Year:D4}-{now.Month:D2}";
         EndMonth = $"{now.Year:D4}-{now.Month:D2}";
 
-        // 计算追缴月数和金额
-        CalculateRecovery();
+        RecoveryMonths = _recoveryService.CalculateRecoveryMonths(StartMonth, EndMonth);
     }
 
     /// <summary>
@@ -192,6 +250,10 @@ public partial class RecoveryFormViewModel : ViewModelBase
     public void LoadRecord(RecoveryRecord record)
     {
         if (record == null) return;
+
+        _storedRecord = record;
+        _loadedSegments = new();
+        _timeline = new();
 
         RecordId = record.Id;
         SourceType = record.SourceType ?? string.Empty;
@@ -217,7 +279,209 @@ public partial class RecoveryFormViewModel : ViewModelBase
             EndMonthValue = end.Month;
         }
 
-        CalculateRecovery();
+        // 应追缴总额以库中已核定值为准（月保障额缺失时不得用「月保障额 × 月数」把已存金额重算成 0）：
+        // 加载时原样回显库值，自动计算仅作参考值展示；用户改动「月保障额 / 追缴周期」后
+        // 才由 CalculateRecovery() 按新口径重算（见 OnAppearingAsync 的编辑分支）。
+        RecoveryMonths = _recoveryService.CalculateRecoveryMonths(StartMonth, EndMonth);
+
+        _suppressAmountWatch = true;
+        RecoveryAmount = record.RecoveryAmount;
+        AmountSource = NormalizeAmountSource(record.AmountSource);
+        AmountNote = record.AmountNote ?? string.Empty;
+        _suppressAmountWatch = false;
+    }
+
+    /// <summary>
+    /// 页面出现：加载历史月保障标准时间轴并完成首次自动计算。
+    /// 参数（LoadPersonInfo/LoadRecord）早于 OnAppearing 注入，故取数与计算统一放这里，
+    /// 属性 setter 只做纯内存重算（§6：热路径禁止 IO）。
+    /// </summary>
+    public override async Task OnAppearingAsync()
+    {
+        await base.OnAppearingAsync();
+
+        await LoadTimelineAsync();
+
+        if (_storedRecord != null)
+        {
+            var storedSegments = await _recoveryService.GetRecoverySegmentsAsync(_storedRecord.Id, CancellationToken);
+            if (storedSegments.IsSuccess)
+                _loadedSegments = storedSegments.Value;
+            else
+                Logger.Warn($"加载追缴分段明细失败: {storedSegments.Message}");
+        }
+
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, _timeline, MonthlyAmount);
+        ApplyAutoReference(result);
+
+        if (_storedRecord != null)
+        {
+            // 编辑既有单据：回显库中已核定总额与来源（自动结果只作参考，绝不自动改写已核定金额）
+            _suppressAmountWatch = true;
+            RecoveryAmount = _storedRecord.RecoveryAmount;
+            AmountSource = NormalizeAmountSource(_storedRecord.AmountSource);
+            _suppressAmountWatch = false;
+            return;
+        }
+
+        ApplyAuto(result);
+    }
+
+    /// <summary>
+    /// 读取来源档案的历史月保障标准时间轴（失败不静默：记日志并提示转人工填写）。
+    /// </summary>
+    private async Task LoadTimelineAsync()
+    {
+        _timeline = new();
+
+        if (string.IsNullOrWhiteSpace(SourceType) || SourceId <= 0)
+            return;
+
+        var history = await _historyProvider.GetMonthlyStandardsAsync(SourceType, SourceId, CancellationToken);
+
+        if (history.IsSuccess)
+        {
+            _timeline = history.Value;
+            return;
+        }
+
+        Logger.Warn($"加载追缴历史月标准失败: sourceType={SourceType}, sourceId={SourceId}, {history.Message}");
+        CannotAutoReason = RecoveryConstants.REASON_HISTORY_LOAD_FAILED;
+    }
+
+    /// <summary>
+    /// 刷新自动计算的参考值、原因与分段明细（不改动应追缴总额）。
+    /// </summary>
+    private void ApplyAutoReference(RecoveryAmountResult result)
+    {
+        AutoAmount = result.TotalAmount;
+        _autoSource = result.AmountSource;
+
+        // 取数失败的原因优先保留，避免被"无历史标准"覆盖
+        if (CannotAutoReason != RecoveryConstants.REASON_HISTORY_LOAD_FAILED)
+            CannotAutoReason = result.CanCalculate ? string.Empty : result.Reason;
+
+        ReplaceSegments(result.Segments.Count > 0 ? result.Segments : _loadedSegments);
+    }
+
+    /// <summary>
+    /// 套用自动计算结果到应追缴总额（人工核实值优先，绝不被自动值覆盖）。
+    /// </summary>
+    private void ApplyAuto(RecoveryAmountResult result)
+    {
+        if (IsManualAmount)
+            return;
+
+        _suppressAmountWatch = true;
+        try
+        {
+            if (result.CanCalculate)
+            {
+                AmountSource = _autoSource;
+                RecoveryAmount = result.TotalAmount;
+            }
+            else
+            {
+                // 自动算不出：转人工填写（保留当前金额，不清零——编辑场景下即库中已核定总额）
+                AmountSource = RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+            }
+        }
+        finally
+        {
+            _suppressAmountWatch = false;
+        }
+    }
+
+    private void ReplaceSegments(IReadOnlyList<RecoverySegment> segments)
+    {
+        Segments.Clear();
+        foreach (var segment in segments)
+            Segments.Add(segment);
+
+        OnPropertyChanged(nameof(HasSegments));
+        OnPropertyChanged(nameof(SegmentsTotalText));
+    }
+
+    private static string NormalizeAmountSource(string? amountSource) => amountSource switch
+    {
+        RecoveryConstants.AMOUNT_SOURCE_SEGMENT => RecoveryConstants.AMOUNT_SOURCE_SEGMENT,
+        RecoveryConstants.AMOUNT_SOURCE_MANUAL => RecoveryConstants.AMOUNT_SOURCE_MANUAL,
+        _ => RecoveryConstants.AMOUNT_SOURCE_FLAT
+    };
+
+    /// <summary>展开/收起自动计算分段明细</summary>
+    [RelayCommand]
+    private void ToggleSegments() => IsSegmentsExpanded = !IsSegmentsExpanded;
+
+    // ── 金额来源派生显示（纯内存计算：禁止在此打 IO/日志，XAML 会反复求值） ──
+
+    /// <summary>当前是否为人工核实填写</summary>
+    public bool IsManualAmount => AmountSource == RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+
+    /// <summary>是否无法自动计算（界面黄条提示）</summary>
+    public bool IsCannotAuto => !string.IsNullOrEmpty(CannotAutoReason);
+
+    /// <summary>金额来源显示文字（徽标）</summary>
+    public string AmountSourceDisplay => RecoveryConstants.GetAmountSourceDisplayName(AmountSource);
+
+    /// <summary>是否有分段明细可展开</summary>
+    public bool HasSegments => Segments.Count > 0;
+
+    /// <summary>人工值与自动参考值是否不一致（不一致时提示差异）</summary>
+    public bool HasAutoDifference => IsManualAmount && AutoAmount > 0 && RecoveryAmount != AutoAmount;
+
+    /// <summary>自动参考值文案</summary>
+    public string AutoReferenceText => AutoAmount > 0 ? $"自动计算参考值：{AutoAmount:N2} 元" : string.Empty;
+
+    /// <summary>分段合计文案</summary>
+    public string SegmentsTotalText => Segments.Count == 0
+        ? string.Empty
+        : $"合计 {Segments.Sum(s => s.Months)} 个月 / {Segments.Sum(s => s.SegmentAmount):N2} 元";
+
+    /// <summary>分段明细展开/收起操作文案</summary>
+    public string SegmentsToggleText => IsSegmentsExpanded ? "收起" : "展开";
+
+    partial void OnIsSegmentsExpandedChanged(bool value) => OnPropertyChanged(nameof(SegmentsToggleText));
+
+    partial void OnAmountSourceChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsManualAmount));
+        OnPropertyChanged(nameof(AmountSourceDisplay));
+        OnPropertyChanged(nameof(HasAutoDifference));
+        NotifyAllCommandsCanExecuteChanged();
+    }
+
+    partial void OnCannotAutoReasonChanged(string value) => OnPropertyChanged(nameof(IsCannotAuto));
+
+    partial void OnAutoAmountChanged(decimal value)
+    {
+        OnPropertyChanged(nameof(HasAutoDifference));
+        OnPropertyChanged(nameof(AutoReferenceText));
+    }
+
+    partial void OnSegmentsChanged(ObservableCollection<RecoverySegment> value)
+    {
+        OnPropertyChanged(nameof(HasSegments));
+        OnPropertyChanged(nameof(SegmentsTotalText));
+    }
+
+    partial void OnRecoveryAmountChanged(decimal value)
+    {
+        OnPropertyChanged(nameof(HasAutoDifference));
+
+        if (_suppressAmountWatch)
+            return;
+
+        // 用户手改总额：与自动值不一致即视为人工核实（保存时必须说明原因）；改回自动值则还原自动来源标记
+        if (AutoAmount <= 0 || value != AutoAmount)
+        {
+            if (!IsManualAmount)
+                AmountSource = RecoveryConstants.AMOUNT_SOURCE_MANUAL;
+        }
+        else if (IsManualAmount)
+        {
+            AmountSource = _autoSource;
+        }
     }
 
     /// <summary>
@@ -282,10 +546,16 @@ public partial class RecoveryFormViewModel : ViewModelBase
         NotifyAllCommandsCanExecuteChanged();
     }
 
+    /// <summary>
+    /// 按当前「月保障额 + 追缴周期 + 历史时间轴」重算应追缴总额（用户改动后触发）。
+    /// </summary>
     private void CalculateRecovery()
     {
         RecoveryMonths = _recoveryService.CalculateRecoveryMonths(StartMonth, EndMonth);
-        RecoveryAmount = _recoveryService.CalculateRecoveryAmount(MonthlyAmount, RecoveryMonths);
+
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, _timeline, MonthlyAmount);
+        ApplyAutoReference(result);
+        ApplyAuto(result);
     }
 
     /// <summary>
@@ -380,7 +650,12 @@ public partial class RecoveryFormViewModel : ViewModelBase
                 MonthlyAmount = MonthlyAmount,
                 StartMonth = StartMonth,
                 EndMonth = EndMonth,
-                RecoveredAmount = RecoveredAmount
+                RecoveredAmount = RecoveredAmount,
+                RecoveryAmount = RecoveryAmount,
+                AmountSource = AmountSource,
+                AmountNote = AmountNote,
+                AutoAmount = AutoAmount,
+                Segments = Segments.ToList()
             };
 
             Result<long> result;
@@ -438,6 +713,12 @@ public partial class RecoveryFormViewModel : ViewModelBase
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "应追缴金额必须大于0");
         }
 
+        if (IsManualAmount && string.IsNullOrWhiteSpace(AmountNote))
+        {
+            ErrorMessage = "手工填写的应追缴总额必须说明原因";
+            return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "手工填写的应追缴总额必须说明原因");
+        }
+
         try
         {
             IsBusy = true;
@@ -453,7 +734,12 @@ public partial class RecoveryFormViewModel : ViewModelBase
                 MonthlyAmount = MonthlyAmount,
                 StartMonth = StartMonth,
                 EndMonth = EndMonth,
-                RecoveredAmount = RecoveredAmount
+                RecoveredAmount = RecoveredAmount,
+                RecoveryAmount = RecoveryAmount,
+                AmountSource = AmountSource,
+                AmountNote = AmountNote,
+                AutoAmount = AutoAmount,
+                Segments = Segments.ToList()
             };
 
             Result<long> result;

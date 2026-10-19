@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
+             xmlns:entities="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.Recovery.RecoveryManualPage"
              x:DataType="RecoveryManualViewModel"
              Title="后补追缴 - 手工录入"
@@ -95,15 +96,15 @@
                             <Label Grid.Column="1" Text="追缴明细" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                         </Grid>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
-                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="追缴原因" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Entry Text="{Binding RecoveryReason}" Placeholder="请输入追缴原因"
                                        Style="{StaticResource FormFieldEntryStyle}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                <Label Text="每月保障标准 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding MonthlyAmount}" Keyboard="Numeric" Placeholder="请输入每月保障标准"
+                                <Label Text="每月保障标准（非必填）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding MonthlyAmount}" Keyboard="Numeric" Placeholder="无历史标准时可留空"
                                        Style="{StaticResource FormFieldEntryStyle}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
@@ -136,25 +137,75 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="3" Grid.ColumnSpan="2" Spacing="4">
                                 <Label Text="应追缴总额" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                    <Border BackgroundColor="{StaticResource PrimarySoft}"
-                                            StrokeThickness="0"
-                                            StrokeShape="RoundRectangle 8"
-                                            Padding="12,8"
-                                            VerticalOptions="Center">
-                                        <Label Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}"
-                                               FontSize="18"
-                                               FontAttributes="Bold"
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <Entry Text="{Binding RecoveryAmount}" Keyboard="Numeric"
+                                           Placeholder="自动计算或手工填写"
+                                           Style="{StaticResource FormFieldEntryStyle}"/>
+                                    <Border Grid.Column="1" BackgroundColor="{StaticResource PrimarySoft}"
+                                            StrokeThickness="0" StrokeShape="RoundRectangle 12"
+                                            Padding="10,4" VerticalOptions="Center">
+                                        <Label Text="{Binding AmountSourceDisplay}" FontSize="12"
                                                TextColor="{StaticResource Primary}"/>
                                     </Border>
-                                    <Label Grid.Column="1"
-                                           Text="{Binding RecoveryMonths, StringFormat='累计 {0} 个月'}"
-                                           FontSize="14"
-                                           TextColor="{StaticResource TextSecondary}"
-                                           VerticalOptions="Center"/>
                                 </Grid>
+                                <Label Text="{Binding RecoveryMonths, StringFormat='累计 {0} 个月'}"
+                                       FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding AutoReferenceText}"
+                                       IsVisible="{Binding HasAutoDifference}"
+                                       FontSize="13" TextColor="{StaticResource Warning}"/>
+                            </VerticalStackLayout>
+                            <!-- 无法自动计算（历史数据不全/跨度超限）：提示转手工填写 -->
+                            <Border Grid.Row="4" Grid.ColumnSpan="2" IsVisible="{Binding IsCannotAuto}"
+                                    BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <Label Text="{Binding CannotAutoReason}" FontSize="13"
+                                       TextColor="{StaticResource Warning}"/>
+                            </Border>
+                            <!-- 手工填写原因（金额来源=手工填写时必填） -->
+                            <VerticalStackLayout Grid.Row="5" Grid.ColumnSpan="2" Spacing="4" IsVisible="{Binding IsManualAmount}">
+                                <Label Text="手工填写原因（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Entry Text="{Binding AmountNote}"
+                                       Placeholder="请说明手工填写原因（如：历史数据不全、按业务核实金额等）"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
                             </VerticalStackLayout>
                         </Grid>
+
+                        <!-- 自动计算依据：分段明细（可折叠；手工录入页通常无） -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding HasSegments}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleSegmentsCommand}"/>
+                                </Grid.GestureRecognizers>
+                                <Label Text="自动计算依据（分段明细）" FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding SegmentsToggleText}" FontSize="13"
+                                       TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            </Grid>
+                            <VerticalStackLayout Spacing="6" IsVisible="{Binding IsSegmentsExpanded}">
+                                <Grid ColumnDefinitions="1.3*,1.3*,0.8*,1*,1.1*" ColumnSpacing="6">
+                                    <Label Text="起始月" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Grid.Column="1" Text="终止月" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Grid.Column="2" Text="月数" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Grid.Column="3" Text="月标准" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Grid.Column="4" Text="段金额" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                                </Grid>
+                                <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Segments}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="entities:RecoverySegment">
+                                            <Grid ColumnDefinitions="1.3*,1.3*,0.8*,1*,1.1*" ColumnSpacing="6">
+                                                <Label Text="{Binding SegmentStartMonth}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Grid.Column="1" Text="{Binding SegmentEndMonth}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Grid.Column="2" Text="{Binding Months}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Grid.Column="3" Text="{Binding MonthlyAmount, StringFormat='{0:N2}'}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Grid.Column="4" Text="{Binding SegmentAmount, StringFormat='{0:N2}'}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                                <Label Text="{Binding SegmentsTotalText}" FontSize="13" FontAttributes="Bold"
+                                       TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 

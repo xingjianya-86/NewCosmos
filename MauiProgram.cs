@@ -189,6 +189,8 @@ public static class MauiProgram
         #region 领域服务注册 - 后补追缴
 
         builder.Services.AddSingleton<IRecoveryService, RecoveryService>();
+        // 追缴历史取数器（月保障标准时间轴，供 RecoveryAmountCalculator 分段计算）
+        builder.Services.AddSingleton<IRecoveryHistoryProvider, RecoveryHistoryProvider>();
 
         #endregion
 
