@@ -238,6 +238,29 @@ public class TemplateConfig
     public Dictionary<string, int> CopiesByClassification { get; set; } = new();
 
     /// <summary>
+    /// 模板级默认打印份数（0 或缺省 = 未配置，默认 1 份）。仅当分类映射未命中时生效，
+    /// 优先级与解析口径唯一实现见 <see cref="ResolveCopies"/>——档案输出页、手机推送打印共用，禁止另写一套。
+    /// </summary>
+    public int Copies { get; set; }
+
+    /// <summary>
+    /// 解析本模板的生效打印份数（唯一事实来源）：
+    /// 分类映射 <see cref="CopiesByClassification"/>[classification] → 模板级 <see cref="Copies"/> → 1；越界钳制 1..99。
+    /// </summary>
+    public int ResolveCopies(string? classification)
+    {
+        if (CopiesByClassification != null && CopiesByClassification.Count > 0
+            && !string.IsNullOrEmpty(classification)
+            && CopiesByClassification.TryGetValue(classification, out var byClassification)
+            && byClassification > 0)
+        {
+            return Math.Clamp(byClassification, 1, 99);
+        }
+
+        return Copies > 0 ? Math.Clamp(Copies, 1, 99) : 1;
+    }
+
+    /// <summary>
     /// 是否按赡养人/照料人每人生成一份文档
     /// </summary>
     public bool CopiesBySupporter { get; set; }

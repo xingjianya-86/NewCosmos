@@ -275,6 +275,10 @@
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="申请日期 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <DatePicker Date="{Binding ApplyDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                <!-- 归属批次提示：申请日 > 当月验收日(13号) 时自动顺延下月 -->
+                                <Label Text="{Binding BatchHintText}" FontSize="11"
+                                       TextColor="{StaticResource TextTertiary}"
+                                       IsVisible="{Binding HasBatchHint}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="填报单位" Style="{StaticResource FormFieldLabelStyle}"/>

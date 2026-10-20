@@ -12,10 +12,10 @@ public interface IPrintJobFactory
     /// <summary>按请求入队（若未提供 TemplateId 则按业务类型+分类解析模板）。</summary>
     Task<Result<PrintJob>> EnqueueAsync(PrintJobRequest request, CancellationToken ct = default);
 
-    /// <summary>临时救助推送打印（构建单据字段后入队）。</summary>
+    /// <summary>临时救助推送打印（构建单据字段后入队；copies 缺省时取模板配置的默认份数）。</summary>
     Task<Result<PrintJob>> EnqueueTempReliefAsync(
         long applicationId,
-        int copies = 1,
+        int? copies = null,
         bool isDuplex = false,
         string? printerName = null,
         CancellationToken ct = default);

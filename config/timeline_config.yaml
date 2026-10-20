@@ -26,15 +26,18 @@ timelines:
     weekend_adjust: "previous_workday"  # 周末调整策略
 
   # 临时救助验收时间线（C线；以验收日为锚，公示/入户调查日历日倒推）
-  # 说明（2026-10-18）：权威实现为 BusinessTimelineService.CalculateCLine，本段仅作文档描述。
+  # 说明（2026-10-18 重构 / 2026-10-20 归属修订）：权威实现为 BusinessTimelineService.CalculateCLine
+  # 与 CalculateCLineForApplyDate，本段仅作文档描述。
   # 验收日固定每月13号（非工作日顺延至其后最近工作日）；公示止=验收日前1天、公示起=验收日前3天
-  # （均日历日，不排工作日）；入户调查窗口=[验收日前5天, 公示起日]；申请日期≤入户调查窗口起日（越界自动钳入）。
+  # （均日历日，不排工作日）；入户调查窗口=[验收日前5天, 公示起日]。
+  # 归属：申请日 ≤ 当月验收日归本月，超过验收日顺延下月（申请日期不改写、不钳制）；
+  # 细则见 docs\20261020_临时救助C线申请日期归属滚动.md。
   temp_relief:
     acceptance_day: 13               # 验收日固定日历日（必为工作日，非工作日顺延至其后最近工作日）
     publicity_end_offset: -1         # 公示止 = 验收日 − 1（日历日，不排工作日）
     publicity_start_offset: -3       # 公示起 = 验收日 − 3（日历日，不排工作日）
     investigation_start_offset: -5   # 入户调查窗口起日 = 验收日 − 5（日历日）；截止 = 公示起日
-    apply_date_auto_clamp: true      # 申请日期越界自动钳到入户调查窗口起日（不报错）
+    apply_date_roll_after_acceptance: true  # 申请日超过验收日 → 归属下月批次；申请日期仅"晚于今天"被拉回今天
 
 # ── 节假日服务配置 ──
 # 现状说明（2026-09）：节假日数据已数据化，权威来源为 nc_sys_holidays 表（值班模块维护：

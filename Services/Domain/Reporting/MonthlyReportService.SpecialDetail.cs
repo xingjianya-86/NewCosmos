@@ -1496,6 +1496,10 @@ public partial class MonthlyReportService
     /// 变更链分类施保减发行（施保金减发数据源之二：nc_biz_change_records 挂旧档，
     /// 户主/地址/类别/原现户月取旧档，死亡成员取 nc_biz_death_records；
     /// 取数带互斥守卫——该链已有保障金变更登记记录时不出行，见 GetShiBaoReductionRowsAsync 注释）
+    ///
+    /// 理由/成员/类别/原低保金四项一律取"链主变更记录"（Main*）与"变更前后分类"（Old/NewClassification）：
+    /// 分类施保减除/分类施保变更是附属记录，自身不带原因语义，禁止拿它当理由（曾硬编码"户主死亡"致
+    /// 经济复核退出的张彦亮误印户主死亡）。原低保金优先取链上 Before 快照（旧档可能被判定覆写）。
     /// </summary>
     private class ShiBaoReduceRow
     {
@@ -1513,6 +1517,21 @@ public partial class MonthlyReportService
         public decimal OldMonthly { get; set; }
         public decimal? NewMonthly { get; set; }
         public string? DeceasedName { get; set; }
+        /// <summary>本记录变更前/后分类（整户退出判定与类别列用；空则回退旧/新档当前分类）</summary>
+        public string? OldClassification { get; set; }
+        public string? NewClassification { get; set; }
+        /// <summary>新档当前分类（new_classification 为空时的退出判定兜底）</summary>
+        public string? NewClassificationResult { get; set; }
+        /// <summary>本记录变更原因原文（主记录缺失时的理由兜底）</summary>
+        public string? ChangeReason { get; set; }
+        /// <summary>链主变更记录（经济复核/户主死亡/成员变更/跨大类转入）的原因类型与原因原文</summary>
+        public string? MainReasonType { get; set; }
+        public string? MainReason { get; set; }
+        /// <summary>主记录减员/死亡明细：被减成员姓名、减员理由（new_value 的 | 分隔首段），顿号连接</summary>
+        public string? RemoveMembers { get; set; }
+        public string? RemoveReasons { get; set; }
+        /// <summary>链上 Before 快照 JSON（含 OldHouseholdMonthlyGuaranteeAmount 时才有值）</summary>
+        public string? OldSnapshotJson { get; set; }
     }
 
     /// <summary>

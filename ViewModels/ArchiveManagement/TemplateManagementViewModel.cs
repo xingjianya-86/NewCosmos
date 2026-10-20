@@ -10,6 +10,7 @@ using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Platform;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
+using System.Text.Json.Nodes;
 
 namespace NewCosmos.ViewModels.ArchiveManagement;
 
@@ -78,6 +79,17 @@ public partial class TemplateManagementViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isEditingCategories;
 
+    /// <summary>模板默认打印份数（编辑中值；1-99，保存只写 config_json 的 copies 键）</summary>
+    [ObservableProperty]
+    private int _editingCopies = 1;
+
+    /// <summary>
+    /// 份数区提示（选中模板/保存后刷新；不放 getter 里解析 JSON——getter 会被 XAML 反复求值）：
+    /// 存在分类级份数时说明"分类命中时优先于默认份数"，避免改了不生效的困惑。
+    /// </summary>
+    [ObservableProperty]
+    private string _copiesHint = string.Empty;
+
     public bool IsNotEditing => !IsEditingConfig && !IsEditingCategories;
 
     public List<string> TemplateTypes { get; } = new() { "Word", "Excel" };
@@ -115,6 +127,18 @@ public partial class TemplateManagementViewModel : ViewModelBase
     partial void OnSelectedTemplateChanged(Template value)
     {
         HasSelectedTemplate = value != null;
+        // 载入模板默认份数与份数提示；损坏配置由 TemplateCopiesResolver 回退默认值，不抛异常
+        EditingCopies = value == null ? 1 : TemplateCopiesResolver.ResolveDefault(value.ConfigJson);
+        UpdateCopiesHint(value?.ConfigJson);
+    }
+
+    /// <summary>刷新份数提示（选中模板/保存后调用）；损坏或空配置按"未配置分类级份数"显示。</summary>
+    private void UpdateCopiesHint(string? configJson)
+    {
+        var overrides = TemplateCopiesResolver.ClassificationCopies(configJson);
+        CopiesHint = overrides.Count > 0
+            ? $"该模板已配置 {overrides.Count} 项分类级份数（分类命中时优先于下方默认份数）"
+            : "未配置分类级份数：所有分类按下方默认份数打印";
     }
 
     partial void OnIsEditingConfigChanged(bool value)
@@ -464,6 +488,79 @@ public partial class TemplateManagementViewModel : ViewModelBase
     {
         IsEditingConfig = false;
         EditingConfigJson = string.Empty;
+    }
+
+    // ========================
+    //  默认打印份数
+    // ========================
+
+    /// <summary>
+    /// 保存模板默认打印份数：只改 config_json 的 copies 键，
+    /// fields/tables/compositeFields/copiesByClassification 等其余配置原样保留（非对象结构拒绝写入）。
+    /// 生效优先级见 TemplateConfig.ResolveCopies：分类映射 → copies → 1。
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveCopiesAsync()
+    {
+        if (SelectedTemplate == null) return;
+
+        var copies = Math.Clamp(EditingCopies, 1, 99);
+        if (copies != EditingCopies) EditingCopies = copies;
+
+        var json = UpdateCopiesJson(SelectedTemplate.ConfigJson, copies);
+        if (json == null)
+        {
+            await _dialogService.DisplayAlertAsync("配置异常",
+                "该模板配置不是 JSON 对象，无法写入份数；请先用「修改字段映射」修正配置结构", "确定");
+            return;
+        }
+
+        try
+        {
+            await _templateService.UpdateConfigJsonAsync(SelectedTemplate.Id, json);
+            SelectedTemplate.ConfigJson = json;
+            if (IsEditingConfig) EditingConfigJson = json;
+            UpdateCopiesHint(json);
+            _logger.LogBusiness("模板默认份数修改",
+                ("TemplateId", SelectedTemplate.Id),
+                ("Copies", copies));
+            await _dialogService.DisplayAlertAsync("成功", $"默认份数已保存：{copies} 份", "确定");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"保存默认份数失败: {ex.Message}");
+            await _dialogService.DisplayAlertAsync("错误", $"保存失败: {ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>只写/改 config_json 的 copies 键；结构非对象或解析失败返回 null（绝不覆盖原配置）。</summary>
+    private static string? UpdateCopiesJson(string? configJson, int copies)
+    {
+        if (string.IsNullOrWhiteSpace(configJson))
+        {
+            return new JsonObject { ["copies"] = copies }.ToJsonString(
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
+
+        JsonNode? node;
+        try
+        {
+            node = JsonNode.Parse(configJson);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (node is not JsonObject obj) return null;
+
+        obj["copies"] = copies;
+        return obj.ToJsonString(new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            // 不用默认编码器：它会把中文占位符转义成 \uXXXX，JSON 面板会变得不可读
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 
     // ========================

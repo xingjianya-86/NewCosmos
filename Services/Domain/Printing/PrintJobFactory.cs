@@ -72,7 +72,7 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
 
     public async Task<Result<PrintJob>> EnqueueTempReliefAsync(
         long applicationId,
-        int copies = 1,
+        int? copies = null,
         bool isDuplex = false,
         string? printerName = null,
         CancellationToken ct = default)
@@ -101,16 +101,31 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         var fields = TempReliefPrintDataBuilder.BuildSingleFields(
             fullApp, memberList, contactUnitPhone, acceptanceDate, investigationDate);
 
+        // 手机推送打印的模板与份数（业务确认：与桌面端同打「临时救助_审核审批表*」、默认 2 份）。
+        // 旧口径是 EnqueueAsync 里按 sort_order 取第一张 Word 模板 —— 实际会取到「临时救助_信息公示」，
+        // 不是审核审批表，故在此显式选模板并把 TemplateId 写进请求（EnqueueAsync 不再二次解析）。
+        var categories = ArchiveCategoryResolver.GetRecordCategories(TempReliefConstants.BusinessType, fullApp.ReliefType);
+        var candidates = await _templateService.GetByCategoriesAsync(categories, ct);
+        var template = PickPushPrintTemplate(candidates);
+        if (template == null)
+            return Result.Failure<PrintJob>(ErrorCodes.TEMPLATE_NOT_FOUND,
+                $"未找到临时救助打印模板（{string.Join(" | ", categories)}）");
+
+        // 份数：调用方显式传入 > 传入值，否则按模板配置解析（与档案输出页同一口径 TemplateCopiesResolver）
+        var effectiveCopies = copies ?? TemplateCopiesResolver.Resolve(template.ConfigJson, fullApp.ReliefType);
+        LogInfo($"临时救助推送打印: 模板={template.Name} 份数={effectiveCopies} 分类={fullApp.ReliefType}");
+
         var request = new PrintJobRequest
         {
             BusinessType = TempReliefConstants.BusinessType,
             BusinessId = applicationId,
             Classification = fullApp.ReliefType,
-            TemplateName = null,
+            TemplateId = template.Id,
+            TemplateName = template.Name,
             ApplicantName = fullApp.ApplicantName,
             ApplicantIdCard = fullApp.ApplicantIdCard,
             PrinterName = printerName,
-            Copies = copies,
+            Copies = effectiveCopies,
             IsDuplex = isDuplex,
             Fields = fields,
             TableRows = new(),
@@ -118,6 +133,18 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         };
 
         return await EnqueueAsync(request, ct);
+    }
+
+    /// <summary>
+    /// 手机推送打印选模板（唯一口径）：优先「临时救助_审核审批表*」（业务确认的主单），
+    /// 未命中回退第一张 Word 模板（与 <see cref="ResolveTemplateAsync"/> 同序）。
+    /// </summary>
+    private static Template? PickPushPrintTemplate(IReadOnlyList<Template> candidates)
+    {
+        if (candidates.Count == 0) return null;
+        return candidates.FirstOrDefault(t => t.Name.StartsWith(TempReliefConstants.TemplateAuditApprovalPrefix, StringComparison.Ordinal))
+               ?? candidates.FirstOrDefault(t => !string.Equals(t.FileType, "xlsx", StringComparison.OrdinalIgnoreCase))
+               ?? candidates[0];
     }
 
     public async Task<Result<PrintJob>> EnqueueElderlyAsync(
