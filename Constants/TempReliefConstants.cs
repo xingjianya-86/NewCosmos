@@ -312,8 +312,10 @@ public static class TempReliefConstants
     public const string CategorySmall = "临时救助/小额";
 
     /// <summary>
-    /// 打印模板名前缀：审核审批表（手机推送打印固定取该模板；库中现为「临时救助_审核审批表2」）。
+    /// 打印模板名匹配令牌：审核审批表（手机推送打印固定取该模板）。
+    /// 2026-10-21 起模板按救助类型分表：大额「临时救助_大额救助_审核审批表」/ 小额「临时救助_小额救助_审核审批表」，
+    /// 旧「临时救助_审核审批表」前缀不再成立；改用「名称含本令牌」匹配。
     /// 业务确认手机端与桌面端同打这一张，禁止再按 sort_order 猜模板。
     /// </summary>
-    public const string TemplateAuditApprovalPrefix = "临时救助_审核审批表";
+    public const string TemplateAuditApprovalNameToken = "审核审批表";
 }

@@ -20,6 +20,13 @@
     "sortOrder": 0
   },
   {
+    "name": "临时救助_小额救助_审核审批表",
+    "file": "Templates_NEW/临时救助_小额救助_审核审批表.xlsx",
+    "configFile": "Templates_NEW/临时救助_小额救助_审核审批表.config.json",
+    "categories": ["临时救助/小额"],
+    "sortOrder": 234
+  },
+  {
     "name": "模板_政务值班表",
     "file": "Resources/Templates/模板_政务值班表.xlsx",
     "categories": ["值班管理"],

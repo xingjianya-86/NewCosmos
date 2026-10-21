@@ -101,7 +101,7 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         var fields = TempReliefPrintDataBuilder.BuildSingleFields(
             fullApp, memberList, contactUnitPhone, acceptanceDate, investigationDate);
 
-        // 手机推送打印的模板与份数（业务确认：与桌面端同打「临时救助_审核审批表*」、默认 2 份）。
+        // 手机推送打印的模板与份数（业务确认：与桌面端同打「临时救助_…审核审批表」、默认 2 份）。
         // 旧口径是 EnqueueAsync 里按 sort_order 取第一张 Word 模板 —— 实际会取到「临时救助_信息公示」，
         // 不是审核审批表，故在此显式选模板并把 TemplateId 写进请求（EnqueueAsync 不再二次解析）。
         var categories = ArchiveCategoryResolver.GetRecordCategories(TempReliefConstants.BusinessType, fullApp.ReliefType);
@@ -136,13 +136,16 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
     }
 
     /// <summary>
-    /// 手机推送打印选模板（唯一口径）：优先「临时救助_审核审批表*」（业务确认的主单），
+    /// 手机推送打印选模板（唯一口径）：优先「临时救助_…审核审批表…」（业务确认的主单），
     /// 未命中回退第一张 Word 模板（与 <see cref="ResolveTemplateAsync"/> 同序）。
+    /// 2026-10-21 起大额/小额分表（临时救助_大额救助_审核审批表 / 临时救助_小额救助_审核审批表），
+    /// 旧名字前缀失效；调用方传入的分类已互斥（ReliefType→CategoryLarge/CategorySmall），
+    /// 故「名称含令牌」命中的就是本救助类型的那一张。
     /// </summary>
     private static Template? PickPushPrintTemplate(IReadOnlyList<Template> candidates)
     {
         if (candidates.Count == 0) return null;
-        return candidates.FirstOrDefault(t => t.Name.StartsWith(TempReliefConstants.TemplateAuditApprovalPrefix, StringComparison.Ordinal))
+        return candidates.FirstOrDefault(t => t.Name.Contains(TempReliefConstants.TemplateAuditApprovalNameToken, StringComparison.Ordinal))
                ?? candidates.FirstOrDefault(t => !string.Equals(t.FileType, "xlsx", StringComparison.OrdinalIgnoreCase))
                ?? candidates[0];
     }
