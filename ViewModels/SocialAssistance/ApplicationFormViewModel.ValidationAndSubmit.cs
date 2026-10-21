@@ -874,7 +874,10 @@ public partial class ApplicationFormViewModel
                 // 分类/保障金用加载时刻的 _loaded*（与入口快照同一时刻捕获，口径一致；
                 // Step5 判定落库会覆写 classification_result/total_guarantee_amount，读库会恒判"无变化"）
                 OldClassification = _loadedClassification,
+                OldIsEligible = _entryApplicationSnapshot?.IsEligible,
                 OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
+                // 年值与年人均：停旧建新后回写旧档历史快照（RestoreSourceArchiveAsync）
+                OldPerCapitaAnnualIncome = _entryApplicationSnapshot?.PerCapitaAnnualIncome,
                 // 保障金变更登记口径旧值（户月保障金，不含分类施保/照料费）：Step5 覆写前捕获
                 OldHouseholdMonthlyGuaranteeAmount = _loadedHouseholdMonthlyGuaranteeAmount,
                 OldClassifiedSubsidyAmount = _loadedClassifiedSubsidyAmount,
@@ -1281,6 +1284,7 @@ public partial class ApplicationFormViewModel
                     ChangeReason = ApplicationReasonDetail,
                     OldFamilySize = _loadedFamilySize,
                     OldClassification = _loadedClassification,
+                    OldIsEligible = _entryApplicationSnapshot?.IsEligible,
                     OldGuaranteeAmount = _loadedTotalGuaranteeAmount,
                     // 保障金变更登记口径旧值（户月保障金，不含分类施保/照料费）：Step5 覆写前捕获
                     OldHouseholdMonthlyGuaranteeAmount = _loadedHouseholdMonthlyGuaranteeAmount,
@@ -1291,6 +1295,21 @@ public partial class ApplicationFormViewModel
                     OldTotalFamilyIncome = _entryApplicationSnapshot?.TotalFamilyIncome,
                     OldPerCapitaIncome = _entryApplicationSnapshot?.PerCapitaIncome,
                     OldRigidExpenditure = _entryApplicationSnapshot?.RigidExpenditure,
+                    // 年值/年人均与收入分项：停旧建新后回写旧档历史快照（RestoreSourceArchiveAsync）
+                    OldTotalAnnualIncome = _entryApplicationSnapshot?.TotalAnnualIncome,
+                    OldPerCapitaAnnualIncome = _entryApplicationSnapshot?.PerCapitaAnnualIncome,
+                    OldComponents = _entryApplicationSnapshot == null ? null : new IncomeComponentValues
+                    {
+                        WorkIncomeTotal = _entryApplicationSnapshot.WorkIncomeTotal,
+                        BusinessIncomeTotal = _entryApplicationSnapshot.BusinessIncomeTotal,
+                        PropertyIncomeTotal = _entryApplicationSnapshot.PropertyIncomeTotal,
+                        TransferIncomeTotal = _entryApplicationSnapshot.TransferIncomeTotal,
+                        OtherIncomeTotal = _entryApplicationSnapshot.OtherIncomeTotal,
+                        RigidExpenditure = _entryApplicationSnapshot.RigidExpenditure,
+                        AlimonyIncome = _entryApplicationSnapshot.AlimonyIncome,
+                        LandIncomeTotal = _entryApplicationSnapshot.LandIncomeTotal,
+                        SubsidyTotal = _entryApplicationSnapshot.SubsidyTotal
+                    },
                     NewTotalFamilyIncome = TotalFamilyIncome,
                     NewPerCapitaIncome = PerCapitaIncome,
                     NewTotalAnnualIncome = TotalAnnualIncome,
