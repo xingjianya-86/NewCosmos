@@ -895,6 +895,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                        {categorySql}
                        -- 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算停保
                        {StoppedArchiveFilter.NotRebuildContinuationSql("a")}
+                       -- 终结档（停旧建新产物自身为停保码）与被停的旧档是同一户，避免重复计数
+                       {StoppedArchiveFilter.TerminalRebuildArchiveSql("a")}
                      ORDER BY a.stop_date ASC, a.first_approved_at DESC";
         var result = await _db.QueryAsync<StoppedRowData>(sql, ct, parameters.ToArray());
         if (result.IsFailure)
@@ -1207,22 +1209,23 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             return Result.Failure<List<MonthlyAmountChangeRow>>(result.ErrorCode!, result.Message!);
 
         var rows = result.Value ?? new List<AmountChangeRow>();
-        // 减发人口数=变更前后快照 FamilySize 差（批量加载避免 N+1）
-        var diffMapResult = await LoadFamilySizeDiffMapAsync(rows.Select(r => r.ChangeId), ct);
-        var diffMap = diffMapResult.IsSuccess ? diffMapResult.Value : new Dictionary<long, int>();
+        // 同链变更快照（Before/After 的家庭人口 + 户月口径旧值，批量加载避免 N+1）：
+        // 快照挂在"主记录"上，而进本表的常是同事务补写的"保障金变更登记"记录（自身无快照），
+        // 故按同 application_id / new_application_id 链、同事务（changed_at 相等）优先、其次时间最近取一次事件的快照，
+        // 供减发人口数 / 原家庭人口 / 现家庭人口 / 户月原值与分类施保旧值共用。
+        var chainMapResult = await LoadChainSnapshotMapAsync(rows.Select(r => r.ChangeId), ct);
+        var chainMap = chainMapResult.IsSuccess
+            ? chainMapResult.Value
+            : new Dictionary<long, ChainSnapshot>();
         var dateMapResult = await LoadApprovalDateMapAsync(rows.Select(r => r.HeadIdCard), ct);
         if (dateMapResult.IsFailure)
             return Result.Failure<List<MonthlyAmountChangeRow>>(dateMapResult.ErrorCode!, dateMapResult.Message!);
         var dateMap = dateMapResult.Value;
-        // 死亡人员姓名 + 原家庭人口（从该户死亡/变更 Before 快照批量查，减发理由/原家庭人口用）
+        // 死亡人员姓名 + 原家庭人口兜底（从该户死亡/变更 Before 快照批量查，减发理由列用）
         var deceasedMapResult = await LoadDeceasedInfoMapAsync(rows.Select(r => r.HeadIdCard), ct);
         if (deceasedMapResult.IsFailure)
             return Result.Failure<List<MonthlyAmountChangeRow>>(deceasedMapResult.ErrorCode!, deceasedMapResult.Message!);
         var deceasedMap = deceasedMapResult.Value;
-        // Before 快照的户月口径旧值（OldHouseholdMonthlyGuaranteeAmount/OldClassifiedSubsidyAmount）：
-        // 登记记录本身已是户月口径无需换算；经济复核主记录等存量记录用快照换算，快照缺失回退原值（历史显示不变）
-        var snapshotMapResult = await LoadHouseholdAmountSnapshotMapAsync(rows.Select(r => r.ChangeId), ct);
-        var snapshotMap = snapshotMapResult.IsSuccess ? snapshotMapResult.Value : new Dictionary<long, HouseholdAmountSnapshot>();
         var cycleEnd = c.End.AddDays(-1);
         var threshold = FundChangeThresholdHelper.Threshold;
 
@@ -1237,8 +1240,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             //   ② 其余记录（经济复核主记录等）：Before 快照有户月旧值 且 新档有户月新值 → 双双用户月；
             //   ③ 任一缺失（存量记录）→ 双双回退记录合计值（保持历史显示口径不变）。
             decimal oldHousehold, newHousehold;
-            var hasSnapshotOld = snapshotMap.TryGetValue(item.ChangeId ?? 0, out var snap)
-                && snap.OldHouseholdMonthly.HasValue;
+            var chain = item.ChangeId.HasValue && chainMap.TryGetValue(item.ChangeId.Value, out var ch)
+                ? ch
+                : null;
+            var hasSnapshotOld = chain?.OldHouseholdMonthly.HasValue == true;
             if (isRegistration)
             {
                 oldHousehold = item.OldGuaranteeAmount ?? 0;
@@ -1246,7 +1251,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             }
             else if (hasSnapshotOld && item.NewHouseholdMonthly.HasValue)
             {
-                oldHousehold = snap!.OldHouseholdMonthly!.Value;
+                oldHousehold = chain!.OldHouseholdMonthly!.Value;
                 newHousehold = item.NewHouseholdMonthly.Value;
             }
             else
@@ -1260,11 +1265,22 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             if (global::System.Math.Abs(householdDiff) < threshold)
                 continue;
 
-            // ── 分类施保列：新额取新档（链尾现役档案），旧额优先取快照，缺失回退旧档当前值 ──
+            // ── 分类施保列：新额取新档（链尾现役档案），旧额优先取同链快照，缺失回退旧档当前值 ──
             var newClassified = item.NewClassifiedSubsidyAmount ?? item.ClassifiedSubsidyAmount ?? 0;
-            var oldClassified = snapshotMap.TryGetValue(item.ChangeId ?? 0, out var snap2) && snap2.OldClassified.HasValue
-                ? snap2.OldClassified.Value
+            var oldClassified = chain?.OldClassified.HasValue == true
+                ? chain!.OldClassified!.Value
                 : item.ClassifiedSubsidyAmount ?? 0;
+
+            // ── 原家庭享受金（仅减发表）：原户月保障金 + 原分类施保 ──
+            // 模板无"原分类施保"列、现分类施保单独成列，原额须合并成总额才与减发金额对平
+            //（李增会：1106+104=1210，1210−79−104=1027）。
+            // 仅在旧值本身是"户月口径"时叠加：① 保障金变更登记记录（写入即户月，不含分类施保）、
+            // ② 取到 Before 快照户月旧值的记录；③ 存量/无快照记录的 old_guarantee_amount 本身就是
+            // 合计口径（含分类施保，如张彦亮 311 = 207+104），再叠加会重复计算。
+            // 增发表不改：模板无现分类施保列，改了会让"增发金额 = 新 − 原"对不上。
+            var oldAmountDisplay = !increase && (isRegistration || hasSnapshotOld)
+                ? oldHousehold + oldClassified
+                : oldHousehold;
 
             var changeAmt = global::System.Math.Abs(householdDiff);
             var birth = string.IsNullOrEmpty(item.HeadIdCard)
@@ -1300,26 +1316,38 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 reason = string.IsNullOrEmpty(reason) ? classifiedText : $"{reason}；{classifiedText}";
             }
 
+            // 原/现家庭人口与减发人口一律以同链变更快照为准：旧档的 family_size 已被 Step5 写成变更后值，
+            // 而停旧建新后旧档又被还原为"变更前"快照，两种取法在某一段都会错位。
+            // 无快照时回退：现人口 → 旧档当前值；原人口 → 死亡前快照 → 现人口。
+            var beforeFamilySize = chain?.BeforeFamilySize ?? 0;
+            var afterFamilySize = chain?.AfterFamilySize ?? 0;
+            var currentFamilySize = afterFamilySize > 0 ? afterFamilySize : item.FamilySize ?? 0;
+            var originalFamilySize = beforeFamilySize > 0
+                ? beforeFamilySize
+                : deceasedMap.TryGetValue(item.HeadIdCard ?? "", out var di2) && di2.OldFamilySize > 0
+                    ? di2.OldFamilySize
+                    : currentFamilySize;
+
             outRows.Add(new MonthlyAmountChangeRow
             {
                 HeadName = item.HeadName ?? "",
                 HeadBirth = birth,
-                FamilySize = (item.FamilySize ?? 0).ToString(),
+                FamilySize = currentFamilySize.ToString(),
                 Address = JoinFullAddress(item.District, item.Town, item.Community, item.Address),
                 Category = display,
                 EnjoyDate = enjoy,
-                OldAmount = oldHousehold.ToString("F2"),
+                // 原家庭享受金（减发表合并分类施保，见上）；增发表保持户月口径不变
+                OldAmount = oldAmountDisplay.ToString("F2"),
                 NewAmount = newHousehold.ToString("F2"),
                 Classification = display,
                 ChangeAmount = changeAmt.ToString("F2"),
-                // 减发人口=快照差；现分类施保=新档（链尾现役档案）分类施保金额
-                DecreasePerson = item.ChangeId.HasValue && diffMap.TryGetValue(item.ChangeId.Value, out var d) ? d : 0,
+                // 减发人口=同链 Before/After 快照差（登记记录自身无快照，链上主记录快照补位）；
+                // 现分类施保=新档（链尾现役档案）分类施保金额
+                DecreasePerson = chain?.FamilySizeDiff ?? 0,
                 ClassifiedSubsidyAmount = newClassified,
                 Reason = reason,
-                // 原家庭人口：从老档案（死亡前 Before 快照）计算，含死亡成员；无则用当前剔除赡养人口
-                OldFamilySize = deceasedMap.TryGetValue(item.HeadIdCard ?? "", out var di2) && di2.OldFamilySize > 0
-                    ? di2.OldFamilySize.ToString()
-                    : (item.FamilySize ?? 0).ToString(),
+                // 原家庭人口：同链变更前（Before）快照，含已死亡/已迁出成员；无则死亡前快照兜底
+                OldFamilySize = originalFamilySize.ToString(),
                 CategoryCode = categoryCode,
                 IsRural = ClassificationConstants.IsCodeRural(categoryCode)
             });
@@ -1328,85 +1356,43 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     }
 
     /// <summary>
-    /// 批量加载变更前后人口快照（nc_biz_change_snapshots.Before/After 的 FamilySize 差），
-    /// 用于保障金减发表的"减发人口数"列；无快照或差≤0 视为减少 0 人。
+    /// 同链变更快照：一次变更事件（Before/After）的家庭人口与户月口径旧值。
     /// </summary>
-    private async Task<Result<Dictionary<long, int>>> LoadFamilySizeDiffMapAsync(IEnumerable<long?> changeIds, CancellationToken ct = default)
+    private sealed class ChainSnapshot
     {
-        var ids = (changeIds ?? Enumerable.Empty<long?>())
-            .Where(i => i.HasValue && i.Value > 0)
-            .Select(i => i!.Value)
-            .Distinct()
-            .ToArray();
-        var map = new Dictionary<long, int>();
-        if (ids.Length == 0)
-            return Result.Success(map);
+        public int? BeforeFamilySize { get; set; }
+        public int? AfterFamilySize { get; set; }
 
-        var sql = @"SELECT change_id, snapshot_type, snapshot_data
-                    FROM nc_biz_change_snapshots
-                    WHERE change_id = ANY($1) AND snapshot_type IN ('Before','After')";
-        var result = await _db.QueryAsync<ChangeSnapshotRow>(sql, ct, ids);
-        if (result.IsFailure)
-            return Result.Failure<Dictionary<long, int>>(result.ErrorCode!, result.Message!);
+        /// <summary>Before 快照的原户月保障金（不含分类施保）</summary>
+        public decimal? OldHouseholdMonthly { get; set; }
 
-        var beforeByChange = new Dictionary<long, int>();
-        var afterByChange = new Dictionary<long, int>();
-        foreach (var row in result.Value ?? new List<ChangeSnapshotRow>())
-        {
-            var size = TryParseFamilySize(row.SnapshotData);
-            if (row.SnapshotType == "Before")
-                beforeByChange[row.ChangeId] = size;
-            else if (row.SnapshotType == "After")
-                afterByChange[row.ChangeId] = size;
-        }
-        foreach (var id in ids)
-        {
-            if (beforeByChange.TryGetValue(id, out var before) && afterByChange.TryGetValue(id, out var after))
-                map[id] = Math.Max(0, before - after);
-        }
-        return Result.Success(map);
+        /// <summary>Before 快照的原分类施保金额</summary>
+        public decimal? OldClassified { get; set; }
+
+        /// <summary>减发人口 = Before − After；任一快照缺失视为 0（不猜测）</summary>
+        public int FamilySizeDiff
+            => BeforeFamilySize.HasValue && AfterFamilySize.HasValue
+                ? global::System.Math.Max(0, BeforeFamilySize.Value - AfterFamilySize.Value)
+                : 0;
     }
 
-    /// <summary>
-    /// 从快照 JSON 提取 FamilySize（快照字段可能存在缺失/更名，解析失败返回 0，全部失败不影响主流程）
-    /// </summary>
-    private static int TryParseFamilySize(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return 0;
-        try
-        {
-            using var doc = global::System.Text.Json.JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("FamilySize", out var el) && el.ValueKind == global::System.Text.Json.JsonValueKind.Number)
-                return el.GetInt32();
-        }
-        catch (global::System.Text.Json.JsonException)
-        {
-            // 快照解析失败不计入减发人口（保持 0）
-        }
-        return 0;
-    }
-
-    private class ChangeSnapshotRow
+    private class ChainSnapshotRow
     {
         public long ChangeId { get; set; }
         public string? SnapshotType { get; set; }
-        public string? SnapshotData { get; set; }
-    }
-
-    /// <summary>户月口径旧值快照（Before JSON 中的 Old* 字段；缺失为 null，消费端回退原值）</summary>
-    private sealed class HouseholdAmountSnapshot
-    {
+        public int? FamilySize { get; set; }
         public decimal? OldHouseholdMonthly { get; set; }
         public decimal? OldClassified { get; set; }
     }
 
     /// <summary>
-    /// 批量加载变更 Before 快照中的户月口径旧值（OldHouseholdMonthlyGuaranteeAmount / OldClassifiedSubsidyAmount）。
-    /// 保障金变更登记记录自身已是户月口径、无需快照；本方法服务于经济复核/成员变更主记录——
-    /// 旧档在停旧建新前已被 Step5 判定覆写，只有表单加载时刻捕获的快照才含真旧值。
-    /// 快照缺失（存量记录）返回不含该 changeId 的条目，消费端回退 old_guarantee_amount（历史显示不变）。
+    /// 批量加载"同链变更快照"（Before/After 的 FamilySize + 户月口径旧值）。
+    /// 快照挂在主记录（经济复核/成员变更）上，而进增减发表的常是同事务补写的"保障金变更登记"记录，
+    /// 登记记录自身无快照 → 按同链（application_id 相同、new_application_id 相同）、
+    /// 同事务（changed_at 相等）优先、其次时间最近的一次事件补位取数。
+    /// 快照缺失的 changeId 不入 map，消费端回退旧记录字段（历史显示不变）。
     /// </summary>
-    private async Task<Result<Dictionary<long, HouseholdAmountSnapshot>>> LoadHouseholdAmountSnapshotMapAsync(
+    private async Task<Result<Dictionary<long, ChainSnapshot>>> LoadChainSnapshotMapAsync(
         IEnumerable<long?> changeIds, CancellationToken ct = default)
     {
         var ids = (changeIds ?? Enumerable.Empty<long?>())
@@ -1414,24 +1400,62 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             .Select(i => i!.Value)
             .Distinct()
             .ToArray();
-        var map = new Dictionary<long, HouseholdAmountSnapshot>();
+        var map = new Dictionary<long, ChainSnapshot>();
         if (ids.Length == 0)
             return Result.Success(map);
 
-        var sql = @"SELECT change_id, snapshot_type, snapshot_data
-                    FROM nc_biz_change_snapshots
-                    WHERE change_id = ANY($1) AND snapshot_type = 'Before'";
-        var result = await _db.QueryAsync<ChangeSnapshotRow>(sql, ct, ids);
+        var sql = @"SELECT cr.id AS change_id, s.snapshot_type,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'FamilySize') = 'number'
+                                THEN (s.snapshot_data ->> 'FamilySize')::int END AS family_size,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'OldHouseholdMonthlyGuaranteeAmount') = 'number'
+                                THEN (s.snapshot_data ->> 'OldHouseholdMonthlyGuaranteeAmount')::numeric END AS old_household_monthly,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'OldClassifiedSubsidyAmount') = 'number'
+                                THEN (s.snapshot_data ->> 'OldClassifiedSubsidyAmount')::numeric END AS old_classified
+                    FROM nc_biz_change_records cr
+                    JOIN LATERAL (
+                            SELECT x.id
+                            FROM nc_biz_change_records x
+                            WHERE x.deleted_at IS NULL
+                              AND x.application_id = cr.application_id
+                              AND x.new_application_id IS NOT DISTINCT FROM cr.new_application_id
+                            ORDER BY CASE WHEN x.changed_at = cr.changed_at THEN 0 ELSE 1 END,
+                                     ABS(EXTRACT(EPOCH FROM (x.changed_at - cr.changed_at))),
+                                     x.id
+                            LIMIT 1
+                          ) x ON TRUE
+                    JOIN nc_biz_change_snapshots s
+                      ON s.change_id = x.id AND s.snapshot_type IN ('Before','After')
+                    WHERE cr.id = ANY($1)";
+        var result = await _db.QueryAsync<ChainSnapshotRow>(sql, ct, ids);
         if (result.IsFailure)
-            return Result.Failure<Dictionary<long, HouseholdAmountSnapshot>>(result.ErrorCode!, result.Message!);
+            return Result.Failure<Dictionary<long, ChainSnapshot>>(result.ErrorCode!, result.Message!);
 
-        foreach (var row in result.Value ?? new List<ChangeSnapshotRow>())
+        foreach (var row in result.Value ?? new List<ChainSnapshotRow>())
         {
-            var snapshot = ParseHouseholdAmountSnapshot(row.SnapshotData);
-            if (snapshot != null)
-                map[row.ChangeId] = snapshot;
+            if (!map.TryGetValue(row.ChangeId, out var snap))
+            {
+                snap = new ChainSnapshot();
+                map[row.ChangeId] = snap;
+            }
+            if (global::System.String.Equals(row.SnapshotType, "Before", global::System.StringComparison.Ordinal))
+            {
+                snap.BeforeFamilySize = row.FamilySize;
+                snap.OldHouseholdMonthly = row.OldHouseholdMonthly;
+                snap.OldClassified = row.OldClassified;
+            }
+            else if (global::System.String.Equals(row.SnapshotType, "After", global::System.StringComparison.Ordinal))
+            {
+                snap.AfterFamilySize = row.FamilySize;
+            }
         }
         return Result.Success(map);
+    }
+
+    /// <summary>户月口径旧值快照（Before JSON 中的 Old* 字段；缺失为 null，消费端回退原值）</summary>
+    private sealed class HouseholdAmountSnapshot
+    {
+        public decimal? OldHouseholdMonthly { get; set; }
+        public decimal? OldClassified { get; set; }
     }
 
     /// <summary>从 Before 快照 JSON 提取户月口径旧值；两个字段都缺失返回 null（不猜测）</summary>
