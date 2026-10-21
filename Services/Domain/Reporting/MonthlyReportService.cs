@@ -1390,6 +1390,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     /// 快照挂在主记录（经济复核/成员变更）上，而进增减发表的常是同事务补写的"保障金变更登记"记录，
     /// 登记记录自身无快照 → 按同链（application_id 相同、new_application_id 相同）、
     /// 同事务（changed_at 相等）优先、其次时间最近的一次事件补位取数。
+    /// ⚠️ 候选记录必须**真的带 Before/After 快照**（EXISTS 过滤）：登记记录与主记录同一事务写入，
+    ///    changed_at 相同、id 更小，若不过滤会先命中登记记录，JOIN 快照后整行丢失，
+    ///    使减发表"现享受人口/减发人口"回退到旧档 family_size（李增会 89：还原快照后是变更前 3 人，
+    ///    正确值应取 After 快照 2 人）。
     /// 快照缺失的 changeId 不入 map，消费端回退旧记录字段（历史显示不变）。
     /// </summary>
     private async Task<Result<Dictionary<long, ChainSnapshot>>> LoadChainSnapshotMapAsync(
@@ -1418,6 +1422,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                             WHERE x.deleted_at IS NULL
                               AND x.application_id = cr.application_id
                               AND x.new_application_id IS NOT DISTINCT FROM cr.new_application_id
+                              -- 候选必须自带快照：同链中无快照的「保障金变更登记」记录（同事务、id 更小）
+                              -- 不能当选，否则下方 JOIN 快照落空，整条链快照丢失
+                              AND EXISTS (SELECT 1 FROM nc_biz_change_snapshots xs
+                                          WHERE xs.change_id = x.id AND xs.snapshot_type IN ('Before','After'))
                             ORDER BY CASE WHEN x.changed_at = cr.changed_at THEN 0 ELSE 1 END,
                                      ABS(EXTRACT(EPOCH FROM (x.changed_at - cr.changed_at))),
                                      x.id
