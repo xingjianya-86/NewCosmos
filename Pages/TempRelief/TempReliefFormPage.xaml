@@ -792,7 +792,8 @@
                                             SelectedItem="{Binding SelectedSmallAmountLevel}"
                                             Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Spacing="6">
+                                <!-- 缺 Grid.Column="1" 会与「定额档位」同列重叠 -->
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
                                     <Label Text="确定金额" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Entry Text="{Binding ConfirmAmountDisplay}" IsReadOnly="True"
                                            BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
