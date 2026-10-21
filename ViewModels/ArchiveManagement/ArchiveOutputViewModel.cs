@@ -626,15 +626,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
             var config = NewCosmos.Services.Templates.TemplateConfig.FromJson(template.ConfigJson);
 
-            var copies = 1;
-            if (config.CopiesByClassification != null && config.CopiesByClassification.Count > 0
-                && !string.IsNullOrEmpty(classification)
-                && config.CopiesByClassification.TryGetValue(classification, out var configuredCopies))
-            {
-                copies = configuredCopies;
-            }
-
-            return (copies, config.IsDirectoryTemplate, config.DirectoryDateField ?? string.Empty);
+            // 份数口径唯一来源：分类映射 copiesByClassification → 模板级默认 copies → 1
+            //（TemplateConfig.ResolveCopies，与手机推送打印同源；见 Helpers\TemplateCopiesResolver）
+            return (config.ResolveCopies(classification), config.IsDirectoryTemplate, config.DirectoryDateField ?? string.Empty);
         }
         catch
         {

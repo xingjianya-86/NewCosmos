@@ -426,7 +426,19 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private DateTime _applyDate = DateTime.Today;
 
-    /// <summary>申请日期变化 → 重算 C 类时间轴公示日期，并把越界申请日期自动修正到窗口内（验收日13号→公示起=验收日前3天、止=验收日前1天、入户调查窗口起=验收日前5天）</summary>
+    /// <summary>
+    /// 归属批次提示（只读）：新建/草稿时显示本次申请落在哪个 C 线批次，
+    /// 例："本次归属：2026年11月批次（公示 11-10~11-12，验收 11-13）"。
+    /// 编辑/查看已存档案保留库中原值、不重算，故为空。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBatchHint))]
+    private string _batchHintText = string.Empty;
+
+    /// <summary>归属批次提示是否显示（配合 StringNotEmptyConverter 控制 Label 显隐）</summary>
+    public bool HasBatchHint => !string.IsNullOrWhiteSpace(BatchHintText);
+
+    /// <summary>申请日期变化 → 按验收日 A 归属 C 线批次并重算公示日期（超过当月 13 号自动顺延下月批次；申请日期本身不被改写）</summary>
     partial void OnApplyDateChanged(DateTime value)
     {
         if (_suppressReload) return;
@@ -980,10 +992,12 @@ public partial class TempReliefFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// C 线公示日期默认值 + 申请日期自动修正（新建/草稿场景）：
-    /// ① 申请日期先修正为「不晚于今日」；
-    /// ② 取修正后日期所在月的 C 线窗口（验收日13号→公示止=验收日前1天、公示起=验收日前3天，均为日历日）；
-    /// ③ 若申请日期仍晚于该月入户调查窗口起日（验收日前5天），自动钳到窗口起日（录入越界自动修正，不报错）。
+    /// C 线归属批次与公示日期默认值（新建/草稿场景）：
+    /// ① 申请日期先修正为「不晚于今日」（仅未来日期被拉回今天，不做回填钳制）；
+    /// ② 按验收日 A 归属批次：申请日 ≤ 当月验收日(13号) 归本月，否则顺延下月（跨年接续）；
+    /// ③ 公示起止、验收日取归属月窗口，并写入归属批次提示。
+    /// 申请日期本身不改写——2026-10-20 前的"越界钳到 A−5"会把 10-14 后录入的申请回填成 10-08、
+    /// 归属永远停在本月，已废止。
     /// 公示日期仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算。
     /// </summary>
     private async Task ApplyPublicizeDefaultsAsync()
@@ -993,7 +1007,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
             var generation = Interlocked.Increment(ref _publicizeCalcGeneration);
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
 
-            // 申请日期自动修正①：不晚于今日
+            // 申请日期自动修正：不晚于今日
             var corrected = ApplyDate == default || ApplyDate.Date > DateTime.Today ? DateTime.Today : ApplyDate.Date;
             var timeline = await timelineService.CalculateTempReliefForApplyDateAsync(corrected);
 
@@ -1004,12 +1018,14 @@ public partial class TempReliefFormViewModel : ViewModelBase
             _suppressReload = true;
             try
             {
-                // 申请日期自动修正②：晚于该月入户调查窗口起日 → 钳到起日
-                ApplyDate = ClampApplyDateIntoWindow(timeline, corrected);
+                // 只回拉未来日期到今天；过去日期与归属月窗口内的日期一律原样保留
+                if (ApplyDate.Date != corrected)
+                    ApplyDate = corrected;
 
                 PublicizeStartDateValue = timeline.PublicityStartDate;
                 PublicizeEndDateValue = timeline.PublicityEndDate;
                 HasPublicizeDates = true;
+                BatchHintText = BuildBatchHint(timeline);
             }
             finally
             {
@@ -1022,15 +1038,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// 申请日期自动修正到 C 线窗口内（录入越界自动修正，不报错）：
-    /// 晚于该月入户调查窗口起日（= 验收日前5天）→ 钳到窗口起日；否则保持原值。
-    /// 返回修正后的申请日期（由调用方在抑制联动上下文中落值）。
-    /// </summary>
-    private static DateTime ClampApplyDateIntoWindow(TimelineResult timeline, DateTime applyDate)
-    {
-        var start = timeline.InvestigationStartDate.Date;
-        return applyDate.Date > start ? start : applyDate.Date;
-    }
+    /// <summary>归属批次提示文案：本次归属：{年}年{月}批次（公示 起~止，验收 A）</summary>
+    private static string BuildBatchHint(TimelineResult timeline)
+        => $"本次归属：{timeline.Year}年{timeline.Month}月批次" +
+           $"（公示 {timeline.PublicityStartDate:MM-dd}~{timeline.PublicityEndDate:MM-dd}，验收 {timeline.AuditDate:MM-dd}）";
 
 }

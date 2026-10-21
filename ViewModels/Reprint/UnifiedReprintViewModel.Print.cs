@@ -157,9 +157,11 @@ public partial class UnifiedReprintViewModel
             case ReprintMonthWindow.TempReliefFull:
             {
                 // C 线批次窗口 = (上月验收日, 本月验收日]：
-                // 与"验收日锚定、申请日≤验收日−5"的新口径一致——申请月即归属月，但存在跨月补录
-                // （如上月22/28申请、本月10~12公示的本月批次）；若仍用 [验收日−5, 验收日]，起点被压到 8 号，
-                // 整批会被漏掉。改以上次验收日为界，批次划分完整且无重叠。
+                // 与 C 线归属规则（申请日 ≤ 本月验收日 A 归本月，超过 A 顺延下月；
+                // 见 BusinessTimelineService.CalculateCLineForApplyDate）严格对齐——
+                // 本窗口正好等于"归入本月批次的全部申请日区间"，无缝无重叠。
+                // 既有跨月补录（如上月 22/28 申请、本月 10~12 公示）天然落在该区间内；
+                // 不可改成 [A−5, A]：申请日 A−5~A 仍属本月批次，改了会把这 5 天漏出或错并。
                 var tl = await _timelineService.CalculateTempReliefAsync(year, month);
                 var prevMonth = month == 1 ? 12 : month - 1;
                 var prevYear = month == 1 ? year - 1 : year;

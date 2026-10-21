@@ -866,7 +866,8 @@ public partial class ChangeService
     /// </summary>
     private async Task<Result<(long NewApplicationId, Dictionary<long, long> MemberIdMap)>> StopAndRebuildAsync(
         long sourceApplicationId, string sourceType, string chainType, string changeReason, string? operatorName,
-        Action<ApplicationEntity>? applyOverrides = null, CancellationToken ct = default)
+        Action<ApplicationEntity>? applyOverrides = null, PreChangeArchiveSnapshot? sourceRestore = null,
+        CancellationToken ct = default)
     {
         // 1. 生成新申请编号
         var appNoResult = await _applicationService.GetNextApplicationNoAsync(ct);
@@ -1140,12 +1141,121 @@ public partial class ChangeService
             allowSubmittedOverride: true, ct: ct);
         if (stopResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(stopResult.ErrorCode!, stopResult.Message ?? "停止旧档案失败");
+
+        // 9.5 旧档还原为变更前快照（分类/合格标记/保障金/收入分项）：
+        //     Step5「分类判定」与经济明细保存已把新值写回旧档，不还原则旧档既非历史记录，
+        //     月报停保汇总表按分类过滤时整户也会漏出（2026-10 张彦亮/贺满程/梁玉祥 实测漏 3 户）。
+        //     新档复制（第 3 步）与覆盖（第 8 步）均已完成，还原只影响旧档自身。
+        if (sourceRestore != null)
+        {
+            var restoreResult = await RestoreSourceArchiveAsync(sourceApplicationId, sourceRestore, ct);
+            if (restoreResult.IsFailure)
+                return Result.Failure<(long, Dictionary<long, long>)>(restoreResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    restoreResult.Message ?? "还原旧档案变更前快照失败");
+        }
+
         var graceTransferResult = await _gracePeriodService.TransferAsync(sourceApplicationId, newApplicationId, ct);
         if (graceTransferResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(graceTransferResult.ErrorCode!, graceTransferResult.Message ?? "转移渐退期到新档案失败");
 
         return Result.Success((newApplicationId, memberIdMap));
     }
+
+    /// <summary>
+    /// 旧档还原为变更前快照（停旧建新第 9.5 步）：全列 COALESCE——快照缺失的列保持旧档现值，
+    /// 不猜测、不写 NULL。分类与保障金是月报停保汇总表/统计的归组与显示口径，收入分项是历史快照口径。
+    /// </summary>
+    private async Task<Result> RestoreSourceArchiveAsync(long sourceId, PreChangeArchiveSnapshot s, CancellationToken ct)
+    {
+        const string sql = @"UPDATE nc_biz_applications SET
+            classification_result = COALESCE($2, classification_result),
+            is_eligible = COALESCE($3, is_eligible),
+            household_monthly_guarantee_amount = COALESCE($4, household_monthly_guarantee_amount),
+            classified_subsidy_amount = COALESCE($5, classified_subsidy_amount),
+            caregiver_subsidy_amount = COALESCE($6, caregiver_subsidy_amount),
+            total_guarantee_amount = COALESCE($7, total_guarantee_amount),
+            family_size = COALESCE($8, family_size),
+            work_income_total = COALESCE($9, work_income_total),
+            business_income_total = COALESCE($10, business_income_total),
+            property_income_total = COALESCE($11, property_income_total),
+            transfer_income_total = COALESCE($12, transfer_income_total),
+            other_income_total = COALESCE($13, other_income_total),
+            total_family_income = COALESCE($14, total_family_income),
+            per_capita_income = COALESCE($15, per_capita_income),
+            total_annual_income = COALESCE($16, total_annual_income),
+            per_capita_annual_income = COALESCE($17, per_capita_annual_income),
+            rigid_expenditure = COALESCE($18, rigid_expenditure),
+            alimony_income = COALESCE($19, alimony_income),
+            land_income_total = COALESCE($20, land_income_total),
+            subsidy_total = COALESCE($21, subsidy_total),
+            updated_at = NOW()
+            WHERE id = $1";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            sourceId,
+            s.Classification,
+            s.IsEligible,
+            s.HouseholdMonthlyGuaranteeAmount,
+            s.ClassifiedSubsidyAmount,
+            s.CaregiverSubsidyAmount,
+            s.TotalGuaranteeAmount,
+            s.FamilySize,
+            s.WorkIncomeTotal,
+            s.BusinessIncomeTotal,
+            s.PropertyIncomeTotal,
+            s.TransferIncomeTotal,
+            s.OtherIncomeTotal,
+            s.TotalFamilyIncome,
+            s.PerCapitaIncome,
+            s.TotalAnnualIncome,
+            s.PerCapitaAnnualIncome,
+            s.RigidExpenditure,
+            s.AlimonyIncome,
+            s.LandIncomeTotal,
+            s.SubsidyTotal);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                result.Message ?? "还原旧档案变更前快照失败");
+        LogInfo($"旧档已还原变更前快照: ApplicationId={sourceId}, 分类={s.Classification ?? "(保持现值)"}," +
+                $" 户月={s.HouseholdMonthlyGuaranteeAmount?.ToString() ?? "(保持现值)"}," +
+                $" 合计={s.TotalGuaranteeAmount?.ToString() ?? "(保持现值)"}");
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// 停旧建新「旧档还原快照」组装：旧值一律取表单入口快照（context.Old*，判定/明细落库前捕获），
+    /// 缺失传 null 由 <see cref="RestoreSourceArchiveAsync"/> 的 COALESCE 保持旧档现值。
+    /// 家庭人数为 0 视为未捕获，同样传 null。
+    /// </summary>
+    private static PreChangeArchiveSnapshot BuildPreChangeSnapshot(
+        string? oldClassification, bool? oldIsEligible,
+        decimal oldTotalGuarantee, decimal oldHouseholdMonthly, decimal oldClassified, decimal oldCaregiver,
+        int oldFamilySize,
+        decimal? oldTotalFamilyIncome, decimal? oldPerCapitaIncome,
+        decimal? oldTotalAnnualIncome, decimal? oldPerCapitaAnnualIncome, decimal? oldRigidExpenditure,
+        IncomeComponentValues? oldComponents)
+        => new PreChangeArchiveSnapshot
+        {
+            Classification = string.IsNullOrEmpty(oldClassification) ? null : oldClassification,
+            IsEligible = oldIsEligible,
+            HouseholdMonthlyGuaranteeAmount = oldHouseholdMonthly < 0 ? 0 : oldHouseholdMonthly,
+            ClassifiedSubsidyAmount = oldClassified,
+            CaregiverSubsidyAmount = oldCaregiver,
+            TotalGuaranteeAmount = oldTotalGuarantee,
+            FamilySize = oldFamilySize > 0 ? oldFamilySize : null,
+            TotalFamilyIncome = oldTotalFamilyIncome,
+            PerCapitaIncome = oldPerCapitaIncome,
+            TotalAnnualIncome = oldTotalAnnualIncome,
+            PerCapitaAnnualIncome = oldPerCapitaAnnualIncome,
+            RigidExpenditure = oldRigidExpenditure,
+            WorkIncomeTotal = oldComponents?.WorkIncomeTotal,
+            BusinessIncomeTotal = oldComponents?.BusinessIncomeTotal,
+            PropertyIncomeTotal = oldComponents?.PropertyIncomeTotal,
+            TransferIncomeTotal = oldComponents?.TransferIncomeTotal,
+            OtherIncomeTotal = oldComponents?.OtherIncomeTotal,
+            AlimonyIncome = oldComponents?.AlimonyIncome,
+            LandIncomeTotal = oldComponents?.LandIncomeTotal,
+            SubsidyTotal = oldComponents?.SubsidyTotal
+        };
 
     /// <summary>
     /// 执行经济复核
@@ -1320,6 +1430,12 @@ public partial class ChangeService
             // 7. 停旧建新：金额/分类/停保任一变化才复制为新档案（original_application_id=旧ID、Draft），
             //    旧档案置 Stopped。新档案应用复核后的收入/分类/金额/保障金；
             //    三项均未变（如 0 元保障户复核 0→0）→ 跳过，复核结果留在原档。
+            // 真旧值只有一份：旧档还原快照（9.5 步）与保障金变更登记（7.5 步）共用下方三值
+            var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
+            var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
+            var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
+                ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
+
             long newApplicationId;
             if (needRebuild)
             {
@@ -1345,7 +1461,15 @@ public partial class ChangeService
                         target.ClassifiedSubsidyAmount = newClassifiedAmount;
                         target.CaregiverSubsidyAmount = newCaregiverAmount;
                     },
-                    ct);
+                    sourceRestore: BuildPreChangeSnapshot(
+                        oldClassification, context.OldIsEligible,
+                        context.OldGuaranteeAmount ?? oldGuaranteeAmount,
+                        oldHouseholdMonthly, oldClassifiedForSettle, oldCaregiverForSettle,
+                        context.OldFamilySize ?? 0,
+                        context.OldTotalFamilyIncome, context.OldPerCapitaIncome,
+                        context.OldTotalAnnualIncome, context.OldPerCapitaAnnualIncome,
+                        context.OldRigidExpenditure, context.OldComponents),
+                    ct: ct);
                 if (rebuildResult.IsFailure)
                 {
                     await tx.RollbackAsync(ct);
@@ -1367,11 +1491,6 @@ public partial class ChangeService
             //     旧值必须用表单加载时刻捕获的 context.Old*（本档经济数据已被覆写，读库拿不到真旧值）
             if (needRebuild)
             {
-                var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
-                var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
-                var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
-                    ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
-
                 var settleResult = await RegisterFundChangeCoreAsync(
                     context.ApplicationId, newApplicationId,
                     oldClassification, newClassification,
@@ -1681,6 +1800,12 @@ public partial class ChangeService
                 : $"{context.ChangeReason}（{context.ChangeSummary}）";
 
             // 7. 停旧建新：旧档案 Stopped，新档案 Draft 承载变更后成员/经济/分类/金额
+            //    真旧值只有一份：旧档还原快照（9.5 步）与保障金变更登记（7.5 步）共用下方三值
+            var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
+            var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
+            var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
+                ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
+
             var rebuiltReason = $"家庭成员变更后 由 {ClassificationConstants.ConvertToMajorCategoryName(oldClassification ?? "")}转入{ClassificationConstants.ConvertToMajorCategoryName(newClassification ?? "")}";
             var rebuildResult = await StopAndRebuildAsync(
                 context.ApplicationId,
@@ -1704,7 +1829,15 @@ public partial class ChangeService
                     target.ClassifiedSubsidyAmount = newClassifiedAmount;
                     target.CaregiverSubsidyAmount = newCaregiverAmount;
                 },
-                ct);
+                sourceRestore: BuildPreChangeSnapshot(
+                    oldClassification, context.OldIsEligible,
+                    oldGuaranteeAmount,
+                    oldHouseholdMonthly, oldClassifiedForSettle, oldCaregiverForSettle,
+                    context.OldFamilySize,
+                    context.OldTotalFamilyIncome, context.OldPerCapitaIncome,
+                    context.OldTotalAnnualIncome, context.OldPerCapitaAnnualIncome,
+                    context.OldRigidExpenditure, context.OldComponents),
+                ct: ct);
             if (rebuildResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
@@ -1716,11 +1849,6 @@ public partial class ChangeService
             // 7.5 保障金变更登记 + 分类施保变动登记（低保同码 + 户月差 ≥ 阈值；分类施保不套阈值）
             //     旧值必须用表单加载时刻捕获的 context.Old*（本档经济数据已被 SaveEconomicDetailsAsync 覆写）
             {
-                var oldClassifiedForSettle = context.OldClassifiedSubsidyAmount ?? 0m;
-                var oldCaregiverForSettle = context.OldCaregiverSubsidyAmount ?? 0m;
-                var oldHouseholdMonthly = context.OldHouseholdMonthlyGuaranteeAmount
-                    ?? ((context.OldGuaranteeAmount ?? oldGuaranteeAmount) - oldClassifiedForSettle - oldCaregiverForSettle);
-
                 var settleResult = await RegisterFundChangeCoreAsync(
                     context.ApplicationId, newApplicationId,
                     oldClassification, newClassification,

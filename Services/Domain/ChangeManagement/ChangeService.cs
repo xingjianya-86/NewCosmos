@@ -99,9 +99,48 @@ public class EconomicReviewContext
     public decimal? OldCaregiverSubsidyAmount { get; set; }
 
     /// <summary>
+    /// 覆写前的合格标记（is_eligible）。Approved 档案在判定落库时会被覆写成 false，
+    /// 停旧建新后须按本值还原旧档（历史快照 + 月报停保汇总表归组）。
+    /// </summary>
+    public bool? OldIsEligible { get; set; }
+
+    /// <summary>覆写前的年人均收入（年值权威口径；还原旧档历史快照用，null 保持旧档现值）</summary>
+    public decimal? OldPerCapitaAnnualIncome { get; set; }
+
+    /// <summary>
     /// 覆写前的收入分项旧值（与 Application 列同名同口径：务工/经营/财产/转移/其他/刚性为月值，赡养/土地/补贴为年值）
     /// </summary>
     public IncomeComponentValues? OldComponents { get; set; }
+}
+
+/// <summary>
+/// 停旧建新的「旧档还原快照」：Step5「分类判定」与经济明细保存会把新值写回当前（旧）档案，
+/// 随后旧档被置 Stopped，若不还原则旧档变成"停保码 + 0 元 + 复核后收入"——既不是历史记录，
+/// 月报停保汇总表按分类过滤时整户也会漏出（2026-10 张彦亮/贺满程/梁玉祥 实测漏 3 户）。
+/// 全字段可空：缺失列由还原 SQL 的 COALESCE 保持旧档现值，不猜测、不写 NULL。
+/// </summary>
+public class PreChangeArchiveSnapshot
+{
+    public string? Classification { get; set; }
+    public bool? IsEligible { get; set; }
+    public decimal? HouseholdMonthlyGuaranteeAmount { get; set; }
+    public decimal? ClassifiedSubsidyAmount { get; set; }
+    public decimal? CaregiverSubsidyAmount { get; set; }
+    public decimal? TotalGuaranteeAmount { get; set; }
+    public int? FamilySize { get; set; }
+    public decimal? TotalFamilyIncome { get; set; }
+    public decimal? PerCapitaIncome { get; set; }
+    public decimal? TotalAnnualIncome { get; set; }
+    public decimal? PerCapitaAnnualIncome { get; set; }
+    public decimal? RigidExpenditure { get; set; }
+    public decimal? WorkIncomeTotal { get; set; }
+    public decimal? BusinessIncomeTotal { get; set; }
+    public decimal? PropertyIncomeTotal { get; set; }
+    public decimal? TransferIncomeTotal { get; set; }
+    public decimal? OtherIncomeTotal { get; set; }
+    public decimal? AlimonyIncome { get; set; }
+    public decimal? LandIncomeTotal { get; set; }
+    public decimal? SubsidyTotal { get; set; }
 }
 
 /// <summary>
@@ -171,6 +210,18 @@ public class MemberChangeContext
 
     /// <summary>覆写前的刚性支出（同上）</summary>
     public decimal? OldRigidExpenditure { get; set; }
+
+    /// <summary>覆写前的年家庭总收入（年值权威口径；还原旧档历史快照用，null 保持旧档现值）</summary>
+    public decimal? OldTotalAnnualIncome { get; set; }
+
+    /// <summary>覆写前的年人均收入（同上）</summary>
+    public decimal? OldPerCapitaAnnualIncome { get; set; }
+
+    /// <summary>覆写前的合格标记（is_eligible；同 OldClassification，须判定落库前捕获）</summary>
+    public bool? OldIsEligible { get; set; }
+
+    /// <summary>覆写前的收入分项旧值（同 EconomicReviewContext，还原旧档历史快照用）</summary>
+    public IncomeComponentValues? OldComponents { get; set; }
 
     public decimal NewTotalFamilyIncome { get; set; }
     public decimal NewPerCapitaIncome { get; set; }

@@ -164,6 +164,23 @@
                                        FontSize="14" TextColor="{StaticResource TextPrimary}"/>
                             </Grid>
 
+                            <!-- 打印默认份数（只写 config_json 的 copies 键） -->
+                            <BoxView Style="{StaticResource Divider}"/>
+                            <Label Text="打印默认份数" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
+                                <Label Grid.Column="0" Text="{Binding CopiesHint}" FontSize="12"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Entry Grid.Column="1" Text="{Binding EditingCopies}" Keyboard="Numeric"
+                                       WidthRequest="70" HeightRequest="40" HorizontalTextAlignment="Center"
+                                       IsEnabled="{Binding IsNotEditing}"/>
+                                <Button Grid.Column="2"
+                                        Text="{OnPlatform WinUI='&#xE74E; 保存', Android='&#x1F4BE; 保存'}"
+                                        FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                                        Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding SaveCopiesCommand}"
+                                        IsEnabled="{Binding IsNotEditing}" WidthRequest="100"/>
+                            </Grid>
+
                             <!-- 配置 JSON -->
                             <BoxView Style="{StaticResource Divider}"/>
                             <Label Text="字段映射配置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>

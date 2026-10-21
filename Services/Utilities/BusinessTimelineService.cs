@@ -81,12 +81,14 @@ public interface IBusinessTimelineService
     DateTime GetTempReliefAcceptanceDate(DateTime? publicizeEnd);
 
     /// <summary>
-    /// 按申请日期归属 C 线窗口：公示起止与验收日均取【申请日期所在月份】的 C 线窗口（不滚月）。
-    /// 申请日期越界（晚于该月入户调查窗口起日）时由表单录入侧自动钳到窗口起日，本方法不处理。
+    /// 按申请日期归属 C 线窗口：取申请日期所在月起第一个「申请日期 ≤ 该月验收日 A」的 C 线窗口；
+    /// 超过当月验收日（13 号，非工作日顺延）→ 顺延下一个月，跨年自动接续（2026-10-20 口径，
+    /// 废止 2026-10-18 的"不滚月 + 越界钳回"）。申请日期原样返回给表单，本方法不改写申请日期。
+    /// 归属月确定后，公示起止 / 入户调查窗口 / 验收日均取该月窗口。
     /// </summary>
     Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate);
 
-    /// <summary>C线窗口（同步版）：供表单申请日期约束与保存校验在同步上下文中调用。</summary>
+    /// <summary>C线窗口（同步版）：供表单申请日期联动与保存校验在同步上下文中调用。</summary>
     TimelineResult CalculateTempReliefForApplyDate(DateTime applyDate);
 
     /// <summary>
@@ -207,11 +209,27 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         => CalculateCLineForApplyDate(applyDate);
 
     /// <summary>
-    /// 申请日归属窗口：直接取申请日期所在月份的 C 线窗口（不滚月）。
-    /// 申请日期越界（晚于该月入户调查窗口起日）时不在此处理——由表单录入侧自动钳到窗口起日。
+    /// 申请日归属窗口：从申请日所在月起，取第一个「申请日 ≤ 该月验收日 A」的 C 线窗口；
+    /// 超过当月验收日 → 顺延下一个月（最多顺延 24 个月防御，仍不满足则回退申请日所在月）。
+    /// 申请日期不在本方法改写——旧的"钳回入户调查窗口起日"会把 10-14 之后录入的申请回填成 10-08，
+    /// 归属也永远停在本月，2026-10-20 起废止。
     /// </summary>
     private TimelineResult CalculateCLineForApplyDate(DateTime applyDate)
-        => CalculateCLine(applyDate.Date.Year, applyDate.Date.Month);
+    {
+        var date = applyDate.Date;
+        var year = date.Year;
+        var month = date.Month;
+        for (var i = 0; i < 24; i++)
+        {
+            var line = CalculateCLine(year, month);
+            if (date <= line.AuditDate.Date)
+                return line;
+
+            month++;
+            if (month > 12) { month = 1; year++; }
+        }
+        return CalculateCLine(date.Year, date.Month);
+    }
 
     /// <summary>按指定年月直算时间轴（纯计算，无滚动判断）</summary>
     private TimelineResult CalculateCore(int year, int month, TimelineType type)
@@ -225,7 +243,11 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         };
     }
 
-    /// <summary>当前C线周期：今天超过验收日（CycleEndDate）时自动滚入下一个月</summary>
+    /// <summary>
+    /// 当前C线周期：今天超过验收日（CycleEndDate）时自动滚入下一个月
+    /// ——与 CalculateCLineForApplyDate 同一口径（超验收日 A 即滚下月），
+    /// 保证"当前时间轴"与"申请日期归属"不再分叉。
+    /// </summary>
     private TimelineResult GetCurrentTempReliefCore()
     {
         var now = DateTime.Today;

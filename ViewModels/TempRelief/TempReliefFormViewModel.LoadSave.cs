@@ -112,13 +112,18 @@ public partial class TempReliefFormViewModel
         // 读入已有申请：救助原因取保存值，视为"已有内容"，类型/明细变化前不自动覆盖
         _reasonDirty = true;
 
-        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按 C 线窗口重算（并自动修正越界申请日期）
+        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按 C 线窗口重算
+        // （草稿申请日期本就重置为今天 → 按验收日 A 归属，超过 13 号自动落到下月批次）
         if (isDraft)
         {
             await ResolveHukouFromOrganizationAsync(CancellationToken);
             await ApplyPublicizeDefaultsAsync();
         }
-        // 非草稿：公示日期与申请日期均保留库中原值，不重算、不修正（申请日期越界修正仅发生在录入/草稿场景）
+        // 非草稿：公示日期与申请日期均保留库中原值，不重算、不修正（越界修正仅发生在录入/草稿场景）
+        else
+        {
+            BatchHintText = string.Empty;
+        }
 
         // 小额：加载档位并回显
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
@@ -347,7 +352,8 @@ public partial class TempReliefFormViewModel
             _familySizeSeed = c.FamilySize;
             ApplicantFamilySize = c.FamilySize;
             ApplicantFamilyCategory = TempReliefConstants.NormalizeFamilyCategory(c.FamilyCategory);
-            // 家庭类别确定后重算公示窗口（特殊群体5个工作日/普通10个工作日会影响归属月份）
+            // 申请日期不变 → 公示窗口不变；这里重算一次只为让归属批次提示与公示日期保持同源
+            // （旧注释"特殊群体5个工作日/普通10个工作日"属 2026-10-18 重构前口径，simplified 已删除）
             await ApplyPublicizeDefaultsAsync();
             // 银行信息：来源台账预填（一卡通账号优先，其次银行卡号；开户行取 bank_name）
             BankName = c.BankName;
@@ -873,7 +879,7 @@ public partial class TempReliefFormViewModel
         if (HasPublicizeDates && PublicizeEndDateValue < PublicizeStartDateValue)
             return "公示结束日期不能早于开始日期";
 
-        // 申请日期不在此报错：录入越界由 ApplyPublicizeDefaultsAsync 自动钳入 C 线窗口（不阻断保存）
+        // 申请日期不在此报错：归属月由 ApplyPublicizeDefaultsAsync 按验收日 A 归属（超过 13 号顺延下月），申请日期不改写
         return null;
     }
 

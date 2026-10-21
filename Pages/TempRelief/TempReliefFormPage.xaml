@@ -482,6 +482,10 @@
                                     <Entry Text="{Binding ReportUnit}" Style="{StaticResource FormFieldEntryStyle}"/>
                                 </VerticalStackLayout>
                             </Grid>
+                            <!-- 归属批次提示：申请日 > 当月验收日(13号) 时自动顺延下月，这里把归属结果显式讲给录入人 -->
+                            <Label Text="{Binding BatchHintText}" FontSize="11"
+                                   TextColor="{StaticResource TextTertiary}" Margin="0,4,0,0"
+                                   IsVisible="{Binding HasBatchHint}"/>
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="困难类型" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding DifficultyTypeOptions}"

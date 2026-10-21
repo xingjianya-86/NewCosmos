@@ -310,4 +310,10 @@ public static class TempReliefConstants
 
     /// <summary>打印模板分类：小额</summary>
     public const string CategorySmall = "临时救助/小额";
+
+    /// <summary>
+    /// 打印模板名前缀：审核审批表（手机推送打印固定取该模板；库中现为「临时救助_审核审批表2」）。
+    /// 业务确认手机端与桌面端同打这一张，禁止再按 sort_order 猜模板。
+    /// </summary>
+    public const string TemplateAuditApprovalPrefix = "临时救助_审核审批表";
 }

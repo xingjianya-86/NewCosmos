@@ -895,6 +895,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                        {categorySql}
                        -- 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算停保
                        {StoppedArchiveFilter.NotRebuildContinuationSql("a")}
+                       -- 终结档（停旧建新产物自身为停保码）与被停的旧档是同一户，避免重复计数
+                       {StoppedArchiveFilter.TerminalRebuildArchiveSql("a")}
                      ORDER BY a.stop_date ASC, a.first_approved_at DESC";
         var result = await _db.QueryAsync<StoppedRowData>(sql, ct, parameters.ToArray());
         if (result.IsFailure)
@@ -1207,22 +1209,23 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             return Result.Failure<List<MonthlyAmountChangeRow>>(result.ErrorCode!, result.Message!);
 
         var rows = result.Value ?? new List<AmountChangeRow>();
-        // 减发人口数=变更前后快照 FamilySize 差（批量加载避免 N+1）
-        var diffMapResult = await LoadFamilySizeDiffMapAsync(rows.Select(r => r.ChangeId), ct);
-        var diffMap = diffMapResult.IsSuccess ? diffMapResult.Value : new Dictionary<long, int>();
+        // 同链变更快照（Before/After 的家庭人口 + 户月口径旧值，批量加载避免 N+1）：
+        // 快照挂在"主记录"上，而进本表的常是同事务补写的"保障金变更登记"记录（自身无快照），
+        // 故按同 application_id / new_application_id 链、同事务（changed_at 相等）优先、其次时间最近取一次事件的快照，
+        // 供减发人口数 / 原家庭人口 / 现家庭人口 / 户月原值与分类施保旧值共用。
+        var chainMapResult = await LoadChainSnapshotMapAsync(rows.Select(r => r.ChangeId), ct);
+        var chainMap = chainMapResult.IsSuccess
+            ? chainMapResult.Value
+            : new Dictionary<long, ChainSnapshot>();
         var dateMapResult = await LoadApprovalDateMapAsync(rows.Select(r => r.HeadIdCard), ct);
         if (dateMapResult.IsFailure)
             return Result.Failure<List<MonthlyAmountChangeRow>>(dateMapResult.ErrorCode!, dateMapResult.Message!);
         var dateMap = dateMapResult.Value;
-        // 死亡人员姓名 + 原家庭人口（从该户死亡/变更 Before 快照批量查，减发理由/原家庭人口用）
+        // 死亡人员姓名 + 原家庭人口兜底（从该户死亡/变更 Before 快照批量查，减发理由列用）
         var deceasedMapResult = await LoadDeceasedInfoMapAsync(rows.Select(r => r.HeadIdCard), ct);
         if (deceasedMapResult.IsFailure)
             return Result.Failure<List<MonthlyAmountChangeRow>>(deceasedMapResult.ErrorCode!, deceasedMapResult.Message!);
         var deceasedMap = deceasedMapResult.Value;
-        // Before 快照的户月口径旧值（OldHouseholdMonthlyGuaranteeAmount/OldClassifiedSubsidyAmount）：
-        // 登记记录本身已是户月口径无需换算；经济复核主记录等存量记录用快照换算，快照缺失回退原值（历史显示不变）
-        var snapshotMapResult = await LoadHouseholdAmountSnapshotMapAsync(rows.Select(r => r.ChangeId), ct);
-        var snapshotMap = snapshotMapResult.IsSuccess ? snapshotMapResult.Value : new Dictionary<long, HouseholdAmountSnapshot>();
         var cycleEnd = c.End.AddDays(-1);
         var threshold = FundChangeThresholdHelper.Threshold;
 
@@ -1237,8 +1240,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             //   ② 其余记录（经济复核主记录等）：Before 快照有户月旧值 且 新档有户月新值 → 双双用户月；
             //   ③ 任一缺失（存量记录）→ 双双回退记录合计值（保持历史显示口径不变）。
             decimal oldHousehold, newHousehold;
-            var hasSnapshotOld = snapshotMap.TryGetValue(item.ChangeId ?? 0, out var snap)
-                && snap.OldHouseholdMonthly.HasValue;
+            var chain = item.ChangeId.HasValue && chainMap.TryGetValue(item.ChangeId.Value, out var ch)
+                ? ch
+                : null;
+            var hasSnapshotOld = chain?.OldHouseholdMonthly.HasValue == true;
             if (isRegistration)
             {
                 oldHousehold = item.OldGuaranteeAmount ?? 0;
@@ -1246,7 +1251,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             }
             else if (hasSnapshotOld && item.NewHouseholdMonthly.HasValue)
             {
-                oldHousehold = snap!.OldHouseholdMonthly!.Value;
+                oldHousehold = chain!.OldHouseholdMonthly!.Value;
                 newHousehold = item.NewHouseholdMonthly.Value;
             }
             else
@@ -1260,11 +1265,22 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             if (global::System.Math.Abs(householdDiff) < threshold)
                 continue;
 
-            // ── 分类施保列：新额取新档（链尾现役档案），旧额优先取快照，缺失回退旧档当前值 ──
+            // ── 分类施保列：新额取新档（链尾现役档案），旧额优先取同链快照，缺失回退旧档当前值 ──
             var newClassified = item.NewClassifiedSubsidyAmount ?? item.ClassifiedSubsidyAmount ?? 0;
-            var oldClassified = snapshotMap.TryGetValue(item.ChangeId ?? 0, out var snap2) && snap2.OldClassified.HasValue
-                ? snap2.OldClassified.Value
+            var oldClassified = chain?.OldClassified.HasValue == true
+                ? chain!.OldClassified!.Value
                 : item.ClassifiedSubsidyAmount ?? 0;
+
+            // ── 原家庭享受金（仅减发表）：原户月保障金 + 原分类施保 ──
+            // 模板无"原分类施保"列、现分类施保单独成列，原额须合并成总额才与减发金额对平
+            //（李增会：1106+104=1210，1210−79−104=1027）。
+            // 仅在旧值本身是"户月口径"时叠加：① 保障金变更登记记录（写入即户月，不含分类施保）、
+            // ② 取到 Before 快照户月旧值的记录；③ 存量/无快照记录的 old_guarantee_amount 本身就是
+            // 合计口径（含分类施保，如张彦亮 311 = 207+104），再叠加会重复计算。
+            // 增发表不改：模板无现分类施保列，改了会让"增发金额 = 新 − 原"对不上。
+            var oldAmountDisplay = !increase && (isRegistration || hasSnapshotOld)
+                ? oldHousehold + oldClassified
+                : oldHousehold;
 
             var changeAmt = global::System.Math.Abs(householdDiff);
             var birth = string.IsNullOrEmpty(item.HeadIdCard)
@@ -1300,26 +1316,38 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 reason = string.IsNullOrEmpty(reason) ? classifiedText : $"{reason}；{classifiedText}";
             }
 
+            // 原/现家庭人口与减发人口一律以同链变更快照为准：旧档的 family_size 已被 Step5 写成变更后值，
+            // 而停旧建新后旧档又被还原为"变更前"快照，两种取法在某一段都会错位。
+            // 无快照时回退：现人口 → 旧档当前值；原人口 → 死亡前快照 → 现人口。
+            var beforeFamilySize = chain?.BeforeFamilySize ?? 0;
+            var afterFamilySize = chain?.AfterFamilySize ?? 0;
+            var currentFamilySize = afterFamilySize > 0 ? afterFamilySize : item.FamilySize ?? 0;
+            var originalFamilySize = beforeFamilySize > 0
+                ? beforeFamilySize
+                : deceasedMap.TryGetValue(item.HeadIdCard ?? "", out var di2) && di2.OldFamilySize > 0
+                    ? di2.OldFamilySize
+                    : currentFamilySize;
+
             outRows.Add(new MonthlyAmountChangeRow
             {
                 HeadName = item.HeadName ?? "",
                 HeadBirth = birth,
-                FamilySize = (item.FamilySize ?? 0).ToString(),
+                FamilySize = currentFamilySize.ToString(),
                 Address = JoinFullAddress(item.District, item.Town, item.Community, item.Address),
                 Category = display,
                 EnjoyDate = enjoy,
-                OldAmount = oldHousehold.ToString("F2"),
+                // 原家庭享受金（减发表合并分类施保，见上）；增发表保持户月口径不变
+                OldAmount = oldAmountDisplay.ToString("F2"),
                 NewAmount = newHousehold.ToString("F2"),
                 Classification = display,
                 ChangeAmount = changeAmt.ToString("F2"),
-                // 减发人口=快照差；现分类施保=新档（链尾现役档案）分类施保金额
-                DecreasePerson = item.ChangeId.HasValue && diffMap.TryGetValue(item.ChangeId.Value, out var d) ? d : 0,
+                // 减发人口=同链 Before/After 快照差（登记记录自身无快照，链上主记录快照补位）；
+                // 现分类施保=新档（链尾现役档案）分类施保金额
+                DecreasePerson = chain?.FamilySizeDiff ?? 0,
                 ClassifiedSubsidyAmount = newClassified,
                 Reason = reason,
-                // 原家庭人口：从老档案（死亡前 Before 快照）计算，含死亡成员；无则用当前剔除赡养人口
-                OldFamilySize = deceasedMap.TryGetValue(item.HeadIdCard ?? "", out var di2) && di2.OldFamilySize > 0
-                    ? di2.OldFamilySize.ToString()
-                    : (item.FamilySize ?? 0).ToString(),
+                // 原家庭人口：同链变更前（Before）快照，含已死亡/已迁出成员；无则死亡前快照兜底
+                OldFamilySize = originalFamilySize.ToString(),
                 CategoryCode = categoryCode,
                 IsRural = ClassificationConstants.IsCodeRural(categoryCode)
             });
@@ -1328,85 +1356,43 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     }
 
     /// <summary>
-    /// 批量加载变更前后人口快照（nc_biz_change_snapshots.Before/After 的 FamilySize 差），
-    /// 用于保障金减发表的"减发人口数"列；无快照或差≤0 视为减少 0 人。
+    /// 同链变更快照：一次变更事件（Before/After）的家庭人口与户月口径旧值。
     /// </summary>
-    private async Task<Result<Dictionary<long, int>>> LoadFamilySizeDiffMapAsync(IEnumerable<long?> changeIds, CancellationToken ct = default)
+    private sealed class ChainSnapshot
     {
-        var ids = (changeIds ?? Enumerable.Empty<long?>())
-            .Where(i => i.HasValue && i.Value > 0)
-            .Select(i => i!.Value)
-            .Distinct()
-            .ToArray();
-        var map = new Dictionary<long, int>();
-        if (ids.Length == 0)
-            return Result.Success(map);
+        public int? BeforeFamilySize { get; set; }
+        public int? AfterFamilySize { get; set; }
 
-        var sql = @"SELECT change_id, snapshot_type, snapshot_data
-                    FROM nc_biz_change_snapshots
-                    WHERE change_id = ANY($1) AND snapshot_type IN ('Before','After')";
-        var result = await _db.QueryAsync<ChangeSnapshotRow>(sql, ct, ids);
-        if (result.IsFailure)
-            return Result.Failure<Dictionary<long, int>>(result.ErrorCode!, result.Message!);
+        /// <summary>Before 快照的原户月保障金（不含分类施保）</summary>
+        public decimal? OldHouseholdMonthly { get; set; }
 
-        var beforeByChange = new Dictionary<long, int>();
-        var afterByChange = new Dictionary<long, int>();
-        foreach (var row in result.Value ?? new List<ChangeSnapshotRow>())
-        {
-            var size = TryParseFamilySize(row.SnapshotData);
-            if (row.SnapshotType == "Before")
-                beforeByChange[row.ChangeId] = size;
-            else if (row.SnapshotType == "After")
-                afterByChange[row.ChangeId] = size;
-        }
-        foreach (var id in ids)
-        {
-            if (beforeByChange.TryGetValue(id, out var before) && afterByChange.TryGetValue(id, out var after))
-                map[id] = Math.Max(0, before - after);
-        }
-        return Result.Success(map);
+        /// <summary>Before 快照的原分类施保金额</summary>
+        public decimal? OldClassified { get; set; }
+
+        /// <summary>减发人口 = Before − After；任一快照缺失视为 0（不猜测）</summary>
+        public int FamilySizeDiff
+            => BeforeFamilySize.HasValue && AfterFamilySize.HasValue
+                ? global::System.Math.Max(0, BeforeFamilySize.Value - AfterFamilySize.Value)
+                : 0;
     }
 
-    /// <summary>
-    /// 从快照 JSON 提取 FamilySize（快照字段可能存在缺失/更名，解析失败返回 0，全部失败不影响主流程）
-    /// </summary>
-    private static int TryParseFamilySize(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return 0;
-        try
-        {
-            using var doc = global::System.Text.Json.JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("FamilySize", out var el) && el.ValueKind == global::System.Text.Json.JsonValueKind.Number)
-                return el.GetInt32();
-        }
-        catch (global::System.Text.Json.JsonException)
-        {
-            // 快照解析失败不计入减发人口（保持 0）
-        }
-        return 0;
-    }
-
-    private class ChangeSnapshotRow
+    private class ChainSnapshotRow
     {
         public long ChangeId { get; set; }
         public string? SnapshotType { get; set; }
-        public string? SnapshotData { get; set; }
-    }
-
-    /// <summary>户月口径旧值快照（Before JSON 中的 Old* 字段；缺失为 null，消费端回退原值）</summary>
-    private sealed class HouseholdAmountSnapshot
-    {
+        public int? FamilySize { get; set; }
         public decimal? OldHouseholdMonthly { get; set; }
         public decimal? OldClassified { get; set; }
     }
 
     /// <summary>
-    /// 批量加载变更 Before 快照中的户月口径旧值（OldHouseholdMonthlyGuaranteeAmount / OldClassifiedSubsidyAmount）。
-    /// 保障金变更登记记录自身已是户月口径、无需快照；本方法服务于经济复核/成员变更主记录——
-    /// 旧档在停旧建新前已被 Step5 判定覆写，只有表单加载时刻捕获的快照才含真旧值。
-    /// 快照缺失（存量记录）返回不含该 changeId 的条目，消费端回退 old_guarantee_amount（历史显示不变）。
+    /// 批量加载"同链变更快照"（Before/After 的 FamilySize + 户月口径旧值）。
+    /// 快照挂在主记录（经济复核/成员变更）上，而进增减发表的常是同事务补写的"保障金变更登记"记录，
+    /// 登记记录自身无快照 → 按同链（application_id 相同、new_application_id 相同）、
+    /// 同事务（changed_at 相等）优先、其次时间最近的一次事件补位取数。
+    /// 快照缺失的 changeId 不入 map，消费端回退旧记录字段（历史显示不变）。
     /// </summary>
-    private async Task<Result<Dictionary<long, HouseholdAmountSnapshot>>> LoadHouseholdAmountSnapshotMapAsync(
+    private async Task<Result<Dictionary<long, ChainSnapshot>>> LoadChainSnapshotMapAsync(
         IEnumerable<long?> changeIds, CancellationToken ct = default)
     {
         var ids = (changeIds ?? Enumerable.Empty<long?>())
@@ -1414,24 +1400,62 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             .Select(i => i!.Value)
             .Distinct()
             .ToArray();
-        var map = new Dictionary<long, HouseholdAmountSnapshot>();
+        var map = new Dictionary<long, ChainSnapshot>();
         if (ids.Length == 0)
             return Result.Success(map);
 
-        var sql = @"SELECT change_id, snapshot_type, snapshot_data
-                    FROM nc_biz_change_snapshots
-                    WHERE change_id = ANY($1) AND snapshot_type = 'Before'";
-        var result = await _db.QueryAsync<ChangeSnapshotRow>(sql, ct, ids);
+        var sql = @"SELECT cr.id AS change_id, s.snapshot_type,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'FamilySize') = 'number'
+                                THEN (s.snapshot_data ->> 'FamilySize')::int END AS family_size,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'OldHouseholdMonthlyGuaranteeAmount') = 'number'
+                                THEN (s.snapshot_data ->> 'OldHouseholdMonthlyGuaranteeAmount')::numeric END AS old_household_monthly,
+                           CASE WHEN jsonb_typeof(s.snapshot_data -> 'OldClassifiedSubsidyAmount') = 'number'
+                                THEN (s.snapshot_data ->> 'OldClassifiedSubsidyAmount')::numeric END AS old_classified
+                    FROM nc_biz_change_records cr
+                    JOIN LATERAL (
+                            SELECT x.id
+                            FROM nc_biz_change_records x
+                            WHERE x.deleted_at IS NULL
+                              AND x.application_id = cr.application_id
+                              AND x.new_application_id IS NOT DISTINCT FROM cr.new_application_id
+                            ORDER BY CASE WHEN x.changed_at = cr.changed_at THEN 0 ELSE 1 END,
+                                     ABS(EXTRACT(EPOCH FROM (x.changed_at - cr.changed_at))),
+                                     x.id
+                            LIMIT 1
+                          ) x ON TRUE
+                    JOIN nc_biz_change_snapshots s
+                      ON s.change_id = x.id AND s.snapshot_type IN ('Before','After')
+                    WHERE cr.id = ANY($1)";
+        var result = await _db.QueryAsync<ChainSnapshotRow>(sql, ct, ids);
         if (result.IsFailure)
-            return Result.Failure<Dictionary<long, HouseholdAmountSnapshot>>(result.ErrorCode!, result.Message!);
+            return Result.Failure<Dictionary<long, ChainSnapshot>>(result.ErrorCode!, result.Message!);
 
-        foreach (var row in result.Value ?? new List<ChangeSnapshotRow>())
+        foreach (var row in result.Value ?? new List<ChainSnapshotRow>())
         {
-            var snapshot = ParseHouseholdAmountSnapshot(row.SnapshotData);
-            if (snapshot != null)
-                map[row.ChangeId] = snapshot;
+            if (!map.TryGetValue(row.ChangeId, out var snap))
+            {
+                snap = new ChainSnapshot();
+                map[row.ChangeId] = snap;
+            }
+            if (global::System.String.Equals(row.SnapshotType, "Before", global::System.StringComparison.Ordinal))
+            {
+                snap.BeforeFamilySize = row.FamilySize;
+                snap.OldHouseholdMonthly = row.OldHouseholdMonthly;
+                snap.OldClassified = row.OldClassified;
+            }
+            else if (global::System.String.Equals(row.SnapshotType, "After", global::System.StringComparison.Ordinal))
+            {
+                snap.AfterFamilySize = row.FamilySize;
+            }
         }
         return Result.Success(map);
+    }
+
+    /// <summary>户月口径旧值快照（Before JSON 中的 Old* 字段；缺失为 null，消费端回退原值）</summary>
+    private sealed class HouseholdAmountSnapshot
+    {
+        public decimal? OldHouseholdMonthly { get; set; }
+        public decimal? OldClassified { get; set; }
     }
 
     /// <summary>从 Before 快照 JSON 提取户月口径旧值；两个字段都缺失返回 null（不猜测）</summary>
@@ -1536,7 +1560,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     ///    享受日期=纳入时间（imported_at），减发金额=人员分类施保金额，原/现分类施保金=0。
     /// ② 变更链分类施保减发（nc_biz_change_records，change_type=ClassifiedSubsidyReduce/ClassifiedSubsidyAdd，
     ///    挂旧档）：changed_at 落在本月 B 线周期（与保障金增减发同口径）；户主/地址/类别/原现户月取旧档，
-    ///    减发成员取死亡记录（缺失回退旧档户主），原/现分类施保取记录 old/new_guarantee_amount。
+    ///    减发成员与理由取链主变更记录，原/现分类施保取记录 old/new_guarantee_amount。
     ///
     /// 【互斥守卫——2026-10 一条输出口径】② 只取"该链没有保障金变更登记记录"的分类施保减发行。
     /// 有登记记录 ⟺ 该链在「保障金增发/减发表」必有一行（登记记录是该表权威来源，阈值在写入时已过），
@@ -1545,6 +1569,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     /// 典型即"户主死亡进入渐退期"（月保障金按原额封顶续发，313→313，无增减发）。
     /// 守卫用登记记录而非"任意 FundChange"判定：经济复核主记录是合计口径的 FundChange，
     /// 用它做守卫会让"户月差低于阈值 + 分类施保有变动"的户在两张表都漏。
+    ///
+    /// 【整户退出不出行（2026-10 业务确认）】链的新分类（new_classification → 新档 → 旧档兜底）属停保族
+    /// （收入超标/不符合认定条件）时本表不出行——该对象已在「退出对象兜底情况纠治表/停保」体现，
+    /// 避免一次退出两张表重复统计（张彦亮 98/99 实测：经济复核收入超标退出）。其余链（户主死亡渐退、
+    /// 成员变更、经济复核降档/同类复核）正常出行。
     /// </summary>
     public async Task<Result<List<MonthlyShiBaoRow>>> GetShiBaoReductionRowsAsync(int year, int month, CancellationToken ct = default)
     {
@@ -1585,11 +1614,18 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         var cycle = cycleResult.Value;
 
         var reduceSql = @"SELECT cr.id, cr.change_date, cr.old_guarantee_amount, cr.new_guarantee_amount,
+                                 cr.old_classification, cr.new_classification, cr.change_reason,
                                  a.applicant_name, a.applicant_id_card, a.classification_result,
                                  a.address, a.district, a.town, a.community,
                                  a.household_monthly_guarantee_amount AS old_monthly,
                                  n.household_monthly_guarantee_amount AS new_monthly,
-                                 d.member_name AS deceased_name
+                                 n.classification_result AS new_classification_result,
+                                 d.member_name AS deceased_name,
+                                 main.change_reason_type AS main_reason_type,
+                                 main.change_reason AS main_reason,
+                                 main.remove_members AS remove_members,
+                                 main.remove_reasons AS remove_reasons,
+                                 old_snap.snapshot_json AS old_snapshot_json
                           FROM nc_biz_change_records cr
                           JOIN nc_biz_applications a ON a.id = cr.application_id AND a.deleted_at IS NULL
                           LEFT JOIN nc_biz_applications n ON n.id = cr.new_application_id AND n.deleted_at IS NULL
@@ -1599,10 +1635,54 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                                 AND (cr.new_application_id IS NULL OR d.new_application_id = cr.new_application_id)
                               ORDER BY d.id DESC LIMIT 1
                           ) d ON TRUE
+                          -- 链主变更记录（经济复核/户主死亡/成员变更/跨大类转入）：理由与减发成员的权威来源。
+                          -- 分类施保减除/分类施保变更只是附属记录（change_reason_type 无原因语义），不能当理由；
+                          -- 主记录取链上 id 最大一条（同链多条时以最近动作为准）。
+                          LEFT JOIN LATERAL (
+                              SELECT m.change_reason_type, m.change_reason,
+                                     (SELECT string_agg(DISTINCT dd.field_label, '、' ORDER BY dd.field_label)
+                                        FROM nc_biz_change_details dd
+                                       WHERE dd.change_id = m.id
+                                         AND dd.field_name IN ('MemberRemove','MemberDeath')
+                                         AND dd.field_label IS NOT NULL AND dd.field_label <> '') AS remove_members,
+                                     (SELECT string_agg(DISTINCT split_part(dd.new_value, '|', 1), '、'
+                                                       ORDER BY split_part(dd.new_value, '|', 1))
+                                        FROM nc_biz_change_details dd
+                                       WHERE dd.change_id = m.id
+                                         AND dd.field_name IN ('MemberRemove','MemberDeath')
+                                         AND split_part(dd.new_value, '|', 1) <> '') AS remove_reasons
+                              FROM nc_biz_change_records m
+                              WHERE m.deleted_at IS NULL
+                                AND m.change_reason_type = ANY($5::text[])
+                                AND (m.application_id IN (cr.application_id, cr.new_application_id)
+                                     OR (cr.new_application_id IS NOT NULL
+                                         AND m.new_application_id = cr.new_application_id))
+                              ORDER BY m.id DESC
+                              LIMIT 1
+                          ) main ON TRUE
+                          -- 链上 Before 快照的户月口径旧值：旧档在停旧建新后可能被判定覆写为 0，
+                          -- 快照才含真旧值（缺则回退旧档当前值，历史显示不变）
+                          LEFT JOIN LATERAL (
+                              SELECT s.snapshot_data::text AS snapshot_json
+                              FROM nc_biz_change_snapshots s
+                              JOIN nc_biz_change_records c2 ON c2.id = s.change_id
+                              WHERE s.snapshot_type = 'Before'
+                                AND s.snapshot_data ->> 'OldHouseholdMonthlyGuaranteeAmount' IS NOT NULL
+                                AND (c2.application_id IN (cr.application_id, cr.new_application_id)
+                                     OR (cr.new_application_id IS NOT NULL
+                                         AND c2.new_application_id = cr.new_application_id))
+                              ORDER BY s.change_id DESC
+                              LIMIT 1
+                          ) old_snap ON TRUE
                           WHERE cr.change_type = ANY($1::text[])
                             AND cr.deleted_at IS NULL
                             AND cr.old_guarantee_amount > cr.new_guarantee_amount
                             AND cr.changed_at >= $2 AND cr.changed_at < $3
+                            -- 整户退出（新分类属停保族：收入超标/不符合认定条件）不进本表：
+                            -- 停保事件由「退出对象兜底情况纠治表/停保」承载，两张表同出即重复统计
+                            AND COALESCE(NULLIF(cr.new_classification, ''),
+                                         COALESCE(n.classification_result, ''),
+                                         a.classification_result, '') <> ALL($6::text[])
                             -- 互斥守卫：该链已有保障金变更登记记录 → 分类施保变动已并入保障金增减发表同行理由列，
                             -- 本表不再出行，避免一次事件两表重复计入「分类施保本月减发合计」
                             AND NOT EXISTS (
@@ -1613,12 +1693,19 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                                        OR reg.new_application_id = cr.new_application_id))
                           ORDER BY cr.id";
         var reduceResult = await _db.QueryAsync<ShiBaoReduceRow>(reduceSql, ct,
-            new string[]
+            new object[]
             {
-                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE,
-                DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD
-            },
-            cycle.Start, cycle.End, ChangeReasonTypeConstants.FundChangeRegistration);
+                new string[]
+                {
+                    DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE,
+                    DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD
+                },
+                cycle.Start,
+                cycle.End,
+                ChangeReasonTypeConstants.FundChangeRegistration,
+                ShiBaoDecreaseMainReasonTypes,
+                ClassificationConstants.StopCategoryCodes
+            });
         if (reduceResult.IsFailure)
             return Result.Failure<List<MonthlyShiBaoRow>>(reduceResult.ErrorCode!, reduceResult.Message!);
         var reduceRows = reduceResult.Value ?? new List<ShiBaoReduceRow>();
@@ -1661,32 +1748,109 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             }
         }
 
-        // ② 减发行装配：户主=旧档户主（樊万河户），减发成员=死亡记录户主姓名，
-        //    低保金原/现=旧/新档户月（无新档回退旧档），分类施保原/现=记录 old/new_guarantee_amount
+        // ② 减发行装配：户主=旧档户主（樊万河户），减发成员/理由=链主变更记录（死亡记录 / 减员明细），
+        //    低保金原值优先取链上 Before 快照（旧档可能被复核覆写为 0），现值取新档户月（无新档回退旧值），
+        //    分类施保原/现=记录 old/new_guarantee_amount，类别=变更前分类
         foreach (var red in reduceRows)
         {
             var enjoy = dateMap.TryGetValue(red.ApplicantIdCard ?? "", out var rdt)
                 ? rdt
                 : monthLast.ToString("yyyy-MM-dd");
 
+            var oldMonthly = ParseHouseholdAmountSnapshot(red.OldSnapshotJson)?.OldHouseholdMonthly ?? red.OldMonthly;
+            var oldCode = !string.IsNullOrEmpty(red.OldClassification) ? red.OldClassification! : red.ClassificationResult ?? "";
+            var category = string.IsNullOrEmpty(oldCode) || ClassificationConstants.IsCodeSubsistence(oldCode)
+                ? ShiBaoReportCategory
+                : ClassificationConstants.ConvertToMajorCategoryName(oldCode);
+
             rows.Add(new MonthlyShiBaoRow
             {
                 HeadName = red.ApplicantName ?? "",
-                MemberName = string.IsNullOrEmpty(red.DeceasedName) ? red.ApplicantName ?? "" : red.DeceasedName,
+                MemberName = BuildShiBaoReduceMember(red),
                 Address = JoinFullAddress(red.District, red.Town, red.Community, red.Address),
-                Category = "最低生活保障对象",
+                Category = category,
                 EnjoyDate = enjoy,
-                OriginalAmount = red.OldMonthly.ToString("F2"),
+                OriginalAmount = oldMonthly.ToString("F2"),
                 OriginalClassified = red.OldGuaranteeAmount.ToString("F2"),
-                Reason = ChangeReasonTypeConstants.HeadDeceased,
+                Reason = MapShiBaoDecreaseReason(red),
                 DecreaseAmount = (red.OldGuaranteeAmount - red.NewGuaranteeAmount).ToString("F2"),
                 CurrentAmount = (red.NewMonthly ?? red.OldMonthly).ToString("F2"),
                 CurrentClassified = red.NewGuaranteeAmount.ToString("F2"),
-                IsRural = ClassificationConstants.IsCodeRural(red.ClassificationResult ?? "")
+                IsRural = ClassificationConstants.IsCodeRural(oldCode)
             });
         }
 
         return Result.Success(rows);
+    }
+
+    /// <summary>施保金减发表类别列默认文案（与数据源①导入库口径一致）</summary>
+    private const string ShiBaoReportCategory = "最低生活保障对象";
+
+    /// <summary>
+    /// 理由/成员映射的链主变更原因类型（分类施保减除/分类施保变更/保障金变更登记为附属记录，不入此列）。
+    /// </summary>
+    private static readonly string[] ShiBaoDecreaseMainReasonTypes =
+    {
+        ChangeReasonTypeConstants.EconomicReview,
+        ChangeReasonTypeConstants.HeadDeceased,
+        ChangeReasonTypeConstants.MemberChange,
+        ChangeReasonTypeConstants.CrossCategoryTransfer
+    };
+
+    /// <summary>
+    /// 施保金减发表「减发分类施保理由」：按链主变更记录 reason_type 映射，禁止写死单一原因
+    /// （曾硬编码"户主死亡"，致经济复核收入超标退出的张彦亮也印户主死亡）。
+    /// 户主死亡→「户主死亡」；经济复核→「经济复核转{新大类}」/同类「经济复核」；
+    /// 成员变更→明细含死亡「成员死亡」，否则「成员变更（减员理由）」；跨大类转入→「转入{新大类}」；
+    /// 主记录缺失时回退变更原因原文（截断），再兜底「分类施保减发」。
+    /// </summary>
+    private static string MapShiBaoDecreaseReason(ShiBaoReduceRow red)
+    {
+        var oldCode = !string.IsNullOrEmpty(red.OldClassification) ? red.OldClassification! : red.ClassificationResult ?? "";
+        var newCode = !string.IsNullOrEmpty(red.NewClassification)
+            ? red.NewClassification!
+            : red.NewClassificationResult ?? "";
+
+        switch (red.MainReasonType)
+        {
+            case ChangeReasonTypeConstants.HeadDeceased:
+                return "户主死亡";
+            case ChangeReasonTypeConstants.EconomicReview:
+                // 整户退出（收入超标等）已被取数排除，此处只可能是降档（低保→低保边缘）或同类复核
+                return string.IsNullOrEmpty(newCode) || string.Equals(newCode, oldCode, StringComparison.Ordinal)
+                    ? "经济复核"
+                    : $"经济复核转{ClassificationConstants.ConvertToMajorCategoryName(newCode)}";
+            case ChangeReasonTypeConstants.MemberChange:
+                if (!string.IsNullOrEmpty(red.RemoveReasons)
+                    && red.RemoveReasons.Contains("死亡", StringComparison.Ordinal))
+                    return "成员死亡";
+                return string.IsNullOrEmpty(red.RemoveReasons)
+                    ? "成员变更"
+                    : $"成员变更（{red.RemoveReasons}）";
+            case ChangeReasonTypeConstants.CrossCategoryTransfer:
+                return string.IsNullOrEmpty(newCode) || string.Equals(newCode, oldCode, StringComparison.Ordinal)
+                    ? "跨大类转入"
+                    : $"转入{ClassificationConstants.ConvertToMajorCategoryName(newCode)}";
+        }
+
+        var fallback = !string.IsNullOrEmpty(red.MainReason) ? red.MainReason : red.ChangeReason;
+        if (string.IsNullOrWhiteSpace(fallback))
+            return "分类施保减发";
+        fallback = fallback.Replace("\r", " ").Replace("\n", " ").Trim();
+        return fallback.Length <= 40 ? fallback : $"{fallback[..40]}…";
+    }
+
+    /// <summary>
+    /// 施保金减发表「减发成员」：成员变更链取变更明细的被减成员（梁佳宁、张微）；
+    /// 户主死亡链取死亡记录户主姓名；其余（经济复核等）减发的是旧档户主本人。
+    /// </summary>
+    private static string BuildShiBaoReduceMember(ShiBaoReduceRow red)
+    {
+        if (string.Equals(red.MainReasonType, ChangeReasonTypeConstants.MemberChange, StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(red.RemoveMembers))
+            return red.RemoveMembers!;
+
+        return string.IsNullOrEmpty(red.DeceasedName) ? red.ApplicantName ?? "" : red.DeceasedName!;
     }
 
 }

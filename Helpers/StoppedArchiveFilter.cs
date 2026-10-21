@@ -41,6 +41,25 @@ public static class StoppedArchiveFilter
         )";
     }
 
+    /// <summary>
+    /// "停旧建新终结档"排除子句（追加到 WHERE 条件中）。
+    /// 经济复核/成员变更触发停保时，除了被停的旧档，还会生成一条"新档分类即停保码"的终结记录，
+    /// 两者是同一户：不排除则普通停保行按户重复计数（2026-10 月报停保卡片 8 户、表格仅 5 户实测）。
+    /// 判定：original_application_id 非空（有上游旧档）且自身分类为停保码且上游档案未删；
+    /// 上游已软删的终结档保留计数（无旧档可承载该户的停保行）。
+    /// 分类码为编译期常量，以 SQL 字面量拼接，无注入风险。
+    /// </summary>
+    public static string TerminalRebuildArchiveSql(string alias)
+    {
+        var stops = Literals(ClassificationConstants.StopCategoryCodes);
+
+        return $@"
+        AND NOT ({alias}.original_application_id IS NOT NULL
+                 AND {alias}.classification_result IN ({stops})
+                 AND EXISTS (SELECT 1 FROM nc_biz_applications up
+                             WHERE up.id = {alias}.original_application_id AND up.deleted_at IS NULL))";
+    }
+
     private static string Literals(IEnumerable<string> codes) =>
         string.Join(",", codes.Select(c => $"'{c.Replace("'", "''")}'"));
 }
