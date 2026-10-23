@@ -1381,7 +1381,8 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         DictionaryConstants.SubsidyType.CORN,
         DictionaryConstants.SubsidyType.SURFACE_WATER_RICE,
         DictionaryConstants.SubsidyType.GROUND_WATER_RICE,
-        DictionaryConstants.SubsidyType.ROTATION
+        DictionaryConstants.SubsidyType.ROTATION,
+        DictionaryConstants.SubsidyType.SOYBEAN_VARIETY
     };
 
     #endregion
@@ -2051,6 +2052,72 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         OnPropertyChanged(nameof(Line2Color));
         OnPropertyChanged(nameof(Line3Color));
         OnPropertyChanged(nameof(Line4Color));
+    }
+
+    /// <summary>
+    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
+    /// 与高龄津贴、临时救助等模块共享同一份人员照片。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("提示", "请先填写身份证号，再采集照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("低收入认定-照片采集/查看", ("ApplicationId", _applicationId.ToString()));
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _applicationId > 0 ? _applicationId : null, ApplicantName));
+    }
+
+    /// <summary>
+    /// 手机端：扫描身份证（Camera2 预览 + 端侧 OCR），回填户主姓名/身份证并触发现有联动。
+    /// 桌面端 IIdentityReader.IsSupported=false（无摄像头/OCR），提示改用手机端。
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanIdCardAsync()
+    {
+        var identityReader = _serviceProvider.GetRequiredService<Services.Platform.IIdentityReader>();
+        if (!identityReader.IsSupported)
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请在手机上使用", "确定");
+            return;
+        }
+
+        try
+        {
+            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
+            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
+                new IdCardScanParameter(result => completion.TrySetResult(result)));
+
+            var scanResult = await completion.Task;
+            if (scanResult is null) return; // 用户取消
+
+            if (scanResult.IsFailure || scanResult.Value is null)
+            {
+                await _serviceProvider.GetRequiredService<IDialogService>()
+                    .DisplayAlertAsync("识别失败", scanResult.Message ?? "未识别到身份证信息", "确定");
+                return;
+            }
+
+            var info = scanResult.Value;
+            if (!string.IsNullOrWhiteSpace(info.Name)) ApplicantName = info.Name.Trim();
+            if (!string.IsNullOrWhiteSpace(info.IdCard)) ApplicantIdCard = info.IdCard.Trim();
+
+            _logger.LogBusiness("低收入认定-身份证扫描",
+                ("HasName", !string.IsNullOrWhiteSpace(info.Name)),
+                ("HasIdCard", !string.IsNullOrWhiteSpace(info.IdCard)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "低收入认定身份证扫描失败");
+            await _serviceProvider.GetRequiredService<IDialogService>()
+                .DisplayAlertAsync("提示", "扫描失败，请重试或手动录入", "确定");
+        }
     }
 
     #endregion

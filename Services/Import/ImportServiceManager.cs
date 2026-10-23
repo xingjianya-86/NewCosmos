@@ -10,12 +10,18 @@ public interface IImportServiceManager
     Task<CombinedPreviewResult> PreviewCombinedAsync(string importType, string familyFilePath, string personFilePath, int previewRows = 10, CancellationToken ct = default);
     Task<CombinedImportResult> ImportCombinedAsync(string importType, string familyFilePath, string personFilePath,  bool clearBeforeImport, IProgress<string> progress = null, CancellationToken ct = default);
     Task<CombinedImportResult> ImportFromFolderAsync(string importType, string folderPath,  bool clearBeforeImport, IProgress<string> progress = null, CancellationToken ct = default);
-    Task<ImportResult> ImportSingleFilesAsync(string importType, IEnumerable<string> filePaths,  bool clearBeforeImport, IProgress<string> progress = null, CancellationToken ct = default);
+    Task<ImportResult> ImportSingleFilesAsync(string importType, IEnumerable<string> filePaths,  bool clearBeforeImport, IProgress<string> progress = null, CancellationToken ct = default, ImportScope? scope = null);
     ICombinedImportService? GetCombinedService(string importType);
     (string FamilyPath, string PersonPath) FindMatchingFiles(string importType, string folderPath);
     string? DetectImportType(string filePath);
     Task<List<SelectedFileInfo>> GetExcelFilesAsync(string folderPath);
     Task<string> ExportImportLogAsync(string importTypeName, List<string> logLines);
+    /// <summary>该导入类型是否有可导出的标准模板</summary>
+    bool HasTemplate(string importType);
+    /// <summary>该导入类型是否支持导入范围（年份覆盖/区间校验/年段清空）</summary>
+    bool SupportsScope(string importType);
+    /// <summary>把导入模板导出到本地目录，返回生成的文件路径</summary>
+    Task<NewCosmos.Models.Results.Result<string>> ExportTemplateAsync(string importType, string folderPath, CancellationToken ct = default);
 }
 
 public class SelectedFileInfo
@@ -218,8 +224,7 @@ public class ImportServiceManager : BaseService, IImportServiceManager
     }
 
     public Task<List<SelectedFileInfo>> GetExcelFilesAsync(string folderPath)
-    {
-        // 文件系统遍历为同步阻塞操作，移出调用线程执行；结果返回 Excel 文件清单
+    {        // 文件系统遍历为同步阻塞操作，移出调用线程执行；结果返回 Excel 文件清单
         return Task.Run(() =>
         {
             var files = Directory.GetFiles(folderPath, "*.xlsx", _recursiveOptions)
@@ -274,7 +279,8 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         IEnumerable<string> filePaths,
         bool clearBeforeImport,
         IProgress<string> progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        ImportScope? scope = null)
     {
         if (!ImportTypeCodes.IsSingleFileType(importType))
         {
@@ -303,19 +309,31 @@ public class ImportServiceManager : BaseService, IImportServiceManager
 
         if (clearBeforeImport)
         {
-            progress?.Report("正在清空现有数据...");
-            // 破坏性清表（TRUNCATE）前自动 pg_dump 备份；备份失败中止导入，防止清空后无回滚介质
+            // 破坏性清空（TRUNCATE 或 年段 DELETE）前自动 pg_dump 备份；备份失败中止导入，防止清空后无回滚介质
             var backup = await BackupBeforeClearAsync(progress, ct);
             if (backup.IsFailure)
                 return ImportResult.Failed($"清表前备份失败，已中止导入: {backup.Message}");
 
-            var clearResult = await service.ClearTableAsync(ct);
-            if (clearResult.IsFailure)
+            if (service.SupportsScope)
             {
-                LogError($"操作失败");
-                return ImportResult.Failed("清空数据失败");
+                // 年份管理型（年度种植补贴）：**不**整表清空——清空交给服务按「本次涉及年段」逐段执行（方案A），
+                // 同一批次多文件只清一次（scope.ClearedYears 去重），其余年段原样保留。
+                scope ??= new ImportScope();
+                scope.ClearBeforeImport = true;
+                progress?.Report($"清空范围：{scope.Describe()} 下本次实际涉及的年段（其余年段保留）");
+                LogInfo($"年段清空模式: {scope.Describe()}");
             }
-            LogInfo($"已清空现有数据");
+            else
+            {
+                progress?.Report("正在清空现有数据...");
+                var clearResult = await service.ClearTableAsync(ct);
+                if (clearResult.IsFailure)
+                {
+                    LogError($"操作失败");
+                    return ImportResult.Failed("清空数据失败");
+                }
+                LogInfo($"已清空现有数据");
+            }
         }
 
         for (var i = 0; i < fileList.Count; i++)
@@ -328,10 +346,23 @@ public class ImportServiceManager : BaseService, IImportServiceManager
 
             try
             {
-                var fileResult = await service.ImportAsync(new[] { filePath }, false, progress, ct);
+                var fileResult = await service.ImportAsync(
+                    new[] { filePath },
+                    service.SupportsScope ? scope : null,
+                    false,
+                    progress,
+                    ct);
 
                 totalImported += fileResult.ImportedCount;
                 totalErrors += fileResult.ErrorCount;
+
+                // 警告必须透传到 UI 与日志：导入会"跳过"部分行（如身份证不合规），
+                // 不透传就是静默丢数据（曾因此丢 1228 行 / 268 万元未被发现）
+                foreach (var warn in fileResult.Warnings)
+                {
+                    result.Warnings.Add($"文件: {fileName}, {warn}");
+                    LogWarn($"导入警告: {fileName} - {warn}");
+                }
 
                 if (fileResult.ErrorCount > 0)
                 {
@@ -359,5 +390,35 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         LogInfo($"单文件批量导入完成: 成功 {totalImported}");
 
         return result;
+    }
+
+    public bool HasTemplate(string importType)
+        => ImportTemplateCatalog.Get(importType) != null;
+
+    public bool SupportsScope(string importType)
+        => _singleFileServices.FirstOrDefault(s => s.ImportTypeName == importType)?.SupportsScope ?? false;
+
+    public Task<NewCosmos.Models.Results.Result<string>> ExportTemplateAsync(
+        string importType, string folderPath, CancellationToken ct = default)
+    {
+        var spec = ImportTemplateCatalog.Get(importType);
+        if (spec == null)
+        {
+            LogError($"该导入类型无模板可导出: {importType}");
+            return Task.FromResult(NewCosmos.Models.Results.Result.Failure<string>(
+                "TEMPLATE_NOT_FOUND", $"「{ImportTypeCodes.GetDisplayName(importType)}」暂无可导出的模板"));
+        }
+
+        var result = ImportTemplateExporter.Export(spec, folderPath);
+        if (result.IsSuccess)
+        {
+            Logger.LogBusiness("导入模板导出", ("Type", importType), ("Path", result.Value));
+            LogInfo($"模板已导出: {result.Value}");
+        }
+        else
+        {
+            LogError($"模板导出失败: {result.Message}");
+        }
+        return Task.FromResult(result);
     }
 }

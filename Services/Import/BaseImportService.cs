@@ -32,20 +32,56 @@ public abstract class BaseImportService : BaseService, IImportService
         return Task.FromResult(Result.Failure("NOT_IMPLEMENTED", "清空功能未实现"));
     }
 
-    public virtual async Task<ImportResult> ImportAsync(IEnumerable<string> filePaths,  bool clearBeforeImport, IProgress<string>? progress = null, CancellationToken ct = default)
+    /// <summary>
+    /// 是否支持「导入范围」（年份强制覆盖 / 区间校验 / 年段感知清空）。
+    /// 默认 false：勾选"导入前清空"仍走整表 <see cref="ClearTableAsync"/>，行为与历史完全一致。
+    /// </summary>
+    public virtual bool SupportsScope => false;
+
+    /// <summary>
+    /// 当前批次的导入范围。只在互斥锁内赋值/清空——服务注册为 Singleton，
+    /// 并发导入由 _importGate 串行化，故该实例字段不会被交叉污染（与既有子类字段同一保证）。
+    /// </summary>
+    protected ImportScope? ActiveScope { get; private set; }
+
+    public virtual async Task<ImportResult> ImportAsync(IEnumerable<string> filePaths, bool clearBeforeImport, IProgress<string>? progress = null, CancellationToken ct = default)
+        => await ImportAsync(filePaths, null, clearBeforeImport, progress, ct);
+
+    public virtual async Task<ImportResult> ImportAsync(IEnumerable<string> filePaths, ImportScope? scope, bool clearBeforeImport, IProgress<string>? progress = null, CancellationToken ct = default)
     {
         if (clearBeforeImport)
         {
-            var clearResult = await ClearTableAsync(ct);
-            if (clearResult.IsFailure)
+            if (SupportsScope)
             {
-                return ImportResult.Failed("执行清空操作失败");
+                // 年份管理型：清空意图交给 scope，由服务按「本次涉及年段」执行，不整表 TRUNCATE
+                scope ??= new ImportScope();
+                scope.ClearBeforeImport = true;
+            }
+            else
+            {
+                // 非年份管理型：维持历史语义（整表清空）
+                var clearResult = await ClearTableAsync(ct);
+                if (clearResult.IsFailure)
+                    return ImportResult.Failed("执行清空操作失败");
             }
         }
-        return await ImportAsync(filePaths, progress, ct);
+
+        await _importGate.WaitAsync(ct);
+        try
+        {
+            ActiveScope = scope;
+            return await ImportCoreAsync(filePaths, progress, ct);
+        }
+        finally
+        {
+            ActiveScope = null;
+            _importGate.Release();
+        }
     }
 
-    /// <summary>导入互斥锁：服务注册为 Singleton，串行化并发导入，避免子类实例字段（_dataYear/_subsidyType 等）互相污染。</summary>
+    /// <summary>
+    /// 导入互斥锁：服务注册为 Singleton，串行化并发导入，避免子类实例字段（_dataYear/_subsidyType/ActiveScope 等）互相污染。
+    /// </summary>
     private readonly SemaphoreSlim _importGate = new(1, 1);
 
     public virtual async Task<ImportResult> ImportAsync(IEnumerable<string> filePaths, IProgress<string>? progress = null, CancellationToken ct = default)

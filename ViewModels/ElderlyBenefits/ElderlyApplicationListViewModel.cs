@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ElderlyBenefits;
@@ -334,6 +335,31 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
     private async Task PushPrintCoreAsync(ElderlyApplication? app, string classification)
     {
         if (app == null) return;
+
+        // 手机端：本地无 Office/COM（WordEngine/ExcelEngine 仅 WINDOWS 编译），不能生成也不能直接打印。
+        // 改为进入手机端「档案输出」页勾选模板后推送打印队列——直接 EnqueueElderlyAsync 只会解析单一模板，
+        // 同分类存在多个模板（如登记表 + 享受须知）时会漏打。
+        if (DeviceInfo.Platform == DevicePlatform.Android)
+        {
+            await ExecuteAsync(async () =>
+            {
+                var appResult = await _applicationService.GetByIdAsync(app.Id, CancellationToken);
+                if (appResult.IsFailure || appResult.Value == null)
+                    return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "加载登记信息失败，无法推送打印");
+
+                PrintNavigationData.ClearDocumentMode();
+                PrintNavigationData.BusinessType = "ElderlyBenefits";
+                PrintNavigationData.BusinessId = app.Id;
+                PrintNavigationData.Classification = classification == "Stop" ? "Stop" : "New";
+                PrintNavigationData.FieldData = ElderlyPrintDataBuilder.BuildSingleFields(appResult.Value);
+                PrintNavigationData.TableData = new();
+                PrintNavigationData.SupporterTableData = null;
+
+                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
+                return Result.Success();
+            }, "准备推送打印...");
+            return;
+        }
 
         await ExecuteAsync(async () =>
         {

@@ -68,13 +68,17 @@
         <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
     </Style>
 
-    <!-- 输入框样式 -->
+    <!-- 输入框样式
+         Android：固定 HeightRequest 会把输入文字裁掉一半（中文字形/系统字体缩放下必现，手机端全页输入框故障根因），
+         改为「最小高度 + 不锁死高度」；WinUI 保持 48 以维持桌面版式。 -->
     <Style TargetType="Entry">
         <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
         <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
-        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="HeightRequest" Value="{OnPlatform WinUI=48, Default=-1}"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
     </Style>
 
     <Style x:Key="EntryBordered" TargetType="Border">
@@ -530,13 +534,15 @@
         <Setter Property="HorizontalOptions" Value="Start"/>
     </Style>
 
-    <!-- 表单输入框样式 -->
+    <!-- 表单输入框样式（Android 不锁死高度，见隐式 Entry 样式注释） -->
     <Style x:Key="FormFieldEntryStyle" TargetType="Entry">
         <Setter Property="FontSize" Value="16"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
         <Setter Property="BackgroundColor" Value="Transparent"/>
-        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="HeightRequest" Value="{OnPlatform WinUI=48, Default=-1}"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
+        <Setter Property="VerticalTextAlignment" Value="Center"/>
         <Setter Property="VerticalOptions" Value="Center"/>
     </Style>
 
@@ -545,7 +551,8 @@
         <Setter Property="FontSize" Value="16"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="BackgroundColor" Value="Transparent"/>
-        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="HeightRequest" Value="{OnPlatform WinUI=48, Default=-1}"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
         <Setter Property="VerticalOptions" Value="Center"/>
     </Style>
 
@@ -559,6 +566,7 @@
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="TitleColor" Value="{StaticResource Gray500}"/>
         <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
     </Style>
 
     <Style TargetType="Editor">

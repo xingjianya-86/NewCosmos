@@ -127,6 +127,12 @@ public static class ErrorCodes
     /// <summary>会话已过期</summary>
     public const string SESSION_EXPIRED = "SESSION_EXPIRED";
 
+    /// <summary>会话已被顶号/强制下线（写操作被会话闸门拦截）</summary>
+    public const string SESSION_REVOKED = "SESSION_REVOKED";
+
+    /// <summary>会话记录不存在或设备标识不匹配</summary>
+    public const string SESSION_INVALID = "SESSION_INVALID";
+
     /// <summary>账户已锁定</summary>
     public const string ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
 

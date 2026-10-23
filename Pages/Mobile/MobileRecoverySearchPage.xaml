@@ -56,7 +56,7 @@
                         <VerticalStackLayout Spacing="10">
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <Entry Grid.Column="0" Placeholder="输入姓名或身份证号搜索停止人员" Text="{Binding SearchKeyword}"
-                                       HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
+                                       MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
                                 <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
                                         BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                                         Command="{Binding SearchCommand}"/>
@@ -95,7 +95,7 @@
                     <Border Style="{StaticResource CardBorder}">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Grid.Column="0" Placeholder="搜索追缴记录（姓名/身份证）" Text="{Binding HistoryKeyword}"
-                                   HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchHistoryCommand}"/>
+                                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchHistoryCommand}"/>
                             <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                                     Command="{Binding SearchHistoryCommand}"/>

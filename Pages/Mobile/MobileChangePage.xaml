@@ -83,7 +83,7 @@
                         <Label Text="选择档案" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Grid.Column="0" Placeholder="输入姓名或身份证号搜索档案" Text="{Binding SearchKeyword}"
-                                   HeightRequest="42" FontSize="14" ReturnCommand="{Binding SearchApplicationsCommand}"/>
+                                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchApplicationsCommand}"/>
                             <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                                     Command="{Binding SearchApplicationsCommand}"/>

@@ -1,8 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Navigation;
@@ -116,6 +118,69 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
         _userService = userService;
         _organizationService = organizationService;
         _dictCache = dictCache;
+    }
+
+    /// <summary>
+    /// 手机端：扫描身份证（Camera2 预览 + 端侧 PaddleOCR），回填姓名/身份证并触发判类联动。
+    /// 桌面端 IIdentityReader.IsSupported=false（无摄像头/OCR），页面只在手机端显示入口。
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanIdCardAsync()
+    {
+        var identityReader = _serviceProvider.GetRequiredService<Services.Platform.IIdentityReader>();
+        if (!identityReader.IsSupported)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请手动录入或改用手机端", "确定");
+            return;
+        }
+
+        try
+        {
+            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
+            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
+                new IdCardScanParameter(result => completion.TrySetResult(result)));
+
+            var scanResult = await completion.Task;
+            if (scanResult is null) return; // 用户取消
+
+            if (scanResult.IsFailure || scanResult.Value is null)
+            {
+                await _dialogService.DisplayAlertAsync("识别失败", scanResult.Message ?? "未识别到身份证信息", "确定");
+                return;
+            }
+
+            var info = scanResult.Value;
+            if (!string.IsNullOrWhiteSpace(info.Name)) Name = info.Name.Trim();
+            // 赋值即触发 OnIdCardChanged 的自动评估（判类 + 补发计算 + 导入台账带出）
+            if (!string.IsNullOrWhiteSpace(info.IdCard)) IdCard = info.IdCard.Trim();
+
+            _logger.LogBusiness("高龄津贴-身份证扫描",
+                ("HasName", !string.IsNullOrWhiteSpace(info.Name)),
+                ("HasIdCard", !string.IsNullOrWhiteSpace(info.IdCard)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "高龄津贴身份证扫描失败");
+            await _dialogService.DisplayAlertAsync("提示", "扫描失败，请重试或手动录入", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
+    /// 高龄津贴、低收入人口认定、临时救助等模块共享同一份人员照片。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync()
+    {
+        if (string.IsNullOrWhiteSpace(IdCard))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先填写身份证号码，再采集照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("高龄津贴-照片采集/查看", ("ApplicationId", _id.ToString()));
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(IdCard.Trim(), _id > 0 ? _id : null, Name));
     }
 
 }

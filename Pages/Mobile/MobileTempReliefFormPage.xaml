@@ -17,13 +17,19 @@
         <!-- 深色橙色头部 -->
         <Border Grid.Row="0" Background="{StaticResource StatCardOrangeGradient}" Padding="16,16,16,14">
             <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding CancelCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding CancelCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <!-- 录入环节照片采集：按申请人身份证归档（已传可继续补传） -->
+                    <Button Grid.Column="2" Text="📷 照片" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                            BackgroundColor="#33FFFFFF" TextColor="White"
+                            Command="{Binding OpenPhotosCommand}"/>
+                </Grid>
                 <Label Text="临时救助申请" FontSize="20" FontAttributes="Bold" TextColor="White"/>
                 <Label Text="申请人来源仅限导入台账库与最低生活保障申请库" FontSize="12" TextColor="#E6FFFFFF"/>
             </VerticalStackLayout>

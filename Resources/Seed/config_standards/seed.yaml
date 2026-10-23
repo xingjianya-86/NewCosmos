@@ -57,9 +57,11 @@ tables:
       - { standard_type: "ELDERLY_SUBSIDY", standard_name: "100周岁以上补贴", hukou_type: "CAT4", support_mode: null, standard_value: 300.00, unit: "元/月", effective_start_date: "2024-10-01", description: "100周岁（含）以上老年人补贴标准" }
       
       # ==================== 农业补贴价格 ====================
-      - { standard_type: "LandFertilityPrice", standard_name: "地力补贴价格", hukou_type: null, support_mode: null, standard_value: 75.60, unit: "元/亩", effective_start_date: "2025-01-01", description: "耕地地力保护补贴每亩价格" }
-      - { standard_type: "SoybeanPrice", standard_name: "大豆补贴价格", hukou_type: null, support_mode: null, standard_value: 350.73, unit: "元/亩", effective_start_date: "2025-01-01", description: "大豆生产者补贴每亩价格" }
-      - { standard_type: "CornPrice", standard_name: "玉米补贴价格", hukou_type: null, support_mode: null, standard_value: 16.73, unit: "元/亩", effective_start_date: "2025-01-01", description: "玉米生产者补贴每亩价格" }
+      # 四类调价补贴自 2026-10-15 起执行新价（原价见描述）；地力、轮作两期不变。
+      # 实际计算取价在 Constants\SubsidyPriceConstants.cs（双轨按日期单点实现），本表仅作展示与运维维护。
+      - { standard_type: "LandFertilityPrice", standard_name: "地力补贴价格", hukou_type: null, support_mode: null, standard_value: 75.73, unit: "元/亩", effective_start_date: "2026-10-15", description: "耕地地力保护补贴每亩价格（原75.60，自2026-10-15起执行）" }
+      - { standard_type: "SoybeanPrice", standard_name: "大豆补贴价格", hukou_type: null, support_mode: null, standard_value: 388.34, unit: "元/亩", effective_start_date: "2026-10-15", description: "大豆生产者补贴每亩价格（原350.73，自2026-10-15起执行）" }
+      - { standard_type: "CornPrice", standard_name: "玉米补贴价格", hukou_type: null, support_mode: null, standard_value: 47.34, unit: "元/亩", effective_start_date: "2026-10-15", description: "玉米生产者补贴每亩价格（原16.73，自2026-10-15起执行）" }
       - { standard_type: "RotationPrice", standard_name: "轮作补贴价格", hukou_type: null, support_mode: null, standard_value: 150.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "耕地轮作补贴每亩价格" }
-      - { standard_type: "SurfaceWaterRicePrice", standard_name: "地表水水稻价格", hukou_type: null, support_mode: null, standard_value: 156.53, unit: "元/亩", effective_start_date: "2025-01-01", description: "地表水灌溉水稻补贴每亩价格" }
-      - { standard_type: "GroundWaterRicePrice", standard_name: "地下水水稻价格", hukou_type: null, support_mode: null, standard_value: 106.53, unit: "元/亩", effective_start_date: "2025-01-01", description: "地下水灌溉水稻补贴每亩价格" }
+      - { standard_type: "SurfaceWaterRicePrice", standard_name: "地表水水稻价格", hukou_type: null, support_mode: null, standard_value: 156.75, unit: "元/亩", effective_start_date: "2026-10-15", description: "地表水灌溉水稻补贴每亩价格（原156.53，自2026-10-15起执行）" }
+      - { standard_type: "GroundWaterRicePrice", standard_name: "地下水水稻价格", hukou_type: null, support_mode: null, standard_value: 106.75, unit: "元/亩", effective_start_date: "2026-10-15", description: "地下水灌溉水稻补贴每亩价格（原106.53，自2026-10-15起执行）" }

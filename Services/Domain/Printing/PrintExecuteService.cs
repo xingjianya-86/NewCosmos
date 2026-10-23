@@ -43,6 +43,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
     private readonly IDatabaseService _db;
     private readonly INewPermissionService _permissionService;
     private readonly Signatures.ISignatureService _signatureService;
+    private readonly IArchivePhotoService _archivePhotoService;
 
     public PrintExecuteService(
         IPrintService printService,
@@ -52,6 +53,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         IDatabaseService db,
         INewPermissionService permissionService,
         Signatures.ISignatureService signatureService,
+        IArchivePhotoService archivePhotoService,
         ILoggerService logger) : base(logger)
     {
         _printService = printService;
@@ -61,6 +63,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         _db = db;
         _permissionService = permissionService;
         _signatureService = signatureService;
+        _archivePhotoService = archivePhotoService;
     }
 
     public async Task<Result<byte[]>> GeneratePreviewPdfAsync(
@@ -210,8 +213,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
             // 直接从已取回的模板解析 config（原实现 GetTemplateConfigAsync 会再次 GetByIdAsync，纯冗余往返）
             var config = string.IsNullOrEmpty(template.ConfigJson) ? null : TemplateConfig.FromJson(template.ConfigJson);
 
-            // 签名嵌入准备：模板含 SIGNATURE_* 占位符时，从 nc_biz_signatures 取回最新签名 PNG（失败不阻断打印）
+            // 签名/照片嵌入准备：模板含 SIGNATURE_*/PHOTO_* 占位符时取回图片（失败不阻断打印）
             var sigImages = await BuildSignatureImageMapAsync(config, businessType, applicantIdCard, businessId, ct);
+            foreach (var kv in await BuildPhotoImageMapAsync(config, applicantIdCard, ct))
+                sigImages[kv.Key] = kv.Value;
 
             var category = OutputPathHelper.GetCategoryDisplayName(businessType);
             var ext = template.FileType.ToLowerInvariant() switch
@@ -604,8 +609,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
         foreach (var mapping in mappings)
         {
-            // 签名类 FieldKey 是图片占位符，不参与文本替换（否则会被 defaultValue 污染成文字）
-            if (!string.IsNullOrEmpty(mapping.FieldKey) && IsSignatureFieldKey(mapping.FieldKey))
+            // 签名/照片类 FieldKey 是图片占位符，不参与文本替换（否则会被 defaultValue 污染成文字）
+            if (!string.IsNullOrEmpty(mapping.FieldKey) && IsImageFieldKey(mapping.FieldKey))
                 continue;
 
             if (!string.IsNullOrEmpty(mapping.FieldKey) && fieldValues.TryGetValue(mapping.FieldKey, out var rawValue))
@@ -623,9 +628,11 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         return result;
     }
 
-    /// <summary>是否为签名类图片占位符 FieldKey（SIGNATURE_*）。</summary>
-    private static bool IsSignatureFieldKey(string? fieldKey)
-        => !string.IsNullOrEmpty(fieldKey) && fieldKey.StartsWith("SIGNATURE_", StringComparison.OrdinalIgnoreCase);
+    /// <summary>是否为图片类占位符 FieldKey（SIGNATURE_* 签名 / PHOTO_* 照片）。</summary>
+    private static bool IsImageFieldKey(string? fieldKey)
+        => !string.IsNullOrEmpty(fieldKey)
+           && (fieldKey.StartsWith("SIGNATURE_", StringComparison.OrdinalIgnoreCase)
+               || fieldKey.StartsWith("PHOTO_", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// 按模板 config 里的签名 FieldKey 映射，构建「占位符 → 签名 PNG」图。
@@ -678,6 +685,70 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         {
             // 签名环节失败绝不阻断打印
             LogWarn($"签名嵌入准备异常，跳过: {ex.Message}");
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// 按模板 config 里的 PHOTO_APPLICANT 映射，构建「占位符 → 照片字节」图。
+    /// 数据源 = nc_biz_archive_photos（按身份证归档，全库模块共享）；
+    /// 取值优先级：本人照片/证件照 &gt; 身份证 &gt; 其他证件照，同类取最新一张。
+    /// 无照片、无占位符或模板未配置时返回空图（引擎侧自然跳过，不影响打印）。
+    /// </summary>
+    private async Task<Dictionary<string, byte[]>> BuildPhotoImageMapAsync(
+        TemplateConfig? config, string? applicantIdCard, CancellationToken ct)
+    {
+        var map = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        if (config == null || config.Fields.Count == 0) return map;
+        if (string.IsNullOrWhiteSpace(applicantIdCard)) return map;
+
+        var placeholders = config.Fields
+            .Where(f => f != null && !string.IsNullOrEmpty(f.Placeholder)
+                && string.Equals(f.FieldKey, Constants.FieldKeys.PHOTO_APPLICANT, StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.Placeholder!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (placeholders.Count == 0) return map;
+
+        try
+        {
+            byte[]? photoBytes = null;
+            foreach (var category in new[]
+                     {
+                         PhotoCategoryConstants.PERSON_PHOTO,
+                         PhotoCategoryConstants.ID_CARD,
+                         PhotoCategoryConstants.OTHER_CERT
+                     })
+            {
+                var listResult = await _archivePhotoService.GetByPersonAsync(applicantIdCard!, category, ct);
+                var photo = listResult.IsSuccess ? listResult.Value?.FirstOrDefault() : null;
+                if (photo == null) continue;
+
+                var dataResult = await _archivePhotoService.GetPhotoDataAsync(photo.Id, ct);
+                if (dataResult.IsSuccess && dataResult.Value is { Length: > 0 })
+                {
+                    photoBytes = dataResult.Value;
+                    break;
+                }
+            }
+
+            if (photoBytes == null)
+                return map;
+
+            foreach (var placeholder in placeholders)
+                map[placeholder] = photoBytes;
+
+            LogInfo($"照片嵌入就绪: 占位符 {map.Count} 个");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // 照片环节失败绝不阻断打印
+            LogWarn($"照片嵌入准备异常，跳过: {ex.Message}");
         }
 
         return map;

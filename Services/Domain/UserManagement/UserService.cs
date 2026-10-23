@@ -10,10 +10,15 @@ public class UserService : BaseService, IUserService
 {
     protected override string ServiceName => "UserService";
     private readonly IDatabaseService _db;
+    private readonly IUserSessionService _sessionService;
+    private readonly ISessionGuard _sessionGuard;
 
-    public UserService(IDatabaseService db, ILoggerService logger) : base(logger)
+    public UserService(IDatabaseService db, ILoggerService logger,
+        IUserSessionService sessionService, ISessionGuard sessionGuard) : base(logger)
     {
         _db = db;
+        _sessionService = sessionService;
+        _sessionGuard = sessionGuard;
     }
 
     public async Task<Result<User>> GetByIdAsync(int id, CancellationToken ct = default)
@@ -145,6 +150,9 @@ public class UserService : BaseService, IUserService
             return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
 
         LogInfo($"执行操作");
+        // 停用用户：所有在线端立即失效
+        if (request.IsActive == false)
+            await RevokeSessionsAsync(request.UserId, SessionConstants.EndReasonAccountDisabled, null, ct);
         return Result.Success();
     }
 
@@ -168,6 +176,7 @@ public class UserService : BaseService, IUserService
 
         LogInfo($"执行操作");
         Logger.LogSecurity("删除用户", ("UserId", id), ("Username", user.Username));
+        await RevokeSessionsAsync(id, SessionConstants.EndReasonAccountDisabled, null, ct);
         return Result.Success();
     }
 
@@ -197,6 +206,8 @@ public class UserService : BaseService, IUserService
 
         LogInfo($"执行操作");
         Logger.LogSecurity("重置密码", ("UserId", userId), ("UpdatedBy", updatedBy));
+        // 管理员重置密码：该用户所有端立即失效，必须用新密码重新登录
+        await RevokeSessionsAsync(userId, SessionConstants.EndReasonPasswordChanged, null, ct);
         return Result.Success();
     }
 
@@ -230,6 +241,10 @@ public class UserService : BaseService, IUserService
 
         LogInfo($"执行操作");
         Logger.LogSecurity("修改密码", ("UserId", userId));
+        // 本人改密：保留当前端会话，踢掉其他端
+        var current = _sessionGuard.SessionId;
+        await RevokeSessionsAsync(userId, SessionConstants.EndReasonPasswordChanged,
+            current.HasValue && App.CurrentUserId == userId ? current : null, ct);
         return Result.Success();
     }
 
@@ -318,6 +333,7 @@ public class UserService : BaseService, IUserService
 
         LogInfo($"执行操作");
         Logger.LogSecurity("分配角色", ("UserId", userId), ("RoleId", roleId), ("AssignedBy", assignedBy));
+        await RevokeSessionsAsync(userId, SessionConstants.EndReasonPermissionsChanged, null, ct);
         return Result.Success();
     }
 
@@ -332,6 +348,7 @@ public class UserService : BaseService, IUserService
             return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
 
         LogInfo($"执行操作");
+        await RevokeSessionsAsync(userId, SessionConstants.EndReasonPermissionsChanged, null, ct);
         return Result.Success();
     }
 
@@ -382,6 +399,7 @@ public class UserService : BaseService, IUserService
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
         LogInfo($"执行操作");
+        await RevokeSessionsAsync(id, SessionConstants.EndReasonAccountDisabled, null, ct);
         return Result.Success();
     }
 
@@ -399,6 +417,26 @@ public class UserService : BaseService, IUserService
     public async Task<Result<User>> AuthenticateAsync(string username, string password, CancellationToken ct = default)
     {
         return await ValidateLoginAsync(username, password, ct);
+    }
+
+    /// <summary>
+    /// 安全操作联动吊销会话：失败只记 Warn，不阻断主操作（本地端仍会在下次心跳退出）。
+    /// </summary>
+    private async Task RevokeSessionsAsync(int userId, string reason, Guid? exceptSessionId, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _sessionService.RevokeAllForUserAsync(
+                userId, reason, App.CurrentUserId, exceptSessionId, ct);
+            if (result.IsFailure)
+                LogWarn($"吊销用户会话失败: UserId={userId}, Reason={reason}, {result.Message}");
+            else if (result.Value > 0)
+                LogInfo($"已吊销该用户 {result.Value} 个活动会话: UserId={userId}, Reason={reason}");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"吊销用户会话异常: UserId={userId}, Reason={reason}, {ex.Message}");
+        }
     }
 
     private static string HashPassword(string password)

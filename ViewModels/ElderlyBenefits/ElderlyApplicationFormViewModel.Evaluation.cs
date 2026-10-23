@@ -27,8 +27,21 @@ public partial class ElderlyApplicationFormViewModel
         {
             ApplyDate = DateTime.Today;
             _id = 0;
-            await LoadInitialRegionAsync();
-            await ApplyOperatorRegionDefaultsAsync();
+
+            // 初始化期统一抑制级联：LoadHukouCitiesAsync 自动选中首个城市时不再 fire-and-forget 拉区县，
+            // 否则会和下面的组织默认值 await 交错——晚到的旧请求会把区县/乡镇覆盖成首个城市的甚至清空
+            // （手机端网络较慢，该竞态必现，表现为"户籍与地址没有读取默认值"）。
+            _suppressRegionCascade = true;
+            try
+            {
+                await LoadInitialRegionAsync();
+                await ApplyOperatorRegionDefaultsAsync();
+                await EnsureRegionCascadeLoadedAsync();
+            }
+            finally
+            {
+                _suppressRegionCascade = false;
+            }
         }
     }
 
@@ -60,9 +73,9 @@ public partial class ElderlyApplicationFormViewModel
         }
         if (string.IsNullOrEmpty(cityName)) return;
 
-        // 设置默认值期间抑制 OnChanged 异步级联，手动顺序 await，避免并行竞态覆盖选项
-        _suppressRegionCascade = true;
-        try
+        // 调用方（InitializeAsync）已置 _suppressRegionCascade=true：此处逐级设置并手动 await，
+        // 不触发 OnChanged 的 fire-and-forget 级联，避免与初始化并行请求交错覆盖选项。
+        // （离开本方法后由调用方统一恢复标志）
         {
             // 户籍（逐级设置并等待级联加载完成，避免异步乱序覆盖）
             SelectedHukouCity = cityName;
@@ -96,10 +109,27 @@ public partial class ElderlyApplicationFormViewModel
                 }
             }
         }
-        finally
-        {
-            _suppressRegionCascade = false;
-        }
+    }
+
+    /// <summary>
+    /// 初始化兜底：组织未配置区划（或未登录上下文）时，抑制级联状态下不会自动展开选项，
+    /// 这里按已选城市逐级显式补齐，保证"城市--&gt;区县--&gt;乡镇--&gt;村"四列至少加载出可选项。
+    /// </summary>
+    private async Task EnsureRegionCascadeLoadedAsync()
+    {
+        if (HukouCountyOptions.Count == 0 && !string.IsNullOrEmpty(SelectedHukouCity))
+            await LoadHukouCountiesAsync();
+        if (HukouTownOptions.Count == 0 && !string.IsNullOrEmpty(SelectedHukouCounty))
+            await LoadHukouTownsAsync();
+        if (HukouVillageOptions.Count == 0 && !string.IsNullOrEmpty(SelectedHukouTown))
+            await LoadHukouVillagesAsync();
+
+        if (FamilyCountyOptions.Count == 0 && !string.IsNullOrEmpty(SelectedFamilyCity))
+            await LoadFamilyCountiesAsync();
+        if (FamilyTownOptions.Count == 0 && !string.IsNullOrEmpty(SelectedFamilyCounty))
+            await LoadFamilyTownsAsync();
+        if (FamilyVillageOptions.Count == 0 && !string.IsNullOrEmpty(SelectedFamilyTown))
+            await LoadFamilyVillagesAsync();
     }
 
     /// <summary>

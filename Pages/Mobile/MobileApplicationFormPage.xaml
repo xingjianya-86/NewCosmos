@@ -12,13 +12,24 @@
         <!-- 蓝色英雄头部：返回 + 标题 + 模式 + 家庭概况 -->
         <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
             <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding AbandonCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding AbandonCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <!-- 录入环节照片采集 + 身份证扫描：均按申请人身份证归档 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="🔍 扫描" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                                BackgroundColor="#33FFFFFF" TextColor="White"
+                                Command="{Binding ScanIdCardCommand}"/>
+                        <Button Text="📷 照片" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                                BackgroundColor="#33FFFFFF" TextColor="White"
+                                Command="{Binding OpenPhotosCommand}"/>
+                    </HorizontalStackLayout>
+                </Grid>
 
                 <Label Text="低收入人口认定申请" FontSize="20" FontAttributes="Bold" TextColor="White"/>
                 <Label Text="{Binding ModeDescription}" FontSize="13" TextColor="#E6FFFFFF"/>

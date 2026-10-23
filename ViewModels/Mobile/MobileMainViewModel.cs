@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Components;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Navigation;
 using NewCosmos.Services.Domain.Reporting;
 using NewCosmos.Services.UserManagement;
@@ -23,6 +24,8 @@ public partial class MobileMainViewModel : ViewModelBase
     private readonly IAppUpdateCoordinator _updateCoordinator;
     private readonly ISessionStore _sessionStore;
     private readonly INavigationService _navigationService;
+    private readonly IUserSessionService _sessionService;
+    private readonly ISessionLifecycleService _sessionLifecycle;
 
     private bool _permissionsLoading;
     private int _permissionRetryCount;
@@ -95,7 +98,9 @@ public partial class MobileMainViewModel : ViewModelBase
         IStatisticsService statisticsService,
         IAppUpdateCoordinator updateCoordinator,
         ISessionStore sessionStore,
-        INavigationService navigationService)
+        INavigationService navigationService,
+        IUserSessionService sessionService,
+        ISessionLifecycleService sessionLifecycle)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
@@ -107,6 +112,8 @@ public partial class MobileMainViewModel : ViewModelBase
         _updateCoordinator = updateCoordinator;
         _sessionStore = sessionStore;
         _navigationService = navigationService;
+        _sessionService = sessionService;
+        _sessionLifecycle = sessionLifecycle;
 
         // 卡片数据在构造期构建一次；权限到位后 RebuildCards 重建（权限未加载时全部隐藏，与原实现一致）
         RebuildCards();
@@ -143,10 +150,27 @@ public partial class MobileMainViewModel : ViewModelBase
         try
         {
             var session = await _sessionStore.LoadAsync();
-            if (session == null || session.UserId <= 0)
+            if (session == null || session.UserId <= 0 || session.SessionId == Guid.Empty)
                 return false;
 
+            // 启动流程已负责保留/清除本地缓存；此处查询失败仅表示无法恢复，不能再误判为会话失效
+            var validation = await _sessionService.ValidateAsync(session.SessionId, session.DeviceId);
+            if (validation.IsFailure)
+            {
+                _logger.Warn($"恢复会话校验失败: {validation.Message}");
+                return false;
+            }
+
+            if (!validation.Value.IsActive)
+            {
+                _logger.Warn($"会话已失效: {validation.Value.Status}/{validation.Value.EndReason}");
+                try { await _sessionStore.ClearAsync(); } catch { /* 已尽力清除 */ }
+                return false;
+            }
+
             App.ApplySession(session);
+            App.SetCurrentSessionId(session.SessionId);
+            await _sessionLifecycle.StartAsync(session.SessionId);
             _logger.Info($"会话已恢复: UserId={session.UserId}");
             return true;
         }
@@ -165,6 +189,7 @@ public partial class MobileMainViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(toast))
             await ShowSnackBarAsync(toast!, SnackBarType.Warning);
 
+        try { await _sessionLifecycle.StopAsync(); } catch { /* 已尽力停止 */ }
         App.ClearSession();
         try { await _sessionStore.ClearAsync(); } catch { /* 已尽力清除 */ }
 
@@ -339,6 +364,8 @@ public partial class MobileMainViewModel : ViewModelBase
 
         ArchiveCards.Clear();
         AddArchiveCard("📁", "救助档案管理", "历史档案检索查阅", "#ECFDF5", CanAccessArchiveQuery, NavigateToMobileArchiveAsync);
+        // 照片补传/导出：独立功能（不挂业务模块），按人搜索后补传，已传过的也可继续补传
+        AddArchiveCard("🖼️", "照片补传", "按人查补证件照片 · 导出", "#F5F3FF", true, OpenPhotoBackfillAsync);
     }
 
     private void AddWorkspaceCard(string icon, string title, string subtitle, string bgColor, bool accessible, Func<Task> onTap)
@@ -377,10 +404,7 @@ public partial class MobileMainViewModel : ViewModelBase
         if (!confirm) return;
 
         _logger.LogSecurity("用户登出", ("UserId", App.CurrentUserId ?? 0));
-        App.ClearSession();
-        try { await _sessionStore.ClearAsync(); } catch { /* 已尽力清除 */ }
-        await _navigationService.SetRootAsync(NavigationKeys.Login);
-        _windowTitleService.SetPageTitle(null);
+        await _sessionLifecycle.LogoutAsync();
     }
 
     /// <summary>检查更新（共用在线更新流程；Android 下载 APK 并触发系统安装）。</summary>
@@ -471,6 +495,12 @@ public partial class MobileMainViewModel : ViewModelBase
     private async Task NavigateToMobileArchiveAsync()
     {
         await NavigateToPageAsync<Pages.Mobile.MobileArchiveQueryPage>("救助档案管理");
+    }
+
+    /// <summary>照片补传（独立功能）：按人搜索 → 勾选补传/打印/导出，已传过的也可继续补传。</summary>
+    private async Task OpenPhotoBackfillAsync()
+    {
+        await NavigateToPageAsync<Pages.Mobile.MobilePhotoBackfillPage>("照片补传");
     }
 
     private async Task NavigateToCollegeStudentAsync()

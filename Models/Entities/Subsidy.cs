@@ -77,12 +77,22 @@ public partial class Subsidy : ObservableObject
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
-    /// 计算金额
+    /// 计算金额，分两种行型：
+    /// ① 面积型（常规）：原始金额 = 面积 × 单价 × 数量，实际金额 = 原始金额 × 比例系数；
+    /// ② 金额型（Area=0 且 UnitPrice=0 且行内已有 OriginalAmount——「大豆品种补贴」等无统一单价的分类）：
+    ///    以存量原始金额为基数按比例折算。**不可走①**，否则金额会被算成 0，保存时把导入的补贴金额静默清空。
     /// </summary>
     public void CalculateAmount()
     {
-        OriginalAmount = Math.Round(Area * UnitPrice * Count, 2);
-        Amount = Math.Round(OriginalAmount * RatioFactor, 2);
+        if (Area == 0 && UnitPrice == 0 && OriginalAmount > 0)
+        {
+            Amount = Math.Round(OriginalAmount * RatioFactor, 2);
+        }
+        else
+        {
+            OriginalAmount = Math.Round(Area * UnitPrice * Count, 2);
+            Amount = Math.Round(OriginalAmount * RatioFactor, 2);
+        }
         OnPropertyChanged(nameof(AmountFormula));
     }
 
@@ -102,14 +112,15 @@ public partial class Subsidy : ObservableObject
     }
 
     /// <summary>
-    /// 补贴类型变化时自动设置单价
+    /// 补贴类型变化时自动设置单价（双轨价单点取 SubsidyPriceConstants.GetPrice）。
+    /// 判价日期：本行已录 created_at 的按 created_at（10-15 前建的行改类型仍取旧价，历史不动），
+    /// 新建/导入行（赋值顺序上 CreatedAt 尚未写入）按当前时间取新价。
+    /// 从库加载时 subsidy_type 先于 unit_price 赋值，行内已存单价会覆盖这里的默认值。
     /// </summary>
     partial void OnSubsidyTypeChanged(string value)
     {
-        if (Constants.SubsidyPriceConstants.TypeToPrice.TryGetValue(value, out var price))
-            UnitPrice = price;
-        else
-            UnitPrice = 0;
+        var asOf = CreatedAt != default ? CreatedAt : DateTime.Now;
+        UnitPrice = Constants.SubsidyPriceConstants.GetPrice(value, asOf);
     }
 
     /// <summary>

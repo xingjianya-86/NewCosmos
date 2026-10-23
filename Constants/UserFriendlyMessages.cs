@@ -62,7 +62,9 @@ public static class UserFriendlyMessages
 
         [ErrorCodes.PERMISSION_DENIED] = "权限不足，无法执行此操作",
         [ErrorCodes.AUTHENTICATION_FAILED] = "用户名或密码错误",
-        [ErrorCodes.SESSION_EXPIRED] = "会话已过期，请重新登录",
+        [ErrorCodes.SESSION_EXPIRED] = "登录已过期，请重新登录",
+        [ErrorCodes.SESSION_REVOKED] = "登录会话已失效（账号可能在其他设备登录），请重新登录",
+        [ErrorCodes.SESSION_INVALID] = "登录会话无效，请重新登录",
         [ErrorCodes.ACCOUNT_LOCKED] = "账户已锁定，请联系管理员",
         [ErrorCodes.INVALID_PASSWORD] = "密码错误",
 

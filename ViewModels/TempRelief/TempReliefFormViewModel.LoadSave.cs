@@ -199,22 +199,19 @@ public partial class TempReliefFormViewModel
         {
             Diseases.Clear();
             if (diseases.IsSuccess && diseases.Value != null)
-                foreach (var d in diseases.Value) { SubscribeDetailChanges(d); Diseases.Add(d); }
+                foreach (var d in diseases.Value)
+                {
+                    // 成员名去空白：避免 "胡希连 " 与候选 "胡希连" 不等导致 Picker 匹配失败显示空
+                    if (!string.IsNullOrWhiteSpace(d.MemberName)) d.MemberName = d.MemberName.Trim();
+                    SubscribeDetailChanges(d);
+                    Diseases.Add(d);
+                }
 
-            // 检测多医院模式：如果各条疾病记录的 Hospital 不全相同，则自动开启
-            if (diseases.IsSuccess && diseases.Value != null && diseases.Value.Count > 1)
-            {
-                var distinctHospitals = diseases.Value
-                    .Where(d => !string.IsNullOrWhiteSpace(d.Hospital))
-                    .Select(d => d.Hospital!)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                IsMultiHospitalMode = distinctHospitals.Count > 1;
-            }
-            else
-            {
-                IsMultiHospitalMode = false;
-            }
+            // 检测逐行模式（原"多家医院"）：医院/治疗起止/费用 任一在行间不同即开启。
+            // ⚠️ 旧口径只比医院名——"同一家医院、不同住院日期的多次就诊"会被误判成共享模式，
+            // 保存时被顶部共享值整体压平（2026-10-22 申请 22 的逐行日期全部丢失），勿退回只比医院。
+            IsMultiHospitalMode = diseases.IsSuccess && diseases.Value != null
+                && HasRowValueDivergence(diseases.Value);
 
             if (IsMultiHospitalMode)
             {
@@ -249,7 +246,51 @@ public partial class TempReliefFormViewModel
             Educations.Clear();
             if (educations.IsSuccess && educations.Value != null)
                 foreach (var e in educations.Value) { SubscribeDetailChanges(e); Educations.Add(e); }
+
+            // 明细装载后补齐成员候选：已存明细里的成员名即使不在家庭成员行里也要能回显
+            // （本方法是差异同步，不会重置 Picker 选中值）
+            RebuildMemberNameOptions();
         });
+    }
+
+    /// <summary>
+    /// 疾病明细行间是否存在"各自独立"的取值差异：医院 / 治疗开始 / 治疗结束 / 费用三件套
+    /// 任一维度出现两个及以上不同取值即返回 true（空医院、未填日期(DateTime.MinValue)、
+    /// 空费用不参与比较——"一行已填一行未填"不判为差异，以免阻断共享回填补空）。
+    /// 用途：① 加载时判定逐行模式（原"多家医院"）；② 保存前护栏——共享回写不得压平已有差异。
+    /// </summary>
+    private static bool HasRowValueDivergence(IReadOnlyList<TempReliefDisease>? diseases)
+    {
+        if (diseases == null || diseases.Count < 2) return false;
+
+        static bool MultipleDistinct<T>(IEnumerable<T> values, IEqualityComparer<T> comparer)
+            => values.Distinct(comparer).Count() > 1;
+
+        var hospitals = diseases
+            .Where(d => !string.IsNullOrWhiteSpace(d.Hospital))
+            .Select(d => d.Hospital!.Trim());
+        if (MultipleDistinct(hospitals, StringComparer.OrdinalIgnoreCase)) return true;
+
+        var starts = diseases
+            .Where(d => d.TreatStartDate != DateTime.MinValue)
+            .Select(d => d.TreatStartDate.Date);
+        if (MultipleDistinct(starts, EqualityComparer<DateTime>.Default)) return true;
+
+        var ends = diseases
+            .Where(d => d.TreatEndDate != DateTime.MinValue)
+            .Select(d => d.TreatEndDate.Date);
+        if (MultipleDistinct(ends, EqualityComparer<DateTime>.Default)) return true;
+
+        foreach (var selector in new Func<TempReliefDisease, decimal?>[]
+            { d => d.MedicalTotal, d => d.InsurancePaid, d => d.SelfPaid })
+        {
+            var amounts = diseases
+                .Where(d => selector(d).HasValue)
+                .Select(d => selector(d)!.Value);
+            if (MultipleDistinct(amounts, EqualityComparer<decimal>.Default)) return true;
+        }
+
+        return false;
     }
 
     [RelayCommand]
@@ -944,8 +985,23 @@ public partial class TempReliefFormViewModel
             BeneficiaryRelation = BeneficiaryRelation
         };
 
-        // 医院为明细区顶部共享值：仅共享模式保存前写入每条疾病明细
-        if (!IsMultiHospitalMode)
+        // 医院/日期/费用为明细区顶部共享值：仅共享模式保存前写入每条疾病明细。
+        // ⚠️ 保存护栏：若明细行已有互不相同的取值（异常路径：逐行开关被手动关闭等），
+        // 一律不覆盖、按各行原值保存并切回逐行模式——严禁再发生"逐行日期被共享值整体压平"
+        // （2026-10-22 申请 22 事故）。
+        if (IsMultiHospitalMode)
+        {
+            // 逐行模式：每条记录已各自填写，无需覆盖
+        }
+        else if (HasRowValueDivergence(app.Diseases))
+        {
+            _logger.Warn($"临时救助保存护栏：疾病明细行取值不一致，跳过共享回写并切回逐行模式（ApplicationId={_id}）");
+            var suppress = _suppressReload;
+            _suppressReload = true;
+            IsMultiHospitalMode = true;
+            _suppressReload = suppress;
+        }
+        else
         {
             foreach (var d in app.Diseases)
             {
@@ -962,7 +1018,6 @@ public partial class TempReliefFormViewModel
                 d.SelfPaid = SelfPaid;
             }
         }
-        // 多医院模式下，每条记录已各自填写，无需覆盖
 
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {

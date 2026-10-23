@@ -757,7 +757,8 @@ public partial class ElderlyApplicationFormViewModel
                 PrintNavigationData.TableData = new();
                 PrintNavigationData.SupporterTableData = null;
 
-                var page = _serviceProvider.GetRequiredService<Pages.ArchiveManagement.ArchiveOutputPage>();
+                // 按 Mobile{桌面页名} 约定解析：Android 走手机端「推送打印工作台」，桌面走原档案输出页
+                var page = ResolvePage<Pages.ArchiveManagement.ArchiveOutputPage>();
                 _serviceProvider.GetRequiredService<IWindowTitleService>()?.Register(page);
                 await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
             }

@@ -43,6 +43,132 @@ public partial class DataImportViewModel : ViewModelBase
 
     public bool CanStartImport => IsCombinedImportMode ? HasMatchedFiles : HasSelectedFiles;
 
+    /// <summary>当前所选导入类型是否可导出标准模板（导出模板按钮显隐）</summary>
+    public bool CanExportTemplate =>
+        IsSingleFileImportMode && _importServiceManager.HasTemplate(SelectedImportTypeKey);
+
+    #endregion
+
+    #region 年份范围（SupportsScope 的类型专用，当前为「年度种植补贴导入」）
+
+    /// <summary>当前类型是否支持年份范围（强制覆盖 / 区间校验 / 年段清空）</summary>
+    [ObservableProperty]
+    private bool _isYearScopeVisible;
+
+    /// <summary>导入年份（强制覆盖，2000–2100）；空＝按文件内「数据年份」列 → 文件名 20xx → 当前年</summary>
+    [ObservableProperty]
+    private string _importYearText = string.Empty;
+
+    /// <summary>按区间校验：年份仍按文件解析，但必须落在起止区间内，越界整份报错、零写库</summary>
+    [ObservableProperty]
+    private bool _isYearRangeMode;
+
+    [ObservableProperty]
+    private string _yearRangeStartText = string.Empty;
+
+    [ObservableProperty]
+    private string _yearRangeEndText = string.Empty;
+
+    public string YearScopeHint => IsYearRangeMode
+        ? "年份仍按文件内「数据年份」列 / 文件名解析，但必须落在下方区间内；超出区间的行会整份报错、不写入任何数据。"
+        : "留空＝按文件内「数据年份」列 → 文件名 20xx → 当前年；填写后以页面年份为准（忽略文件内年份与文件名）。";
+
+    /// <summary>勾选「导入前清空」时的影响提示（实时刷新）</summary>
+    public string ClearImpactHint
+    {
+        get
+        {
+            if (!ClearBeforeImport) return string.Empty;
+            if (!IsYearScopeVisible) return "⚠ 将清空整张表后再导入（导入前自动整库备份）";
+            if (!string.IsNullOrWhiteSpace(ImportYearText))
+                return $"⚠ 将清空并重写 {ImportYearText.Trim()} 年段的全部记录，其余年段保留（导入前自动整库备份）";
+            if (IsYearRangeMode)
+                return $"⚠ 清空范围＝本次文件实际涉及的年段（限 {YearRangeStartText}-{YearRangeEndText} 内），其余年段保留（导入前自动整库备份）";
+            return "⚠ 清空范围＝本次文件实际涉及的年段，其余年段保留（导入前自动整库备份）";
+        }
+    }
+
+    partial void OnIsYearRangeModeChanged(bool value)
+    {
+        // 单年与区间互斥：开区间即清掉单年输入，避免"强制覆盖 2026 + 区间 2024-2026"的矛盾配置
+        if (value && !string.IsNullOrWhiteSpace(ImportYearText)) ImportYearText = string.Empty;
+        OnPropertyChanged(nameof(YearScopeHint));
+        OnPropertyChanged(nameof(ClearImpactHint));
+    }
+
+    partial void OnImportYearTextChanged(string value) => OnPropertyChanged(nameof(ClearImpactHint));
+
+    partial void OnYearRangeStartTextChanged(string value) => OnPropertyChanged(nameof(ClearImpactHint));
+
+    partial void OnYearRangeEndTextChanged(string value) => OnPropertyChanged(nameof(ClearImpactHint));
+
+    partial void OnClearBeforeImportChanged(bool value) => OnPropertyChanged(nameof(ClearImpactHint));
+
+    partial void OnIsYearScopeVisibleChanged(bool value)
+    {
+        if (!value)
+        {
+            IsYearRangeMode = false;
+            ImportYearText = string.Empty;
+            YearRangeStartText = string.Empty;
+            YearRangeEndText = string.Empty;
+        }
+        OnPropertyChanged(nameof(ClearImpactHint));
+    }
+
+    /// <summary>
+    /// 按页面输入构造导入范围。输入非法返回 null 并经 message 报出（调用方弹窗后中止导入，不写库）。
+    /// 单年＝强制覆盖；区间＝仅校验；两者互斥。
+    /// </summary>
+    private ImportScope? BuildImportScope(out string? message)
+    {
+        message = null;
+        if (!IsYearScopeVisible) return null;
+
+        int? year = null;
+        if (!string.IsNullOrWhiteSpace(ImportYearText))
+        {
+            if (!int.TryParse(ImportYearText.Trim(), out var y) || y < 2000 || y > 2100)
+            {
+                message = $"「导入年份」必须是 2000–2100 的四位年份，当前填写：{ImportYearText}";
+                return null;
+            }
+            year = y;
+        }
+
+        int? start = null, end = null;
+        if (IsYearRangeMode)
+        {
+            if (!int.TryParse((YearRangeStartText ?? "").Trim(), out var s) ||
+                !int.TryParse((YearRangeEndText ?? "").Trim(), out var e) ||
+                s < 2000 || e > 2100 || s > e)
+            {
+                message = "「导入区间」起止年份必须是 2000–2100，且起始年 ≤ 结束年。";
+                return null;
+            }
+            if (e - s > 4)
+            {
+                message = $"「导入区间」跨度过大（{s}–{e}），最多允许 5 年，请分批导入。";
+                return null;
+            }
+            if (year.HasValue)
+            {
+                message = "已开启「按区间」，请清空上方的单年输入（区间模式下年份按文件解析）。";
+                return null;
+            }
+            start = s;
+            end = e;
+        }
+
+        return new ImportScope
+        {
+            OverrideYear = year,
+            RangeStart = start,
+            RangeEnd = end,
+            ClearBeforeImport = ClearBeforeImport
+        };
+    }
+
     #endregion
 
     #region 文件选择
@@ -202,6 +328,8 @@ public partial class DataImportViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowMatchedFiles));
         OnPropertyChanged(nameof(ShowMatchError));
         OnPropertyChanged(nameof(CanStartImport));
+        OnPropertyChanged(nameof(CanExportTemplate));
+        IsYearScopeVisible = _importServiceManager.SupportsScope(SelectedImportTypeKey);
 
         ImportModeHint = IsCombinedImportMode
             ? "整合导入：自动识别家庭人员文件配对"
@@ -512,11 +640,26 @@ public partial class DataImportViewModel : ViewModelBase
     {
         var filePaths = SelectedFiles.Select(f => f.FilePath).ToList();
 
+        // 年份范围（年度种植补贴）：参数非法直接中止，不碰数据库
+        var scope = BuildImportScope(out var scopeError);
+        if (scopeError != null)
+        {
+            ImportStatusMessage = "导入参数有误";
+            ImportResultMessage = $"导入参数有误：{scopeError}";
+            ImportLogLines.Add($"[错误] 导入参数有误：{scopeError}");
+            _logger.Info($"导入参数有误，已中止: {scopeError}");
+            await _dialogService.DisplayAlertAsync("导入参数有误", scopeError, "确定");
+            return;
+        }
+        if (scope != null)
+            _logger.Info($"导入范围: {scope.Describe()}, 年段清空={scope.ClearBeforeImport}");
+
         var result = await _importServiceManager.ImportSingleFilesAsync(SelectedImportTypeKey,
             filePaths,
             ClearBeforeImport,
             progress,
-            CancellationToken);
+            CancellationToken,
+            scope);
 
         PersonImportedCount = result.ImportedCount;
         ImportProgress = 1.0;
@@ -528,13 +671,19 @@ public partial class DataImportViewModel : ViewModelBase
 
             if (result.Warnings.Count > 0)
             {
-                foreach (var warning in result.Warnings.Take(5))
+                // 跳过行必须显眼：结果文案标注 + 全量进日志（静默丢数是红线）
+                ImportResultMessage += $"，⚠ 警告 {result.Warnings.Count} 项（详见导入日志）";
+                const int maxShown = 20;
+                foreach (var warning in result.Warnings.Take(maxShown))
                 {
                     ImportLogLines.Add($"[警告] {warning}");
                 }
+                if (result.Warnings.Count > maxShown)
+                    ImportLogLines.Add($"[警告] ……另有 {result.Warnings.Count - maxShown} 条警告未逐条显示");
+                _logger.Warn($"导入有警告 {result.Warnings.Count} 项: {result.Warnings[0]}");
             }
 
-            _logger.Info($"单文件导入成功: {result.ImportedCount} 条");
+            _logger.Info($"单文件导入成功: {result.ImportedCount} 条, 警告 {result.Warnings.Count} 项");
         }
         else
         {
@@ -547,6 +696,39 @@ public partial class DataImportViewModel : ViewModelBase
             }
 
             _logger.Error($"导入失败: {result.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportTemplateAsync()
+    {
+        if (string.IsNullOrEmpty(SelectedImportTypeKey))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择导入类型", "确定");
+            return;
+        }
+
+        try
+        {
+            // 统一导出目录选择：取消/失败均有可见反馈（ViewModelBase 统一流程）
+            var folder = await PickExportFolderAsync("选择模板保存位置");
+            if (string.IsNullOrWhiteSpace(folder)) return;
+
+            var result = await _importServiceManager.ExportTemplateAsync(SelectedImportTypeKey, folder);
+            if (result.IsSuccess)
+            {
+                await _dialogService.DisplayAlertAsync("模板已导出", $"模板已导出到:\n{result.Value}", "确定");
+                _logger.Info($"导入模板导出成功: {result.Value}");
+            }
+            else
+            {
+                await _dialogService.DisplayAlertAsync("导出失败", result.Message, "确定");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"导出模板失败: {ex.Message}");
+            await _dialogService.DisplayAlertAsync("导出失败", ex.Message, "确定");
         }
     }
 

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobilePhotoBackfillPage"
+             x:DataType="MobilePhotoBackfillViewModel"
+             Title="照片补传"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <!-- 历史档案照片补传：高龄 / 低收入 / 临时救助 三域按身份证查已有照片数，
+         手工勾选后 ① 连续采集（照片页会话队列） ② 推送打印（PC 执行）。
+         照片按身份证归档，补传不改业务表。 -->
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="0">
+
+        <!-- ① 头部 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,14,16,12">
+            <VerticalStackLayout Spacing="6">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="照片补传" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="历史档案按身份证补传证件照片，补后可推送打印"
+                       FontSize="12" TextColor="#E6FFFFFF" LineBreakMode="WordWrap"/>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <components:StatCapsule Grid.Column="0" Value="{Binding TotalCount}" Caption="待补/在列（人）"/>
+                    <components:StatCapsule Grid.Column="1" Value="{Binding SelectedCount}" Caption="已选（人）"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- ② 业务域胶囊 -->
+        <ScrollView Grid.Row="1" Orientation="Horizontal" BackgroundColor="White" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout Padding="12,10" Spacing="8">
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsDomainAll, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding SwitchDomainCommand}" CommandParameter="ALL"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="全部" FontSize="13"
+                           TextColor="{Binding IsDomainAll, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsDomainElderly, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding SwitchDomainCommand}" CommandParameter="ElderlyBenefits"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="高龄津贴" FontSize="13"
+                           TextColor="{Binding IsDomainElderly, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsDomainAssistance, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding SwitchDomainCommand}" CommandParameter="SocialAssistance"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="低收入人口" FontSize="13"
+                           TextColor="{Binding IsDomainAssistance, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsDomainTempRelief, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding SwitchDomainCommand}" CommandParameter="TempRelief"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="临时救助" FontSize="13"
+                           TextColor="{Binding IsDomainTempRelief, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <!-- ③ 搜索 + 只看未传 -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,6" BackgroundColor="White">
+            <Entry Grid.Column="0" Placeholder="搜索姓名、身份证号..." Text="{Binding Keyword}"
+                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding ApplySearchCommand}"/>
+            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" MinimumHeightRequest="48"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
+                    Command="{Binding ApplySearchCommand}"/>
+        </Grid>
+
+        <!-- ④ 列表 -->
+        <Grid Grid.Row="3">
+            <CollectionView ItemsSource="{Binding Candidates}" SelectionMode="None" Margin="12,8">
+                <CollectionView.EmptyView>
+                    <Label Text="{Binding EmptyHint}"
+                           Style="{StaticResource EmptyStateLabel}" Padding="0,24" HorizontalTextAlignment="Center"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="ent:PhotoBackfillCandidate">
+                        <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0"
+                                Padding="12" Margin="0,4">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalOptions="Center"/>
+                                <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label Text="{Binding PersonName}" FontSize="15" FontAttributes="Bold"
+                                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Border StrokeShape="RoundRectangle 8" Padding="6,1" StrokeThickness="0"
+                                                BackgroundColor="{StaticResource WarningSoft}" VerticalOptions="Center">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding HasPhoto}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Label Text="{Binding PhotoStateText}" FontSize="11"
+                                                   TextColor="{StaticResource WarningDark}">
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding HasPhoto}" Value="True">
+                                                        <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+                                        </Border>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding IdCardMasked}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding Subtitle}" FontSize="11" TextColor="{StaticResource TextTertiary}"
+                                           LineBreakMode="TailTruncation"/>
+                                </VerticalStackLayout>
+                                <Button Grid.Column="2" Text="查看"
+                                        FontSize="12" Padding="10,0" HeightRequest="34" CornerRadius="8"
+                                        BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource TextSecondary}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type MobilePhotoBackfillViewModel}}, Path=OpenPersonCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- 加载蒙版 -->
+            <Border BackgroundColor="#80000000" IsVisible="{Binding IsBusy}" InputTransparent="True">
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                    <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                    <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                           IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- ⑤ 分页 -->
+        <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,6">
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
+                <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                        Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- ⑥ 底部：全选 / 补传 / 打印 -->
+        <Border Grid.Row="5" BackgroundColor="White" StrokeThickness="0" Padding="10,8,10,14">
+            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+                <Button Grid.Column="0" Text="全选" FontSize="12" HeightRequest="46" CornerRadius="8" Padding="12,0"
+                        BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource TextSecondary}"
+                        Command="{Binding ToggleSelectAllCommand}"/>
+                <Button Grid.Column="1" Text="{Binding BackfillButtonText}"
+                        Command="{Binding BackfillSelectedCommand}"
+                        FontSize="13" HeightRequest="46" CornerRadius="8" Padding="0"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"/>
+                <Button Grid.Column="2" Text="{Binding PrintButtonText}"
+                        Command="{Binding PrintSelectedCommand}"
+                        FontSize="13" HeightRequest="46" CornerRadius="8" Padding="0"
+                        BackgroundColor="{StaticResource Warning}" TextColor="White"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</ContentPage>

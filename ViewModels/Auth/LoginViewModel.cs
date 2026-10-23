@@ -25,6 +25,9 @@ public partial class LoginViewModel : ViewModelBase
     private readonly IUpdateService _updateService;
     private readonly INetworkAccessService _networkAccessService;
     private readonly INavigationService _navigationService;
+    private readonly IUserSessionService _sessionService;
+    private readonly ISessionLifecycleService _sessionLifecycle;
+    private readonly IDeviceIdentityProvider _deviceIdentity;
     private readonly PreferencesOptions _preferencesOptions;
 
     [ObservableProperty]
@@ -54,7 +57,10 @@ public partial class LoginViewModel : ViewModelBase
         IWindowTitleService windowTitleService,
         IUpdateService updateService,
         INetworkAccessService networkAccessService,
-        INavigationService navigationService)
+        INavigationService navigationService,
+        IUserSessionService sessionService,
+        ISessionLifecycleService sessionLifecycle,
+        IDeviceIdentityProvider deviceIdentity)
     {
         _serviceProvider = serviceProvider;
         _userService = userService;
@@ -66,6 +72,9 @@ public partial class LoginViewModel : ViewModelBase
         _updateService = updateService;
         _networkAccessService = networkAccessService;
         _navigationService = navigationService;
+        _sessionService = sessionService;
+        _sessionLifecycle = sessionLifecycle;
+        _deviceIdentity = deviceIdentity;
         _preferencesOptions = _configService.GetPreferencesOptions();
 
         LoadBackgroundImages();
@@ -287,9 +296,31 @@ public partial class LoginViewModel : ViewModelBase
             {
                 _logger.LogSecurity("登录成功", ("UserId", result.Value.Id), ("UserName", Username));
 
+                // 先建立数据库会话（按端配额裁决旧会话）；失败则不进入系统，避免"半登录"状态
+                var appOptions = _configService.GetAppOptions();
+                var sessionResult = await _sessionService.CreateAsync(
+                    result.Value.Id,
+                    _deviceIdentity.DeviceId,
+                    _deviceIdentity.DeviceKind,
+                    _deviceIdentity.DeviceName,
+                    appOptions.Version,
+                    null,
+                    CancellationToken);
+
+                if (sessionResult.IsFailure)
+                {
+                    ErrorMessage = sessionResult.Message ?? "无法建立登录会话，请检查网络后重试";
+                    _logger.LogSecurity("登录会话创建失败",
+                        ("UserId", result.Value.Id), ("Reason", ErrorMessage));
+                    return;
+                }
+
+                var sessionId = sessionResult.Value.SessionId;
+
                 await SaveRememberSettingsAsync();
 
                 App.SetCurrentUserId(result.Value.Id);
+                App.SetCurrentSessionId(sessionId);
                 App.SetCurrentUser(
                     result.Value.Username ?? Username,
                     result.Value.FullName ?? result.Value.Username ?? Username,
@@ -317,11 +348,14 @@ public partial class LoginViewModel : ViewModelBase
                     }
                 }
 
-                // 持久化会话（不含密码，7 天有效期），进程重启后可免登录恢复
+                // 持久化会话缓存（不含密码；有效期以数据库 expires_at 为准），进程重启后先本地读再联网校验
                 try
                 {
                     await _serviceProvider.GetRequiredService<ISessionStore>().SaveAsync(new UserSession
                     {
+                        SessionId = sessionId,
+                        DeviceId = _deviceIdentity.DeviceId,
+                        DeviceKind = _deviceIdentity.DeviceKind,
                         UserId = result.Value.Id,
                         UserName = result.Value.Username ?? Username,
                         FullName = result.Value.FullName ?? result.Value.Username ?? Username,
@@ -333,12 +367,23 @@ public partial class LoginViewModel : ViewModelBase
                         TownName = App.CurrentUserTownName,
                         VillageName = App.CurrentUserVillageName,
                         OrgAddress = App.CurrentUserOrgAddress,
-                        LoginAtUtc = DateTime.UtcNow
+                        LoginAtUtc = DateTime.UtcNow,
+                        ExpiresAtUtc = sessionResult.Value.ExpiresAt.ToUniversalTime()
                     });
                 }
                 catch (Exception ex)
                 {
                     _logger.Warn($"保存登录会话失败（不影响本次登录）: {ex.Message}");
+                }
+
+                // 启动心跳：被顶号/强制下线/过期时由 SessionLifecycleService 统一提示并回登录页
+                try
+                {
+                    await _sessionLifecycle.StartAsync(sessionId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"启动会话心跳失败（不影响本次登录）: {ex.Message}");
                 }
 
                 if (Helpers.WindowNavigator.CurrentPage != null)

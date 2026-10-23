@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.TempRelief.TempReliefFormPage"
+             x:Name="PageRoot"
              x:DataType="TempReliefFormViewModel"
              Title="临时救助申请"
              NavigationPage.HasNavigationBar="False"
@@ -285,8 +286,12 @@
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="6">
                                     <Label Text="身份证号 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                    <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="True"
-                                           BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="True"
+                                               BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                        <Button Grid.Column="1" Text="照片" Style="{StaticResource ButtonSmall}"
+                                                Command="{Binding OpenPhotosCommand}" VerticalOptions="Center"/>
+                                    </Grid>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="2" Spacing="6">
                                     <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -502,7 +507,7 @@
                                         <Label Grid.Column="1" Text="（困难类型为疾病时，可多条，最多 10 条）"
                                                FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                         <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
-                                            <Label Text="多家医院" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                                            <Label Text="逐条填写医院/日期/费用（多次住院）" FontSize="12" TextColor="{StaticResource TextSecondary}"
                                                    VerticalOptions="Center"/>
                                             <Switch IsToggled="{Binding IsMultiHospitalMode}"
                                                     IsEnabled="{Binding IsEditable}"
@@ -556,7 +561,7 @@
                                                             </VerticalStackLayout>
                                                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                                                 <Label Text="患病成员" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=MemberNameOptions}"
+                                                                <Picker ItemsSource="{Binding BindingContext.MemberNameOptions, Source={x:Reference PageRoot}}"
                                                                         SelectedItem="{Binding MemberName}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                             </VerticalStackLayout>
                                                             <VerticalStackLayout Grid.Column="2" Spacing="4">
@@ -632,12 +637,12 @@
                                                     <Grid ColumnDefinitions="*,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="8">
                                                         <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="4">
                                                             <Label Text="意外/灾害类型 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                            <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=AccidentTypeOptions}"
+                                                            <Picker ItemsSource="{Binding BindingContext.AccidentTypeOptions, Source={x:Reference PageRoot}}"
                                                                     SelectedItem="{Binding AccidentType}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                         </VerticalStackLayout>
                                                         <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="4">
                                                             <Label Text="受灾成员" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                            <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=MemberNameOptions}"
+                                                            <Picker ItemsSource="{Binding BindingContext.MemberNameOptions, Source={x:Reference PageRoot}}"
                                                                     SelectedItem="{Binding MemberName}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                         </VerticalStackLayout>
                                                         <Button Grid.Row="0" Grid.Column="2" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
@@ -710,7 +715,7 @@
                                                             </VerticalStackLayout>
                                                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                                                 <Label Text="就学阶段 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=EducationStageOptions}"
+                                                                <Picker ItemsSource="{Binding BindingContext.EducationStageOptions, Source={x:Reference PageRoot}}"
                                                                         SelectedItem="{Binding EducationStage}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                             </VerticalStackLayout>
                                                         </Grid>
@@ -725,7 +730,7 @@
                                                             </VerticalStackLayout>
                                                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                                                 <Label Text="学年制" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                                <Picker ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type TempReliefFormViewModel}}, Path=SchoolDurationOptions}"
+                                                                <Picker ItemsSource="{Binding BindingContext.SchoolDurationOptions, Source={x:Reference PageRoot}}"
                                                                         SelectedItem="{Binding SchoolDurationDisplay}" Style="{StaticResource FormFieldPickerStyle}"/>
                                                             </VerticalStackLayout>
                                                         </Grid>

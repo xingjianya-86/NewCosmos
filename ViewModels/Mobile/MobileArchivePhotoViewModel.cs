@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
@@ -86,6 +87,74 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         ApplicantName = applicantName ?? string.Empty;
     }
 
+    #region 补传会话（历史档案批量补传：拍完一人点「下一位」连续采集）
+
+    private IReadOnlyList<PhotoBackfillPerson>? _sessionQueue;
+    private int _sessionIndex = -1;
+
+    /// <summary>是否处于补传会话（≥2 人时才显示会话条）。</summary>
+    [ObservableProperty]
+    private bool _hasSession;
+
+    /// <summary>会话进度文案（第 2/5 人 · 张三）。</summary>
+    [ObservableProperty]
+    private string _sessionText = string.Empty;
+
+    /// <summary>是否已是会话最后一人（按钮显示「完成」）。</summary>
+    [ObservableProperty]
+    private bool _isLastInSession;
+
+    public string SessionActionText => IsLastInSession ? "完成" : "下一位";
+
+    partial void OnIsLastInSessionChanged(bool value) => OnPropertyChanged(nameof(SessionActionText));
+
+    /// <summary>注入会话队列（补传页传入；其他入口传 null 表示单页模式）。</summary>
+    public void ApplySession(IReadOnlyList<PhotoBackfillPerson>? queue, int index)
+    {
+        _sessionQueue = queue;
+        _sessionIndex = index;
+        UpdateSessionState();
+    }
+
+    private void UpdateSessionState()
+    {
+        HasSession = _sessionQueue is { Count: > 1 } && _sessionIndex >= 0 && _sessionIndex < _sessionQueue.Count;
+        if (!HasSession)
+        {
+            SessionText = string.Empty;
+            IsLastInSession = false;
+            return;
+        }
+
+        var person = _sessionQueue![_sessionIndex];
+        SessionText = $"第 {_sessionIndex + 1}/{_sessionQueue.Count} 人 · {person.Name}";
+        IsLastInSession = _sessionIndex >= _sessionQueue.Count - 1;
+    }
+
+    /// <summary>下一位（最后一位则退出采集，回到补传清单）。</summary>
+    [RelayCommand]
+    private async Task NextPersonAsync()
+    {
+        if (!HasSession || _sessionQueue == null) return;
+
+        if (_sessionIndex >= _sessionQueue.Count - 1)
+        {
+            var navigation = Helpers.WindowNavigator.CurrentPage?.Navigation;
+            if (navigation != null)
+                await navigation.PopAsync();
+            return;
+        }
+
+        _sessionIndex++;
+        var next = _sessionQueue[_sessionIndex];
+        // 保留当前照片类别，方便同一批档案按同一类别连续采集
+        ApplyParameter(next.IdCard, next.ApplicationId, next.Name);
+        UpdateSessionState();
+        await LoadPhotosAsync();
+    }
+
+    #endregion
+
     public override async Task OnAppearingAsync()
     {
         await base.OnAppearingAsync();
@@ -144,56 +213,93 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
         try
         {
-            FileResult? result = camera
-                ? await MediaPicker.Default.CapturePhotoAsync()
-                : (await MediaPicker.Default.PickPhotosAsync())?.FirstOrDefault();
+            // 拍照：单张；从相册选择：支持一次多选，批量归入当前类别
+            var files = new List<FileResult>();
+            if (camera)
+            {
+                var shot = await MediaPicker.Default.CapturePhotoAsync();
+                if (shot != null) files.Add(shot);
+            }
+            else
+            {
+                var picked = await MediaPicker.Default.PickPhotosAsync();
+                if (picked != null) files.AddRange(picked);
+            }
 
-            if (result == null)
+            if (files.Count == 0)
                 return; // 用户取消
 
-            byte[] raw;
-            await using (var stream = await result.OpenReadAsync())
-            using (var ms = new MemoryStream())
-            {
-                await stream.CopyToAsync(ms);
-                raw = ms.ToArray();
-            }
-
-            if (raw.Length == 0)
-            {
-                await _dialogService.DisplayAlertAsync("提示", "照片读取为空，请重试", "确定");
-                return;
-            }
-
-            // 压缩后存库
-            var compressed = Helpers.ImageCompressor.Compress(raw);
-
-            var photo = new ArchivePhoto
-            {
-                PhotoData = compressed,
-                ApplicantIdCard = ApplicantIdCard.Trim(),
-                ApplicationId = ApplicationId,
-                PhotoCategory = SelectedCategoryCode,
-                PhotoName = null,
-                CreatedBy = App.CurrentUserId.HasValue ? (int?)App.CurrentUserId.Value : null,
-                CreatedByName = App.CurrentUserName
-            };
+            var savedCount = 0;
+            var failedCount = 0;
 
             await ExecuteAsync(async () =>
             {
-                var save = await _photoService.SavePhotoAsync(photo, CancellationToken);
-                if (save.IsFailure)
-                    return Result.Failure(save.ErrorCode!, save.Message!);
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        byte[] raw;
+                        await using (var stream = await file.OpenReadAsync())
+                        using (var ms = new MemoryStream())
+                        {
+                            await stream.CopyToAsync(ms);
+                            raw = ms.ToArray();
+                        }
 
-                _logger.LogBusiness("采集档案照片",
-                    ("ApplicationId", ApplicationId?.ToString() ?? ""),
-                    ("Category", SelectedCategoryCode),
-                    ("PhotoId", save.Value.ToString()),
-                    ("Size", compressed.Length.ToString()));
+                        if (raw.Length == 0)
+                        {
+                            failedCount++;
+                            continue;
+                        }
+
+                        // 压缩后存库
+                        var compressed = Helpers.ImageCompressor.Compress(raw);
+
+                        var photo = new ArchivePhoto
+                        {
+                            PhotoData = compressed,
+                            ApplicantIdCard = ApplicantIdCard.Trim(),
+                            ApplicationId = ApplicationId,
+                            PhotoCategory = SelectedCategoryCode,
+                            PhotoName = null,
+                            CreatedBy = App.CurrentUserId.HasValue ? (int?)App.CurrentUserId.Value : null,
+                            CreatedByName = App.CurrentUserName
+                        };
+
+                        var save = await _photoService.SavePhotoAsync(photo, CancellationToken);
+                        if (save.IsFailure)
+                        {
+                            failedCount++;
+                            _logger.Warn($"照片保存失败: {file.FileName} {save.Message}");
+                            continue;
+                        }
+
+                        savedCount++;
+                        _logger.LogBusiness("采集档案照片",
+                            ("ApplicationId", ApplicationId?.ToString() ?? ""),
+                            ("Category", SelectedCategoryCode),
+                            ("PhotoId", save.Value.ToString()),
+                            ("Size", compressed.Length.ToString()));
+                    }
+                    catch (Exception ex)
+                    {
+                        failedCount++;
+                        _logger.Warn($"照片处理失败: {file.FileName} {ex.Message}");
+                    }
+                }
+
                 return Result.Success();
-            }, "保存照片...");
+            }, files.Count > 1 ? $"上传 {files.Count} 张照片..." : "保存照片...");
 
             await LoadPhotosAsync();
+
+            if (savedCount == 0 && failedCount == 0)
+                return; // 全部取消
+
+            var message = failedCount == 0
+                ? $"已保存 {savedCount} 张照片（{SelectedCategoryName}）"
+                : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）";
+            await ShowTipAsync(message);
         }
         catch (FeatureNotSupportedException)
         {
@@ -208,6 +314,38 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             _logger.LogError(ex, "采集照片失败");
             await _dialogService.DisplayAlertAsync("错误", $"采集失败：{ex.Message}", "确定");
         }
+    }
+
+    /// <summary>
+    /// 导出到系统相册（Android MediaStore / Windows 图片目录）：便于外发打印或留档。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportPhotoAsync(ArchivePhoto? photo)
+    {
+        if (photo == null) return;
+
+        var album = _serviceProvider.GetRequiredService<Services.Platform.IAlbumExportService>();
+
+        var result = await ExecuteAsync(async () =>
+        {
+            var data = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
+            if (data.IsFailure || data.Value == null || data.Value.Length == 0)
+                return Result.Failure(data.ErrorCode ?? ErrorCodes.NOT_FOUND, data.Message ?? "照片读取失败");
+
+            var fileName = $"NewCosmos_{photo.ApplicantIdCard}_{photo.PhotoCategory}_{DateTime.Now:yyyyMMddHHmmss}_{photo.Id}.jpg";
+            var saved = await album.SaveToAlbumAsync(fileName, data.Value, CancellationToken);
+            if (saved.IsFailure)
+                return Result.Failure(saved.ErrorCode!, saved.Message!);
+
+            _logger.LogBusiness("档案照片导出到相册",
+                ("PhotoId", photo.Id),
+                ("Category", photo.PhotoCategory),
+                ("Target", saved.Value ?? string.Empty));
+            return Result.Success();
+        }, "导出到相册...");
+
+        if (result.IsSuccess)
+            await ShowTipAsync("已导出到相册");
     }
 
     /// <summary>删除照片（长按/按钮）。</summary>

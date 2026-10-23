@@ -182,8 +182,8 @@ public static class TempReliefPrintDataBuilder
 
     /// <summary>
     /// 解析打印用日期：验收日（= 公示止所属月份 C 线验收日，13号或其后最近工作日）与入户调查时间
-    /// （= clamp(今日的最近工作日, 窗口[A−5, 公示起])：今日是工作日填今日、非工作日往回取、
-    /// 早于窗口起日取起日、补打超期兜底窗口截止）。
+    /// （= clamp(今日的最近工作日, 窗口[A−5, 公示起])：起日 2026-10-22 起遇非工作日顺延、今日是工作日填今日、
+    /// 非工作日往回取、早于窗口起日取起日、补打超期兜底窗口截止 = 公示起日（不规避，可能为休息日））。
     /// 月份以记录公示开始日（无则公示结束日/申请日/当天）为锚。
     /// 打印调用方统一走此方法，避免各自重抄。
     /// </summary>
@@ -415,10 +415,9 @@ public static class TempReliefPrintDataBuilder
                     : i < diseaseOwners.Count && !string.IsNullOrWhiteSpace(diseaseOwners[i])
                         ? diseaseOwners[i].Trim()
                         : "";
-                var owner = string.IsNullOrEmpty(ownerName) ? "" : ownerName + " ";
-                var seg = $"{owner}{d.DiseaseName}".Trim();
-                if (!string.IsNullOrWhiteSpace(d.DiseaseCode)) seg += $"（编码 {d.DiseaseCode}）";
-                parts.Add(seg);
+                // 申请书（模板238）疾病明细改为住院句：姓名在起至止因患XX，在XX医院住院
+                // （原「姓名 疾病（编码）」罗列已废止；ICD 编码不再进申请书正文）
+                parts.Add(BuildHospitalizationSentence(d, ownerName));
             }
         }
 
@@ -459,6 +458,48 @@ public static class TempReliefPrintDataBuilder
         }
 
         return string.Join(Environment.NewLine, parts);
+    }
+
+    /// <summary>
+    /// 申请书疾病明细句：姓名在起至止因患XX，在XX医院住院；句尾有编码时追加（ICD-10编码：XXX）。
+    /// 缺什么省什么：缺日期省日期段、缺医院省「在XX医院」、缺病名省「因患X，」段；
+    /// 主语姓名取不到时用「本人」（申请书通篇第一人口吻，避免空主语）。
+    /// 日期口径见 FormatTreatSpanAlways（与表单救助原因的同日单日口径不同）。
+    /// </summary>
+    private static string BuildHospitalizationSentence(TempReliefDisease d, string ownerName)
+    {
+        var subject = string.IsNullOrWhiteSpace(ownerName) ? "本人" : ownerName.Trim();
+        var span = FormatTreatSpanAlways(d.TreatStartDate, d.TreatEndDate);
+        var head = string.IsNullOrWhiteSpace(span) ? subject : $"{subject}在{span}";
+
+        var hospital = string.IsNullOrWhiteSpace(d.Hospital) ? string.Empty : d.Hospital.Trim();
+        var hospitalPart = string.IsNullOrEmpty(hospital) ? "住院" : $"在{hospital}住院";
+
+        var disease = string.IsNullOrWhiteSpace(d.DiseaseName) ? string.Empty : d.DiseaseName.Trim();
+        var sentence = string.IsNullOrEmpty(disease)
+            ? head + hospitalPart
+            : string.IsNullOrEmpty(hospital)
+                ? $"{head}因患{disease}住院"
+                : $"{head}因患{disease}，{hospitalPart}";
+
+        // 句尾追加 ICD-10 编码（审核对照用；无编码不追加）
+        if (!string.IsNullOrWhiteSpace(d.DiseaseCode)) sentence += $"（ICD-10编码：{d.DiseaseCode.Trim()}）";
+        return sentence;
+    }
+
+    /// <summary>
+    /// 申请书住院区间文本：起止都填时始终输出「起至止」（起止同日也保留「至」，按申请书句式要求）；
+    /// 单边只输出已有日期；均未填返回空串。
+    /// ⚠️ 与表单救助原因 TempReliefFormViewModel.FormatTreatRange（同日只显单日）口径不同，勿相互替换。
+    /// </summary>
+    private static string FormatTreatSpanAlways(DateTime start, DateTime end)
+    {
+        var hasStart = start != DateTime.MinValue;
+        var hasEnd = end != DateTime.MinValue;
+        if (hasStart && hasEnd) return $"{start:yyyy年M月d日}至{end:yyyy年M月d日}";
+        if (hasStart) return start.ToString("yyyy年M月d日");
+        if (hasEnd) return end.ToString("yyyy年M月d日");
+        return string.Empty;
     }
 
     private static string BuildAccidentDetails(List<TempReliefAccident>? accidents)

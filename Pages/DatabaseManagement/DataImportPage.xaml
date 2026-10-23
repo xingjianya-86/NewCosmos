@@ -88,6 +88,35 @@
                         <Label Text="{Binding ImportModeHint}"
                                FontSize="14" TextColor="{StaticResource TextTertiary}"
                                LineBreakMode="WordWrap"/>
+
+                        <!-- 年份范围：仅 SupportsScope 类型（年度种植补贴导入）显示 -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding IsYearScopeVisible}">
+                            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <Label Grid.Column="0" Text="导入年份:" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Entry Grid.Column="1"
+                                       Text="{Binding ImportYearText}"
+                                       Placeholder="留空＝按文件内「数据年份」列/文件名"
+                                       Keyboard="Numeric" FontSize="15"
+                                       BackgroundColor="{StaticResource Gray50}"
+                                       IsEnabled="{Binding IsYearRangeMode, Converter={StaticResource BoolToInverseConverter}}"/>
+                                <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
+                                    <CheckBox IsChecked="{Binding IsYearRangeMode}" Color="{StaticResource Primary}"/>
+                                    <Label Text="按区间" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,100,Auto,100" ColumnSpacing="10"
+                                  IsVisible="{Binding IsYearRangeMode}">
+                                <Label Grid.Column="0" Text="起始年:" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Entry Grid.Column="1" Text="{Binding YearRangeStartText}" Placeholder="2024"
+                                       Keyboard="Numeric" FontSize="15" BackgroundColor="{StaticResource Gray50}"/>
+                                <Label Grid.Column="2" Text="结束年:" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Entry Grid.Column="3" Text="{Binding YearRangeEndText}" Placeholder="2026"
+                                       Keyboard="Numeric" FontSize="15" BackgroundColor="{StaticResource Gray50}"/>
+                            </Grid>
+                            <Label Text="{Binding YearScopeHint}"
+                                   FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
                 
@@ -143,7 +172,16 @@
                                 <CheckBox IsChecked="{Binding ClearBeforeImport}" Color="{StaticResource Primary}"/>
                                 <Label Text="导入前清空表数据" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
+                            <Button Grid.Column="1" Text="↓ 导出模板" FontSize="14" Padding="14,7"
+                                    Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding ExportTemplateCommand}"
+                                    IsVisible="{Binding CanExportTemplate}"
+                                    VerticalOptions="Center"/>
                         </Grid>
+                        <!-- 清空影响提示（年段感知清空/整表清空，实时刷新；为空时该 Label 无高度） -->
+                        <Label Text="{Binding ClearImpactHint}"
+                               FontSize="13" FontAttributes="Bold" TextColor="#EF4444"
+                               LineBreakMode="WordWrap"/>
                         
 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                              <Button Grid.Column="0" Text="{OnPlatform WinUI='&#xE873; 预览', Android='&#x1F441;&#xFE0F; 预览'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" Style="{StaticResource ButtonOutline}" 

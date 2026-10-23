@@ -111,4 +111,138 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
         LogInfo($"照片删除: Id={photoId}");
         return Result.Success(true);
     }
+
+    /// <summary>
+    /// 照片补传候选（人员维度）：三域 UNION ALL → 按业务域/关键词过滤 → 按身份证聚合（业务域、代表业务ID）
+    /// → LEFT JOIN 照片张数。不做"未传"过滤：已传照片的人同样可继续补传。
+    /// </summary>
+    public async Task<Result<PagedResult<PhotoBackfillCandidate>>> GetBackfillCandidatesAsync(
+        string? businessType, string? keyword,
+        int pageIndex, int pageSize, CancellationToken ct = default)
+    {
+        pageIndex = Math.Max(1, pageIndex);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        const string cte = @"
+WITH biz AS (
+    SELECT 'ElderlyBenefits'::text AS business_type, e.id AS business_id,
+           e.name AS person_name, e.id_card
+    FROM nc_biz_elderly_applications e
+    WHERE e.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'SocialAssistance', a.id, a.applicant_name, a.applicant_id_card
+    FROM nc_biz_applications a
+    WHERE a.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'TempRelief', t.id, t.applicant_name, t.applicant_id_card
+    FROM nc_biz_temp_relief_applications t
+    WHERE t.deleted_at IS NULL
+),
+filtered AS (
+    SELECT * FROM biz
+    WHERE ($1::text = '' OR business_type = $1::text)
+      AND ($2::text = '' OR person_name ILIKE '%' || $2::text || '%' OR id_card ILIKE '%' || $2::text || '%')
+),
+people AS (
+    SELECT id_card,
+           MAX(person_name) AS person_name,
+           string_agg(DISTINCT business_type, '/' ORDER BY business_type) AS business_types,
+           MAX(business_id) AS business_id
+    FROM filtered
+    GROUP BY id_card
+),
+counted AS (
+    SELECT p.id_card, p.person_name, p.business_types, p.business_id,
+           COALESCE(c.photo_count, 0)::int AS photo_count
+    FROM people p
+    LEFT JOIN (
+        SELECT applicant_id_card, COUNT(*)::int AS photo_count
+        FROM nc_biz_archive_photos
+        GROUP BY applicant_id_card
+    ) c ON c.applicant_id_card = p.id_card
+)";
+
+        var type = businessType ?? string.Empty;
+        var kw = keyword?.Trim() ?? string.Empty;
+
+        var countResult = await _db.ExecuteScalarAsync<long>(
+            cte + " SELECT COUNT(*) FROM counted", ct, type, kw);
+        if (countResult.IsFailure)
+        {
+            LogError($"补传候选计数失败: {countResult.Message}");
+            return Result.Failure<PagedResult<PhotoBackfillCandidate>>(countResult.ErrorCode!, countResult.Message!);
+        }
+
+        var listResult = await _db.QueryAsync<PhotoBackfillCandidate>(
+            cte + @"
+SELECT id_card, person_name, business_types, business_id, photo_count
+FROM counted
+ORDER BY person_name, id_card
+LIMIT $3 OFFSET $4",
+            ct, type, kw, pageSize, (pageIndex - 1) * pageSize);
+
+        if (listResult.IsFailure)
+        {
+            LogError($"补传候选查询失败: {listResult.Message}");
+            return Result.Failure<PagedResult<PhotoBackfillCandidate>>(listResult.ErrorCode!, listResult.Message!);
+        }
+
+        return Result.Success(new PagedResult<PhotoBackfillCandidate>
+        {
+            Items = listResult.Value ?? new List<PhotoBackfillCandidate>(),
+            PageIndex = pageIndex,
+            PageSize = pageSize,
+            TotalCount = (int)countResult.Value
+        });
+    }
+
+    /// <summary>照片查询（桌面端/导出用）：关键词匹配身份证/备注，类别可过滤，返回元数据分页。</summary>
+    public async Task<Result<PagedResult<ArchivePhoto>>> GetPhotosPagedAsync(
+        string? keyword, string? category, int pageIndex, int pageSize, CancellationToken ct = default)
+    {
+        pageIndex = Math.Max(1, pageIndex);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        const string where = @"
+WHERE ($1::text = '' OR applicant_id_card ILIKE '%' || $1::text || '%'
+       OR COALESCE(photo_name, '') ILIKE '%' || $1::text || '%')
+  AND ($2::text = '' OR photo_category = $2::text)";
+
+        var kw = keyword?.Trim() ?? string.Empty;
+        var cat = category ?? string.Empty;
+
+        var countResult = await _db.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM nc_biz_archive_photos" + where, ct, kw, cat);
+        if (countResult.IsFailure)
+        {
+            LogError($"照片查询计数失败: {countResult.Message}");
+            return Result.Failure<PagedResult<ArchivePhoto>>(countResult.ErrorCode!, countResult.Message!);
+        }
+
+        var listResult = await _db.QueryAsync<ArchivePhoto>(
+            @"SELECT id, applicant_id_card, application_id, photo_category, photo_name,
+                     file_size, created_by, created_by_name, created_at
+              FROM nc_biz_archive_photos" + where + @"
+              ORDER BY created_at DESC, id DESC
+              LIMIT $3 OFFSET $4",
+            ct, kw, cat, pageSize, (pageIndex - 1) * pageSize);
+
+        if (listResult.IsFailure)
+        {
+            LogError($"照片查询失败: {listResult.Message}");
+            return Result.Failure<PagedResult<ArchivePhoto>>(listResult.ErrorCode!, listResult.Message!);
+        }
+
+        return Result.Success(new PagedResult<ArchivePhoto>
+        {
+            Items = listResult.Value ?? new List<ArchivePhoto>(),
+            PageIndex = pageIndex,
+            PageSize = pageSize,
+            TotalCount = (int)countResult.Value
+        });
+    }
 }

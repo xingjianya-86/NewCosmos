@@ -52,6 +52,9 @@ public static partial class FieldKeys
     public const string SIGNATURE_AGENT = "SIGNATURE_AGENT";                       // 代理人签名
     public const string SIGNATURE_OPERATOR = "SIGNATURE_OPERATOR";                 // 经办人签名
 
+    // 照片（图片占位符，非文本字段——由 PrintExecuteService 按身份证取回照片后经 ReplaceImageFields 内嵌）
+    public const string PHOTO_APPLICANT = "PHOTO_APPLICANT";                       // 申请人本人照片（证件照）
+
     // 代理人
     public const string AGENT_NAME = "AGENT_NAME";
     public const string AGENT_ID_CARD = "AGENT_ID_CARD";

@@ -18,7 +18,7 @@
             <VerticalStackLayout Spacing="16">
 
                 <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
                     <HorizontalStackLayout Spacing="6">
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
@@ -27,8 +27,21 @@
                         <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
-                    <!-- 每月公示文档输出按钮 -->
+                    <!-- 照片查询/导出（桌面端） -->
                     <Button Grid.Column="2"
+                            Text="{OnPlatform WinUI='&#xE8B9; 照片查询', Android='&#x1F5BC; 照片查询'}"
+                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                            BackgroundColor="#33FFFFFF"
+                            TextColor="White"
+                            FontSize="13"
+                            Command="{Binding OpenPhotoQueryCommand}"
+                            VerticalOptions="Center"
+                            Padding="14,8"
+                            CornerRadius="18"
+                            Margin="0,0,8,0"/>
+
+                    <!-- 每月公示文档输出按钮 -->
+                    <Button Grid.Column="3"
                             Text="{OnPlatform WinUI='&#xE7B5; 每月公示文档输出', Android='&#x1F4C4; 每月公示文档输出'}"
                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             BackgroundColor="White"

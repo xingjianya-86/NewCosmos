@@ -1,0 +1,77 @@
+# 年度种植补贴（四合一长表）Schema 定义
+# 版本: 1.0
+# 说明: 合并原 农业补贴(地力)/种植补贴/大豆补贴(品种)/轮作补贴 四类导入，
+#       一行 = 一年 × 一人 × 一个补贴分类，按 data_year 分年段记录。
+# 权威口径: 本文件为表结构唯一权威（SchemaService 幂等建表/补列依据）。
+
+database: 年度种植补贴数据库
+version: 1.0
+description: 年度种植补贴导入台账 - 按年段记录各补贴分类的金额/面积
+
+tables:
+  - name: nc_biz_annual_planting_subsidy
+    comment: "[导入台账] 年度种植补贴表 - 长表：一年×一人×一个分类（玉米/大豆/水稻/地力/轮作/大豆品种）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        primaryKey: true
+        comment: 主键ID
+      - name: data_year
+        type: INTEGER
+        nullable: false
+        comment: 数据年份（年段）
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 姓名
+      - name: id_card
+        type: VARCHAR(20)
+        nullable: false
+        comment: 身份证号
+      - name: phone
+        type: VARCHAR(20)
+        comment: 联系电话
+      - name: address
+        type: VARCHAR(255)
+        comment: 家庭地址（村/屯，可从文件名解析）
+      - name: category
+        type: VARCHAR(50)
+        nullable: false
+        comment: 补贴分类（与申请表单 SubsidyType 同名）：玉米补贴/大豆补贴/地表水水稻/地下水水稻/地力补贴/轮作补贴/大豆品种补贴
+      - name: area
+        type: NUMERIC(18,4)
+        comment: 面积（亩）- 存量转换来的面积型数据；金额型导入行为 NULL
+      - name: amount
+        type: NUMERIC(18,2)
+        comment: 补贴金额（元）- 新模板按金额导入；存量面积型数据为 NULL
+      - name: source_type
+        type: VARCHAR(50)
+        nullable: false
+        defaultValue: ''
+        comment: 文件来源标记（文件名含“非社保卡/社保卡”则记之，存量转换记 高油/高蛋白，其余为空串）；空串参与唯一键
+      - name: source_file
+        type: VARCHAR(500)
+        comment: 原始文件名（审计用，幂等靠 data_year+证件+分类+来源标记）
+      - name: imported_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 导入时间
+      - name: created_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        default: CURRENT_TIMESTAMP
+        comment: 更新时间
+    constraints:
+      - name: uk_annual_planting_year_card_category_source
+        type: UNIQUE
+        columns: [data_year, id_card, category, source_type]
+    indexes:
+      - name: idx_annual_planting_id_card
+        columns: [id_card]
+      - name: idx_annual_planting_data_year
+        columns: [data_year]
+      - name: idx_annual_planting_year_card
+        columns: [data_year, id_card]

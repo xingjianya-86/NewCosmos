@@ -320,6 +320,16 @@
 
                     <!-- 操作按钮 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="{OnPlatform WinUI='&#xE7F4; 在线会话', Android='&#x1F4F1; 在线会话'}"
+                                FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                                BackgroundColor="#33FFFFFF"
+                                TextColor="White"
+                                FontSize="14"
+                                Command="{Binding OpenOnlineSessionsCommand}"
+                                VerticalOptions="Center"
+                                Padding="16,10"
+                                CornerRadius="20"
+                                IsVisible="{Binding IsUsersTabSelected}"/>
                         <Button Text="{OnPlatform WinUI='&#xE710; 创建用户', Android='&#x2795; 创建用户'}"
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="#33FFFFFF"

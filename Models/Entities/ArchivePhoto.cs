@@ -37,4 +37,7 @@ public class ArchivePhoto
 
     /// <summary>采集时间。</summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>类别中文名（列表展示用）。</summary>
+    public string PhotoCategoryName => PhotoCategoryConstants.GetDisplayName(PhotoCategory);
 }

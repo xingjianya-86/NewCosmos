@@ -60,11 +60,15 @@ public sealed record ApplicationArchiveParameter(long ApplicationId);
 
 /// <summary>
 /// 档案照片页导航参数：按人（身份证）+ 申请定位，采集/查阅该人的证件与核查照片。
+/// SessionQueue/SessionIndex：补传会话模式（历史档案批量补传），提供"下一位"连续采集；
+/// 从各业务表单单人进入时为 null。
 /// </summary>
 public sealed record ArchivePhotoParameter(
     string ApplicantIdCard,
     long? ApplicationId = null,
-    string? ApplicantName = null);
+    string? ApplicantName = null,
+    IReadOnlyList<NewCosmos.Models.Entities.PhotoBackfillPerson>? SessionQueue = null,
+    int SessionIndex = 0);
 
 /// <summary>
 /// 档案产出页初始化来源参数：复核/成员变更归档。

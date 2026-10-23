@@ -558,6 +558,23 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 资产核查照片采集：按户主身份证归档（与低收入/临时救助/高龄共用同一份人员照片库）。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync()
+    {
+        var target = Applicants.FirstOrDefault(a => a.IsHead) ?? Applicants.FirstOrDefault();
+        if (target == null || string.IsNullOrWhiteSpace(target.ApplicantIdCard))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先填写户主身份证号码，再采集照片", "确定");
+            return;
+        }
+
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(target.ApplicantIdCard.Trim(), null, target.ApplicantName));
+    }
+
     [RelayCommand]
     private async Task QueryHistoryAsync(AssetCheckItemDto applicant)
     {

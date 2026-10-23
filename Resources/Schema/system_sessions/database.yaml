@@ -1,0 +1,98 @@
+# 登录会话数据库 Schema 定义
+# 会话权威记录：登录裁决（按端配额/单会话/多端）与心跳校验均以此表为准，
+# 客户端 SecureStorage 仅作离线缓存。状态与原因常量见 Constants/SessionConstants.cs。
+database: 登录会话数据库
+version: 1.0
+description: 记录桌面端/移动端登录会话，支撑按端配额互踢、强制下线与在线会话审计
+
+tables:
+  - name: nc_sys_user_sessions
+    comment: "[系统] 登录会话表 - 每次登录一行，status=active 表示仍可使用；被顶号/强制下线/过期后置终态"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: session_id
+        type: uuid
+        nullable: false
+        comment: 会话令牌（客户端持久化，服务端校验唯一凭据）
+      - name: user_id
+        type: integer
+        nullable: false
+        comment: 用户ID，关联 nc_sys_users.id
+      - name: device_id
+        type: character varying(64)
+        nullable: false
+        defaultValue: "''"
+        comment: 安装级设备标识（重装应用会变化，不使用硬件指纹）
+      - name: device_kind
+        type: character varying(16)
+        nullable: false
+        defaultValue: "'desktop'"
+        comment: 端类型：desktop=桌面端、android=移动端
+      - name: device_name
+        type: character varying(100)
+        nullable: true
+        defaultValue: "''"
+        comment: 设备显示名：计算机名/手机厂商型号
+      - name: app_version
+        type: character varying(32)
+        nullable: true
+        defaultValue: "''"
+        comment: 客户端版本
+      - name: login_at
+        type: timestamp with time zone
+        nullable: false
+        defaultValue: NOW()
+        comment: 登录时间（数据库时间）
+      - name: last_seen_at
+        type: timestamp with time zone
+        nullable: false
+        defaultValue: NOW()
+        comment: 最后心跳时间（在线判定依据）
+      - name: expires_at
+        type: timestamp with time zone
+        nullable: false
+        comment: 绝对过期时间（数据库时间计算，客户端改时钟无效）
+      - name: status
+        type: character varying(16)
+        nullable: false
+        defaultValue: "'active'"
+        comment: 状态：active/replaced/kicked/logout/expired
+      - name: end_reason
+        type: character varying(64)
+        nullable: true
+        comment: 结束原因（other_device_login/admin_kick/user_logout/password_changed/...）
+      - name: ended_by
+        type: integer
+        nullable: true
+        comment: 结束操作人（管理员强制下线时记录）
+      - name: ended_at
+        type: timestamp with time zone
+        nullable: true
+        comment: 结束时间
+      - name: client_ip
+        type: character varying(64)
+        nullable: true
+        comment: 客户端地址（审计用，可为空）
+      - name: created_at
+        type: timestamp with time zone
+        nullable: false
+        defaultValue: NOW()
+        comment: 记录创建时间
+    indexes:
+      - name: uq_sys_user_sessions_session_id
+        columns: [session_id]
+        unique: true
+        comment: 会话令牌唯一
+      - name: idx_sys_user_sessions_user_status
+        columns: [user_id, status]
+        comment: 登录裁决按用户查活动会话
+      - name: idx_sys_user_sessions_active
+        columns: [status, last_seen_at]
+        comment: 在线会话列表与陈旧会话清理
+      - name: idx_sys_user_sessions_ended_at
+        columns: [ended_at]
+        comment: 终态记录按保留期清理

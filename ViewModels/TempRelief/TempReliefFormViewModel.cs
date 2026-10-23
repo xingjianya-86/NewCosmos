@@ -399,17 +399,55 @@ public partial class TempReliefFormViewModel : ViewModelBase
     /// <summary>明细行"患病/受灾成员"候选名单：户主 + 家庭成员姓名（供疾病/灾害行 Picker 使用）</summary>
     public ObservableCollection<string> MemberNameOptions { get; } = new();
 
+    /// <summary>
+    /// 重建成员候选名单。两条硬约束：
+    /// ① 内容与现状一致时**不动集合**——Clear()+Add 会让绑定中的 Picker 重置选中，
+    ///    并把空值 TwoWay 回写进明细行（曾导致重新进入草稿后"患病成员"全变空）；
+    /// ② 已存明细行里的成员姓名一并纳入候选——成员行被删/改名后，历史值仍能正常显示。
+    /// </summary>
     private void RebuildMemberNameOptions()
     {
         var names = new List<string>();
-        if (!string.IsNullOrWhiteSpace(ApplicantName)) names.Add(ApplicantName);
-        foreach (var m in Members)
+        if (!string.IsNullOrWhiteSpace(ApplicantName)) names.Add(ApplicantName.Trim());
+
+        void Include(string? raw)
         {
-            if (string.IsNullOrWhiteSpace(m.MemberName)) continue;
-            if (!names.Contains(m.MemberName)) names.Add(m.MemberName);
+            if (string.IsNullOrWhiteSpace(raw)) return;
+            var name = raw.Trim();
+            if (!names.Contains(name)) names.Add(name);
         }
-        MemberNameOptions.Clear();
-        foreach (var n in names) MemberNameOptions.Add(n);
+
+        foreach (var m in Members) Include(m.MemberName);
+        foreach (var d in Diseases) Include(d.MemberName);
+        foreach (var a in Accidents) Include(a.MemberName);
+
+        // 差异同步：只删多余、只补缺失，绝不整体 Clear
+        for (var i = MemberNameOptions.Count - 1; i >= 0; i--)
+        {
+            if (!names.Contains(MemberNameOptions[i])) MemberNameOptions.RemoveAt(i);
+        }
+        foreach (var name in names)
+        {
+            if (!MemberNameOptions.Contains(name)) MemberNameOptions.Add(name);
+        }
+    }
+
+    /// <summary>
+    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
+    /// 与高龄津贴、低收入人口认定等模块共享同一份人员照片。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择申请人（身份证号缺失），再采集照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("临时救助-照片采集/查看", ("ApplicationId", _id.ToString()));
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _id > 0 ? _id : null, ApplicantName));
     }
 
     /// <summary>救助对象选项条目</summary>
@@ -487,31 +525,51 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private string _hospital = string.Empty;
 
-    partial void OnHospitalChanged(string value) => RegenerateOnSharedDiseaseFieldChanged();
+    partial void OnHospitalChanged(string value)
+    {
+        PropagateSharedValuesToRows();
+        RegenerateOnSharedDiseaseFieldChanged();
+    }
 
     /// <summary>治疗开始日期（疾病明细共享，区域顶部填写一次）</summary>
     [ObservableProperty]
     private DateTime _treatStartDate = DateTime.Today;
 
-    partial void OnTreatStartDateChanged(DateTime value) => RegenerateOnSharedDiseaseFieldChanged();
+    partial void OnTreatStartDateChanged(DateTime value)
+    {
+        PropagateSharedValuesToRows();
+        RegenerateOnSharedDiseaseFieldChanged();
+    }
 
     /// <summary>治疗结束日期（疾病明细共享，区域顶部填写一次）</summary>
     [ObservableProperty]
     private DateTime _treatEndDate = DateTime.Today;
 
-    partial void OnTreatEndDateChanged(DateTime value) => RegenerateOnSharedDiseaseFieldChanged();
+    partial void OnTreatEndDateChanged(DateTime value)
+    {
+        PropagateSharedValuesToRows();
+        RegenerateOnSharedDiseaseFieldChanged();
+    }
 
     /// <summary>医疗费用总额（元，疾病明细共享，区域顶部填写一次）</summary>
     [ObservableProperty]
     private decimal? _medicalTotal;
 
-    partial void OnMedicalTotalChanged(decimal? value) => RegenerateOnSharedDiseaseFieldChanged();
+    partial void OnMedicalTotalChanged(decimal? value)
+    {
+        PropagateSharedValuesToRows();
+        RegenerateOnSharedDiseaseFieldChanged();
+    }
 
     /// <summary>医保/其他报销金额（元，疾病明细共享，区域顶部填写一次）</summary>
     [ObservableProperty]
     private decimal? _insurancePaid;
 
-    partial void OnInsurancePaidChanged(decimal? value) => RegenerateOnSharedDiseaseFieldChanged();
+    partial void OnInsurancePaidChanged(decimal? value)
+    {
+        PropagateSharedValuesToRows();
+        RegenerateOnSharedDiseaseFieldChanged();
+    }
 
     /// <summary>个人自付费用（元，疾病明细共享，区域顶部填写一次）</summary>
     [ObservableProperty]
@@ -520,7 +578,30 @@ public partial class TempReliefFormViewModel : ViewModelBase
     partial void OnSelfPaidChanged(decimal? value) => RegenerateOnSharedDiseaseFieldChanged();
 
     /// <summary>
-    /// 是否为"多家医院"模式：开启后每条疾病明细独立填写医院/日期/费用；关闭时使用顶部共享值。
+    /// 共享模式下把顶部共享值实时同步到每条疾病明细（新增行/改顶部字段时调用）。
+    /// 保持"行间取值始终一致"，保存护栏（BuildApplication.HasRowValueDivergence）才不会误触发；
+    /// 加载中（_suppressReload）与逐条模式不处理——加载期共享值本就取自明细行本身。
+    /// </summary>
+    private void PropagateSharedValuesToRows()
+    {
+        if (_suppressReload) return;
+        if (IsMultiHospitalMode) return;
+        if (Diseases.Count == 0) return;
+
+        foreach (var d in Diseases)
+        {
+            d.Hospital = Hospital;
+            d.TreatStartDate = TreatStartDate;
+            d.TreatEndDate = TreatEndDate;
+            d.MedicalTotal = MedicalTotal;
+            d.InsurancePaid = InsurancePaid;
+            d.SelfPaid = SelfPaid;
+        }
+    }
+
+    /// <summary>
+    /// 是否为"逐条填写"模式（原名"多家医院"）：开启后每条疾病明细独立填写医院/日期/费用；
+    /// 关闭时使用顶部共享值。同一家医院的多次住院也需开启（否则逐行日期会被共享值压平）。
     /// </summary>
     [ObservableProperty]
     private bool _isMultiHospitalMode;
@@ -532,7 +613,10 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
         if (!value)
         {
-            // 从多医院 → 共享模式：用第一条记录的值回填共享字段
+            // 从逐条 → 共享模式：用第一条记录的值回填共享字段，
+            // 并立即把共享值写回每条明细——使各行取值一致。
+            // 这样用户"手动关闭开关"的统一意图在保存时不再被护栏当成异常差异拦下
+            // （护栏只拦"未主动统一却被覆盖"的路径，见 BuildApplication）。
             var first = Diseases[0];
             Hospital = first.Hospital ?? string.Empty;
             TreatStartDate = first.TreatStartDate == DateTime.MinValue ? DateTime.Today : first.TreatStartDate;
@@ -540,6 +624,16 @@ public partial class TempReliefFormViewModel : ViewModelBase
             MedicalTotal = first.MedicalTotal;
             InsurancePaid = first.InsurancePaid;
             SelfPaid = first.SelfPaid;
+
+            foreach (var d in Diseases)
+            {
+                d.Hospital = Hospital;
+                d.TreatStartDate = TreatStartDate;
+                d.TreatEndDate = TreatEndDate;
+                d.MedicalTotal = MedicalTotal;
+                d.InsurancePaid = InsurancePaid;
+                d.SelfPaid = SelfPaid;
+            }
         }
         else
         {
@@ -601,6 +695,17 @@ public partial class TempReliefFormViewModel : ViewModelBase
             TreatStartDate = DateTime.Today,
             TreatEndDate = DateTime.Today
         };
+        // 共享模式：新行直接以顶部共享值初始化（否则新行的默认"今天"与既有行的共享日期不同，
+        // 保存时会被误判为行间差异，触发护栏拒绝回写并误切逐条模式）
+        if (!IsMultiHospitalMode)
+        {
+            item.Hospital = Hospital;
+            item.TreatStartDate = TreatStartDate;
+            item.TreatEndDate = TreatEndDate;
+            item.MedicalTotal = MedicalTotal;
+            item.InsurancePaid = InsurancePaid;
+            item.SelfPaid = SelfPaid;
+        }
         item.PropertyChanged += OnDetailPropertyChanged;
         Diseases.Add(item);
         if (!_reasonDirty) RegenerateDifficultyReason();

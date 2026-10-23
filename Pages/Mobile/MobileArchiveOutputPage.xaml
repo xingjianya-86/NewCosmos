@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.Mobile.MobileArchiveOutputPage"
+             x:DataType="ArchiveOutputViewModel"
+             Title="档案输出"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <!-- 手机端专用布局：单列「推送打印工作台」。
+         手机端没有 Office/COM，无法本地生成文书或直接打印（WordEngine/ExcelEngine 仅在 WINDOWS 编译），
+         因此本页不提供预览/保存/打印，只做：勾选模板 → 推送打印队列 → 电脑端打印代理执行。
+         业务逻辑（模板清单/份数口径）复用 ArchiveOutputViewModel，本页只做布局与手机侧动作。 -->
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="0">
+
+        <!-- ① 头部：返回 / 标题 / 模板统计 -->
+        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,14,16,12">
+            <VerticalStackLayout Spacing="6">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <HorizontalStackLayout Grid.Column="0" Spacing="6">
+                        <HorizontalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                        </HorizontalStackLayout.GestureRecognizers>
+                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <Button Grid.Column="2" Text="打印任务" FontSize="12"
+                            BackgroundColor="White" TextColor="{StaticResource Primary}"
+                            Padding="12,0" HeightRequest="34" CornerRadius="17"
+                            Command="{Binding OpenPrintJobsCommand}"/>
+                </Grid>
+                <Label Text="档案输出" FontSize="20" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="{Binding StatusText}" FontSize="12" TextColor="#E6FFFFFF" LineBreakMode="WordWrap"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- ② 说明条：为什么手机上只有「推送打印」 -->
+        <Border Grid.Row="1" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <Label Text="ℹ️" FontSize="14" VerticalOptions="Center"/>
+                <Label Grid.Column="1" FontSize="12" TextColor="{StaticResource PrimaryDark}"
+                       LineBreakMode="WordWrap"
+                       Text="手机端不生成文书：勾选模板后推送打印任务，电脑端登录后自动打印。"/>
+            </Grid>
+        </Border>
+
+        <!-- ③ 模板清单（要打印哪些文书） -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Margin="12,10,12,0">
+            <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="输出模板（批量）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                    <Button Grid.Column="1" Text="全选 / 取消"
+                            FontSize="12" Padding="10,0" HeightRequest="32" CornerRadius="8"
+                            BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource TextSecondary}"
+                            Command="{Binding ToggleSelectAllCommand}"/>
+                </Grid>
+                <CollectionView Grid.Row="1" ItemsSource="{Binding Templates}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="TemplateSelectItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Padding="0,7">
+                                <Switch IsToggled="{Binding IsSelected}" OnColor="{StaticResource Primary}"
+                                        IsEnabled="{Binding IsApplicable}" VerticalOptions="Center"/>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                                           LineBreakMode="TailTruncation"/>
+                                    <Label Text="{Binding BaseCopies, StringFormat='{0} 份'}" FontSize="11"
+                                           TextColor="{StaticResource TextTertiary}"
+                                           IsVisible="{Binding IsVerificationReport, Converter={StaticResource BoolToInverseConverter}}"/>
+                                    <Label Text="核查报告需在电脑端生成（不支持推送）" FontSize="11"
+                                           TextColor="{StaticResource WarningDark}"
+                                           IsVisible="{Binding IsVerificationReport}"/>
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2" Text="{Binding ReportStatus}" FontSize="11"
+                                       VerticalOptions="Center"
+                                       TextColor="{Binding ReportStatus, Converter={StaticResource ReportStatusColorConverter}}"
+                                       IsVisible="{Binding IsVerificationReport}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    <CollectionView.EmptyView>
+                        <Label Text="暂无可打印模板" Style="{StaticResource EmptyStateLabel}" Padding="0,20"/>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <!-- ④ 打印设置（份数倍数 / 双面；打印机由电脑端决定）+ 已上传照片随档打印 -->
+        <VerticalStackLayout Grid.Row="3" Spacing="10" Margin="12,10,12,0">
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="打印设置（电脑端执行）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Label Text="份数倍数" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                        <Button Text="−" Command="{Binding DecreaseCopiesCommand}"
+                                WidthRequest="38" HeightRequest="38" FontSize="18" FontAttributes="Bold" Padding="0"
+                                BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
+                                CornerRadius="8"/>
+                        <Entry Text="{Binding Copies}" Keyboard="Numeric"
+                               WidthRequest="64" MinimumHeightRequest="48" HorizontalTextAlignment="Center" FontSize="14"/>
+                        <Button Text="+" Command="{Binding IncreaseCopiesCommand}"
+                                WidthRequest="38" HeightRequest="38" FontSize="18" FontAttributes="Bold" Padding="0"
+                                BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
+                                CornerRadius="8"/>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center">
+                        <Label Text="双面" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 已上传照片：随档一起打印，每张可选版式（整页/半页/证件原寸） -->
+        <Border Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="同时打印已上传照片" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                    <Switch Grid.Column="1" IsToggled="{Binding IsPrintPhotosOn}" OnColor="{StaticResource Primary}"/>
+                </Grid>
+                <Label Text="该申请人暂无照片，可到「档案 → 照片补传」采集后再打印"
+                       FontSize="12" TextColor="{StaticResource TextTertiary}"
+                       IsVisible="{Binding HasNoPhotoForPrint}"/>
+                <CollectionView ItemsSource="{Binding PhotoPrintItems}"
+                                IsVisible="{Binding IsPrintPhotosOn}"
+                                HeightRequest="150" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:PhotoPrintItem">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="0,4">
+                                <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding DisplayText}" FontSize="12"
+                                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"
+                                       LineBreakMode="TailTruncation"/>
+                                <Picker Grid.Column="2" WidthRequest="112" FontSize="12"
+                                        ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PhotoLayoutOptions}"
+                                        ItemDisplayBinding="{Binding Name}"
+                                        SelectedItem="{Binding SelectedLayout, Mode=TwoWay}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Border>
+        </VerticalStackLayout>
+
+        <!-- ⑤ 底部：返回首页 + 推送打印 -->
+        <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
+            <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="返回首页"
+                        Command="{Binding GoHomeCommand}"
+                        FontSize="14" HeightRequest="48" CornerRadius="10" Padding="0"
+                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                        BorderColor="{StaticResource Gray200}" BorderWidth="1"/>
+                <Button Grid.Column="1" Text="推送打印"
+                        Command="{Binding PushPrintCommand}"
+                        IsEnabled="{Binding IsNotBusy}"
+                        FontSize="15" FontAttributes="Bold" HeightRequest="48" CornerRadius="10"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"/>
+            </Grid>
+        </Border>
+
+        <!-- 生成/推送进度 -->
+        <Border Grid.Row="1" Grid.RowSpan="4"
+                Style="{StaticResource CardBorderElevated}"
+                IsVisible="{Binding IsGenerating}"
+                VerticalOptions="Center" HorizontalOptions="Center"
+                MinimumWidthRequest="280" MaximumWidthRequest="360"
+                ZIndex="10">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="推送中..." FontSize="16" FontAttributes="Bold" HorizontalOptions="Center"/>
+                <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Primary}"/>
+                <Label Text="{Binding ProgressText}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                       HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="5" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

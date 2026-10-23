@@ -17,6 +17,7 @@ public partial class App : Application
 
     public static IServiceProvider Services { get; set; } = null!;
     public static int? CurrentUserId { get; private set; }
+    public static Guid? CurrentSessionId { get; private set; }
     public static string CurrentUserName { get; private set; } = string.Empty;
     public static string CurrentUserFullName { get; private set; } = string.Empty;
     public static string CurrentUserPhone { get; private set; } = string.Empty;
@@ -31,6 +32,9 @@ public partial class App : Application
     public static string? CurrentUserOrgAddress { get; private set; }
 
     public static void SetCurrentUserId(int userId) => CurrentUserId = userId;
+
+    /// <summary>记录当前数据库会话令牌（心跳/会话闸门/登出使用）</summary>
+    public static void SetCurrentSessionId(Guid sessionId) => CurrentSessionId = sessionId;
 
     public static void SetCurrentUser(string userName, string fullName, string phone, int? organizationId)
     {
@@ -236,7 +240,9 @@ public partial class App : Application
     };
 
     /// <summary>
-    /// 后台恢复会话并切换到主页面或登录页；失败一律落登录页，异常记日志+错误页兜底，绝不吞掉。
+    /// 后台恢复会话并切换页面：
+    /// 本地会话 → 用户仍启用 → 数据库会话仍 active 且设备匹配 → 恢复并启动心跳；
+    /// 网络/数据库不可用时保留本地会话并显示"重试/重新登录"，绝不再把抖动当失效直接清会话。
     /// </summary>
     private static async Task RestoreSessionAndNavigateAsync(Window window, AppOptions appOptions, IWindowTitleService windowTitleService)
     {
@@ -254,55 +260,102 @@ public partial class App : Application
                 Serilog.Log.Warning(ex, "[APP] 读取会话失败，转登录页");
             }
 
-            if (session != null)
+            // SessionId 为空 = 升级前缓存，无法向数据库校验，直接要求重新登录
+            if (session != null && session.SessionId != Guid.Empty)
             {
-                // 校验用户仍存在且启用；失败则清会话回登录页
+                // 1) 用户仍存在且启用
+                Services.Domain.UserManagement.User? user = null;
                 try
                 {
                     var userService = Services.GetRequiredService<Services.Domain.UserManagement.IUserService>();
                     var userResult = await userService.GetByIdAsync(session.UserId);
-                    if (userResult.IsSuccess && userResult.Value != null && userResult.Value.IsActive)
+                    if (userResult.IsFailure)
                     {
-                        ApplySession(session);
-                        Serilog.Log.Information("[APP] 会话已恢复: UserId={UserId}", session.UserId);
-
-                        Page mainPage;
-                        if (DeviceInfo.Platform == DevicePlatform.Android)
+                        if (IsConnectionFailure(userResult))
                         {
-                            var mobileType = typeof(Pages.Main.MainPage).Assembly.GetType("NewCosmos.Pages.Mobile.MobileMainPage");
-                            mainPage = mobileType != null
-                                ? (Services.GetService(mobileType) as Page) ?? Services.GetRequiredService<Pages.Main.MainPage>()
-                                : Services.GetRequiredService<Pages.Main.MainPage>();
-                        }
-                        else
-                        {
-                            mainPage = Services.GetRequiredService<Pages.Main.MainPage>();
+                            Serilog.Log.Warning("[APP] 启动校验无法连接数据库，保留本地会话并提示重试");
+                            ShowConnectionRetryPage(window, appOptions, windowTitleService);
+                            return;
                         }
 
-                        windowTitleService.Register(mainPage);
-                        window.Page = new NavigationPage(mainPage);
-                        window.Title = appOptions.WindowTitle;
-                        Serilog.Log.Information("[APP] 启动完成（会话恢复）");
-                        return;
+                        Serilog.Log.Warning("[APP] 用户校验失败，清除本地会话: {Message}", userResult.Message);
                     }
-
-                    Serilog.Log.Warning("[APP] 会话用户无效，清除并转登录页");
-                    ClearSession();
-                    if (sessionStore != null)
-                        _ = sessionStore.ClearAsync();
+                    else
+                    {
+                        user = userResult.Value;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Serilog.Log.Warning(ex, "[APP] 会话校验失败，转登录页");
-                    ClearSession();
+                    Serilog.Log.Warning(ex, "[APP] 启动校验无法连接数据库，保留本地会话并提示重试");
+                    ShowConnectionRetryPage(window, appOptions, windowTitleService);
+                    return;
                 }
+
+                // 2) 数据库会话仍有效且属于本设备
+                if (user is { IsActive: true })
+                {
+                    Services.Domain.UserManagement.SessionValidationResult? validation = null;
+                    try
+                    {
+                        var sessionService = Services.GetRequiredService<Services.Domain.UserManagement.IUserSessionService>();
+                        var validationResult = await sessionService.ValidateAsync(session.SessionId, session.DeviceId);
+                        if (validationResult.IsFailure)
+                        {
+                            if (IsConnectionFailure(validationResult))
+                            {
+                                Serilog.Log.Warning("[APP] 会话校验无法连接数据库，保留本地会话并提示重试");
+                                ShowConnectionRetryPage(window, appOptions, windowTitleService);
+                                return;
+                            }
+
+                            Serilog.Log.Warning("[APP] 会话校验失败，转登录页: {Message}", validationResult.Message);
+                        }
+                        else
+                        {
+                            validation = validationResult.Value;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Serilog.Log.Warning(ex, "[APP] 会话校验无法连接数据库，保留本地会话并提示重试");
+                        ShowConnectionRetryPage(window, appOptions, windowTitleService);
+                        return;
+                    }
+
+                    if (validation is { IsActive: true })
+                    {
+                        ApplySession(session);
+                        SetCurrentSessionId(session.SessionId);
+                        try
+                        {
+                            await Services.GetRequiredService<ISessionLifecycleService>().StartAsync(session.SessionId);
+                        }
+                        catch (Exception ex)
+                        {
+                            // 心跳启动失败不阻断进入首页：下一次启动校验仍会兜底
+                            Serilog.Log.Warning(ex, "[APP] 会话心跳启动失败");
+                        }
+
+                        SwitchToMainPage(window, appOptions, windowTitleService);
+                        Serilog.Log.Information("[APP] 会话已恢复: UserId={UserId}", session.UserId);
+                        return;
+                    }
+
+                    Serilog.Log.Warning("[APP] 会话已失效（{Status}/{Reason}），清除并转登录页",
+                        validation?.Status, validation?.EndReason);
+                }
+                else
+                {
+                    Serilog.Log.Warning("[APP] 会话用户无效或已停用，清除并转登录页");
+                }
+
+                ClearSession();
+                if (sessionStore != null)
+                    _ = sessionStore.ClearAsync();
             }
 
-            var loginPage = Services.GetRequiredService<LoginPage>();
-            // root 页也注册标题跟随：pop/系统返回回登录页时窗口标题按其 Page.Title 恢复
-            windowTitleService.Register(loginPage);
-            window.Page = new NavigationPage(loginPage);
-            window.Title = $"登录 - {appOptions.WindowTitle}";
+            SwitchToLoginPage(window, appOptions, windowTitleService);
             Serilog.Log.Information("[APP] 启动完成（登录页）");
         }
         catch (Exception ex)
@@ -310,6 +363,108 @@ public partial class App : Application
             Serilog.Log.Error(ex, "[APP] 后台会话恢复异常");
             window.Page = CreateErrorWindow($"启动初始化失败:\n{ex.Message}").Page;
         }
+    }
+
+    /// <summary>连接级失败（网络/超时）：保留本地会话并允许重试，不能当成会话失效</summary>
+    private static bool IsConnectionFailure(Models.Results.Result result) =>
+        result.ErrorCode is Constants.ErrorCodes.DB_CONNECTION_FAILED
+            or Constants.ErrorCodes.DB_TIMEOUT
+            or Constants.ErrorCodes.NETWORK_ERROR;
+
+    private static void SwitchToMainPage(Window window, AppOptions appOptions, IWindowTitleService windowTitleService)
+    {
+        Page mainPage;
+        if (DeviceInfo.Platform == DevicePlatform.Android)
+        {
+            var mobileType = typeof(Pages.Main.MainPage).Assembly.GetType("NewCosmos.Pages.Mobile.MobileMainPage");
+            mainPage = mobileType != null
+                ? (Services.GetService(mobileType) as Page) ?? Services.GetRequiredService<Pages.Main.MainPage>()
+                : Services.GetRequiredService<Pages.Main.MainPage>();
+        }
+        else
+        {
+            mainPage = Services.GetRequiredService<Pages.Main.MainPage>();
+        }
+
+        windowTitleService.Register(mainPage);
+        window.Page = new NavigationPage(mainPage);
+        window.Title = appOptions.WindowTitle;
+    }
+
+    private static void SwitchToLoginPage(Window window, AppOptions appOptions, IWindowTitleService windowTitleService)
+    {
+        var loginPage = Services.GetRequiredService<LoginPage>();
+        // root 页也注册标题跟随：pop/系统返回回登录页时窗口标题按其 Page.Title 恢复
+        windowTitleService.Register(loginPage);
+        window.Page = new NavigationPage(loginPage);
+        window.Title = $"登录 - {appOptions.WindowTitle}";
+    }
+
+    /// <summary>
+    /// 启动时数据库不可用：保留本地会话，提供重试与重新登录两条出口。
+    /// （历史实现会在这里直接清会话，导致弱网用户每次启动都被迫重新登录）
+    /// </summary>
+    private static void ShowConnectionRetryPage(Window window, AppOptions appOptions, IWindowTitleService windowTitleService)
+    {
+        var retryButton = new Button { Text = "重试", HorizontalOptions = LayoutOptions.Fill };
+        var reloginButton = new Button
+        {
+            Text = "重新登录",
+            HorizontalOptions = LayoutOptions.Fill,
+            BackgroundColor = Colors.Transparent,
+            TextColor = Colors.Gray
+        };
+
+        var page = new ContentPage
+        {
+            BackgroundColor = Colors.White,
+            Content = new ScrollView
+            {
+                Content = new VerticalStackLayout
+                {
+                    VerticalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.Center,
+                    Spacing = 16,
+                    Padding = new Thickness(40),
+                    WidthRequest = 360,
+                    Children =
+                    {
+                        new Label { Text = "暂时无法连接服务器", FontSize = 20, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center },
+                        new Label
+                        {
+                            Text = "登录状态已保留。请检查网络（ZeroTier / 4G）后点击重试，无需重新输入密码。",
+                            FontSize = 13,
+                            TextColor = Colors.Gray,
+                            HorizontalTextAlignment = TextAlignment.Center
+                        },
+                        retryButton,
+                        reloginButton
+                    }
+                }
+            }
+        };
+
+        retryButton.Clicked += (_, _) =>
+        {
+            retryButton.IsEnabled = false;
+            _ = RestoreSessionAndNavigateAsync(window, appOptions, windowTitleService);
+        };
+
+        reloginButton.Clicked += async (_, _) =>
+        {
+            reloginButton.IsEnabled = false;
+            try
+            {
+                await Services.GetRequiredService<ISessionStore>().ClearAsync();
+            }
+            catch { }
+            ClearSession();
+            SwitchToLoginPage(window, appOptions, windowTitleService);
+        };
+
+        windowTitleService.Register(page);
+        window.Page = new NavigationPage(page);
+        window.Title = $"连接中断 - {appOptions.WindowTitle}";
     }
 
     private static Window CreateErrorWindow(string message)
@@ -357,6 +512,7 @@ public partial class App : Application
     public static void ClearSession()
     {
         ClearCurrentUserId();
+        CurrentSessionId = null;
         CurrentUserName = string.Empty;
         CurrentUserFullName = string.Empty;
         CurrentUserPhone = string.Empty;

@@ -26,6 +26,7 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
 
     private readonly DatabaseOptions _options;
     private readonly PerformanceOptions _perfOptions;
+    private readonly ISessionGuard _sessionGuard;
     private readonly string _connectionString;
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertyCache = new();
 
@@ -42,11 +43,12 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     /// </summary>
     private readonly AsyncLocal<AmbientTransaction?> _ambient = new();
 
-    public PostgreSqlDatabaseService(DatabaseOptions options, PerformanceOptions perfOptions, ILoggerService logger)
+    public PostgreSqlDatabaseService(DatabaseOptions options, PerformanceOptions perfOptions, ILoggerService logger, ISessionGuard sessionGuard)
         : base(logger)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _perfOptions = perfOptions ?? throw new ArgumentNullException(nameof(perfOptions));
+        _sessionGuard = sessionGuard ?? throw new ArgumentNullException(nameof(sessionGuard));
         _connectionString = BuildConnectionString();
         _staticLogger ??= logger;
     }
@@ -151,6 +153,10 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
         if (string.IsNullOrEmpty(sql))
             return Result.Failure<T>(ErrorCodes.VALIDATION_FAILED, "SQL 语句不能为空");
 
+        // 会话闸门：被顶号/强制下线后立即拒绝业务写入与查询（心跳与登出 SQL 走 Bypass）
+        if (_sessionGuard.IsBlocked)
+            return Result.Failure<T>(ErrorCodes.SESSION_REVOKED, "登录会话已失效，请重新登录");
+
         var (scope, gateAcquired, connection) = (GetActiveScope(), false, (NpgsqlConnection?)null);
         var sw = Stopwatch.StartNew();
         try
@@ -191,6 +197,9 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     {
         if (string.IsNullOrEmpty(sql))
             return Result.Failure<List<T>>(ErrorCodes.VALIDATION_FAILED, "SQL 语句不能为空");
+
+        if (_sessionGuard.IsBlocked)
+            return Result.Failure<List<T>>(ErrorCodes.SESSION_REVOKED, "登录会话已失效，请重新登录");
 
         var (scope, gateAcquired, connection) = (GetActiveScope(), false, (NpgsqlConnection?)null);
         var sw = Stopwatch.StartNew();
@@ -235,6 +244,9 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
         if (string.IsNullOrEmpty(sql))
             return Result.Failure<int>(ErrorCodes.VALIDATION_FAILED, "SQL 语句不能为空");
 
+        if (_sessionGuard.IsBlocked)
+            return Result.Failure<int>(ErrorCodes.SESSION_REVOKED, "登录会话已失效，请重新登录");
+
         var (scope, gateAcquired, connection) = (GetActiveScope(), false, (NpgsqlConnection?)null);
         try
         {
@@ -263,6 +275,9 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     {
         if (string.IsNullOrEmpty(sql))
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "SQL 语句不能为空");
+
+        if (_sessionGuard.IsBlocked)
+            return Result.Failure<long>(ErrorCodes.SESSION_REVOKED, "登录会话已失效，请重新登录");
 
         var (scope, gateAcquired, connection) = (GetActiveScope(), false, (NpgsqlConnection?)null);
         try
@@ -302,6 +317,9 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     {
         if (string.IsNullOrEmpty(sql))
             return Result.Failure<T?>(ErrorCodes.VALIDATION_FAILED, "SQL 语句不能为空");
+
+        if (_sessionGuard.IsBlocked)
+            return Result.Failure<T?>(ErrorCodes.SESSION_REVOKED, "登录会话已失效，请重新登录");
 
         var (scope, gateAcquired, connection) = (GetActiveScope(), false, (NpgsqlConnection?)null);
         try

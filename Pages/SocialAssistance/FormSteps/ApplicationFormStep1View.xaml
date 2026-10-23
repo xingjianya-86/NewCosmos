@@ -162,11 +162,15 @@
                     </VerticalStackLayout>
                      <VerticalStackLayout Grid.Column="1" Spacing="8">
                         <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
-                        <Entry Text="{Binding ApplicantIdCard}"
-                               Placeholder="{Binding ApplicantIdCardField.Placeholder}"
-                               IsReadOnly="{Binding IsApplicantIdentityLocked}"
-                               Style="{StaticResource FormFieldEntryStyle}"
-                               MaxLength="18"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Text="{Binding ApplicantIdCard}"
+                                   Placeholder="{Binding ApplicantIdCardField.Placeholder}"
+                                   IsReadOnly="{Binding IsApplicantIdentityLocked}"
+                                   Style="{StaticResource FormFieldEntryStyle}"
+                                   MaxLength="18"/>
+                            <Button Grid.Column="1" Text="照片" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding OpenPhotosCommand}" VerticalOptions="Center"/>
+                        </Grid>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
                         <Label Text="残疾证号（后两位）" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>

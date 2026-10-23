@@ -68,7 +68,17 @@
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="身份证号码 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <Entry Grid.Column="0" Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                                    <Button Grid.Column="1" Text="📷 扫描"
+                                            FontSize="12" HeightRequest="42" Padding="10,0" CornerRadius="8"
+                                            BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                            Command="{Binding ScanIdCardCommand}"/>
+                                    <Button Grid.Column="2" Text="🖼 照片"
+                                            FontSize="12" HeightRequest="42" Padding="10,0" CornerRadius="8"
+                                            BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
+                                            Command="{Binding OpenPhotosCommand}"/>
+                                </Grid>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="联系电话 *" Style="{StaticResource FormFieldLabelStyle}"/>

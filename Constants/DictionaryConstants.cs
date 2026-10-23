@@ -269,8 +269,13 @@ public static class DictionaryConstants
         public const string SURFACE_WATER_RICE = "地表水水稻";
         public const string GROUND_WATER_RICE = "地下水水稻";
         public const string ROTATION = "轮作补贴";
+        /// <summary>大豆品种补贴（高油/高蛋白等）：无统一单价，只记金额（金额型行）</summary>
+        public const string SOYBEAN_VARIETY = "大豆品种补贴";
 
-        public static readonly string[] All = { LAND_FERTILITY, SOYBEAN, CORN, SURFACE_WATER_RICE, GROUND_WATER_RICE, ROTATION };
+        public static readonly string[] All =
+        {
+            LAND_FERTILITY, SOYBEAN, CORN, SURFACE_WATER_RICE, GROUND_WATER_RICE, ROTATION, SOYBEAN_VARIETY
+        };
     }
 
     /// <summary>

@@ -227,6 +227,26 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
         _ = LoadHeaderStatsAsync();
     }
 
+    /// <summary>打开在线会话页（桌面/移动端活动的登录会话，可强制下线）</summary>
+    [RelayCommand]
+    private async Task OpenOnlineSessionsAsync()
+    {
+        if (!CanViewUser)
+        {
+            await _dialogService.DisplayAlertAsync("权限不足", "您没有查看在线会话的权限", "确定");
+            return;
+        }
+
+        try
+        {
+            await NavigateToPageAsync<Pages.UserManagement.OnlineSessionsPage>("在线会话");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "打开在线会话页失败");
+        }
+    }
+
     #region 页头统计栏
 
     /// <summary>统计加载失败占位</summary>

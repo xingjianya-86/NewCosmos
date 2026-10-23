@@ -37,13 +37,18 @@ public class SessionStore : ISessionStore
                 return null;
 
             var session = JsonSerializer.Deserialize<UserSession>(json);
-            if (session == null || session.UserId <= 0)
+            // SessionId 为空 = 升级前的历史缓存（当时数据库无会话记录），无法校验，直接作废
+            if (session == null || session.UserId <= 0 || session.SessionId == Guid.Empty)
             {
                 await ClearAsync();
                 return null;
             }
 
-            if (DateTime.UtcNow - session.LoginAtUtc > SessionLifetime)
+            // 有效期优先取数据库签发的 expires_at；旧缓存无该字段时按登录时间 + 默认 7 天兜底
+            var expiresAt = session.ExpiresAtUtc == default
+                ? session.LoginAtUtc + SessionLifetime
+                : session.ExpiresAtUtc;
+            if (DateTime.UtcNow > expiresAt)
             {
                 await ClearAsync();
                 return null;

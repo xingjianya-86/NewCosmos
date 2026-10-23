@@ -33,8 +33,22 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
     private int _sensorOrientation;
     private int _viewWidth;
     private int _viewHeight;
+    private bool _isOpening;
     private TaskCompletionSource<byte[]>? _captureTcs;
     private readonly object _sync = new();
+
+    /// <summary>回调内统一兜底：Java 相机回调线程上的异常若越过 JNI 边界会直接终结进程（已实测闪退）。</summary>
+    private static void SafeInvoke(string what, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CameraPreview] {what} 异常: {ex.Message}");
+        }
+    }
 
     public CameraPreviewViewHandler() : base(PropertyMapper) { }
 
@@ -122,11 +136,22 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         if (activity?.GetSystemService(Context.CameraService) is not CameraManager manager)
             return;
 
+        // 纹理回调可能早于 OnAppearing→StartAsync 触发：这里必须先建后台线程，
+        // 否则 CreateCaptureSession 的 HandlerExecutor 会拿到 null Handler → 回调线程空引用闪退（实测）。
+        StartBackgroundThread();
+
+        if (_cameraDevice != null || _isOpening)
+            return; // 预览可用与 StartAsync 会各触发一次，避免重复打开
+
+        _isOpening = true;
         try
         {
             _cameraId = PickBackCameraId(manager);
             if (_cameraId == null)
+            {
+                _isOpening = false;
                 return;
+            }
 
             var characteristics = manager.GetCameraCharacteristics(_cameraId);
             _sensorOrientation = characteristics.Get(CameraCharacteristics.SensorOrientation) is Java.Lang.Integer so
@@ -145,6 +170,7 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         }
         catch (Exception ex)
         {
+            _isOpening = false;
             System.Diagnostics.Debug.WriteLine($"打开相机失败: {ex.Message}");
         }
     }
@@ -204,10 +230,13 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         if (texture == null || _cameraDevice == null)
             return;
 
+        // 后台 Handler 必须非空：回调线程上构建 HandlerExecutor 时为空会直接崩进程
+        var handler = _backgroundHandler ??= new Handler(global::Android.OS.Looper.MainLooper!);
+
         var surface = new Surface(texture);
         _imageReader = ImageReader.NewInstance(_captureSize!.Width, _captureSize.Height,
             global::Android.Graphics.ImageFormatType.Jpeg, 2);
-        _imageReader.SetOnImageAvailableListener(new ImageListener(this), _backgroundHandler);
+        _imageReader.SetOnImageAvailableListener(new ImageListener(this), handler);
 
         var readerSurface = _imageReader.Surface;
         if (readerSurface == null)
@@ -221,24 +250,31 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
             // minSdk 24 设备仍走 else 分支的旧重载。0 = SessionConfiguration.TYPE_REGULAR
             var outputConfigs = outputs.Select(s => new OutputConfiguration(s)).ToList();
             var sessionConfig = new SessionConfiguration(
-                0, outputConfigs, new HandlerExecutor(_backgroundHandler!), sessionListener);
+                0, outputConfigs, new HandlerExecutor(handler), sessionListener);
             _cameraDevice.CreateCaptureSession(sessionConfig);
         }
         else
         {
-            _cameraDevice.CreateCaptureSession(outputs, sessionListener, _backgroundHandler);
+            _cameraDevice.CreateCaptureSession(outputs, sessionListener, handler);
         }
     }
 
     /// <summary>Handler 版 IExecutor 适配（SessionConfiguration 需要 Executor；Handler.getExecutor 未绑定）</summary>
     private sealed class HandlerExecutor : Java.Lang.Object, Java.Util.Concurrent.IExecutor
     {
-        private readonly Handler _handler;
+        private readonly Handler? _handler;
         public HandlerExecutor(Handler handler) => _handler = handler;
         public void Execute(Java.Lang.IRunnable? command)
         {
-            if (command != null)
-                _handler.Post(command);
+            if (command == null) return;
+
+            // 兜底：Handler 意外为空时就地执行，绝不抛空引用（Java 回调线程抛异常 = 进程闪退）
+            if (_handler == null)
+            {
+                SafeInvoke("Executor.Run", command.Run);
+                return;
+            }
+            _handler.Post(command);
         }
     }
 
@@ -296,22 +332,29 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         if (_textureView == null || _previewSize == null || viewWidth == 0 || viewHeight == 0)
             return;
 
-        var relative = (_sensorOrientation - GetDisplayRotationDegrees() + 360) % 360;
-        var bufferWidth = _previewSize.Width;
-        var bufferHeight = _previewSize.Height;
+        try
+        {
+            var relative = (_sensorOrientation - GetDisplayRotationDegrees() + 360) % 360;
+            var bufferWidth = _previewSize.Width;
+            var bufferHeight = _previewSize.Height;
 
-        var rotatedWidth = relative is 90 or 270 ? bufferHeight : bufferWidth;
-        var rotatedHeight = relative is 90 or 270 ? bufferWidth : bufferHeight;
+            var rotatedWidth = relative is 90 or 270 ? bufferHeight : bufferWidth;
+            var rotatedHeight = relative is 90 or 270 ? bufferWidth : bufferHeight;
 
-        var centerX = viewWidth / 2f;
-        var centerY = viewHeight / 2f;
-        var scale = Math.Max(viewWidth / (float)rotatedWidth, viewHeight / (float)rotatedHeight);
+            var centerX = viewWidth / 2f;
+            var centerY = viewHeight / 2f;
+            var scale = Math.Max(viewWidth / (float)rotatedWidth, viewHeight / (float)rotatedHeight);
 
-        using var matrix = new Matrix();
-        matrix.PostTranslate(centerX - bufferWidth / 2f, centerY - bufferHeight / 2f);
-        matrix.PostRotate(relative, centerX, centerY);
-        matrix.PostScale(scale, scale, centerX, centerY);
-        _textureView.SetTransform(matrix);
+            using var matrix = new Matrix();
+            matrix.PostTranslate(centerX - bufferWidth / 2f, centerY - bufferHeight / 2f);
+            matrix.PostRotate(relative, centerX, centerY);
+            matrix.PostScale(scale, scale, centerX, centerY);
+            _textureView.SetTransform(matrix);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CameraPreview] ConfigureTransform 异常: {ex.Message}");
+        }
     }
 
     private static int GetDisplayRotationDegrees()
@@ -362,14 +405,17 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
 
         public void OnSurfaceTextureAvailable(SurfaceTexture surface, int width, int height)
         {
-            _owner.OpenCamera();
-            _owner.ConfigureTransform(width, height);
+            SafeInvoke("OnSurfaceTextureAvailable", () =>
+            {
+                _owner.OpenCamera();
+                _owner.ConfigureTransform(width, height);
+            });
         }
 
         public bool OnSurfaceTextureDestroyed(SurfaceTexture surface) => true;
 
         public void OnSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height)
-            => _owner.ConfigureTransform(width, height);
+            => SafeInvoke("OnSurfaceTextureSizeChanged", () => _owner.ConfigureTransform(width, height));
 
         public void OnSurfaceTextureUpdated(SurfaceTexture surface) { }
     }
@@ -380,23 +426,29 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         public DeviceStateListener(CameraPreviewViewHandler owner) => _owner = owner;
 
         public override void OnOpened(CameraDevice camera)
-        {
-            _owner._cameraDevice = camera;
-            _owner.CreateCaptureSession();
-        }
+            => SafeInvoke("OnOpened", () =>
+            {
+                _owner._isOpening = false;
+                _owner._cameraDevice = camera;
+                _owner.CreateCaptureSession();
+            });
 
         public override void OnDisconnected(CameraDevice camera)
-        {
-            camera.Close();
-            _owner._cameraDevice = null;
-        }
+            => SafeInvoke("OnDisconnected", () =>
+            {
+                _owner._isOpening = false;
+                camera.Close();
+                _owner._cameraDevice = null;
+            });
 
         public override void OnError(CameraDevice camera, CameraError error)
-        {
-            camera.Close();
-            _owner._cameraDevice = null;
-            _owner._captureTcs?.TrySetResult(Array.Empty<byte>());
-        }
+            => SafeInvoke("OnError", () =>
+            {
+                _owner._isOpening = false;
+                camera.Close();
+                _owner._cameraDevice = null;
+                _owner._captureTcs?.TrySetResult(Array.Empty<byte>());
+            });
     }
 
     private sealed class SessionStateListener : CameraCaptureSession.StateCallback
@@ -405,10 +457,11 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         public SessionStateListener(CameraPreviewViewHandler owner) => _owner = owner;
 
         public override void OnConfigured(CameraCaptureSession session)
-        {
-            _owner._captureSession = session;
-            _owner.StartPreview();
-        }
+            => SafeInvoke("OnConfigured", () =>
+            {
+                _owner._captureSession = session;
+                _owner.StartPreview();
+            });
 
         public override void OnConfigureFailed(CameraCaptureSession session)
             => System.Diagnostics.Debug.WriteLine("相机会话配置失败");

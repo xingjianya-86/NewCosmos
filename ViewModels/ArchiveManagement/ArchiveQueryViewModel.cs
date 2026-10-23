@@ -728,6 +728,14 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             new ArchivePhotoParameter(ApplicantIdCard, _proofBusinessId, ApplicantName));
     }
 
+    /// <summary>档案照片查询/导出（桌面端）：按身份证或备注检索，批量导出到输出根</summary>
+    [RelayCommand]
+    private Task OpenPhotoQueryAsync()
+    {
+        _logger.LogBusiness("档案查询-照片查询");
+        return NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage>("档案照片查询");
+    }
+
     #endregion
 
     #region 每月公示文档输出

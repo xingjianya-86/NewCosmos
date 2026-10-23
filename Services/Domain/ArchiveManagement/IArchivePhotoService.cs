@@ -21,4 +21,18 @@ public interface IArchivePhotoService
 
     /// <summary>删除一张照片（采集人误删/重拍场景）。</summary>
     Task<Result<bool>> DeletePhotoAsync(long photoId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 照片补传候选（人员维度）：按姓名/身份证检索用户可补传的人员，附带所属业务域与已有照片数。
+    /// businessType 空 = 全部域；同一身份证跨域聚合为一行；不做"未传"过滤（已传也可继续补传）。
+    /// </summary>
+    Task<Result<PagedResult<PhotoBackfillCandidate>>> GetBackfillCandidatesAsync(
+        string? businessType, string? keyword,
+        int pageIndex, int pageSize, CancellationToken ct = default);
+
+    /// <summary>
+    /// 照片查询（桌面端/导出用）：关键词匹配身份证或照片备注，类别可过滤，分页返回元数据（不含二进制）。
+    /// </summary>
+    Task<Result<PagedResult<ArchivePhoto>>> GetPhotosPagedAsync(
+        string? keyword, string? category, int pageIndex, int pageSize, CancellationToken ct = default);
 }

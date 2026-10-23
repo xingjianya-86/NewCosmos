@@ -33,9 +33,9 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="报表周期" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
-                            <Picker Grid.Column="0" HeightRequest="40" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}" FontSize="14"/>
+                            <Picker Grid.Column="0" MinimumHeightRequest="48" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}" FontSize="14"/>
                             <Label Grid.Column="1" Text="年" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                            <Picker Grid.Column="2" HeightRequest="40" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}" FontSize="14"/>
+                            <Picker Grid.Column="2" MinimumHeightRequest="48" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}" FontSize="14"/>
                             <Label Grid.Column="3" Text="月" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                         </Grid>
                         <Label Text="{Binding PeriodText}" FontSize="14" TextColor="{StaticResource Primary}"/>
@@ -98,7 +98,7 @@
                         <!-- 搜索框 -->
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Grid.Column="0" Placeholder="搜索姓名/身份证号" Text="{Binding SearchKeyword}"
-                                   HeightRequest="38" FontSize="14"/>
+                                   MinimumHeightRequest="48" FontSize="14"/>
                             <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="38"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
                                     Command="{Binding SearchCommand}"/>

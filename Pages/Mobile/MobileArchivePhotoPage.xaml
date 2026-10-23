@@ -23,6 +23,19 @@
                 <Label Text="档案照片" FontSize="20" FontAttributes="Bold" TextColor="White"/>
                 <Label Text="{Binding ApplicantName, StringFormat='申请人：{0}'}" FontSize="13" TextColor="#E6FFFFFF"/>
                 <Label Text="采集证件与核查照片，按类别归档（仅存内网）" FontSize="12" TextColor="#E6FFFFFF"/>
+
+                <!-- 补传会话条：批量补传时显示进度与「下一位/完成」 -->
+                <Border IsVisible="{Binding HasSession}" BackgroundColor="White" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8" Padding="10,6" Margin="0,4,0,0">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding SessionText}" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Button Grid.Column="1" Text="{Binding SessionActionText}"
+                                FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                Command="{Binding NextPersonCommand}"/>
+                    </Grid>
+                </Border>
             </VerticalStackLayout>
         </Border>
 
@@ -83,6 +96,11 @@
                                     Text="删除" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
                                     BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=DeletePhotoCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Grid.Row="0" Grid.Column="2"
+                                    Text="导出" FontSize="12" Padding="12,0" HeightRequest="30" CornerRadius="8"
+                                    BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource SecondaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=ExportPhotoCommand}"
                                     CommandParameter="{Binding .}"/>
                         </Grid>
                     </Border>

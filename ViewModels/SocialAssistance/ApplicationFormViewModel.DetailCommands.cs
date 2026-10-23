@@ -1286,17 +1286,28 @@ public partial class ApplicationFormViewModel
                 Subsidies.Clear();
                 foreach (var record in result.Value)
                 {
-                    // 地力补贴 SQL 返回 area=0、amount=政府原始总金额；种植/轮作补贴返回实际面积。
-                    // 地力补贴有面积但 SQL 未返回，用金额÷单价反推亩数。
+                    // 两种入账口径：
+                    // ① 面积型（存量转换来的种植/轮作）：area>0，直接按 面积×单价 计；
+                    // ② 金额型（新模板按金额导入）：area=0 —— 有单价的分类用「金额÷当日单价」反推亩数
+                    //    （与地力既有做法一致，存在分级舍入差，已拍板接受）；
+                    //    无单价的分类（大豆品种补贴）走金额型行：面积/单价留 0，金额落 OriginalAmount/Amount，
+                    //    由 Subsidy.CalculateAmount 的金额型分支按比例计算，绝不可被算成 0。
                     var area = record.Area;
+                    var amountOnly = 0m;
+
                     if (area == 0 && record.Amount > 0)
                     {
-                        // 地力补贴：金额÷单价反推面积
                         var unitPrice = SubsidyPriceConstants.GetPrice(record.SubsidyType);
-                        area = unitPrice > 0
-                            ? (decimal)SubsidyPriceConstants.CalculateArea(record.Amount, unitPrice)
-                            : 0;
+                        if (unitPrice > 0)
+                        {
+                            area = (decimal)SubsidyPriceConstants.CalculateArea(record.Amount, unitPrice);
+                        }
+                        else
+                        {
+                            amountOnly = record.Amount;
+                        }
                     }
+
                     var subsidy = new Models.Entities.Subsidy
                     {
                         ApplicationId = _applicationId,
@@ -1306,6 +1317,11 @@ public partial class ApplicationFormViewModel
                         MemberIdCard = record.IdCard,
                         CreatedAt = DateTime.Now
                     };
+                    if (amountOnly > 0)
+                    {
+                        subsidy.OriginalAmount = amountOnly;
+                        subsidy.Amount = amountOnly;
+                    }
                     Subsidies.Add(subsidy);
                 }
                 RecalculateIncome();

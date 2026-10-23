@@ -740,6 +740,16 @@ public partial class ArchiveProductionViewModel
             if (sb.Length > 0) sb.Append("；");
             var percent = Math.Round(subsidy.RatioFactor * 100, 2);
             var ratioPart = percent >= 99.99m ? "" : $"×{percent:F2}%";
+            // 金额型行（面积/单价均为 0，如「大豆品种补贴」无统一单价的分类）：无亩数与单价可写，
+            // 直接给出金额算式，否则会打出「0亩×0元/亩=500元」这类自相矛盾文案。
+            if (subsidy.Area == 0 && subsidy.UnitPrice == 0)
+            {
+                var baseAmount = subsidy.OriginalAmount > 0 ? subsidy.OriginalAmount : subsidy.Amount;
+                sb.Append(percent >= 99.99m
+                    ? $"{subsidy.SubsidyType}={FormatDecimal(baseAmount)}元"
+                    : $"{subsidy.SubsidyType}原{FormatDecimal(baseAmount)}元{ratioPart}={FormatDecimal(subsidy.Amount)}元");
+                continue;
+            }
             sb.Append($"{subsidy.SubsidyType}{FormatDecimal(subsidy.Area)}亩×{FormatDecimal(subsidy.UnitPrice)}元/亩{ratioPart}={FormatDecimal(subsidy.Amount)}元");
         }
         return sb.ToString();

@@ -71,7 +71,11 @@ public static class MauiProgram
             sp.GetRequiredService<AppOptions>(),
             sp.GetRequiredService<PerformanceOptions>()));
         builder.Services.AddSingleton<IConfigService, ConfigService>();
+        builder.Services.AddSingleton<ISessionGuard, SessionGuard>();
+        builder.Services.AddSingleton<IDeviceIdentityProvider, DeviceIdentityProvider>();
         builder.Services.AddSingleton<ISessionStore, SessionStore>();
+        builder.Services.AddSingleton<ISessionHeartbeatService, SessionHeartbeatService>();
+        builder.Services.AddSingleton<ISessionLifecycleService, SessionLifecycleService>();
         builder.Services.AddSingleton<IWindowTitleService, WindowTitleService>();
         builder.Services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
         builder.Services.AddSingleton<INavigationService, Navigation.NavigationService>();
@@ -87,12 +91,14 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPrinterService, Platforms.Windows.WindowsPrinterService>();
         builder.Services.AddSingleton<IIdentityReader, Platforms.Windows.WindowsIdentityReader>();
         builder.Services.AddSingleton<IAppPackageInstaller, Platforms.Windows.WindowsPackageInstaller>();
+        builder.Services.AddSingleton<IAlbumExportService, Platforms.Windows.WindowsAlbumExportService>();
 #elif ANDROID
         builder.Services.AddSingleton<IFolderPickerService, NewCosmos.Services.Platform.AndroidFolderPickerService>();
         builder.Services.AddSingleton<IFilePickerService, NewCosmos.Services.Platform.AndroidFilePickerService>();
         builder.Services.AddSingleton<IPrinterService, NewCosmos.Services.Platform.AndroidPrinterService>();
         builder.Services.AddSingleton<IIdentityReader, NewCosmos.Services.Platform.AndroidIdentityReader>();
         builder.Services.AddSingleton<IAppPackageInstaller, NewCosmos.Services.Platform.AndroidPackageInstaller>();
+        builder.Services.AddSingleton<IAlbumExportService, NewCosmos.Platforms.Android.AndroidAlbumExportService>();
         // 原生 Camera2 预览控件（身份证扫描取景框）
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<NewCosmos.Controls.CameraPreviewView, NewCosmos.Platforms.Android.Camera.CameraPreviewViewHandler>());
@@ -211,6 +217,7 @@ public static class MauiProgram
         #region 领域服务注册 - 用户管理
 
         builder.Services.AddSingleton<IUserService, UserService>();
+        builder.Services.AddSingleton<IUserSessionService, UserSessionService>();
         builder.Services.AddSingleton<IOrganizationService, OrganizationService>();
         
         #endregion
@@ -274,19 +281,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<DestituteImportService>());
 
         builder.Services.AddSingleton<ElderlySubsidyImportService>();
-        builder.Services.AddSingleton<AgriculturalSubsidyImportService>();
-        builder.Services.AddSingleton<PlantingSubsidyImportService>();
+        builder.Services.AddSingleton<AnnualPlantingSubsidyImportService>();
         builder.Services.AddSingleton<LandContractImportService>();
-        builder.Services.AddSingleton<SoybeanSubsidyImportService>();
-        builder.Services.AddSingleton<RotationSubsidyImportService>();
         builder.Services.AddSingleton<BankFlowImportService>();
 
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<ElderlySubsidyImportService>());
-        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<AgriculturalSubsidyImportService>());
-        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<PlantingSubsidyImportService>());
+        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<AnnualPlantingSubsidyImportService>());
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<LandContractImportService>());
-        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<SoybeanSubsidyImportService>());
-        builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<RotationSubsidyImportService>());
         builder.Services.AddSingleton<IImportService>(sp => sp.GetRequiredService<BankFlowImportService>());
 
         builder.Services.AddSingleton<IImportServiceManager, ImportServiceManager>();
@@ -391,6 +392,7 @@ public static class MauiProgram
         builder.Services.AddTransient<MonthlyReportMainViewModel>();
 
         builder.Services.AddTransient<UserManagementViewModel>();
+        builder.Services.AddTransient<OnlineSessionsViewModel>();
         builder.Services.AddTransient<OrganizationTreeViewModel>();
         builder.Services.AddTransient<OrganizationImportViewModel>();
         builder.Services.AddTransient<UserEditorViewModel>();
@@ -495,6 +497,9 @@ public static class MauiProgram
         // 档案照片采集（手机端）
         builder.Services.AddTransient<ViewModels.Mobile.MobileArchivePhotoViewModel>();
         builder.Services.AddTransient<Pages.Mobile.MobileArchivePhotoPage>();
+        // 历史档案照片补传（高龄/低收入/临时救助，手工勾选后连续采集或推送打印）
+        builder.Services.AddTransient<ViewModels.Mobile.MobilePhotoBackfillViewModel>();
+        builder.Services.AddTransient<Pages.Mobile.MobilePhotoBackfillPage>();
         // P7：后补追缴手机端
         builder.Services.AddTransient<Pages.Mobile.MobileRecoverySearchPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileRecoveryFormPage>();
@@ -522,6 +527,7 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.AssetVerification.MonthlyReportPage>();
         builder.Services.AddTransient<Pages.Reporting.MonthlyReportPage>();
         builder.Services.AddTransient<Pages.UserManagement.UserManagementPage>();
+        builder.Services.AddTransient<Pages.UserManagement.OnlineSessionsPage>();
         builder.Services.AddTransient<OrganizationPage>();
         builder.Services.AddTransient<OrganizationImportPage>();
         builder.Services.AddTransient<DatabaseManagementPage>();
@@ -530,10 +536,14 @@ public static class MauiProgram
           builder.Services.AddTransient<Pages.DatabaseManagement.DictionaryManagementPage>();
         builder.Services.AddTransient<Pages.DatabaseManagement.StandardConfigManagementPage>();
         builder.Services.AddTransient<Pages.DatabaseManagement.RegionManagementPage>();
-        builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveOutputPage>();
+        builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveOutputPage>();        // 手机端档案输出（单列三分区）：Android 由 ResolvePage 按 Mobile{桌面页名} 约定解析
+        builder.Services.AddTransient<Pages.Mobile.MobileArchiveOutputPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveProductionPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.TemplateManagementPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveQueryPage>();
+        // 档案照片查询/导出（桌面端）：按身份证/备注检索 → 预览 → 导出到输出根
+        builder.Services.AddTransient<ViewModels.ArchiveManagement.ArchivePhotoQueryViewModel>();
+        builder.Services.AddTransient<Pages.ArchiveManagement.ArchivePhotoQueryPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ProofUnitTemplateManagePage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.MonthlyPublicityPage>();
 

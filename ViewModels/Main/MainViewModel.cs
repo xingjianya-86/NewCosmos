@@ -34,7 +34,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly IDictCacheService _dictCacheService = null!;
     private readonly IGracePeriodService _gracePeriodService = null!;
     private readonly IWindowTitleService _windowTitleService = null!;
-    private readonly INavigationService _navigationService = null!;
+    private readonly ISessionLifecycleService _sessionLifecycle = null!;
     private readonly IElderlyApplicationService _elderlyApplicationService = null!;
     private readonly ICollegeStudentService _collegeStudentService = null!;
     private readonly AppOptions _appOptions = null!;
@@ -340,8 +340,8 @@ public partial class MainViewModel : ViewModelBase
         IWindowTitleService windowTitleService,
         IUpdateService updateService,
         IAppUpdateCoordinator updateCoordinator,
-        INavigationService navigationService,
-        NewCosmos.Services.System.IClientVersionService clientVersionService)
+        NewCosmos.Services.System.IClientVersionService clientVersionService,
+        ISessionLifecycleService sessionLifecycle)
     {
         _logger = logger;
         _systemService = systemService;
@@ -358,8 +358,8 @@ public partial class MainViewModel : ViewModelBase
         _windowTitleService = windowTitleService;
         _updateService = updateService;
         _updateCoordinator = updateCoordinator;
-        _navigationService = navigationService;
         _clientVersionService = clientVersionService;
+        _sessionLifecycle = sessionLifecycle;
 
         _appOptions = _configService.GetAppOptions();
         Title = _appOptions.WindowTitle;
@@ -1035,20 +1035,8 @@ public partial class MainViewModel : ViewModelBase
         var confirm = await _dialogService.DisplayAlertAsync("确认", "确定要退出登录吗", "确定", "取消");
         if (confirm)
         {
-            App.ClearSession();
-            try
-            {
-                await _serviceProvider.GetRequiredService<ISessionStore>().ClearAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"清除会话存储失败: {ex.Message}");
-            }
-            // 回到登录页（镜像 App.CreateWindow 的启动结构）。
-            // 历史上解析 AppShell 会抛 InvalidOperationException（它从未注册进 DI）；AppShell 已删除，现只经 NavigationService 导航。
-            // 登出后导航栈整体替换，root 登录页同样注册标题跟随（SetRootAsync 内部完成）
-            await _navigationService.SetRootAsync(NavigationKeys.Login);
-            _windowTitleService.SetPageTitle(null);
+            // 统一收尾：吊销数据库会话 → 停止心跳/解除闸门 → 清本地缓存 → 回登录页（root 由 NavigationService 注册标题）
+            await _sessionLifecycle.LogoutAsync();
         }
     }
 

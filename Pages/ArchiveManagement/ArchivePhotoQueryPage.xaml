@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ArchiveManagement.ArchivePhotoQueryPage"
+             x:DataType="ArchivePhotoQueryViewModel"
+             Title="档案照片查询"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 头部 -->
+        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
+            <VerticalStackLayout Spacing="12">
+                <HorizontalStackLayout Spacing="6">
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
+                    </HorizontalStackLayout.GestureRecognizers>
+                    <Label Text="‹" FontSize="20" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+                <Label Text="档案照片查询" Style="{StaticResource ModuleHeroTitle}"/>
+                <Label Text="按身份证或备注检索人员证件照，支持预览与批量导出到输出根" Style="{StaticResource ModuleHeroSubtitle}"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- 查询条 -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="16,10">
+            <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片备注关键词"
+                       MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
+                <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
+                        ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
+                        SelectedItem="{Binding SelectedCategoryOption}"/>
+                <Button Grid.Column="2" Text="查询" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                        Command="{Binding ApplySearchCommand}"/>
+                <Button Grid.Column="3" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
+                        Command="{Binding ExportAllCommand}"/>
+                <Button Grid.Column="4" Text="导出选中" Style="{StaticResource ButtonOutline}" HeightRequest="40"
+                        Command="{Binding ExportSelectedCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- 列表 + 预览 -->
+        <Grid Grid.Row="2" Padding="16,8" ColumnDefinitions="6.5*,3.5*" ColumnSpacing="12">
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}">
+                <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                    <Label Text="照片清单" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                    <CollectionView Grid.Row="1" ItemsSource="{Binding Photos}" SelectionMode="Single"
+                                    SelectedItem="{Binding SelectedPhoto, Mode=TwoWay}">
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无照片（可用身份证号检索，或先在手机端补传）"
+                                   Style="{StaticResource EmptyStateLabel}" Padding="0,20"/>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="ent:ArchivePhoto">
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Padding="6,5">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding PhotoCategoryName}" FontSize="14" FontAttributes="Bold"
+                                               TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="{Binding ApplicantIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                        <Label Text="{Binding PhotoName}" FontSize="12" TextColor="{StaticResource TextTertiary}"
+                                               LineBreakMode="TailTruncation"/>
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="1" Text="{Binding FileSize, StringFormat='{0:N0} B'}"
+                                           FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="2" Text="{Binding CreatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
+                                           FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorder}">
+                <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                    <Label Text="预览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                    <Grid Grid.Row="1">
+                        <Label Text="{Binding PreviewInfo}" Style="{StaticResource EmptyStateLabel}"
+                               IsVisible="{Binding PreviewImage, Converter={StaticResource NullToInverseBoolConverter}}"
+                               VerticalOptions="Center" HorizontalTextAlignment="Center"/>
+                        <Image Source="{Binding PreviewImage}" Aspect="AspectFit"
+                               IsVisible="{Binding PreviewImage, Converter={StaticResource NullToBoolConverter}}"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 分页 -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="16,8,16,12">
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
+                <Button Text="上一页" Style="{StaticResource ButtonOutline}" FontSize="13" HeightRequest="36"
+                        Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
+                <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" Style="{StaticResource ButtonOutline}" FontSize="13" HeightRequest="36"
+                        Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
+            </HorizontalStackLayout>
+        </Border>
+
+        <!-- 加载蒙版 -->
+        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+                IsVisible="{Binding IsBusy}" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                       IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+</ContentPage>

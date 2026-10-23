@@ -33,6 +33,7 @@ public partial class MobileArchivePhotoPage : ContentPage, IParameterizedPage<Ar
     Task IParameterizedPage<ArchivePhotoParameter>.SetParameterAsync(ArchivePhotoParameter parameter)
     {
         _viewModel.ApplyParameter(parameter.ApplicantIdCard, parameter.ApplicationId, parameter.ApplicantName);
+        _viewModel.ApplySession(parameter.SessionQueue, parameter.SessionIndex);
         return Task.CompletedTask;
     }
 }
