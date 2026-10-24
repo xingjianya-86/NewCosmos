@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.1.20261023</ApplicationDisplayVersion>
-		<ApplicationVersion>20261023</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261024</ApplicationDisplayVersion>
+		<ApplicationVersion>20261024</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -161,6 +161,13 @@
 	     发布输入集，AOT 编译 NPOI.OOXML 时报 "Could not load ... 'SkiaSharp'"。
 	     显式引用 SkiaSharp，确保其 Android 资产被纳入发布与 AOT 输入。仅 Android。 -->
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<PackageReference Include="SkiaSharp" Version="3.119.2" />
+	</ItemGroup>
+
+	<!-- 档案照片 WebP 编解码（Helpers/ImageCompressor、ImageTranscoder）。
+	     Windows 输出本来已带 libSkiaSharp 原生资产（NPOI/SkiaSharp 传递依赖），
+	     这里补托管 SkiaSharp.dll；Android 已在上一组引用，避免重复。 -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<PackageReference Include="SkiaSharp" Version="3.119.2" />
 	</ItemGroup>
 
