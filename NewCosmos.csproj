@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261024</ApplicationDisplayVersion>
-		<ApplicationVersion>20261024</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261025</ApplicationDisplayVersion>
+		<ApplicationVersion>20261025</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -80,6 +80,15 @@
 
 	<ItemGroup>
 		<MauiIcon Include="Resources\AppIcon\appicon.png" />
+	</ItemGroup>
+
+	<!-- 吉祥物素材：主界面看板娘立绘 + 应用内 Logo 副本（源图 newcosmos_*_v2.png，
+	     去白底/裁边/生成由 Scripts\prepare_mascot_assets.ps1 负责）。
+	     本工具链没有 Resources\Images 默认 glob（mauiimage.inputs 仅含 appicon 已实证），
+	     必须显式声明为 MauiImage 才能被 XAML 的 Source="xxx.png" 解析。 -->
+	<ItemGroup>
+		<MauiImage Include="Resources\Images\newcosmos_character.png" />
+		<MauiImage Include="Resources\Images\mascot_icon.png" />
 	</ItemGroup>
 
 	<!-- 排除备份文件 -->
