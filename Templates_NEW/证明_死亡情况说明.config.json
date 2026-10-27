@@ -1,0 +1,30 @@
+{
+    "fields": [
+        { "fieldKey": "PROVINCE",              "description": "所在省",         "placeholder": "{所在省}" },
+        { "fieldKey": "CITY",                  "description": "所在市",         "placeholder": "{所在市}" },
+        { "fieldKey": "DISTRICT",              "description": "所在县区",       "placeholder": "{所在县区}" },
+        { "fieldKey": "DEATH_TOWN",            "description": "所在乡镇",       "placeholder": "{所在乡镇}" },
+        { "fieldKey": "DEATH_VILLAGE",         "description": "所在村",         "placeholder": "{所在村}" },
+        { "fieldKey": "PUSH_UNIT",             "description": "推送单位（三联各异）", "placeholder": "{推送单位}" },
+        { "fieldKey": "DEATH_NAME",            "description": "死者姓名",       "placeholder": "{死者姓名}" },
+        { "fieldKey": "DEATH_GENDER",          "description": "死者性别",       "placeholder": "{死者性别}" },
+        { "fieldKey": "DEATH_ETHNICITY",       "description": "死者民族",       "placeholder": "{死者民族}" },
+        { "fieldKey": "DEATH_ID_CARD",         "description": "死者身份证号码", "placeholder": "{死者身份证号码}" },
+        { "fieldKey": "DEATH_ADDRESS",         "description": "户籍地及生前住址", "placeholder": "{死者居住地址}" },
+        { "fieldKey": "DEATH_DATETIME_TEXT",   "description": "死亡时间",       "placeholder": "{死亡时间}" },
+        { "fieldKey": "DEATH_PLACE",           "description": "死亡地点",       "placeholder": "{死亡地点}" },
+        { "fieldKey": "DEATH_REPORTER_NAME",   "description": "发现（报告）人", "placeholder": "{死者报告人}" },
+        { "fieldKey": "DEATH_REPORTER_RELATION","description": "报告人与死者关系", "placeholder": "{死者报告人与死者关系}" },
+        { "fieldKey": "DEATH_REPORTER_PHONE",  "description": "报告人联系电话", "placeholder": "{死者报告人联系方式}" },
+        { "fieldKey": "DEATH_SITUATION_DESC",  "description": "现场所见情况",   "placeholder": "{死者情况描述}" },
+        { "fieldKey": "DEATH_REMAINS_ARRANGEMENT", "description": "遗体安置情况", "placeholder": "{死亡人遗体安置情况}" },
+        { "fieldKey": "BUSINESS_AGENT",        "description": "业务办理人",     "placeholder": "{业务办理人}" },
+        { "fieldKey": "BUSINESS_MATTER",       "description": "相关业务事项",   "placeholder": "{相关业务事项}" },
+        { "fieldKey": "DECLARED_BY_NAME",      "description": "申报人姓名（承诺人）", "placeholder": "{死者申报人}" },
+        { "fieldKey": "DECLARED_RELATION",     "description": "申报人与死者关系", "placeholder": "{申报人与死者关系}" },
+        { "fieldKey": "DECLARED_BY_ID_CARD",   "description": "申报人身份证号码", "placeholder": "{申报人身份证号码}" },
+        { "fieldKey": "DECLARED_BY_PHONE",     "description": "申报人联系电话", "placeholder": "{申报人联系电话}" },
+        { "fieldKey": "DEATH_ISSUE_DATE",      "description": "填写日期",       "placeholder": "{填写日期}" }
+    ],
+    "tables": []
+}

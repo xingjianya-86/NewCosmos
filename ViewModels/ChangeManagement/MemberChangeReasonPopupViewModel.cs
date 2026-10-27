@@ -15,7 +15,8 @@ public class MemberChangeReasonOption
 }
 
 /// <summary>增/减员登记结果：确认 => 本记录；取消 => null</summary>
-public sealed record MemberChangeReasonResult(string ReasonCode, string ReasonName, DateTime EventDate, string Remark);
+public sealed record MemberChangeReasonResult(string ReasonCode, string ReasonName, DateTime EventDate, string Remark,
+    TimeSpan? EventTime = null);
 
 /// <summary>
 /// 家庭成员变更登记弹窗 ViewModel（增员/减员共用）：
@@ -86,6 +87,19 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
     [ObservableProperty]
     private DateTime _eventDate = DateTime.Today;
 
+    /// <summary>事由时刻（减员原因为「人员死亡」时显示并必填，落 nc_biz_death_records.death_time）</summary>
+    [ObservableProperty]
+    private TimeSpan _eventTime = new(12, 0, 0);
+
+    /// <summary>是否显示「死亡确切时间」（仅减员原因为人员死亡时）</summary>
+    [ObservableProperty]
+    private bool _isDeathTimeVisible;
+
+    partial void OnSelectedReasonChanged(MemberChangeReasonOption? value)
+    {
+        IsDeathTimeVisible = IsRemoveMode && value != null && MemberChangeReasonConstants.IsDeath(value.Code);
+    }
+
     [ObservableProperty]
     private string _remark = string.Empty;
 
@@ -122,6 +136,9 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
                 Name = o.Display
             }));
         SelectedReason = null;
+        IsDeathTimeVisible = false;
+        EventDate = DateTime.Today;
+        EventTime = new TimeSpan(12, 0, 0);
     }
 
     /// <summary>确认（未选择原因时按钮不可用）</summary>
@@ -134,7 +151,8 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
             SelectedReason.Code,
             SelectedReason.Name,
             EventDate,
-            Remark ?? string.Empty));
+            Remark ?? string.Empty,
+            IsDeathTimeVisible ? EventTime : null));
     }
 
     private bool CanConfirm() => SelectedReason != null;

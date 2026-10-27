@@ -37,19 +37,19 @@ public partial class AssetVerificationHomeViewModel : ModuleHomeViewModelBase
 
     #region 模块统计（失败降级显示 StatNA）
 
-    /// <summary>待上传报告数（status='0'，不限时间）</summary>
+    /// <summary>待上传户数（status='0'，不限时间，按户）</summary>
     [ObservableProperty]
     private string _pendingReportCountText = StatNA;
 
-    /// <summary>本月已完成核对数（status='1' 且 updated_at∈当月）</summary>
+    /// <summary>本月已完成核对数（status='1' 且 application_date∈A线周期）</summary>
     [ObservableProperty]
     private string _monthlyCompletedText = StatNA;
 
-    /// <summary>本月新增申请数</summary>
+    /// <summary>本月新增申请数（application_date∈A线周期）</summary>
     [ObservableProperty]
     private string _monthlyNewText = StatNA;
 
-    /// <summary>全年累计申请数</summary>
+    /// <summary>全年累计申请数（application_date∈A线年度）</summary>
     [ObservableProperty]
     private string _yearTotalText = StatNA;
 

@@ -183,6 +183,15 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
+                    UNION ALL
+                    SELECT p.id, p.name, p.id_card, p.gender,
+                           NULL::date, NULL::bigint, NULL::text, NULL::text, NULL::text,
+                           p.head_id_card, 'import'
+                    FROM nc_biz_other_difficulty_persons p
+                    WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
+                      AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
+                      AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                          TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                 ),
                 all_families AS (
                     SELECT applicant_id_card, applicant_name, phone,
@@ -214,6 +223,11 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                            COALESCE(district, '') || COALESCE(street, '') || COALESCE(community, ''),
                            'rigid_expenditure'
                     FROM nc_biz_rigid_expenditure_families
+                    UNION ALL
+                    SELECT applicant_id_card, applicant_name, phone,
+                           COALESCE(district, '') || COALESCE(street, '') || COALESCE(community, ''),
+                           'other_difficulty'
+                    FROM nc_biz_other_difficulty_families
                 ),
                 all_candidates AS (
                     SELECT * FROM family_members

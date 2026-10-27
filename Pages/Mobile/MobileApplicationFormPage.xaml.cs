@@ -61,6 +61,7 @@ public partial class MobileApplicationFormPage : ContentPage,
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        _viewModel.IsFieldPanelVisible = false;
         _viewModel.OnDisappearing();
         UnsubscribeFromStepChanges();
     }
@@ -93,6 +94,7 @@ public partial class MobileApplicationFormPage : ContentPage,
     {
         if (e.PropertyName == nameof(ApplicationFormViewModel.CurrentStep))
         {
+            _viewModel.IsFieldPanelVisible = false;
             ShowCurrentStepView();
         }
     }

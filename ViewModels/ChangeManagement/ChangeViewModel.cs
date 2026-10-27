@@ -127,7 +127,7 @@ public partial class ChangeViewModel : ViewModelBase
     private ArchiveSearchResultItem? _selectedSearchItem;
 
     /// <summary>
-    /// 搜索档案：当前库（nc_biz_applications）+ 5 个历史导入库 双源合并
+    /// 搜索档案：当前库（nc_biz_applications）+ 6 个历史导入库 双源合并
     /// </summary>
     [RelayCommand]
     private async Task SearchApplicationsAsync()
@@ -160,7 +160,7 @@ public partial class ChangeViewModel : ViewModelBase
                 _logger.Error($"当前库档案搜索失败: {current.Message}");
             }
 
-            // ② 5 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困人员、刚性支出困难家庭）
+            // ② 6 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困人员、刚性支出困难家庭、其他困难人员）
             var imported = await _importedArchiveService.SearchAsync(keyword, CancellationToken);
             if (imported.IsSuccess && imported.Value != null)
             {

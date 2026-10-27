@@ -21,6 +21,9 @@ using XmlnsPrefixAttribute = Microsoft.Maui.Controls.XmlnsPrefixAttribute;
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Models.Categories")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Models.Requests")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Models.Results")]
+// 死亡情况说明模型（DeathSearchItem/DeathIdentityItem/DeathReminderItem/DeathLinkAction/VillageScope…）：
+// 独立命名空间注册，因为 NewCosmos.Models.Entities 因 Application 与 MAUI 同名冲突被排除在全局 xmlns 之外
+[assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Models.DeathStatement")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Pages.SocialAssistance")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Services.Domain.AssetVerification")]
 [assembly: XmlnsDefinition("http://schemas.microsoft.com/dotnet/maui/global", "NewCosmos.Services.Domain.ChangeManagement")]

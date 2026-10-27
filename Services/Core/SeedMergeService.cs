@@ -107,7 +107,9 @@ public class SeedMergeService : BaseService, ISeedMergeService
             if (staleKeys.Count > 0)
             {
                 var deleteSql = $"DELETE FROM {definition.TableName} WHERE \"{definition.BusinessKeyColumn}\" = ANY($1)";
-                var deleteResult = await _db.ExecuteNonQueryAsync(deleteSql, ct, staleKeys.ToArray());
+                // staleKeys 是 string[]：唯一实参会被 params object[] 当成形参数组本身，
+                // $1 退化为首个标量 → ANY($1) 报 42809/22P02，残留键一条也删不掉
+                var deleteResult = await _db.ExecuteNonQueryAsync(deleteSql, ct, new object[] { staleKeys.ToArray() });
                 if (deleteResult.IsFailure)
                     return Result.Failure<MergeResult>(deleteResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         $"种子 DELETE 失败: {deleteResult.Message}");

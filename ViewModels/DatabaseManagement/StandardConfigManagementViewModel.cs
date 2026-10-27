@@ -94,15 +94,6 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
 
     #region SnackBar
 
-    [ObservableProperty]
-    private string _snackBarMessage = string.Empty;
-
-    [ObservableProperty]
-    private SnackBarType _snackBarType;
-
-    [ObservableProperty]
-    private bool _isSnackBarVisible;
-
     /// <summary>当前选中分类是否为「照料护理费」（控制计算方法公示横幅显隐）</summary>
     [ObservableProperty]
     private bool _isCareAllowanceCategory;
@@ -263,37 +254,6 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
             _logger.Info($"加载完成: {ConfigStandards.Count} 条标准");
         }, "确定");
     }
-
-    private int _snackBarVersion;
-
-    private Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Success)
-    {
-        SnackBarMessage = message;
-        SnackBarType = type;
-        IsSnackBarVisible = true;
-
-        // 非阻塞隐藏：不延长调用命令的执行时间；版本号防止旧的隐藏任务关闭新消息
-        var version = ++_snackBarVersion;
-        _ = HideSnackBarAfterDelayAsync(version);
-        return Task.CompletedTask;
-    }
-
-    private async Task HideSnackBarAfterDelayAsync(int version)
-    {
-        try
-        {
-            await Task.Delay(3000);
-            if (version == _snackBarVersion)
-            {
-                IsSnackBarVisible = false;
-            }
-        }
-        catch
-        {
-            // fire-and-forget：忽略异常，避免未观察的任务异常
-        }
-    }
-
     [RelayCommand]
     private async Task SyncSchemaAsync()
     {

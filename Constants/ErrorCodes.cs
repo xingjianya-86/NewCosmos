@@ -328,4 +328,14 @@ public static class ErrorCodes
     public const string REGION_HAS_CHILDREN = "REGION_HAS_CHILDREN";
 
     #endregion
+
+    #region 组织机构（经办机构管理）
+
+    /// <summary>组织名称重复</summary>
+    public const string ORGANIZATION_NAME_DUPLICATE = "ORGANIZATION_NAME_DUPLICATE";
+
+    /// <summary>组织详情加载失败，无法进入编辑</summary>
+    public const string ORGANIZATION_LOAD_FAILED = "ORGANIZATION_LOAD_FAILED";
+
+    #endregion
 }

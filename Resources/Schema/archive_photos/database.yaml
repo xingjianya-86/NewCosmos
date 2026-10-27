@@ -6,7 +6,7 @@ description: 手机端证件/核查照片采集存档（身份证、户口本、
 
 tables:
   - name: nc_biz_archive_photos
-    comment: 档案照片表 - 手机端采集的证件/核查照片，按人+申请+类别归档（bytea 存库）
+    comment: 档案照片表 - 手机端采集的证件/核查照片，按人+申请+类别归档（bytea 存库，新数据 WebP）
     columns:
       - name: id
         type: bigserial
@@ -16,7 +16,12 @@ tables:
       - name: photo_data
         type: bytea
         nullable: false
-        comment: 照片二进制（JPEG，长边压缩后）
+        comment: 照片二进制（新采集为 WebP；旧数据可能为 JPEG/PNG）
+      - name: image_format
+        type: character varying(16)
+        nullable: false
+        default: "'jpeg'"
+        comment: 照片格式（webp/jpeg/png；2026-10-24 起新采集为 webp，旧数据默认 jpeg）
       - name: applicant_id_card
         type: character varying(30)
         nullable: false

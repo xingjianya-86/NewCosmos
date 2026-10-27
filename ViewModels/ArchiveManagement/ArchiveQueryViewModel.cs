@@ -337,7 +337,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     #region 搜索
 
     /// <summary>
-    /// 搜索档案：当前库（nc_biz_applications）+ 5 个历史导入库双源合并
+    /// 搜索档案：当前库（nc_biz_applications）+ 6 个历史导入库双源合并
     /// </summary>
     [RelayCommand]
     private async Task SearchAsync()
@@ -370,7 +370,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
                 _logger.LogError(new Exception(current.Message ?? "未知错误"), "当前库档案搜索失败");
             }
 
-            // ② 5 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困供养、刚性支出困难家庭）
+            // ② 6 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困供养、刚性支出困难家庭、其他困难人员）
             var imported = await _importedArchiveService.SearchAsync(keyword, ct);
             if (imported.IsSuccess && imported.Value != null)
             {
@@ -675,6 +675,10 @@ public partial class ArchiveQueryViewModel : ViewModelBase
                 SummaryFields.Add(new SummaryFieldItem("家庭分类施保",
                     detail.FamilyClassifiedAmount > 0
                         ? $"{detail.FamilyClassifiedAmount:F2} 元" : "-"));
+                break;
+
+            case ArchiveSearchSource.OtherDifficulty:
+                SummaryFields.Add(new SummaryFieldItem("成员收入口径", "成员月收入×12（台账月值）"));
                 break;
 
             case ArchiveSearchSource.LowIncomeEdge:

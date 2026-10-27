@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Models.Results;
 
 namespace NewCosmos.Services.Domain.UserManagement;
@@ -59,6 +59,12 @@ public interface IOrganizationService
     Task<Result<List<OrganizationTreeNode>>> GetTreeAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// 由全量组织列表在内存构建组织树（不查库）。
+    /// 供"一次取全量、树与统计共用"的调用方使用，避免 GetTreeAsync 与统计各自再查一遍全表。
+    /// </summary>
+    List<OrganizationTreeNode> BuildTree(List<Organization> allOrgs);
+
+    /// <summary>
     /// 检查组织名称是否存    /// </summary>
     Task<Result<bool>> CheckNameExistsAsync(string name, int? excludeId = null, CancellationToken ct = default);
 
@@ -68,14 +74,14 @@ public interface IOrganizationService
     Task<Result<int>> GetUserCountAsync(int organizationId, CancellationToken ct = default);
 
     /// <summary>
-    /// 预览CSV文件导入数据
+    /// 预览导入文件（Excel 与 CSV/TSV 均可，见 TabularFileReader）
     /// </summary>
-    OrganizationCsvPreview PreviewCsvImport(string filePath, int previewCount = 5);
+    OrganizationCsvPreview PreviewImport(string filePath, int previewCount = 5);
 
     /// <summary>
-    /// 从CSV文件导入组织数据
+    /// 从 Excel / CSV / TSV 导入组织数据（含市/县/乡镇/村区划列，按名称解析为 ID）
     /// </summary>
-    Task<ImportResult> ImportFromCsvAsync(string filePath, IProgress<string> progress = null, CancellationToken ct = default);
+    Task<ImportResult> ImportFromFileAsync(string filePath, IProgress<string> progress = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -97,6 +103,8 @@ public class OrganizationPreviewRow
     public string Principal { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
+    /// <summary>所在地区（市/县/乡镇/村 拼接，仅用于预览展示）</summary>
+    public string Region { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -117,6 +125,13 @@ public class Organization
     public string InstitutionType { get; set; } = string.Empty;
     public string InstitutionCategory { get; set; } = string.Empty;
     public bool IsSpecialCareInstitution { get; set; }
+
+    /// <summary>所属省ID（2026-10-26 真级联省；nc_sys_organizations.province_id）</summary>
+    public int? ProvinceId { get; set; }
+
+    /// <summary>省级行政区名称（由 nc_regions_provinces JOIN 得来，不落库）</summary>
+    public string ProvinceName { get; set; } = string.Empty;
+
     public int? CityId { get; set; }
     public string CityName { get; set; } = string.Empty;
     public int? CountyId { get; set; }
@@ -163,6 +178,7 @@ public class OrganizationCreateRequest
     public string InstitutionType { get; set; } = string.Empty;
     public string InstitutionCategory { get; set; } = string.Empty;
     public bool IsSpecialCareInstitution { get; set; }
+    public int? ProvinceId { get; set; }
     public int? CityId { get; set; }
     public int? CountyId { get; set; }
     public int? TownId { get; set; }
@@ -188,6 +204,7 @@ public class OrganizationUpdateRequest
     public string InstitutionType { get; set; } = string.Empty;
     public string InstitutionCategory { get; set; } = string.Empty;
     public bool IsSpecialCareInstitution { get; set; }
+    public int? ProvinceId { get; set; }
     public int? CityId { get; set; }
     public int? CountyId { get; set; }
     public int? TownId { get; set; }
@@ -213,6 +230,7 @@ public class OrganizationSaveRequest
     public string InstitutionType { get; set; } = string.Empty;
     public string InstitutionCategory { get; set; } = string.Empty;
     public bool IsSpecialCareInstitution { get; set; }
+    public int? ProvinceId { get; set; }
     public int? CityId { get; set; }
     public int? CountyId { get; set; }
     public int? TownId { get; set; }

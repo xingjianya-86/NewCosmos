@@ -5,14 +5,17 @@ namespace NewCosmos.Models.Entities;
 /// <summary>
 /// 档案照片实体（nc_biz_archive_photos）。
 /// 手机端采集的证件/核查照片，按人（applicant_id_card）+ 申请（application_id）+ 类别（photo_category）归档。
-/// 照片属公民身份敏感信息：存库 bytea（内网 PostgreSQL），仅作留痕存档，打印在批次三实现。
+/// 照片属公民身份敏感信息：存库 bytea（内网 PostgreSQL），新采集统一 WebP（单张 ≤500KB）。
 /// </summary>
 public class ArchivePhoto
 {
     public long Id { get; set; }
 
-    /// <summary>照片二进制（JPEG，长边压缩后）。</summary>
+    /// <summary>照片二进制（新采集为 WebP，长边压缩后；旧数据可能为 JPEG/PNG）。</summary>
     public byte[] PhotoData { get; set; } = Array.Empty<byte>();
+
+    /// <summary>照片格式（webp/jpeg/png）。2026-10-24 起新采集统一为 webp；旧数据默认 jpeg。</summary>
+    public string ImageFormat { get; set; } = PhotoFormatConstants.Jpeg;
 
     /// <summary>照片所属人身份证号（跨申请按人聚合的关键字段）。</summary>
     public string ApplicantIdCard { get; set; } = string.Empty;

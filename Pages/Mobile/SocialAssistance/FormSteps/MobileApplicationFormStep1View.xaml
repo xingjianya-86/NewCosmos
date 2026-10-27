@@ -38,12 +38,8 @@
                     <Picker ItemsSource="{Binding HukouVillageOptions}" SelectedItem="{Binding HukouVillage}"
                             Style="{StaticResource FormFieldPickerStyle}" Title=""/>
                 </VerticalStackLayout>
-                <VerticalStackLayout Spacing="4">
-                    <Label Text="户籍地址" Style="{StaticResource FormFieldLabelStyle}"/>
-                    <Entry Text="{Binding HukouAddress}" MaxLength="200"
-                           Placeholder="自动拼接，可手工修正"
-                           Style="{StaticResource FormFieldEntryStyle}"/>
-                </VerticalStackLayout>
+                <!-- 2026-10-27：户籍地址全文不再提供输入框（与桌面版一致）——
+                     值仍由 UpdateHukouAddress() 自动拼接并落库，仅界面不给手输入口。 -->
             </VerticalStackLayout>
         </Border>
 

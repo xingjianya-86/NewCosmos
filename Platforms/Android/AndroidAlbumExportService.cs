@@ -15,9 +15,10 @@ public sealed class AndroidAlbumExportService : IAlbumExportService
 {
     private const string AlbumFolder = "NewCosmos";
 
-    public Task<Result<string>> SaveToAlbumAsync(string fileName, byte[] jpegBytes, CancellationToken ct = default)
+    public Task<Result<string>> SaveToAlbumAsync(
+        string fileName, byte[] imageBytes, string mimeType, CancellationToken ct = default)
     {
-        if (jpegBytes == null || jpegBytes.Length == 0)
+        if (imageBytes == null || imageBytes.Length == 0)
             return Task.FromResult(Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "照片内容为空"));
 
         try
@@ -31,7 +32,8 @@ public sealed class AndroidAlbumExportService : IAlbumExportService
 
             var values = new ContentValues();
             values.Put(MediaStore.Images.Media.InterfaceConsts.DisplayName, safeName);
-            values.Put(MediaStore.Images.Media.InterfaceConsts.MimeType, "image/jpeg");
+            values.Put(MediaStore.Images.Media.InterfaceConsts.MimeType,
+                string.IsNullOrWhiteSpace(mimeType) ? "image/jpeg" : mimeType);
             if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
             {
                 // 注意：插值字符串里不能直接写 global::（: 会被当成格式说明符）
@@ -48,7 +50,7 @@ public sealed class AndroidAlbumExportService : IAlbumExportService
                 if (stream == null)
                     return Task.FromResult(Result.Failure<string>(ErrorCodes.UNKNOWN_ERROR, "无法写入相册"));
 
-                stream.Write(jpegBytes);
+                stream.Write(imageBytes);
                 stream.Flush();
             }
 

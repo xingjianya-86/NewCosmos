@@ -568,15 +568,27 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
     {
         LogInfo("获取日期范围统计");
 
-        var sql = $@"SELECT
+        // 按户口径：同一 head_id_card 只取一行（优先户主行，缺失时取最新成员行），
+        // 再按户状态计数；月报卡片/导出说明均为“统计按户、名册按人”。
+        var sql = $@"WITH h AS (
+                        SELECT DISTINCT ON (COALESCE(NULLIF(head_id_card, ''), 'APP:' || id))
+                               COALESCE(NULLIF(head_id_card, ''), 'APP:' || id) AS household_key,
+                               status
+                        FROM nc_biz_asset_checks
+                        WHERE application_date >= $1 AND application_date < $2
+                          AND deleted_at IS NULL
+                        ORDER BY COALESCE(NULLIF(head_id_card, ''), 'APP:' || id),
+                                 (applicant_id_card = head_id_card) DESC,
+                                 created_at DESC
+                    )
+                    SELECT
                         COALESCE(COUNT(*) FILTER (WHERE status = $3), 0) as submitted_count,
                         COALESCE(COUNT(*) FILTER (WHERE status = $4), 0) as has_report_count,
                         COALESCE(COUNT(*) FILTER (WHERE status = $5), 0) as archived_count,
                         COALESCE(COUNT(*) FILTER (WHERE status = $6), 0) as rejected_count,
                         COALESCE(COUNT(*), 0) as total_count,
                         0 as total_asset_value
-                    FROM nc_biz_asset_checks
-                    WHERE application_date >= $1 AND application_date < $2;
+                    FROM h;
 ";
 
         try
@@ -638,43 +650,78 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             .AddIf(!string.IsNullOrEmpty(status), "status = {0}", status)
             .AddIf(!string.IsNullOrEmpty(keyword), "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", "%" + keyword + "%");
 
-        // 只查询户主（业务申请工作流 Tab 列表）
-        // 使用 applicant_id_card = head_id_card 判断户主，兼容历史数据
-        if (onlyHead)
-            conditions.Add("applicant_id_card = head_id_card");
-
+        // 只查询户主（业务申请工作流 Tab 列表）：按户返回一行，
+        // 优先户主行；缺户主行时用成员行兜底（历史数据里存在只有配偶行的情况）。
         var whereClause = conditions.ToWhereClause();
-
-        var countSql = "SELECT COUNT(*) FROM nc_biz_asset_checks" + whereClause;
-        var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
-        if (countResult.IsFailure)
-            return Result.Failure<PagedResult<AssetVerificationTask>>(countResult.ErrorCode!, countResult.Message!);
-
         var offset = (pageIndex - 1) * pageSize;
 
-        var querySql = $@"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
+        if (onlyHead)
+        {
+            var cte = $@"WITH filtered AS (
+                            SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
+                                   applicant_id_card,
+                                   batch_id, relationship, head_id_card, is_head, family_address, community, applicant_id_type,
+                                   application_date, status, created_at
+                            FROM nc_biz_asset_checks {whereClause}
+                        ), households AS (
+                            SELECT DISTINCT ON (COALESCE(NULLIF(head_id_card, ''), 'APP:' || id)) *
+                            FROM filtered
+                            ORDER BY COALESCE(NULLIF(head_id_card, ''), 'APP:' || id),
+                                     (applicant_id_card = head_id_card) DESC,
+                                     created_at DESC
+                        )";
+            var countSql = cte + " SELECT COUNT(*) FROM households";
+            var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
+            if (countResult.IsFailure)
+                return Result.Failure<PagedResult<AssetVerificationTask>>(countResult.ErrorCode!, countResult.Message!);
+
+            var querySql = cte + $@" SELECT id, archive_id, archive_name, archive_id_card, batch_id, relationship,
+                                            head_id_card, is_head, family_address, community, applicant_id_type,
+                                            EXTRACT(YEAR FROM application_date)::int AS verification_year,
+                                            EXTRACT(MONTH FROM application_date)::int AS verification_month,
+                                            'Quick' AS verification_type, status,
+                                            NULL::decimal AS total_asset_value, NULL::text AS verification_result,
+                                            created_at, NULL::timestamp AS completed_at
+                                     FROM households
+                                     ORDER BY created_at DESC
+                                     LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
+            var pageParams = new List<object?>(conditions.GetParameters()) { pageSize, offset };
+            var listResult = await _db.QueryAsync<AssetVerificationTask>(querySql, ct, pageParams.ToArray());
+            if (listResult.IsFailure)
+                return Result.Failure<PagedResult<AssetVerificationTask>>(listResult.ErrorCode!, listResult.Message!);
+
+            LogInfo($"日期范围搜索(按户)成功: 共{Convert.ToInt32(countResult.Value)}户");
+            return Result.Success(PagedResult<AssetVerificationTask>.FromList(
+                listResult.Value, pageIndex, pageSize, Convert.ToInt32(countResult.Value)));
+        }
+
+        var countSqlAll = "SELECT COUNT(*) FROM nc_biz_asset_checks" + whereClause;
+        var countResultAll = await _db.ExecuteScalarAsync<long>(countSqlAll, ct, conditions.GetParameters());
+        if (countResultAll.IsFailure)
+            return Result.Failure<PagedResult<AssetVerificationTask>>(countResultAll.ErrorCode!, countResultAll.Message!);
+
+        var querySqlAll = $@"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
                                    batch_id, relationship,
-                                   head_id_card, family_address, community, applicant_id_type,
+                                   head_id_card, is_head, family_address, community, applicant_id_type,
                                    EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                    EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                    'Quick' AS verification_type,
-                                   CASE WHEN status = ${conditions.ParamCount + 1} THEN '已提交' WHEN status = ${conditions.ParamCount + 2} THEN '已核查' WHEN status = ${conditions.ParamCount + 3} THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
+                                   status,
                                    NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                                    created_at, NULL::timestamp AS completed_at
                             FROM nc_biz_asset_checks " + whereClause +
-                   $" ORDER BY created_at DESC LIMIT ${conditions.ParamCount + 4} OFFSET ${conditions.ParamCount + 5}";
-        var pageParams = new List<object?>(conditions.GetParameters())
+                   $" ORDER BY created_at DESC LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
+        var pageParamsAll = new List<object?>(conditions.GetParameters())
         {
-            AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED, AssetCheckStatusConstants.INCLUDED,
             pageSize, offset
         };
 
-        var listResult = await _db.QueryAsync<AssetVerificationTask>(querySql, ct, pageParams.ToArray());
-        if (listResult.IsFailure)
-            return Result.Failure<PagedResult<AssetVerificationTask>>(listResult.ErrorCode!, listResult.Message!);
+        var listResultAll = await _db.QueryAsync<AssetVerificationTask>(querySqlAll, ct, pageParamsAll.ToArray());
+        if (listResultAll.IsFailure)
+            return Result.Failure<PagedResult<AssetVerificationTask>>(listResultAll.ErrorCode!, listResultAll.Message!);
 
-        LogInfo("日期范围搜索成功: 共" + Convert.ToInt32(countResult.Value) + "条");
-        return Result.Success(PagedResult<AssetVerificationTask>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(countResult.Value)));
+        LogInfo("日期范围搜索成功: 共" + Convert.ToInt32(countResultAll.Value) + "条");
+        return Result.Success(PagedResult<AssetVerificationTask>.FromList(listResultAll.Value, pageIndex, pageSize, Convert.ToInt32(countResultAll.Value)));
     }
 
     /// <inheritdoc />
@@ -690,11 +737,11 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             var sql = $@"
                 SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
                        batch_id, relationship,
-                       head_id_card, family_address, community, applicant_id_type,
+                       head_id_card, is_head, family_address, community, applicant_id_type,
                        EXTRACT(YEAR FROM application_date)::int AS verification_year,
                        EXTRACT(MONTH FROM application_date)::int AS verification_month,
                        'Quick' AS verification_type,
-                       CASE WHEN status = $2 THEN '已提交' WHEN status = $3 THEN '已核查' WHEN status = $4 THEN '已纳入低收入人群' ELSE '不予认定' END AS status,
+                       status,
                        NULL::decimal AS total_asset_value, NULL::text AS verification_result,
                        created_at, NULL::timestamp AS completed_at
                 FROM nc_biz_asset_checks
@@ -704,8 +751,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
             var result = await _db.QueryAsync<AssetVerificationTask>(sql, ct, new object[]
             {
-                headIdCards.ToArray(),
-                AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED, AssetCheckStatusConstants.INCLUDED
+                headIdCards.ToArray()
             });
             if (result.IsFailure)
                 return Result.Failure<List<AssetVerificationTask>>(result.ErrorCode!, result.Message!);
@@ -859,6 +905,15 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             FROM nc_biz_rigid_expenditure_persons p
             LEFT JOIN nc_biz_rigid_expenditure_families f ON p.family_id = f.id
             WHERE p.id_card = $1
+            UNION ALL
+            SELECT p.name AS applicant_name, p.relationship,
+                   COALESCE(p.address, '') AS family_address,
+                   COALESCE(f.phone, '') AS contact_phone,
+                   COALESCE(f.community, '') AS village,
+                   '' AS application_reason
+            FROM nc_biz_other_difficulty_persons p
+            LEFT JOIN nc_biz_other_difficulty_families f ON p.family_id = f.id
+            WHERE p.id_card = $1
             LIMIT 1";
         var result3 = await _db.QuerySingleAsync<AssetCheckHistoryResult>(sql3, ct, idCard);
         if (result3.IsSuccess && result3.Value != null)
@@ -922,7 +977,8 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
 
             // 第一步：精确匹配（TRIM 去除前后空格）
             var exactSql = @"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
-                                   batch_id, relationship,
+                                   batch_id, relationship, head_id_card, is_head, family_address, community,
+                                   application_date,
                                    EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                    EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                    'Quick' AS verification_type, status,
@@ -948,7 +1004,8 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             LogInfo("精确匹配无结果，降级模糊匹配");
 
             var fuzzySql = @"SELECT id, 0 AS archive_id, applicant_name AS archive_name, applicant_id_card AS archive_id_card,
-                                   batch_id, relationship,
+                                   batch_id, relationship, head_id_card, is_head, family_address, community,
+                                   application_date,
                                    EXTRACT(YEAR FROM application_date)::int AS verification_year,
                                    EXTRACT(MONTH FROM application_date)::int AS verification_month,
                                    'Quick' AS verification_type, status,

@@ -91,22 +91,23 @@
                         <Label Text="数据预览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
-                        <Grid ColumnDefinitions="Auto,*,*,*,*" RowDefinitions="Auto,Auto" Padding="8"
+                        <Grid ColumnDefinitions="Auto,*,*,*,*,*" RowDefinitions="Auto,Auto" Padding="8"
                               ColumnSpacing="8" RowSpacing="8">
-                            <Label Grid.Row="0" Grid.Column="0" Text="行号" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="0" Text="文件行" Style="{StaticResource TableHeaderLabel}"/>
                             <Label Grid.Row="0" Grid.Column="1" Text="名称" Style="{StaticResource TableHeaderLabel}"/>
                             <Label Grid.Row="0" Grid.Column="2" Text="简称" Style="{StaticResource TableHeaderLabel}"/>
                             <Label Grid.Row="0" Grid.Column="3" Text="负责人" Style="{StaticResource TableHeaderLabel}"/>
                             <Label Grid.Row="0" Grid.Column="4" Text="电话" Style="{StaticResource TableHeaderLabel}"/>
+                            <Label Grid.Row="0" Grid.Column="5" Text="所在地区" Style="{StaticResource TableHeaderLabel}"/>
 
-                            <CollectionView Grid.Row="1" Grid.ColumnSpan="5"
+                            <CollectionView Grid.Row="1" Grid.ColumnSpan="6"
                                             ItemsSource="{Binding PreviewRows}">
                                 <CollectionView.EmptyView>
                                     <Label Text="暂无数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
                                 </CollectionView.EmptyView>
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="domain:OrganizationPreviewRow">
-                                        <Grid ColumnDefinitions="Auto,*,*,*,*" ColumnSpacing="8"
+                                        <Grid ColumnDefinitions="Auto,*,*,*,*,*" ColumnSpacing="8"
                                               Padding="8,6" Style="{StaticResource TableRowInteractive}">
                                             <Label Grid.Column="0" Text="{Binding RowNumber}"
                                                    FontSize="15" TextColor="{StaticResource TextSecondary}"/>
@@ -117,6 +118,8 @@
                                             <Label Grid.Column="3" Text="{Binding Principal}"
                                                    FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="4" Text="{Binding Phone}"
+                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="5" Text="{Binding Region}"
                                                    FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </DataTemplate>
@@ -161,6 +164,18 @@
                                 </VerticalStackLayout>
                             </Border>
                         </Grid>
+
+                        <!-- 失败明细：只有计数无法定位是哪一行（原实现明细只进日志，界面看不到） -->
+                        <VerticalStackLayout IsVisible="{Binding HasImportErrors}" Spacing="6">
+                            <Label Text="失败明细" FontSize="15" FontAttributes="Bold" TextColor="#991B1B"/>
+                            <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding ImportErrors}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Label Text="{Binding .}" FontSize="14" TextColor="#991B1B"/>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
 

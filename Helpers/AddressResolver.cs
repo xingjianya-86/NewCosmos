@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using NewCosmos.Models.Entities;
+using NewCosmos.Services.Core;
 using NewCosmos.Services.System;
 
 namespace NewCosmos.Helpers;
@@ -14,6 +16,7 @@ public class AddressResolver
     private const int FullAddressCacheLimit = 5000;
 
     private readonly IRegionService _regionService;
+    private readonly ILoggerService _logger;
     private readonly ConcurrentDictionary<string, string> _villageNameCache = new();
     private readonly ConcurrentDictionary<string, string> _fullAddressCache = new();
 
@@ -22,13 +25,16 @@ public class AddressResolver
     private readonly ConcurrentDictionary<int, (string TownName, int CountyId)> _townInfoById = new();
     private readonly ConcurrentDictionary<int, string> _countyNameById = new();
 
-    public AddressResolver(IRegionService regionService)
+    public AddressResolver(IRegionService regionService, ILoggerService logger)
     {
         _regionService = regionService;
+        _logger = logger;
     }
 
     /// <summary>
-    /// 预加载一批 village_code 对应的村名，避免逐条查询
+    /// 预加载一批 village_code 对应的村名。
+    /// 走**批量**接口一次取回——原实现逐条 <c>GetVillageByCodeAsync</c>：
+    /// 本地快照缺失时是 N 次打库（N+1），已加载时则是每条都全量扫一遍村表（N × 万级）。
     /// </summary>
     public async Task WarmupAsync(IEnumerable<string> communityCodes, CancellationToken ct = default)
     {
@@ -37,23 +43,40 @@ public class AddressResolver
             .Distinct()
             .ToList();
 
-        foreach (var code in codes)
+        if (codes.Count == 0) return;
+
+        try
         {
-            try
+            var result = await _regionService.GetVillagesByCodesAsync(codes, ct);
+            if (result.IsFailure)
             {
-                var vr = await _regionService.GetVillageByCodeAsync(code, ct);
-                if (vr.IsSuccess && vr.Value != null)
-                {
-                    var name = vr.Value.VillageName
-                        .Replace("村委会", "")
-                        .Replace("居民委员会", "")
-                        .Replace("社区", "");
-                    _villageNameCache[code] = name;
-                }
+                _logger.Warn($"地址预热：批量查村失败（{codes.Count} 个编码，本次跳过）: {result.ErrorCode} {result.Message}");
+                return;
             }
-            catch { }
+
+            foreach (var v in result.Value ?? new List<RegionVillage>())
+            {
+                if (string.IsNullOrEmpty(v.VillageCode)) continue;
+                _villageNameCache[v.VillageCode] = StripVillageSuffix(v.VillageName);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 页面离开/令牌取消属正常路径，静默（原实现 catch {} 也吞，保持不变）
+        }
+        catch (Exception ex)
+        {
+            // 原实现是裸 catch {}：预热失败零痕迹，地址退化时无从定位
+            _logger.Warn($"地址预热：批量查村异常（{codes.Count} 个编码）: {ex.Message}");
         }
     }
+
+    /// <summary>去掉村级名称后缀（与历史口径完全一致，勿改顺序）</summary>
+    private static string StripVillageSuffix(string? villageName) =>
+        (villageName ?? string.Empty)
+            .Replace("村委会", "")
+            .Replace("居民委员会", "")
+            .Replace("社区", "");
 
     /// <summary>
     /// 获取村名（去后缀）
@@ -111,7 +134,10 @@ public class AddressResolver
     }
 
     /// <summary>
-    /// 预加载一批 village_code 对应的"县/镇/村"名称，避免逐条查询。
+    /// 预加载一批 village_code 对应的"县/镇/村"名称。
+    /// 村一级走**批量**接口一次取回——原实现逐条 <c>GetVillageByCodeAsync</c>，
+    /// 是 N 次打库（快照缺失）或 N × 全量扫村表（快照已加载）。
+    /// 镇/县两级按 ID 记忆化，实际查询次数 = 不同乡镇/县区数，与编码条数无关。
     /// </summary>
     public async Task WarmupFullAddressAsync(IEnumerable<string> communityCodes, CancellationToken ct = default)
     {
@@ -120,13 +146,56 @@ public class AddressResolver
             .Distinct()
             .ToList();
 
-        foreach (var code in codes)
+        if (codes.Count == 0) return;
+
+        List<RegionVillage> villages;
+        try
         {
+            var batch = await _regionService.GetVillagesByCodesAsync(codes, ct);
+            if (batch.IsFailure)
+            {
+                _logger.Warn($"地址预热：批量查村失败（{codes.Count} 个编码，本次跳过）: {batch.ErrorCode} {batch.Message}");
+                return;
+            }
+            villages = batch.Value ?? new List<RegionVillage>();
+        }
+        catch (OperationCanceledException)
+        {
+            return;   // 页面离开/令牌取消属正常路径
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"地址预热：批量查村异常（{codes.Count} 个编码）: {ex.Message}");
+            return;
+        }
+
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var v in villages)
+        {
+            if (string.IsNullOrEmpty(v.VillageCode)) continue;
+            found.Add(v.VillageCode!);
             try
             {
-                _communityNameCache[code!] = await ResolveCommunityNamesAsync(code!, ct);
+                var resolved = await ResolveNamesFromVillageAsync(v, ct);
+                // null = 查询失败：**不写缓存**，下次重试；写进去会把偶发故障固化成"地址永远缺三级"
+                if (resolved.HasValue)
+                    _communityNameCache[v.VillageCode!] = resolved.Value;
             }
-            catch { }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"地址预热：解析县/镇/村失败 Code={v.VillageCode}: {ex.Message}");
+            }
+        }
+
+        // 批量里没有的编码 = 查无此村：按原口径记空三元组，避免下次重复预热
+        foreach (var code in codes)
+        {
+            if (!found.Contains(code!.Trim()))
+                _communityNameCache[code] = (string.Empty, string.Empty, string.Empty);
         }
     }
 
@@ -162,43 +231,52 @@ public class AddressResolver
         return prefix + detail;
     }
 
-    private async Task<(string County, string Town, string Village)> ResolveCommunityNamesAsync(string communityCode, CancellationToken ct)
+    /// <summary>
+    /// 由已批量取回的村级实体解析「县 / 镇 / 村」（村名去后缀）。
+    /// 返回 <c>null</c> = **查询失败**（调用方不得缓存，下次重试）；
+    /// 镇/县按 ID 记忆化 —— 同一批里重复的乡镇/县区只查一次。
+    /// 原实现把失败与"未找到"混为一谈，且会把失败结果写进缓存——一次偶发 DB 故障
+    /// 就让该编码的地址在进程存活期内永久缺县/镇（同 _villageCodeCache 的历史缺陷）。
+    /// </summary>
+    private async Task<(string County, string Town, string Village)?> ResolveNamesFromVillageAsync(
+        RegionVillage village, CancellationToken ct)
     {
-        var vr = await _regionService.GetVillageByCodeAsync(communityCode, ct);
-        if (vr.IsFailure || vr.Value == null)
-            return (string.Empty, string.Empty, string.Empty);
+        var villageName = StripVillageSuffix(village.VillageName);
 
-        var village = vr.Value.VillageName
-            .Replace("村委会", "")
-            .Replace("居民委员会", "")
-            .Replace("社区", "");
-
-        var townName = string.Empty;
-        var countyName = string.Empty;
-        var countyId = 0;
-
-        if (!_townInfoById.TryGetValue(vr.Value.TownId, out var townInfo))
+        if (!_townInfoById.TryGetValue(village.TownId, out var townInfo))
         {
-            var townResult = await _regionService.GetTownByIdAsync(vr.Value.TownId, ct);
-            townInfo = townResult.IsSuccess && townResult.Value != null
+            var townResult = await _regionService.GetTownByIdAsync(village.TownId, ct);
+            if (townResult.IsFailure)
+            {
+                _logger.Warn($"地址解析：查乡镇失败（不缓存）TownId={village.TownId}: {townResult.ErrorCode} {townResult.Message}");
+                return null;
+            }
+            townInfo = townResult.Value != null
                 ? (townResult.Value.TownName, townResult.Value.CountyId)
                 : (string.Empty, 0);
-            _townInfoById[vr.Value.TownId] = townInfo;
+            _townInfoById[village.TownId] = townInfo;
         }
-        townName = townInfo.TownName;
-        countyId = townInfo.CountyId;
+
+        var townName = townInfo.TownName;
+        var countyId = townInfo.CountyId;
+        var countyName = string.Empty;
 
         if (countyId > 0)
         {
             if (!_countyNameById.TryGetValue(countyId, out countyName))
             {
                 var countyResult = await _regionService.GetCountyByIdAsync(countyId, ct);
-                countyName = countyResult.IsSuccess && countyResult.Value != null ? countyResult.Value.CountyName : string.Empty;
+                if (countyResult.IsFailure)
+                {
+                    _logger.Warn($"地址解析：查县/区失败（不缓存）CountyId={countyId}: {countyResult.ErrorCode} {countyResult.Message}");
+                    return null;
+                }
+                countyName = countyResult.Value != null ? countyResult.Value.CountyName : string.Empty;
                 _countyNameById[countyId] = countyName;
             }
         }
 
-        return (countyName ?? string.Empty, townName ?? string.Empty, village);
+        return (countyName ?? string.Empty, townName ?? string.Empty, villageName);
     }
 
     /// <summary>

@@ -107,28 +107,41 @@
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="12">
                             <Label Text="🏠 户籍与住址" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Label Text="{Binding AddressScopeDescription}" FontSize="11" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
+                            <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「经办机构管理」补齐区划。" FontSize="11" TextColor="#7F1D1D"
+                                   IsVisible="{Binding IsAddressScopeAvailable, Converter={StaticResource BoolToInverseConverter}}"/>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
-                            <Label Text="户籍地址" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <Label Text="户籍地址（限本单位管辖范围）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding HukouProvinceOptions}" SelectedItem="{Binding SelectedHukouProvince}"
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        IsEnabled="{Binding IsHukouProvinceLocked, Converter={StaticResource BoolToInverseConverter}}"/>
+                            </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="城市 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding HukouCityOptions}" SelectedItem="{Binding SelectedHukouCity}"
-                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        IsEnabled="{Binding IsHukouCityLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="区县 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding HukouCountyOptions}" SelectedItem="{Binding SelectedHukouCounty}"
-                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        IsEnabled="{Binding IsHukouCountyLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="乡镇 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding HukouTownOptions}" SelectedItem="{Binding SelectedHukouTown}"
-                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        IsEnabled="{Binding IsHukouTownLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="村/社区 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding HukouVillageOptions}" SelectedItem="{Binding SelectedHukouVillage}"
-                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        IsEnabled="{Binding IsHukouVillageLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="户籍详细地址（门牌号）" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -137,7 +150,12 @@
                             </VerticalStackLayout>
 
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
-                            <Label Text="家庭住址（独立区划）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <Label Text="家庭住址（独立区划 · 全国可选）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                                <Picker ItemsSource="{Binding FamilyProvinceOptions}" SelectedItem="{Binding SelectedFamilyProvince}"
+                                        Style="{StaticResource FormFieldPickerStyle}"/>
+                            </VerticalStackLayout>
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding FamilyCityOptions}" SelectedItem="{Binding SelectedFamilyCity}"

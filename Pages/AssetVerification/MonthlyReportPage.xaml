@@ -111,7 +111,7 @@
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
                                 <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource SecondaryDark}" VerticalOptions="Center"/>
-                                <Label Text="已完成建档" FontSize="13" TextColor="{StaticResource SecondaryDark}" VerticalOptions="Center"/>
+                                <Label Text="已建档" FontSize="13" TextColor="{StaticResource SecondaryDark}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ArchivedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
                         </VerticalStackLayout>
@@ -122,7 +122,7 @@
                         <VerticalStackLayout Spacing="8">
                             <HorizontalStackLayout Spacing="8">
                                 <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
-                                <Label Text="申请被拒" FontSize="13" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
+                                <Label Text="不予认定" FontSize="13" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <Label Text="{Binding RejectedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
                         </VerticalStackLayout>
@@ -131,18 +131,22 @@
 
                 <!-- 全部汇总 -->
                 <Border Style="{StaticResource CardBorder}" Padding="16,12">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <Border BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="8"
-                                VerticalOptions="Center">
-                            <Label Text="{OnPlatform WinUI='&#xE9D9;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}"
-                                   HorizontalOptions="Center" VerticalOptions="Center"/>
-                        </Border>
-                        <Label Grid.Column="1" Text="{Binding TotalLabel}" FontSize="15" FontAttributes="Bold"
-                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                        <Label Grid.Column="2" Text="{Binding TotalCount, StringFormat='{0} 人'}"
-                               FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Primary}"
-                               VerticalOptions="Center"/>
-                    </Grid>
+                    <VerticalStackLayout Spacing="4">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Border BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="8"
+                                    VerticalOptions="Center">
+                                <Label Text="{OnPlatform WinUI='&#xE9D9;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}"
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <Label Grid.Column="1" Text="{Binding TotalLabel}" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="{Binding TotalCount, StringFormat='{0} 户'}"
+                                   FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Primary}"
+                                   VerticalOptions="Center"/>
+                        </Grid>
+                        <Label Text="统计按户；导出名册按人" FontSize="11" TextColor="{StaticResource TextTertiary}"
+                               HorizontalOptions="End"/>
+                    </VerticalStackLayout>
                 </Border>
 
                 <!-- 月报表输出 -->
@@ -161,6 +165,10 @@
 
                         <Label Text="选择时间周期后，点击下方按钮导出核查人员名册。"
                                FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <HorizontalStackLayout Spacing="4">
+                            <CheckBox IsChecked="{Binding OnlyCurrentStatusPersons}" VerticalOptions="Center"/>
+                            <Label Text="仅导出当前状态人员（不展开整户）" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
 
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
                             <Button Grid.Column="0"
@@ -199,8 +207,12 @@
                                    Margin="0" VerticalOptions="Center"/>
                         </Grid>
 
-                        <Label Text="导出所有月份中指定状态的人员（含同户全部成员），不限于当前选择的月份。"
+                        <Label Text="导出所有月份中指定状态的人员（默认含同户全部成员）；勾选“仅导出当前状态人员”时不展开整户。"
                                FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <HorizontalStackLayout Spacing="4">
+                            <CheckBox IsChecked="{Binding OnlyCurrentStatusPersons}" VerticalOptions="Center"/>
+                            <Label Text="仅导出当前状态人员（不展开整户）" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
 
                         <Button Text="导出全部已提交申请人员"
                                 Style="{StaticResource ButtonPrimary}"

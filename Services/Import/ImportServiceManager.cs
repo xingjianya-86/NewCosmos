@@ -224,11 +224,12 @@ public class ImportServiceManager : BaseService, IImportServiceManager
     }
 
     public Task<List<SelectedFileInfo>> GetExcelFilesAsync(string folderPath)
-    {        // 文件系统遍历为同步阻塞操作，移出调用线程执行；结果返回 Excel 文件清单
+    {        // 文件系统遍历为同步阻塞操作，移出调用线程执行；结果返回 Excel 文件清单。
+        // 一次枚举 + 扩展名过滤：避免 "*.xls" 在 Windows 下同时命中 ".xlsx" 造成重复扫描/重复导入。
         return Task.Run(() =>
         {
-            var files = Directory.GetFiles(folderPath, "*.xlsx", _recursiveOptions)
-                .Concat(Directory.GetFiles(folderPath, "*.xls", _recursiveOptions))
+            var files = Directory.EnumerateFiles(folderPath, "*", _recursiveOptions)
+                .Where(SheetReaderFactory.IsExcelFile)
                 .ToList();
 
             var result = files.Select(file =>

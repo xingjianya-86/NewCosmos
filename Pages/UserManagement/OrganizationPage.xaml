@@ -363,8 +363,9 @@
                         </Border>
                     </Grid>
 
-                    <!-- 未选中时空状态提示 -->
-                    <Grid IsVisible="{Binding SelectedOrganizationDetails, Converter={StaticResource BoolToInverseConverter}}">
+                    <!-- 未选中时空状态提示：源是 Organization 对象，必须用 NullToInverseBoolConverter
+                         （BoolToInverseConverter 只认 bool，收到对象恒返回 true，会与详情面板同时显示） -->
+                    <Grid IsVisible="{Binding SelectedOrganizationDetails, Converter={StaticResource NullToInverseBoolConverter}}">
                         <Border Style="{StaticResource CardBorderElevated}" Padding="40"
                                 HorizontalOptions="Fill">
                             <VerticalStackLayout HorizontalOptions="Center" Spacing="12">
@@ -497,6 +498,10 @@
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="所在地区" FontSize="15" FontAttributes="Bold"
                                        TextColor="{StaticResource TextSecondary}"/>
+                                <!-- 省（2026-10-26 真级联：选省 → 筛市；回显按市反查省） -->
+                                <Picker Title="选择省/直辖市" FontSize="16" BackgroundColor="{StaticResource Gray50}"
+                                        ItemsSource="{Binding OrganizationEditorViewModel.ProvinceOptions}"
+                                        SelectedItem="{Binding OrganizationEditorViewModel.SelectedProvinceName}"/>
                                 <Picker Title="选择地级市" FontSize="16" BackgroundColor="{StaticResource Gray50}"
                                         ItemsSource="{Binding OrganizationEditorViewModel.CityOptions}"
                                         SelectedItem="{Binding OrganizationEditorViewModel.SelectedCityName}"/>
@@ -509,6 +514,11 @@
                                 <Picker Title="选择村/社区" FontSize="16" BackgroundColor="{StaticResource Gray50}"
                                         ItemsSource="{Binding OrganizationEditorViewModel.VillageOptions}"
                                         SelectedItem="{Binding OrganizationEditorViewModel.SelectedVillageName}"/>
+                                <!-- 区划加载失败提示：原实现是静默空列表，既无提示也无日志，
+                                     保存时还会把库中已有区划写成 NULL -->
+                                <Label IsVisible="{Binding OrganizationEditorViewModel.RegionLoadFailed}"
+                                       Text="{Binding OrganizationEditorViewModel.RegionLoadMessage}"
+                                       FontSize="13" TextColor="#B45309" Margin="0,6,0,0"/>
                             </VerticalStackLayout>
                         </VerticalStackLayout>
                     </ScrollView>

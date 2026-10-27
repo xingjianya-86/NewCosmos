@@ -106,6 +106,131 @@ public partial class ElderlyApplicationFormViewModel
     /// <summary>级联抑制标志：默认值设置时抑制 OnChanged 异步级联，避免与手动 await 交错产生竞态</summary>
     private bool _suppressRegionCascade;
 
+    // ── 2026-10-27 五级化 + 管辖范围限制 ──
+    // 户籍组（受限）：账号绑定级别及以上锁定置灰、只留本单位一项；以下级开放。
+    // 家庭住址组（居住地）：全国可选、不受范围限制（默认取本单位）。
+    // 省不落库：省由市隐含（city_code 前2位），仅作级联入口，DB 仍是市/县/镇/村 ID 四列。
+
+    [ObservableProperty]
+    private ObservableCollection<string> _hukouProvinceOptions = new();
+
+    [ObservableProperty]
+    private string _selectedHukouProvince = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _familyProvinceOptions = new();
+
+    [ObservableProperty]
+    private string _selectedFamilyProvince = string.Empty;
+
+    /// <summary>省名 → 省ID（按省筛市；省表缺失时为空 → 市回退全量）</summary>
+    private readonly Dictionary<string, int> _provinceIdMap = new();
+
+    /// <summary>户籍级锁定（账号绑定级别及以上 → Picker 置灰禁点）</summary>
+    public bool IsHukouProvinceLocked => _addressScope?.IsProvinceLocked == true;
+    public bool IsHukouCityLocked => _addressScope?.IsCityLocked == true;
+    public bool IsHukouCountyLocked => _addressScope?.IsCountyLocked == true;
+    public bool IsHukouTownLocked => _addressScope?.IsTownLocked == true;
+    public bool IsHukouVillageLocked => _addressScope?.IsVillageLocked == true;
+
+    /// <summary>地址区是否可用（false=未绑区划 → 整个地址区禁用）</summary>
+    public bool IsAddressScopeAvailable => _addressScope?.IsAvailable != false;
+
+    /// <summary>户籍范围提示文案</summary>
+    public string AddressScopeDescription => _addressScope?.ScopeDescription ?? string.Empty;
+
+    /// <summary>范围解析后刷新锁定态绑定</summary>
+    private void NotifyAddressScopeChanged()
+    {
+        OnPropertyChanged(nameof(IsHukouProvinceLocked));
+        OnPropertyChanged(nameof(IsHukouCityLocked));
+        OnPropertyChanged(nameof(IsHukouCountyLocked));
+        OnPropertyChanged(nameof(IsHukouTownLocked));
+        OnPropertyChanged(nameof(IsHukouVillageLocked));
+        OnPropertyChanged(nameof(IsAddressScopeAvailable));
+        OnPropertyChanged(nameof(AddressScopeDescription));
+    }
+
+    /// <summary>户籍市级：锁定时只留本单位市</summary>
+    private bool AllowHukouCity(string cityName) =>
+        _addressScope is not { IsCityLocked: true }
+        || string.Equals(cityName, _addressScope.CityName, StringComparison.Ordinal);
+
+    private bool AllowHukouCounty(string countyName) =>
+        _addressScope is not { IsCountyLocked: true }
+        || string.Equals(countyName, _addressScope.CountyName, StringComparison.Ordinal);
+
+    private bool AllowHukouTown(string townName) =>
+        _addressScope is not { IsTownLocked: true }
+        || string.Equals(townName, _addressScope.TownName, StringComparison.Ordinal);
+
+    private bool AllowHukouVillage(string villageName) =>
+        _addressScope is not { IsVillageLocked: true }
+        || string.Equals(villageName, _addressScope.VillageName, StringComparison.Ordinal);
+
+    /// <summary>解析管辖范围 + 加载省列表（户籍/家庭住址两组共用一次；编辑与新建入口各调一次）</summary>
+    private async Task EnsureAddressScopeAsync()
+    {
+        if (_addressScope == null)
+        {
+            var scopeResult = await _addressScopeService.ResolveAsync(CancellationToken);
+            _addressScope = scopeResult.IsSuccess ? scopeResult.Value : null;
+            if (_addressScope == null)
+                _logger.Warn($"地址管辖范围解析失败（地址区将被禁用）: {scopeResult.Message}");
+            NotifyAddressScopeChanged();
+        }
+
+        if (HukouProvinceOptions.Count == 0) await LoadHukouProvincesAsync();
+    }
+
+    /// <summary>加载 34 省（户籍+家庭住址两组同一份数据；省表缺失时回退单值占位）</summary>
+    private async Task LoadHukouProvincesAsync()
+    {
+        var result = await _regionService.GetProvincesAsync(CancellationToken);
+
+        HukouProvinceOptions.Clear();
+        FamilyProvinceOptions.Clear();
+        _provinceIdMap.Clear();
+
+        if (result.IsSuccess && result.Value is { Count: > 0 })
+        {
+            foreach (var p in result.Value)
+            {
+                HukouProvinceOptions.Add(p.ProvinceName);
+                FamilyProvinceOptions.Add(p.ProvinceName);
+                _provinceIdMap[p.ProvinceName] = p.Id;
+            }
+
+            var preferred = _addressScope?.ProvinceName;
+            if (string.IsNullOrWhiteSpace(preferred)) preferred = DefaultValuesConstants.HOME_PROVINCE;
+            if (!string.IsNullOrEmpty(preferred) && HukouProvinceOptions.Contains(preferred))
+            {
+                SelectedHukouProvince = preferred;
+                SelectedFamilyProvince = preferred;
+            }
+        }
+        else
+        {
+            if (result.IsFailure) _logger.Warn($"省级选项加载失败（回退单值）: {result.Message}");
+            HukouProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
+            FamilyProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
+        }
+    }
+
+    partial void OnSelectedHukouProvinceChanged(string value)
+    {
+        if (_suppressRegionCascade) return;
+        if (value is null) return;
+        SafeFireAndForget(async () => await LoadHukouCitiesAsync());
+    }
+
+    partial void OnSelectedFamilyProvinceChanged(string value)
+    {
+        if (_suppressRegionCascade) return;
+        if (value is null) return;
+        SafeFireAndForget(async () => await LoadFamilyCitiesAsync());
+    }
+
     [ObservableProperty]
     private ObservableCollection<string> _hukouCityOptions = new();
 
@@ -153,13 +278,29 @@ public partial class ElderlyApplicationFormViewModel
 
     private async Task LoadHukouCitiesAsync()
     {
-        var result = await _regionService.GetCitiesAsync(CancellationToken);
+        // 2026-10-27：按选中省筛市（省已可选全国）+ 户籍按管辖范围过滤
+        var provinceId = 0;
+        if (!string.IsNullOrEmpty(SelectedHukouProvince))
+            _provinceIdMap.TryGetValue(SelectedHukouProvince, out provinceId);
+
+        var result = provinceId > 0
+            ? await _regionService.GetCitiesByProvinceIdAsync(provinceId, CancellationToken)
+            : await _regionService.GetCitiesAsync(CancellationToken);
         if (result.IsFailure || result.Value == null) return;
         HukouCityOptions.Clear();
-        foreach (var c in result.Value) HukouCityOptions.Add(c.CityName);
+        foreach (var c in result.Value)
+        {
+            if (AllowHukouCity(c.CityName)) HukouCityOptions.Add(c.CityName);
+        }
         if (string.IsNullOrEmpty(SelectedHukouCity) && HukouCityOptions.Count > 0)
         {
             SelectedHukouCity = HukouCityOptions[0];
+        }
+        // 户籍锁定时（账号绑到市级及以下）预选本单位市
+        if (_addressScope is { IsCityLocked: true } && !string.IsNullOrEmpty(_addressScope.CityName)
+            && HukouCityOptions.Contains(_addressScope.CityName))
+        {
+            SelectedHukouCity = _addressScope.CityName;
         }
     }
 
@@ -171,8 +312,16 @@ public partial class ElderlyApplicationFormViewModel
         if (string.IsNullOrEmpty(SelectedHukouCity)) return;
         var result = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
         if (result.IsFailure || result.Value == null) return;
-        foreach (var c in result.Value) HukouCountyOptions.Add(c.CountyName);
+        foreach (var c in result.Value)
+        {
+            if (AllowHukouCounty(c.CountyName)) HukouCountyOptions.Add(c.CountyName);   // 管辖范围内
+        }
         if (HukouCountyOptions.Count > 0) SelectedHukouCounty = HukouCountyOptions[0];
+        if (_addressScope is { IsCountyLocked: true } && !string.IsNullOrEmpty(_addressScope.CountyName)
+            && HukouCountyOptions.Contains(_addressScope.CountyName))
+        {
+            SelectedHukouCounty = _addressScope.CountyName;
+        }
     }
 
     private async Task LoadHukouTownsAsync()
@@ -186,8 +335,16 @@ public partial class ElderlyApplicationFormViewModel
         if (county == null) return;
         var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
         if (towns.IsFailure || towns.Value == null) return;
-        foreach (var t in towns.Value) HukouTownOptions.Add(t.TownName);
+        foreach (var t in towns.Value)
+        {
+            if (AllowHukouTown(t.TownName)) HukouTownOptions.Add(t.TownName);   // 管辖范围内
+        }
         if (HukouTownOptions.Count > 0) SelectedHukouTown = HukouTownOptions[0];
+        if (_addressScope is { IsTownLocked: true } && !string.IsNullOrEmpty(_addressScope.TownName)
+            && HukouTownOptions.Contains(_addressScope.TownName))
+        {
+            SelectedHukouTown = _addressScope.TownName;
+        }
     }
 
     private async Task LoadHukouVillagesAsync()
@@ -204,8 +361,17 @@ public partial class ElderlyApplicationFormViewModel
         if (town == null) return;
         var villages = await _regionService.GetVillagesByTownIdAsync(town.Id, CancellationToken);
         if (villages.IsFailure || villages.Value == null) return;
-        foreach (var v in villages.Value) HukouVillageOptions.Add(v.VillageName);
+        foreach (var v in villages.Value)
+        {
+            if (AllowHukouVillage(v.VillageName)) HukouVillageOptions.Add(v.VillageName);   // 管辖范围内
+        }
         if (HukouVillageOptions.Count > 0) SelectedHukouVillage = HukouVillageOptions[0];
+        // 账号绑到村 → 村下拉只剩本村一项（=「其他全部禁用」）
+        if (_addressScope is { IsVillageLocked: true } && !string.IsNullOrEmpty(_addressScope.VillageName)
+            && HukouVillageOptions.Contains(_addressScope.VillageName))
+        {
+            SelectedHukouVillage = _addressScope.VillageName;
+        }
     }
 
     #endregion
@@ -247,7 +413,14 @@ public partial class ElderlyApplicationFormViewModel
 
     private async Task LoadFamilyCitiesAsync()
     {
-        var result = await _regionService.GetCitiesAsync(CancellationToken);
+        // 家庭住址=居住地：**全国可选、不限范围**，只按选中省筛市
+        var provinceId = 0;
+        if (!string.IsNullOrEmpty(SelectedFamilyProvince))
+            _provinceIdMap.TryGetValue(SelectedFamilyProvince, out provinceId);
+
+        var result = provinceId > 0
+            ? await _regionService.GetCitiesByProvinceIdAsync(provinceId, CancellationToken)
+            : await _regionService.GetCitiesAsync(CancellationToken);
         if (result.IsFailure || result.Value == null) return;
         FamilyCityOptions.Clear();
         foreach (var c in result.Value) FamilyCityOptions.Add(c.CityName);

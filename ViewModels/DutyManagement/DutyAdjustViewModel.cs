@@ -130,49 +130,6 @@ public partial class DutyAdjustViewModel : ViewModelBase
     }
 
     #endregion
-
-    #region SnackBar
-
-    [ObservableProperty]
-    private string _snackBarMessage = string.Empty;
-
-    [ObservableProperty]
-    private SnackBarType _snackBarType;
-
-    [ObservableProperty]
-    private bool _isSnackBarVisible;
-
-    private int _snackBarVersion;
-
-    private Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Success)
-    {
-        SnackBarMessage = message;
-        SnackBarType = type;
-        IsSnackBarVisible = true;
-
-        var version = ++_snackBarVersion;
-        _ = HideSnackBarAfterDelayAsync(version);
-        return Task.CompletedTask;
-    }
-
-    private async Task HideSnackBarAfterDelayAsync(int version)
-    {
-        try
-        {
-            await Task.Delay(3000);
-            if (version == _snackBarVersion)
-            {
-                IsSnackBarVisible = false;
-            }
-        }
-        catch
-        {
-            // fire-and-forget：忽略异常
-        }
-    }
-
-    #endregion
-
     #region 请假
 
     [ObservableProperty]

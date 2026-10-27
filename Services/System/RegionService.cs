@@ -23,6 +23,9 @@ public class RegionService : BaseService, IRegionService
     private readonly ISeedMergeService _seedMerge;
 
     private readonly ConcurrentDictionary<string, RegionVillage> _villageCodeCache = new();
+    // "查无此村"负缓存：查询成功但 0 行时记一次，避免同一编码反复打库；
+    // 与正缓存分开存放——查询**失败**两者都不写，否则会被 null 永久污染（见 GetVillageByCodeAsync）。
+    private readonly ConcurrentDictionary<string, bool> _villageCodeMissCache = new();
 
     // 地区数据基本静态，按查询维度缓存，任何写操作（增删改/清空/初始化/同步）整体失效。
     private volatile List<RegionCity>? _citiesCache;
@@ -30,6 +33,14 @@ public class RegionService : BaseService, IRegionService
     private readonly ConcurrentDictionary<string, List<RegionCounty>> _countiesByCityCache = new();
     private readonly ConcurrentDictionary<int, List<RegionTown>> _townsByCountyCache = new();
     private readonly ConcurrentDictionary<int, List<RegionVillage>> _villagesByTownCache = new();
+
+    /// <summary>
+    /// 本地是否持有**全量**村数据（决定「按 id/code/name 全局扫描」能否直接返回内存结果）。
+    /// v2 起村不进快照、只按 town_id 懒加载 → 此标志恒为 false，全局查找必须走 DB
+    /// （否则部分缓存会被误当全量：漏数据，甚至把存在但未缓存的村写成"查无此村"负缓存）。
+    /// 若将来恢复全量村快照，加载成功处置 true 即可让以下分支重新生效。
+    /// </summary>
+    private volatile bool _villagesFullSnapshot;
 
     // ===== 本地优先区划快照（2026-10）=====
     // 区划是静态参照数据：查询入口先加载本地快照（含真实主键，毫秒级、离线可用）填充上述缓存，
@@ -50,6 +61,8 @@ public class RegionService : BaseService, IRegionService
         _townsByCountyCache.Clear();
         _villagesByTownCache.Clear();
         _villageCodeCache.Clear();
+        _villageCodeMissCache.Clear();
+        _villagesFullSnapshot = false;   // 全量村标志随缓存一起作废
         LogDebug("地区缓存已清除");
 
         // 数据已重建/清空：本地快照同步作废，防止下次启动加载陈旧数据
@@ -66,6 +79,37 @@ public class RegionService : BaseService, IRegionService
             LogWarn($"地区本地快照删除失败: {ex.Message}");
         }
     }
+
+    #region 查询收尾（失败如实上抛 · AGENTS §7）
+
+    /// <summary>
+    /// 列表查询收尾：**查询失败如实上抛**，不再折叠成 <c>Success(空列表)</c>。
+    /// 历史实现让调用方无法区分"该级没有数据"与"查询失败"，表现是区划 Picker 无提示地空着、
+    /// 日志零痕迹，且 36 处调用点早已写好的 <c>IsFailure</c> 分支从来没被触发过。
+    /// 查询成功但 0 行仍返回 <c>Success(空)</c> —— 那是"没有数据"，不是错误。
+    /// </summary>
+    private Result<List<T>> CompleteList<T>(Result<List<T>> result, string what)
+    {
+        if (result.IsFailure)
+        {
+            LogWarn($"{what}查询失败（不再折叠为空结果）: {result.ErrorCode} {result.Message}");
+            return result;
+        }
+        return Result.Success(result.Value ?? new List<T>());
+    }
+
+    /// <summary>
+    /// 单条查询收尾：**查询失败如实上抛**，不再折叠成 <c>Success(null)</c>。
+    /// 查询成功但 0 行仍是 <c>Success(null)</c>＝未找到，与失败是两回事。
+    /// </summary>
+    private Result<T> CompleteSingle<T>(Result<T> result, string what)
+    {
+        if (result.IsFailure)
+            LogWarn($"{what}查询失败（不再折叠为「未找到」）: {result.ErrorCode} {result.Message}");
+        return result;
+    }
+
+    #endregion
 
     public RegionService(
         IDatabaseService dbService,
@@ -116,12 +160,17 @@ public class RegionService : BaseService, IRegionService
 
     private sealed class RegionLocalSnapshot
     {
-        public int Version { get; set; } = 1;
+        // v2：村退出快照（全国 62 万村曾把快照撑到 115MB、进程内存 +500MB），
+        // 只存省市区县镇（≈4.6 万行 / 3MB）。村按 town_id 懒加载。
+        // 旧 v1 文件里的 "Villages" 字段因本类已无该属性，反序列化时被直接跳过（不物化对象）。
+        public int Version { get; set; } = 2;
+
+        /// <summary>区划指纹（DB 标量聚合算出，count/max(id)/名称长度和），刷新前先比它决定要不要拉行数据。</summary>
         public string Signature { get; set; } = string.Empty;
+
         public List<RegionCity> Cities { get; set; } = new();
         public List<RegionCounty> Counties { get; set; } = new();
         public List<RegionTown> Towns { get; set; } = new();
-        public List<RegionVillage> Villages { get; set; } = new();
     }
 
     /// <summary>
@@ -144,13 +193,53 @@ public class RegionService : BaseService, IRegionService
         TryStartBackgroundRefresh();
     }
 
-    private void TryLoadLocalSnapshot()
+    /// <summary>
+    /// 判定是否为 v1 旧快照（含全量村、体积 ~115MB）：读文件头一小段看 Version 字段，
+    /// 不整读文件（否则淘汰逻辑本身又把 115MB 读一遍）。
+    /// </summary>
+    private static bool IsLegacySnapshot(string path)
     {
         try
+        {
+            var info = new FileInfo(path);
+            if (info.Length > 8 * 1024 * 1024) return true;   // v2 轻量快照约 3MB，超 8MB 视为旧版
+
+            Span<char> head = stackalloc char[256];
+            using var reader = new StreamReader(path, Encoding.UTF8);
+            var read = reader.Read(head);
+            var text = new string(head[..read]);
+            return text.Contains("\"Version\":1", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;   // 判不了就按新格式读，读失败走原有 catch 分支
+        }
+    }
+
+    private void TryLoadLocalSnapshot()
+    {        try
         {
             if (!File.Exists(_snapshotPath))
             {
                 LogDebug("地区本地快照不存在，走 DB 查询并在后台刷新成功后生成");
+                return;
+            }
+
+            // v1 旧快照（含 62 万村，约 115MB）识别与淘汰：
+            // 反序列化会把整个 115MB 读进内存再跳过 Villages 属性，代价与改造前无异；
+            // 而它的 Signature 是旧算法，与新 DB 指纹必不相等 → 迟早要重写。直接删掉走 DB 更省。
+            if (IsLegacySnapshot(_snapshotPath))
+            {
+                try
+                {
+                    File.Delete(_snapshotPath);
+                    _loadedSnapshotSignature = null;
+                    LogInfo("检测到 v1 旧区划快照（含全量村），已删除并改走 DB（下次生成 v2 轻量快照）");
+                }
+                catch (Exception ex)
+                {
+                    LogWarn($"删除 v1 旧快照失败（继续读取，指纹不一致会重写）: {ex.Message}");
+                }
                 return;
             }
 
@@ -174,14 +263,11 @@ public class RegionService : BaseService, IRegionService
                     _townsByCountyCache[g.Key] = g.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToList();
             }
 
-            if (snap.Villages.Count > 0)
-            {
-                foreach (var g in snap.Villages.GroupBy(v => v.TownId))
-                    _villagesByTownCache[g.Key] = g.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList();
-            }
+            // v2：村不进快照，_villagesByTownCache 保持为空 → 村查询按 town_id 懒加载（见 GetVillagesByTownIdAsync）
+            _villagesFullSnapshot = false;
 
             _loadedSnapshotSignature = snap.Signature;
-            LogInfo($"地区本地快照已加载: 市{snap.Cities.Count} 县{snap.Counties.Count} 镇{snap.Towns.Count} 村{snap.Villages.Count}");
+            LogInfo($"地区本地快照已加载: 市{snap.Cities.Count} 县{snap.Counties.Count} 镇{snap.Towns.Count}（村按需加载）");
         }
         catch (Exception ex)
         {
@@ -226,8 +312,11 @@ public class RegionService : BaseService, IRegionService
     }
 
     /// <summary>
-    /// 后台从 DB 全量刷新四级区划缓存并回写本地快照。
-    /// 每级独立覆盖（成功的表以 DB 为准）；仅四级全部成功才写快照，避免把不完整数据固化。
+    /// 后台从 DB 刷新区划缓存并回写本地快照。
+    /// **P2 指纹预判**：先用一条标量聚合 SQL 算 DB 指纹，与快照内指纹一致 → 跳过全量 SELECT
+    /// （正常启动四表数据没变，省掉几万行传输与反序列化）。
+    /// **P1 不拉村**：村（62 万行）改为按 town_id 懒加载，本方法只拉省市区县镇（≈4.6 万行）。
+    /// 指纹含村的 count/max/名称长度 → 村有增删改名同样会触发刷新并清空村缓存。
     /// </summary>
     private async Task<bool> RefreshCachesFromDbAsync(CancellationToken ct)
     {
@@ -242,6 +331,23 @@ public class RegionService : BaseService, IRegionService
             }
         }
 
+        // ① 标量指纹预判（一行一列，替代四表全量 SELECT）
+        var fingerprint = await ComputeDbFingerprintAsync(ct);
+        if (fingerprint.IsFailure)
+        {
+            LogWarn($"地区后台刷新: 指纹计算失败（保留本地数据）: {fingerprint.Message}");
+            return false;
+        }
+
+        if (string.Equals(fingerprint.Value, _loadedSnapshotSignature, StringComparison.Ordinal)
+            && _citiesCache is not null && _allCountiesCache is not null
+            && !_countiesByCityCache.IsEmpty && !_townsByCountyCache.IsEmpty)
+        {
+            LogDebug("地区数据与快照指纹一致，跳过全量刷新");
+            return true;
+        }
+
+        // ② 指纹不一致 → 只拉省市区县镇（不拉村）
         // 明确列名（AGENTS §8）；排序与既有查询口径一致
         var cities = await _dbService.QueryAsync<RegionCity>(
             "SELECT id, city_name, city_code, sort_order, is_active FROM nc_regions_cities WHERE is_active = TRUE ORDER BY sort_order, id", ct);
@@ -249,13 +355,10 @@ public class RegionService : BaseService, IRegionService
             "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE is_active = TRUE ORDER BY sort_order, id", ct);
         var towns = await _dbService.QueryAsync<RegionTown>(
             "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE is_active = TRUE ORDER BY sort_order, id", ct);
-        var villages = await _dbService.QueryAsync<RegionVillage>(
-            "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE is_active = TRUE ORDER BY sort_order, id", ct);
 
         var citiesOk = cities.IsSuccess && cities.Value is { Count: > 0 };
         var countiesOk = counties.IsSuccess && counties.Value is { Count: > 0 };
         var townsOk = towns.IsSuccess && towns.Value is { Count: > 0 };
-        var villagesOk = villages.IsSuccess && villages.Value is { Count: > 0 };
 
         if (citiesOk)
             _citiesCache = cities.Value;
@@ -275,31 +378,53 @@ public class RegionService : BaseService, IRegionService
                 _townsByCountyCache[g.Key] = g.OrderBy(t => t.SortOrder).ThenBy(t => t.Id).ToList();
         }
 
-        if (villagesOk)
+        if (citiesOk && countiesOk && townsOk)
         {
+            // 指纹变了（含村级变化）→ 已缓存的村与编码解析结果一律作废，之后按需重新取
             _villagesByTownCache.Clear();
-            foreach (var g in villages.Value.GroupBy(v => v.TownId))
-                _villagesByTownCache[g.Key] = g.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList();
             _villageCodeCache.Clear();
-        }
+            _villageCodeMissCache.Clear();
+            _villagesFullSnapshot = false;
 
-        if (citiesOk && countiesOk && townsOk && villagesOk)
-        {
-            SaveLocalSnapshot(cities.Value!, counties.Value!, towns.Value!, villages.Value!);
-            LogInfo($"地区后台刷新完成: 市{cities.Value!.Count} 县{counties.Value!.Count} 镇{towns.Value!.Count} 村{villages.Value!.Count}");
+            SaveLocalSnapshot(cities.Value!, counties.Value!, towns.Value!, fingerprint.Value!);
+            LogInfo($"地区后台刷新完成(不含村): 市{cities.Value!.Count} 县{counties.Value!.Count} 镇{towns.Value!.Count}；村改为按镇懒加载");
             return true;
         }
 
-        LogWarn($"地区后台刷新未完整成功（市:{cities.Message} 县:{counties.Message} 镇:{towns.Message} 村:{villages.Message}），保留本地已有数据");
+        LogWarn($"地区后台刷新未完整成功（市:{cities.Message} 县:{counties.Message} 镇:{towns.Message}），保留本地已有数据");
         return false;
     }
 
-    private void SaveLocalSnapshot(List<RegionCity> cities, List<RegionCounty> counties, List<RegionTown> towns, List<RegionVillage> villages)
+    /// <summary>
+    /// DB 侧区划指纹：每表 `count / max(id) / sum(length(名称))` 拼成一串（仅一行一列）。
+    /// 口径与快照里存的 <see cref="RegionLocalSnapshot.Signature"/> 一致——快照侧直接存本方法的结果，
+    /// 因此两者可直接做相等比较（旧实现由 C# 端从已加载行算签名，村退出快照后算不出来了）。
+    /// </summary>
+    private async Task<Result<string>> ComputeDbFingerprintAsync(CancellationToken ct)
+    {
+        const string sql = @"
+SELECT
+    (SELECT count(*)||'/'||COALESCE(max(id),0)||'/'||COALESCE(sum(length(city_name)),0)    FROM nc_regions_cities)
+ || '|' ||
+    (SELECT count(*)||'/'||COALESCE(max(id),0)||'/'||COALESCE(sum(length(county_name)),0)  FROM nc_regions_counties)
+ || '|' ||
+    (SELECT count(*)||'/'||COALESCE(max(id),0)||'/'||COALESCE(sum(length(town_name)),0)    FROM nc_regions_towns)
+ || '|' ||
+    (SELECT count(*)||'/'||COALESCE(max(id),0)||'/'||COALESCE(sum(length(village_name)),0) FROM nc_regions_villages)";
+
+        var result = await _dbService.QuerySingleAsync<string>(sql, ct);
+        if (result.IsFailure)
+            return Result.Failure<string>(result.ErrorCode!, result.Message!);
+        if (string.IsNullOrWhiteSpace(result.Value))
+            return Result.Failure<string>(ErrorCodes.DB_QUERY_ERROR, "区划指纹为空");
+        return Result.Success(result.Value!);
+    }
+
+    private void SaveLocalSnapshot(List<RegionCity> cities, List<RegionCounty> counties, List<RegionTown> towns, string fingerprint)
     {
         try
         {
-            var signature = ComputeSnapshotSignature(cities, counties, towns, villages);
-            if (string.Equals(signature, _loadedSnapshotSignature, StringComparison.Ordinal))
+            if (string.Equals(fingerprint, _loadedSnapshotSignature, StringComparison.Ordinal))
             {
                 LogDebug("地区数据与本地快照一致，跳过写入");
                 return;
@@ -307,11 +432,10 @@ public class RegionService : BaseService, IRegionService
 
             var snapshot = new RegionLocalSnapshot
             {
-                Signature = signature,
+                Signature = fingerprint,
                 Cities = cities,
                 Counties = counties,
                 Towns = towns,
-                Villages = villages,
             };
 
             var dir = Path.GetDirectoryName(_snapshotPath);
@@ -320,7 +444,7 @@ public class RegionService : BaseService, IRegionService
             var tmpPath = _snapshotPath + ".tmp";
             File.WriteAllText(tmpPath, JsonSerializer.Serialize(snapshot));
             File.Move(tmpPath, _snapshotPath, true);
-            _loadedSnapshotSignature = signature;
+            _loadedSnapshotSignature = fingerprint;
             LogInfo("地区本地快照已写入");
         }
         catch (Exception ex)
@@ -329,34 +453,130 @@ public class RegionService : BaseService, IRegionService
         }
     }
 
-    /// <summary>
-    /// 快照一致性签名：行数 + 主键和 + 名称长度和（跨进程稳定；string.GetHashCode 跨进程随机，不可用）。
-    /// </summary>
-    private static string ComputeSnapshotSignature(List<RegionCity> cities, List<RegionCounty> counties, List<RegionTown> towns, List<RegionVillage> villages)
-    {
-        return string.Join(':',
-            cities.Count,
-            counties.Count,
-            towns.Count,
-            villages.Count,
-            towns.Sum(t => (long)t.Id),
-            villages.Sum(v => (long)v.Id),
-            counties.Sum(c => (long)c.CountyName.Length),
-            villages.Sum(v => (long)v.VillageName.Length));
-    }
-
     #endregion
 
     #region Schema管理
 
     private static bool _tablesVerified;
 
+    /// <summary>
+    /// 建地区取号序列（全部写死字面量，不拼接任何标识符——AGENTS §1，动态表名须过 TableNameValidator）。
+    /// </summary>
+    private static readonly string[] EnsureSequenceSql =
+    {
+        "CREATE SEQUENCE IF NOT EXISTS seq_nc_regions_cities",
+        "CREATE SEQUENCE IF NOT EXISTS seq_nc_regions_counties",
+        "CREATE SEQUENCE IF NOT EXISTS seq_nc_regions_towns",
+        "CREATE SEQUENCE IF NOT EXISTS seq_nc_regions_villages",
+    };
+
+    /// <summary>
+    /// 地区表缺失索引（同样写死字面量、幂等）。
+    /// 为什么不只写进 YAML：YAML 里的索引只在「数据库管理 → 初始化数据库结构」
+    /// （SchemaService.InitializeAllTablesAsync）里补建，而那个方法**没有任何自动调用方**——
+    /// 靠它漏建的话，约 1 万行的村表按编码查会一直退化成顺序扫描。
+    /// 与 regions/database.yaml 中的同名索引重复声明无害：两处都是 IF NOT EXISTS。
+    /// </summary>
+    private static readonly string[] EnsureIndexSql =
+    {
+        // 地址解析热路径：AddressResolver.GetVillageByCodeAsync / GetVillagesByCodesAsync
+        "CREATE INDEX IF NOT EXISTS idx_villages_village_code ON nc_regions_villages (village_code)",
+    };
+
+    /// <summary>
+    /// 序列对齐：setval(GREATEST(表内最大 ID, 序列已发到的值, 基线), true) → 下一个取号 = 该值 + 1。
+    /// GREATEST 保证**只前进不回退**，不会把已发号的位置让回去导致主键冲突；
+    /// 基线与历史 MAX(id)+1 的兜底值一致（县 9000 / 镇 90000 / 村 900000）。
+    /// </summary>
+    private static readonly string[] SyncSequenceSql =
+    {
+        @"SELECT setval('seq_nc_regions_cities', GREATEST(
+              COALESCE((SELECT MAX(id) FROM nc_regions_cities), 0),
+              COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'seq_nc_regions_cities'), 0),
+              0))",
+        @"SELECT setval('seq_nc_regions_counties', GREATEST(
+              COALESCE((SELECT MAX(id) FROM nc_regions_counties), 0),
+              COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'seq_nc_regions_counties'), 0),
+              9000))",
+        @"SELECT setval('seq_nc_regions_towns', GREATEST(
+              COALESCE((SELECT MAX(id) FROM nc_regions_towns), 0),
+              COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'seq_nc_regions_towns'), 0),
+              90000))",
+        @"SELECT setval('seq_nc_regions_villages', GREATEST(
+              COALESCE((SELECT MAX(id) FROM nc_regions_villages), 0),
+              COALESCE((SELECT last_value FROM pg_sequences WHERE schemaname = 'public' AND sequencename = 'seq_nc_regions_villages'), 0),
+              900000))",
+    };
+
+    private static bool _regionObjectsVerified;
+
+    /// <summary>
+    /// 建索引 + 建序列 + 对齐（每个进程只跑一次）。
+    /// **故意不设列 DEFAULT**：所有 INSERT 仍显式传 id，序列只承担"下一个 ID"的分配，
+    /// 种子/批量导入的既定 ID 区间因此完全不受影响，也不必改任何 INSERT。
+    /// **失败不影响读取**：索引/序列都只是"查得快不快"和"新建地区能不能取号"的事，
+    /// 建不起来只让对应功能失败并给出明确错误，不能把整个地区子系统（Picker/回显）一起拖死。
+    /// </summary>
+    private async Task<Result> EnsureRegionObjectsAsync(CancellationToken ct)
+    {
+        if (_regionObjectsVerified) return Result.Success();
+        _regionObjectsVerified = true;   // 无论成败只尝试一次，避免每次查询都重复打 DDL
+
+        foreach (var sql in EnsureIndexSql)
+        {
+            var r = await _dbService.ExecuteNonQueryAsync(sql, ct);
+            if (r.IsFailure)
+            {
+                LogError($"建地区索引失败（读取不受影响，仅按编码查村会走顺序扫描）: {r.ErrorCode} {r.Message}");
+                return Result.Success();
+            }
+        }
+
+        foreach (var sql in EnsureSequenceSql)
+        {
+            var r = await _dbService.ExecuteNonQueryAsync(sql, ct);
+            if (r.IsFailure)
+            {
+                LogError($"建地区主键序列失败（读取不受影响，仅新建地区会失败）: {r.ErrorCode} {r.Message}");
+                return Result.Success();
+            }
+        }
+
+        var sync = await SyncRegionSequencesAsync(ct);
+        if (sync.IsFailure)
+        {
+            LogError($"对齐地区主键序列失败（读取不受影响，仅新建地区会失败）: {sync.Message}");
+            return Result.Success();
+        }
+
+        LogInfo("地区索引与主键序列已就绪");
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// 把四条序列对齐到各自表的 max(id)。**必须**在两类操作之后调用：
+    /// ① 用显式 ID 的种子/批量写入 ② TRUNCATE。
+    /// </summary>
+    private async Task<Result> SyncRegionSequencesAsync(CancellationToken ct)
+    {
+        foreach (var sql in SyncSequenceSql)
+        {
+            var r = await _dbService.ExecuteScalarAsync(sql, ct);
+            if (r.IsFailure)
+            {
+                LogWarn($"同步地区主键序列失败: {r.ErrorCode} {r.Message}");
+                return Result.Failure(r.ErrorCode!, r.Message!);
+            }
+        }
+        return Result.Success();
+    }
+
     public async Task<Result> EnsureTablesExistAsync(CancellationToken ct = default)
     {
         if (_tablesVerified)
         {
             LogInfo("地区表已验证（缓存）");
-            return Result.Success();
+            return await EnsureRegionObjectsAsync(ct);
         }
 
         LogInfo("开始检查地区表是否存在");
@@ -371,15 +591,23 @@ public class RegionService : BaseService, IRegionService
         {
             LogInfo("地区表已存在");
             _tablesVerified = true;
-            return Result.Success();
+            return await EnsureRegionObjectsAsync(ct);
         }
 
         LogInfo("地区表不完整，开始创建");
-        return await SyncSchemaAsync(null, ct);
+        var syncResult = await SyncSchemaAsync(null, ct);
+        if (syncResult.IsFailure)
+            return syncResult;
+        // 整表重建（allowDrop）会把数据清空，序列必须重新对齐
+        _regionObjectsVerified = false;
+        return await EnsureRegionObjectsAsync(ct);
     }
 
     public async Task<Result> SyncSchemaAsync(IProgress<ProgressContext> progress = null, CancellationToken ct = default)
     {
+        // 表可能被整表重建（allowDrop: true），序列对齐状态失效，下面会重新对齐
+        _regionObjectsVerified = false;
+
         LogInfo("开始同步地区表Schema");
 
         // 表结构以 Resources/Schema/regions/database.yaml 为唯一权威来源
@@ -492,6 +720,14 @@ public class RegionService : BaseService, IRegionService
             ReportProgress(progress, 10, totalSteps, "提交事务");
             await tx.CommitAsync(ct);
             InvalidateRegionCaches();
+
+            // 种子与批量导入用的是显式 ID，序列必须重新对齐到 max(id)，否则后续新建会撞主键
+            var seqResult = await SyncRegionSequencesAsync(ct);
+            if (seqResult.IsFailure)
+            {
+                _regionObjectsVerified = false;   // 下次进地区页重试
+                LogWarn($"种子初始化后同步主键序列失败: {seqResult.Message}");
+            }
             LogInfo($"地区数据初始化完成: 县区{counties.Count}个, 乡镇{towns.Count}个, 村/社区{villagesCount}个");
             return Result.Success();
         }
@@ -519,6 +755,15 @@ public class RegionService : BaseService, IRegionService
             await tx.CommitAsync(ct);
 
             InvalidateRegionCaches();
+
+            // TRUNCATE 后 max(id) 归零，序列必须重新对齐，否则将来重新种入的 ID 会与取号撞车
+            var seqResult = await SyncRegionSequencesAsync(ct);
+            if (seqResult.IsFailure)
+            {
+                _regionObjectsVerified = false;
+                LogWarn($"清空地区表后同步主键序列失败: {seqResult.Message}");
+            }
+
             LogInfo("地区表已清空");
             return Result.Success();
         }
@@ -548,7 +793,7 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo("获取所有地级市");
 
-        var sql = "SELECT * FROM nc_regions_cities WHERE is_active = TRUE ORDER BY sort_order, id";
+        var sql = "SELECT id, city_name, city_code, province_id, sort_order, is_active FROM nc_regions_cities WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCity>(sql, ct);
 
         if (result.IsSuccess && result.Value is not null)
@@ -557,7 +802,7 @@ public class RegionService : BaseService, IRegionService
             return Result.Success(new List<RegionCity>(result.Value));
         }
 
-        return Result.Success(new List<RegionCity>());
+        return CompleteList(result, "地级市列表");
     }
 
     public async Task<Result<RegionCity>> GetCityByIdAsync(int id, CancellationToken ct = default)
@@ -574,12 +819,10 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"获取地级市: Id={id}");
 
-        var sql = "SELECT * FROM nc_regions_cities WHERE id = $1";
+        var sql = "SELECT id, city_name, city_code, province_id, sort_order, is_active FROM nc_regions_cities WHERE id = $1";
         var result = await _dbService.QuerySingleAsync<RegionCity>(sql, ct, id);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionCity>(null);
+        return CompleteSingle(result, "地级市");
     }
 
     public async Task<Result<RegionCity>> GetCityByNameAsync(string cityName, CancellationToken ct = default)
@@ -597,12 +840,52 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_cities WHERE city_name = $1";
+        var sql = "SELECT id, city_name, city_code, province_id, sort_order, is_active FROM nc_regions_cities WHERE city_name = $1";
         var result = await _dbService.QuerySingleAsync<RegionCity>(sql, ct, cityName);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionCity>(null);
+        return CompleteSingle(result, "地级市");
+    }
+
+    /// <summary>
+    /// 省级行政区列表（2026-10-26 真级联省）。
+    /// 与市/县不同：省表由 docs/migrations/20261026_regions_provinces.sql 建表并回填，不进
+    /// SyncSchemaAsync 的 allowDrop 表数组（那个流程会整表重建清数据）。
+    /// </summary>
+    public async Task<Result<List<RegionProvince>>> GetProvincesAsync(CancellationToken ct = default)
+    {
+        await EnsureTablesExistAsync(ct);
+
+        LogInfo("获取省级行政区列表");
+
+        var sql = "SELECT id, province_name, province_code, sort_order, is_active FROM nc_regions_provinces WHERE is_active = TRUE ORDER BY sort_order, id";
+        var result = await _dbService.QueryAsync<RegionProvince>(sql, ct);
+
+        if (result.IsSuccess && result.Value is not null)
+            return Result.Success(new List<RegionProvince>(result.Value));
+
+        // 省表缺失（迁移未跑）时显式失败，不洗成"无省数据"
+        return CompleteList(result, "省级行政区列表");
+    }
+
+    /// <summary>按省筛地级市（选省 → 筛市 级联）。省ID异常 → 空列表，不当错误。</summary>
+    public async Task<Result<List<RegionCity>>> GetCitiesByProvinceIdAsync(int provinceId, CancellationToken ct = default)
+    {
+        if (provinceId <= 0)
+            return Result.Success(new List<RegionCity>());
+
+        await EnsureTablesExistAsync(ct);
+
+        LogInfo($"按省获取地级市: ProvinceId={provinceId}");
+
+        var sql = "SELECT id, city_name, city_code, province_id, sort_order, is_active FROM nc_regions_cities WHERE is_active = TRUE AND province_id = $1 ORDER BY sort_order, id";
+        // $1 必须绑 provinceId：漏参会让 Npgsql 抛 08P01（bind supplies 0 parameters），
+        // 表现是"选省后城市全空"（AGENTS §8：位置参数 $1..$n 与 SQL 一一对应）
+        var result = await _dbService.QueryAsync<RegionCity>(sql, ct, provinceId);
+
+        if (result.IsSuccess && result.Value is not null)
+            return Result.Success(new List<RegionCity>(result.Value));
+
+        return CompleteList(result, "省内地级市列表");
     }
 
     #endregion
@@ -624,7 +907,7 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo("获取所有县区");
 
-        var sql = "SELECT * FROM nc_regions_counties WHERE is_active = TRUE ORDER BY sort_order, id";
+        var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCounty>(sql, ct);
 
         if (result.IsSuccess && result.Value is not null)
@@ -633,7 +916,7 @@ public class RegionService : BaseService, IRegionService
             return Result.Success(new List<RegionCounty>(result.Value));
         }
 
-        return Result.Success(new List<RegionCounty>());
+        return CompleteList(result, "县区列表");
     }
 
     public async Task<Result<List<RegionCounty>>> GetCountiesByCityAsync(string cityName, CancellationToken ct = default)
@@ -653,7 +936,7 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"获取县区: CityName={cityName}");
 
-        var sql = "SELECT * FROM nc_regions_counties WHERE city_name = $1 AND is_active = TRUE ORDER BY sort_order, id";
+        var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE city_name = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCounty>(sql, ct, cityName);
 
         if (result.IsSuccess && result.Value is not null)
@@ -662,7 +945,7 @@ public class RegionService : BaseService, IRegionService
             return Result.Success(new List<RegionCounty>(result.Value));
         }
 
-        return Result.Success(new List<RegionCounty>());
+        return CompleteList(result, "县/区列表");
     }
 
     public async Task<Result<List<RegionCounty>>> GetCountiesByCityIdAsync(int cityId, CancellationToken ct = default)
@@ -670,7 +953,9 @@ public class RegionService : BaseService, IRegionService
         EnsureLocalCacheLoaded();
 
         var cityResult = await GetCityByIdAsync(cityId, ct);
-        if (cityResult.IsFailure || cityResult.Value == null)
+        if (cityResult.IsFailure)
+            return Result.Failure<List<RegionCounty>>(cityResult.ErrorCode!, cityResult.Message!);
+        if (cityResult.Value == null)
             return Result.Failure<List<RegionCounty>>(ErrorCodes.REGION_CITY_NOT_FOUND, $"地级市未找到: Id={cityId}");
 
         return await GetCountiesByCityAsync(cityResult.Value.CityName, ct);
@@ -688,12 +973,10 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_counties WHERE id = $1";
+        var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE id = $1";
         var result = await _dbService.QuerySingleAsync<RegionCounty>(sql, ct, id);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionCounty>(null);
+        return CompleteSingle(result, "县/区");
     }
 
     public async Task<Result<RegionCounty>> GetCountyByCodeAsync(string code, CancellationToken ct = default)
@@ -711,12 +994,10 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_counties WHERE county_code = $1 AND is_active = true";
+        var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE county_code = $1 AND is_active = true";
         var result = await _dbService.QuerySingleAsync<RegionCounty>(sql, ct, code);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionCounty>(null);
+        return CompleteSingle(result, "县/区");
     }
 
     #endregion
@@ -737,7 +1018,7 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"获取乡镇: CountyId={countyId}");
 
-        var sql = "SELECT * FROM nc_regions_towns WHERE county_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
+        var sql = "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE county_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionTown>(sql, ct, countyId);
 
         if (result.IsSuccess && result.Value is not null)
@@ -746,7 +1027,7 @@ public class RegionService : BaseService, IRegionService
             return Result.Success(new List<RegionTown>(result.Value));
         }
 
-        return Result.Success(new List<RegionTown>());
+        return CompleteList(result, "乡镇/街道列表");
     }
 
     public async Task<Result<RegionTown>> GetTownByIdAsync(int id, CancellationToken ct = default)
@@ -760,12 +1041,10 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_towns WHERE id = $1";
+        var sql = "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE id = $1";
         var result = await _dbService.QuerySingleAsync<RegionTown>(sql, ct, id);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionTown>(null);
+        return CompleteSingle(result, "乡镇/街道");
     }
 
     public async Task<Result<List<RegionTown>>> SearchTownsAsync(string keyword, CancellationToken ct = default)
@@ -790,12 +1069,10 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"搜索乡镇: Keyword={keyword}");
 
-        var sql = "SELECT * FROM nc_regions_towns WHERE town_name LIKE $1 AND is_active = TRUE ORDER BY sort_order, id LIMIT 50";
+        var sql = "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE town_name LIKE $1 AND is_active = TRUE ORDER BY sort_order, id LIMIT 50";
         var result = await _dbService.QueryAsync<RegionTown>(sql, ct, $"%{keyword}%");
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<RegionTown>());
+        return CompleteList(result, "乡镇/街道搜索");
     }
 
     #endregion
@@ -816,7 +1093,7 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"获取村/社区: TownId={townId}");
 
-        var sql = "SELECT * FROM nc_regions_villages WHERE town_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
+        var sql = "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE town_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionVillage>(sql, ct, townId);
 
         if (result.IsSuccess && result.Value is not null)
@@ -825,13 +1102,14 @@ public class RegionService : BaseService, IRegionService
             return Result.Success(new List<RegionVillage>(result.Value));
         }
 
-        return Result.Success(new List<RegionVillage>());
+        return CompleteList(result, "村/社区列表");
     }
 
     public async Task<Result<RegionVillage>> GetVillageByIdAsync(int id, CancellationToken ct = default)
     {
         EnsureLocalCacheLoaded();
-        if (!_villagesByTownCache.IsEmpty)
+        // 仅当本地是全量村快照才可直接内存命中；懒加载的部分缓存不能当全量用（会漏数据）
+        if (_villagesFullSnapshot && !_villagesByTownCache.IsEmpty)
         {
             var hit = _villagesByTownCache.Values.SelectMany(v => v).FirstOrDefault(v => v.Id == id);
             if (hit != null) return Result.Success(hit);
@@ -839,12 +1117,10 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_villages WHERE id = $1";
+        var sql = "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE id = $1";
         var result = await _dbService.QuerySingleAsync<RegionVillage>(sql, ct, id);
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionVillage>(null);
+        return CompleteSingle(result, "村/社区");
     }
 
     public async Task<Result<RegionVillage>> GetVillageByCodeAsync(string villageCode, CancellationToken ct = default)
@@ -857,7 +1133,10 @@ public class RegionService : BaseService, IRegionService
         if (_villageCodeCache.TryGetValue(villageCode, out var cached))
             return Result.Success(cached);
 
-        if (!_villagesByTownCache.IsEmpty)
+        if (_villageCodeMissCache.ContainsKey(villageCode))
+            return Result.Success<RegionVillage>(null);
+
+        if (_villagesFullSnapshot && !_villagesByTownCache.IsEmpty)
         {
             var local = _villagesByTownCache.Values
                 .SelectMany(v => v)
@@ -871,14 +1150,115 @@ public class RegionService : BaseService, IRegionService
 
         await EnsureTablesExistAsync(ct);
 
-        var sql = "SELECT * FROM nc_regions_villages WHERE village_code = $1 AND is_active = true";
+        var sql = "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE village_code = $1 AND is_active = true";
         var result = await _dbService.QuerySingleAsync<RegionVillage>(sql, ct, villageCode);
 
-        _villageCodeCache[villageCode] = result.Value;
+        // 只有"查询成功"才写缓存：查询失败/会话被拒时 result.Value 为 null，
+        // 一旦把 null 写进正缓存，TryGetValue 会永远返回 Success(null)，进程内该编码的
+        // 村名解析（AddressResolver → 模板/打印地址）永久退化且不再重查。
+        if (result.IsSuccess)
+        {
+            if (result.Value != null)
+                _villageCodeCache[villageCode] = result.Value;
+            else
+                _villageCodeMissCache[villageCode] = true;   // 查无此村：负缓存
+        }
+        else
+        {
+            LogWarn($"按编码查村/社区失败（不写缓存，下次重查）: Code={villageCode}, {result.ErrorCode} {result.Message}");
+        }
 
-        return result.IsSuccess
-            ? Result.Success(result.Value)
-            : Result.Success<RegionVillage>(null);
+        // 查到→实体；查无此村→Success(null)＝未找到；查询失败→如实上抛（失败时上面已记日志）
+        if (result.IsFailure)
+            return Result.Failure<RegionVillage>(result.ErrorCode!, result.Message!);
+        return Result.Success<RegionVillage>(result.Value!);
+    }
+
+    /// <summary>
+    /// 按编码**批量**查村/社区：一次取回，替代逐条 <see cref="GetVillageByCodeAsync"/>。
+    /// 供 AddressResolver 预热使用——原实现每条编码要么各打一次库（快照缺失时的 N+1），
+    /// 要么全量扫一遍村表（本地快照下 N × 万级）。
+    /// 命中本地缓存的直接回填；只对缺口查询，查不到的写负缓存避免重复打库。
+    /// </summary>
+    public async Task<Result<List<RegionVillage>>> GetVillagesByCodesAsync(
+        IEnumerable<string> villageCodes, CancellationToken ct = default)
+    {
+        var codes = (villageCodes ?? Enumerable.Empty<string>())
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (codes.Length == 0)
+            return Result.Success(new List<RegionVillage>());
+
+        EnsureLocalCacheLoaded();
+
+        var found = new List<RegionVillage>(codes.Length);
+        var missing = new List<string>(codes.Length);
+        foreach (var code in codes)
+        {
+            if (_villageCodeCache.TryGetValue(code, out var hit)) { found.Add(hit); continue; }
+            if (_villageCodeMissCache.ContainsKey(code)) continue;
+            missing.Add(code);
+        }
+
+        if (missing.Count == 0)
+            return Result.Success(found);
+
+        // 仅当本地是全量村快照才可用内存索引；部分缓存下未命中的 code 必须回 DB 查，
+        // 否则"没缓存到"会被误写成"查无此村"负缓存（永久污染，之后即使有数据也返回查不到）
+        if (_villagesFullSnapshot && !_villagesByTownCache.IsEmpty)
+        {
+            var want = new HashSet<string>(missing, StringComparer.Ordinal);
+            var hitMap = new Dictionary<string, RegionVillage>(StringComparer.Ordinal);
+            foreach (var v in _villagesByTownCache.Values.SelectMany(x => x))
+            {
+                if (!string.IsNullOrEmpty(v.VillageCode) && want.Contains(v.VillageCode))
+                    hitMap[v.VillageCode] = v;
+            }
+
+            foreach (var code in missing)
+            {
+                if (hitMap.TryGetValue(code, out var v))
+                {
+                    _villageCodeCache[code] = v;
+                    found.Add(v);
+                }
+                else
+                {
+                    _villageCodeMissCache[code] = true;
+                }
+            }
+            return Result.Success(found);
+        }
+
+        await EnsureTablesExistAsync(ct);
+
+        const string sql =
+            "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active "
+          + "FROM nc_regions_villages WHERE village_code = ANY($1) AND is_active = true";
+
+        // ⚠️ string[] 作为唯一实参会被 params object[] 按 normal form 摊成 $1..$N，
+        //    $1 只绑到首个标量 → ANY($1) 报 42809/22P02，必须包成"1 个数组参数"。
+        var result = await _dbService.QueryAsync<RegionVillage>(sql, ct, new object[] { missing.ToArray() });
+        if (result.IsFailure)
+            return CompleteList(result, "村/社区编码批量查询");
+
+        var got = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var v in result.Value ?? new List<RegionVillage>())
+        {
+            if (string.IsNullOrEmpty(v.VillageCode)) continue;
+            _villageCodeCache[v.VillageCode] = v;
+            got.Add(v.VillageCode);
+            found.Add(v);
+        }
+        foreach (var code in missing)
+        {
+            if (!got.Contains(code)) _villageCodeMissCache[code] = true;
+        }
+
+        return Result.Success(found);
     }
 
     public async Task<Result<List<RegionVillage>>> SearchVillagesAsync(string keyword, CancellationToken ct = default)
@@ -887,9 +1267,9 @@ public class RegionService : BaseService, IRegionService
             return Result.Failure<List<RegionVillage>>(ErrorCodes.VALIDATION_FAILED, "搜索关键词不能为空");
 
         EnsureLocalCacheLoaded();
-        if (!_villagesByTownCache.IsEmpty)
+        // 仅全量村快照才可内存检索；懒加载的部分缓存搜出来的结果不完整，必须回 DB LIKE 查
+        if (_villagesFullSnapshot && !_villagesByTownCache.IsEmpty)
         {
-            // 本地已有全量村/社区数据：直接内存检索（离线可用）
             var localHits = _villagesByTownCache.Values
                 .SelectMany(v => v)
                 .Where(v => !string.IsNullOrEmpty(v.VillageName) && v.VillageName.Contains(keyword, StringComparison.Ordinal))
@@ -903,12 +1283,10 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"搜索村/社区: Keyword={keyword}");
 
-        var sql = "SELECT * FROM nc_regions_villages WHERE village_name LIKE $1 AND is_active = TRUE ORDER BY sort_order, id LIMIT 50";
+        var sql = "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE village_name LIKE $1 AND is_active = TRUE ORDER BY sort_order, id LIMIT 50";
         var result = await _dbService.QueryAsync<RegionVillage>(sql, ct, $"%{keyword}%");
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<RegionVillage>());
+        return CompleteList(result, "村/社区搜索");
     }
 
     #endregion
@@ -922,15 +1300,13 @@ public class RegionService : BaseService, IRegionService
         LogInfo("获取县区及乡镇树形结构");
 
         var sql = @"
-            SELECT c.* FROM nc_regions_counties c
+            SELECT c.id, c.county_name, c.county_code, c.city_name, c.sort_order, c.is_active FROM nc_regions_counties c
             WHERE c.is_active = TRUE 
             AND EXISTS (SELECT 1 FROM nc_regions_towns t WHERE t.county_id = c.id AND t.is_active = true)
             ORDER BY c.sort_order, c.id";
         var result = await _dbService.QueryAsync<RegionCounty>(sql, ct);
 
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<RegionCounty>());
+        return CompleteList(result, "县区-乡镇树形");
     }
 
     public async Task<Result<Dictionary<string, List<RegionTown>>>> GetAllTownsGroupedByCountyAsync(CancellationToken ct = default)
@@ -940,14 +1316,17 @@ public class RegionService : BaseService, IRegionService
         LogInfo("获取按县区分组的所有乡镇");
 
         var sql = @"
-            SELECT t.* FROM nc_regions_towns t
+            SELECT t.id, t.county_id, t.town_name, t.town_code, t.town_type, t.sort_order, t.is_active FROM nc_regions_towns t
             INNER JOIN nc_regions_counties c ON t.county_id = c.id
             WHERE t.is_active = TRUE AND c.is_active = TRUE
             ORDER BY c.sort_order, c.id, t.sort_order, t.id";
         var result = await _dbService.QueryAsync<RegionTown>(sql, ct);
 
-        if (!result.IsSuccess || result.Value is null)
-            return Result.Success(new Dictionary<string, List<RegionTown>>());
+        if (result.IsFailure)
+        {
+            LogWarn($"按县区分组的乡镇查询失败（不再折叠为空字典）: {result.ErrorCode} {result.Message}");
+            return Result.Failure<Dictionary<string, List<RegionTown>>>(result.ErrorCode!, result.Message!);
+        }
 
         var grouped = result.Value
             .GroupBy(t => t.CountyId.ToString())
@@ -969,20 +1348,34 @@ public class RegionService : BaseService, IRegionService
 
         LogInfo($"新建地级市: {request.CityName}");
 
+        // Id<=0 时走序列取号：原实现传 NULL 给 NOT NULL 主键，"新建城市"必然失败
+        int cityIdArg;
+        if (request.Id > 0)
+        {
+            cityIdArg = request.Id;
+        }
+        else
+        {
+            var nextId = await GetNextCityIdAsync(ct);
+            if (nextId.IsFailure)
+                return Result.Failure<RegionCity>(nextId.ErrorCode!, nextId.Message!);
+            cityIdArg = nextId.Value;
+        }
+
         var sql = @"INSERT INTO nc_regions_cities (id, city_name, city_code, sort_order, is_active)
                     VALUES ($1, $2, $3, $4, $5)
                     RETURNING id";
         var result = await _dbService.QuerySingleAsync<RegionCity>(sql, ct,
-            request.Id > 0 ? request.Id : (object?)null,
+            cityIdArg,
             request.CityName, request.CityCode, request.SortOrder, request.IsActive);
 
-        if (result.IsSuccess && result.Value != null)
-        {
-            InvalidateRegionCaches();
-            return Result.Success(result.Value);
-        }
+        if (result.IsFailure)
+            return Result.Failure<RegionCity>(result.ErrorCode!, result.Message!);
+        if (result.Value == null)
+            return Result.Failure<RegionCity>(ErrorCodes.DB_QUERY_ERROR, "新建地级市失败");
 
-        return Result.Failure<RegionCity>(ErrorCodes.DB_QUERY_ERROR, "新建地级市失败");
+        InvalidateRegionCaches();
+        return Result.Success(result.Value);
     }
 
     public async Task<Result<RegionCity>> UpdateCityAsync(RegionCitySaveRequest request, CancellationToken ct = default)
@@ -1002,13 +1395,13 @@ public class RegionService : BaseService, IRegionService
         var result = await _dbService.QuerySingleAsync<RegionCity>(sql, ct,
             request.CityName, request.CityCode, request.SortOrder, request.IsActive, request.Id);
 
-        if (result.IsSuccess && result.Value != null)
-        {
-            InvalidateRegionCaches();
-            return Result.Success(result.Value);
-        }
+        if (result.IsFailure)
+            return Result.Failure<RegionCity>(result.ErrorCode!, result.Message!);
+        if (result.Value == null)
+            return Result.Failure<RegionCity>(ErrorCodes.REGION_CITY_NOT_FOUND, $"地级市未找到: Id={request.Id}");
 
-        return Result.Failure<RegionCity>(ErrorCodes.REGION_CITY_NOT_FOUND, $"地级市未找到: Id={request.Id}");
+        InvalidateRegionCaches();
+        return Result.Success(result.Value);
     }
 
     public async Task<Result> DeleteCityAsync(int cityId, CancellationToken ct = default)
@@ -1047,7 +1440,10 @@ public class RegionService : BaseService, IRegionService
 
         try
         {
-            var nextId = await GetNextCountyIdAsync(ct);
+            var nextIdResult = await GetNextCountyIdAsync(ct);
+            if (nextIdResult.IsFailure)
+                return Result.Failure<RegionCounty>(nextIdResult.ErrorCode!, nextIdResult.Message!);
+            var nextId = nextIdResult.Value;
 
             var sql = @"INSERT INTO nc_regions_counties (id, county_name, county_code, city_name, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
@@ -1120,7 +1516,10 @@ public class RegionService : BaseService, IRegionService
         {
             var checkSql = "SELECT COUNT(*) FROM nc_regions_towns WHERE county_id = $1 AND is_active = true";
             var checkResult = await _dbService.ExecuteScalarAsync(checkSql, ct, countyId);
-            if (checkResult.IsSuccess && Convert.ToInt64(checkResult.Value) > 0)
+            // 检查失败必须显式失败：不能当成"没有下级"继续停用（AGENTS §7）
+            if (checkResult.IsFailure)
+                return Result.Failure(checkResult.ErrorCode!, checkResult.Message!);
+            if (Convert.ToInt64(checkResult.Value) > 0)
                 return Result.Failure(ErrorCodes.REGION_HAS_CHILDREN, "该县区下存在乡镇，不能删除");
 
             var sql = "UPDATE nc_regions_counties SET is_active = FALSE WHERE id = $1";
@@ -1158,7 +1557,10 @@ public class RegionService : BaseService, IRegionService
 
         try
         {
-            var nextId = await GetNextTownIdAsync(ct);
+            var nextIdResult = await GetNextTownIdAsync(ct);
+            if (nextIdResult.IsFailure)
+                return Result.Failure<RegionTown>(nextIdResult.ErrorCode!, nextIdResult.Message!);
+            var nextId = nextIdResult.Value;
 
             var sql = @"INSERT INTO nc_regions_towns (id, county_id, town_name, town_code, town_type, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
@@ -1231,7 +1633,10 @@ public class RegionService : BaseService, IRegionService
         {
             var checkSql = "SELECT COUNT(*) FROM nc_regions_villages WHERE town_id = $1 AND is_active = true";
             var checkResult = await _dbService.ExecuteScalarAsync(checkSql, ct, townId);
-            if (checkResult.IsSuccess && Convert.ToInt64(checkResult.Value) > 0)
+            // 检查失败必须显式失败：不能当成"没有下级"继续停用（AGENTS §7）
+            if (checkResult.IsFailure)
+                return Result.Failure(checkResult.ErrorCode!, checkResult.Message!);
+            if (Convert.ToInt64(checkResult.Value) > 0)
                 return Result.Failure(ErrorCodes.REGION_HAS_CHILDREN, "该乡镇下存在村/社区，不能删除");
 
             var sql = "UPDATE nc_regions_towns SET is_active = FALSE WHERE id = $1";
@@ -1269,7 +1674,10 @@ public class RegionService : BaseService, IRegionService
 
         try
         {
-            var nextId = await GetNextVillageIdAsync(ct);
+            var nextIdResult = await GetNextVillageIdAsync(ct);
+            if (nextIdResult.IsFailure)
+                return Result.Failure<RegionVillage>(nextIdResult.ErrorCode!, nextIdResult.Message!);
+            var nextId = nextIdResult.Value;
 
             var sql = @"INSERT INTO nc_regions_villages (id, town_id, village_name, village_code, village_type, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
@@ -1361,25 +1769,35 @@ public class RegionService : BaseService, IRegionService
 
     #region ID生成辅助方法
 
-    private async Task<int> GetNextCountyIdAsync(CancellationToken ct)
-    {
-        var sql = "SELECT COALESCE(MAX(id), 9000) + 1 FROM nc_regions_counties";
-        var result = await _dbService.ExecuteScalarAsync(sql, ct);
-        return result.IsSuccess ? Convert.ToInt32(result.Value) : 9001;
-    }
+    /// <summary>
+    /// 取下一个主键：改用**序列**（原子），替代原来的 <c>MAX(id)+1</c>。
+    /// 为什么换：MAX+1 在并发创建时两条事务会算出同一个 ID，后到的撞主键 23505；
+    /// 取号失败时旧实现还只能返回兜底假 ID（90001/900001），等于拿假 ID 去 INSERT
+    /// （AGENTS §7：失败不当空值/假值）。
+    /// 所有 INSERT 仍**显式传 id**：种子与批量导入依赖既定 ID 区间，序列只负责"下一个 ID"。
+    /// SQL 全部写死字面量（AGENTS §1），取号失败如实上抛。
+    /// </summary>
+    private async Task<Result<int>> GetNextCityIdAsync(CancellationToken ct)
+        => await ReadNextIdAsync("SELECT nextval('seq_nc_regions_cities')", "地级市", ct);
 
-    private async Task<int> GetNextTownIdAsync(CancellationToken ct)
-    {
-        var sql = "SELECT COALESCE(MAX(id), 90000) + 1 FROM nc_regions_towns";
-        var result = await _dbService.ExecuteScalarAsync(sql, ct);
-        return result.IsSuccess ? Convert.ToInt32(result.Value) : 90001;
-    }
+    private async Task<Result<int>> GetNextCountyIdAsync(CancellationToken ct)
+        => await ReadNextIdAsync("SELECT nextval('seq_nc_regions_counties')", "县区", ct);
 
-    private async Task<int> GetNextVillageIdAsync(CancellationToken ct)
+    private async Task<Result<int>> GetNextTownIdAsync(CancellationToken ct)
+        => await ReadNextIdAsync("SELECT nextval('seq_nc_regions_towns')", "乡镇/街道", ct);
+
+    private async Task<Result<int>> GetNextVillageIdAsync(CancellationToken ct)
+        => await ReadNextIdAsync("SELECT nextval('seq_nc_regions_villages')", "村/社区", ct);
+
+    private async Task<Result<int>> ReadNextIdAsync(string sql, string what, CancellationToken ct)
     {
-        var sql = "SELECT COALESCE(MAX(id), 900000) + 1 FROM nc_regions_villages";
         var result = await _dbService.ExecuteScalarAsync(sql, ct);
-        return result.IsSuccess ? Convert.ToInt32(result.Value) : 900001;
+        if (result.IsFailure)
+        {
+            LogWarn($"取{what}下一个主键失败（不返回兜底假ID）: {result.ErrorCode} {result.Message}");
+            return Result.Failure<int>(result.ErrorCode!, result.Message!);
+        }
+        return Result.Success(Convert.ToInt32(result.Value));
     }
 
     #endregion
@@ -1478,7 +1896,10 @@ public class RegionService : BaseService, IRegionService
             return Result.Failure<int>(ErrorCodes.DB_QUERY_ERROR, "乡镇编码映射为空，无法导入村/社区数据");
         }
 
-        var startId = await GetNextVillageIdAsync(ct);
+        var startIdResult = await GetNextVillageIdAsync(ct);
+        if (startIdResult.IsFailure)
+            return Result.Failure<int>(startIdResult.ErrorCode!, startIdResult.Message!);
+        var startId = startIdResult.Value;
         var processed = new List<(int TownId, string Name, string Code, string Type, int SortOrder, bool IsActive)>();
 
         var grouped = villages.GroupBy(v => v.StreetCode);

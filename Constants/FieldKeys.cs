@@ -6,6 +6,7 @@
 //   FieldKeys.NearRelative.cs 近亲属备案
 //   FieldKeys.Recovery.cs     档案域（后补追缴/渐退期审批表/保障金减少）
 //   FieldKeys.Change.cs       增减员调整表 + 动态管理记录 + 定期复核审批表
+//   FieldKeys.DeathStatement.cs 死亡情况说明（死亡申报台账文书：死者信息/申报信息/身份清单/数据提醒）
 // 本文件仅保留声明与总注释；2026-10-16 拆分为纯组织改动，常量名/值一律不变。
 //
 // 【新增键纪律（批6 长效机制，2026-10-16）】新增 fieldKey 必须三同步，缺一即产生孤儿键：

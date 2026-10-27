@@ -440,7 +440,8 @@ public partial class TempReliefFormViewModel
                         {
                             MemberName = m.MemberName,
                             Gender = m.Gender,
-                            Relation = m.Relation,
+                            // 快照来源已转换，这里再加一道兜底，防止未来新增来源绕过统一转换
+                            Relation = TempReliefConstants.GetRelationshipDisplayName(m.Relation),
                             IdCard = m.IdCard,
                             WorkUnit = m.WorkUnit,
                             AnnualIncome = m.AnnualIncome

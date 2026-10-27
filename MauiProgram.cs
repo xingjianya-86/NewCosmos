@@ -19,6 +19,7 @@ using NewCosmos.Services.Import.UrbanSubsistence;
 using NewCosmos.Services.Import.LowIncomeEdge;
 using NewCosmos.Services.Import.RigidExpenditure;
 using NewCosmos.Services.Import.Destitute;
+using NewCosmos.Services.Import.OtherDifficulty;
 using NewCosmos.Services.Platform;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.ChangeManagement;
@@ -72,6 +73,7 @@ public static class MauiProgram
             sp.GetRequiredService<PerformanceOptions>()));
         builder.Services.AddSingleton<IConfigService, ConfigService>();
         builder.Services.AddSingleton<ISessionGuard, SessionGuard>();
+    builder.Services.AddSingleton<IAddressScopeService, AddressScopeService>();
         builder.Services.AddSingleton<IDeviceIdentityProvider, DeviceIdentityProvider>();
         builder.Services.AddSingleton<ISessionStore, SessionStore>();
         builder.Services.AddSingleton<ISessionHeartbeatService, SessionHeartbeatService>();
@@ -80,7 +82,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
         builder.Services.AddSingleton<INavigationService, Navigation.NavigationService>();
         builder.Services.AddSingleton<ILoadingProgressRunner, Navigation.LoadingProgressRunner>();
-        builder.Services.AddSingleton<IInitializationService, InitializationService>();
         builder.Services.AddSingleton<IOutputRootMigrationService, OutputRootMigrationService>();
         builder.Services.AddSingleton<ISystemService, SystemService>();
         builder.Services.AddSingleton<IBackgroundLoaderService, BackgroundLoaderService>();
@@ -165,6 +166,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFamilyMemberService, FamilyMemberService>();
         builder.Services.AddSingleton<IClassificationService, ClassificationService>();
         builder.Services.AddSingleton<IIncomeCalculationService, IncomeCalculationService>();
+        // 非死亡性停保 → 其他困难人员台账联动（停保/恢复保障单向调用）
+        builder.Services.AddSingleton<IOtherDifficultyLedgerService, OtherDifficultyLedgerService>();
         builder.Services.AddSingleton<IGuaranteeAmountService, GuaranteeAmountService>();
         builder.Services.AddSingleton<IGracePeriodService, GracePeriodService>();
         builder.Services.AddSingleton<IVisitRecordService, VisitRecordService>();
@@ -273,12 +276,14 @@ public static class MauiProgram
         builder.Services.AddSingleton<LowIncomeEdgeImportService>();
         builder.Services.AddSingleton<RigidExpenditureImportService>();
         builder.Services.AddSingleton<DestituteImportService>();
+        builder.Services.AddSingleton<OtherDifficultyImportService>();
 
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<RuralSubsistenceImportService>());
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<UrbanSubsistenceImportService>());
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<LowIncomeEdgeImportService>());
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<RigidExpenditureImportService>());
         builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<DestituteImportService>());
+        builder.Services.AddSingleton<ICombinedImportService>(sp => sp.GetRequiredService<OtherDifficultyImportService>());
 
         builder.Services.AddSingleton<ElderlySubsidyImportService>();
         builder.Services.AddSingleton<AnnualPlantingSubsidyImportService>();
@@ -309,7 +314,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.ITemplateService, Services.Domain.ArchiveManagement.TemplateService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchiveService, Services.Domain.ArchiveManagement.ArchiveService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IProofUnitTemplateService, Services.Domain.ArchiveManagement.ProofUnitTemplateService>();
+        builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IDeathStatementService, Services.Domain.ArchiveManagement.DeathStatementService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoService, Services.Domain.ArchiveManagement.ArchivePhotoService>();
+        builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoWebPMigrationService, Services.Domain.ArchiveManagement.ArchivePhotoWebPMigrationService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IPublicityOutputService, Services.Domain.ArchiveManagement.PublicityOutputService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeService, Services.Domain.ChangeManagement.ChangeService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IImportedArchiveService, Services.Domain.ChangeManagement.ImportedArchiveService>();
@@ -369,6 +376,7 @@ public static class MauiProgram
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.ArchiveProductionViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.TemplateManagementViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.ArchiveQueryViewModel>();
+        builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.DeathStatementViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.ProofUnitTemplateManageViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.MonthlyPublicityViewModel>();
 
@@ -490,6 +498,7 @@ public static class MauiProgram
         // P5：只读查询/报表手机端
         builder.Services.AddTransient<Pages.Mobile.MobileGracePeriodExpiringListPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileArchiveQueryPage>();
+        builder.Services.AddTransient<Pages.Mobile.MobileDeathStatementPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileDutySchedulePage>();
         // P6：推送打印任务查看
         builder.Services.AddTransient<ViewModels.Mobile.MobilePrintJobsViewModel>();
@@ -541,6 +550,7 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveProductionPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.TemplateManagementPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchiveQueryPage>();
+        builder.Services.AddTransient<Pages.ArchiveManagement.DeathStatementPage>();
         // 档案照片查询/导出（桌面端）：按身份证/备注检索 → 预览 → 导出到输出根
         builder.Services.AddTransient<ViewModels.ArchiveManagement.ArchivePhotoQueryViewModel>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchivePhotoQueryPage>();

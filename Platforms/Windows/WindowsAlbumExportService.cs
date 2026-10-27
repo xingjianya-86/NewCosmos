@@ -11,9 +11,10 @@ public sealed class WindowsAlbumExportService : IAlbumExportService
 {
     private const string AlbumFolder = "NewCosmos";
 
-    public async Task<Result<string>> SaveToAlbumAsync(string fileName, byte[] jpegBytes, CancellationToken ct = default)
+    public async Task<Result<string>> SaveToAlbumAsync(
+        string fileName, byte[] imageBytes, string mimeType, CancellationToken ct = default)
     {
-        if (jpegBytes == null || jpegBytes.Length == 0)
+        if (imageBytes == null || imageBytes.Length == 0)
             return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "照片内容为空");
 
         try
@@ -24,7 +25,7 @@ public sealed class WindowsAlbumExportService : IAlbumExportService
 
             var safeName = string.IsNullOrWhiteSpace(fileName) ? $"photo_{DateTime.Now:yyyyMMddHHmmss}.jpg" : fileName;
             var path = Path.Combine(dir, safeName);
-            await File.WriteAllBytesAsync(path, jpegBytes, ct);
+            await File.WriteAllBytesAsync(path, imageBytes, ct);
             return Result.Success(path);
         }
         catch (Exception ex)

@@ -17,6 +17,8 @@ public static class TableNameValidator
         "nc_biz_destitute_persons",
         "nc_biz_rigid_expenditure_families",
         "nc_biz_rigid_expenditure_persons",
+        "nc_biz_other_difficulty_families",
+        "nc_biz_other_difficulty_persons",
         "nc_biz_low_income_edge_families",
         "nc_biz_low_income_edge_persons",
         "nc_biz_labor_incomes",

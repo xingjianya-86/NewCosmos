@@ -142,8 +142,7 @@ public partial class ElderlyStopViewModel : ViewModelBase
     }
 
     public void LoadApplication(ElderlyApplication app)
-    {
-        _applicationId = app.Id;
+    {        _applicationId = app.Id;
         ApplicantName = app.Name;
         ApplicantIdCard = app.IdCard;
         ApplicationNo = app.ApplicationNo;
@@ -166,6 +165,24 @@ public partial class ElderlyStopViewModel : ViewModelBase
 
     public bool CanConfirm =>
         SelectedStopReason != null && (!IsRecover || RecoverEndYear >= RecoverStartYear);
+
+    /// <summary>
+    /// 跨流程联动预填（死亡情况说明「高龄停发」卡片跳转）：
+    /// 预选停发原因=去世、死亡日期与建议应停日期回填申报值；追缴金额不预填（人工核定，§9-7）。
+    /// 仍走本页自身校验与确认。
+    /// </summary>
+    public void ApplyDeathPrefill(DateTime? deathDate, string? deathReason)
+    {
+        var deceased = StopReasonOptions.FirstOrDefault(o => o.Key == ElderlyBenefitConstants.StopReasonDeceased);
+        if (!string.IsNullOrEmpty(deceased.Key))
+            SelectedStopReason = deceased;
+
+        if (deathDate is { } date && date != default)
+        {
+            DeathDate = date;
+            DueStopDate = date;
+        }
+    }
 
     [RelayCommand]
     private async Task ConfirmStopAsync()

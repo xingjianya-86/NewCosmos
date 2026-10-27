@@ -35,8 +35,31 @@ public partial class RegionManagementViewModel : ViewModelBase
     public ObservableCollection<RegionTown> Towns { get; } = new();
     public ObservableCollection<RegionVillage> Villages { get; } = new();
 
+    /// <summary>省级行政区（2026-10-26 真级联：选省 → 筛市）</summary>
+    public ObservableCollection<RegionProvince> Provinces { get; } = new();
+
     [ObservableProperty]
     private RegionCity _selectedCity = null!;
+
+    /// <summary>选中省（null=不限省份，显示全部市）</summary>
+    [ObservableProperty]
+    private RegionProvince? _selectedProvince;
+
+    /// <summary>省变化 → 重载市（按省筛）。省表缺失时 Provinces 为空，不影响既有市/县/镇/村。</summary>
+    partial void OnSelectedProvinceChanged(RegionProvince? value)
+    {
+        SelectedCity = null!;
+        SelectedCounty = null;
+        SelectedTown = null;
+        SelectedVillage = null;
+        Cities.Clear();
+        Counties.Clear();
+        Towns.Clear();
+        Villages.Clear();
+        NotifyLevelChanged();
+
+        SafeFireAndForget(() => LoadCitiesAsync(value?.Id));
+    }
 
     [ObservableProperty]
     private RegionCounty _selectedCounty = null!;
@@ -115,9 +138,37 @@ public partial class RegionManagementViewModel : ViewModelBase
     {
         // [PERF-PROBE] 阶段0归因埋点：子页数据加载耗时
         var probe = Stopwatch.StartNew();
+        await LoadProvincesAsync();
         await LoadCitiesAsync();
         probe.Stop();
         _logger.LogPerf("区划管理-OnAppearing", probe.Elapsed.TotalMilliseconds);
+    }
+
+    /// <summary>
+    /// 加载省级行政区（2026-10-26 真级联省）。
+    /// 省表未建/迁移未跑时只记日志不弹错——省缺失不得阻断市/县/镇/村既有维护。
+    /// </summary>
+    private async Task LoadProvincesAsync()
+    {
+        try
+        {
+            _logger.Info("加载省级行政区列表");
+            var result = await _regionService.GetProvincesAsync(default);
+            if (result.IsSuccess && result.Value is not null)
+            {
+                Provinces.Clear();
+                foreach (var province in result.Value)
+                    Provinces.Add(province);
+            }
+            else
+            {
+                _logger.Warn($"加载省级行政区失败（不影响市县镇村）: {result.ErrorCode} {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载省级行政区异常（不影响市县镇村）");
+        }
     }
 
     /// <summary>页面可见后异步执行权限检查 + 数据加载（C 组：不阻塞 PushAsync）</summary>
@@ -127,15 +178,18 @@ public partial class RegionManagementViewModel : ViewModelBase
         await OnAppearingAsync();
     }, nameof(StartLoadingInBackground));
 
-    private async Task LoadCitiesAsync()
+    private async Task LoadCitiesAsync(int? provinceId = null)
     {
         if (IsLoading) return;
         IsLoading = true;
 
         try
         {
-            _logger.Info("加载地级市列表");
-            var result = await _regionService.GetCitiesAsync(default);
+            _logger.Info(provinceId is > 0 ? $"按省加载地级市列表: ProvinceId={provinceId}" : "加载地级市列表");
+            // 选省 → 按省筛；未选省（含回显/首屏）→ 全部市，既有行为不变
+            var result = (provinceId.HasValue && provinceId.Value > 0)
+                ? await _regionService.GetCitiesByProvinceIdAsync(provinceId.Value, default)
+                : await _regionService.GetCitiesAsync(default);
             if (result.IsSuccess && result.Value is not null)
             {
                 Cities.Clear();

@@ -24,6 +24,10 @@ public partial class ChangeService
     {
         LogInfo($"处理成员死亡: ApplicationId={context.ApplicationId}");
 
+        // 死亡确切时间必填（DB 列可空是为存量历史行；新写入由本入参校验 + 表单必填双门保证）
+        if (context.DeathTime is null)
+            return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择死亡确切时间");
+
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
         try
@@ -57,13 +61,14 @@ public partial class ChangeService
                     markResult.Message ?? "标记成员死亡失败");
             }
 
-            // 3. 创建死亡记录
+            // 3. 创建死亡记录（death_time=死亡确切时刻，新写入必填）
             var deathSql = @"INSERT INTO nc_biz_death_records
-                            (application_id, member_id, member_name, member_id_card, death_date, death_reason, operator_name)
-                            VALUES ($1,$2,$3,$4,$5,$6,$7);";
+                            (application_id, member_id, member_name, member_id_card, death_date, death_time, death_reason, operator_name)
+                            VALUES ($1,$2,$3,$4,$5,$6,$7,$8);";
             var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
                 context.ApplicationId, context.MemberId, context.MemberName,
-                context.MemberIdCard, context.DeathDate, context.DeathReason, context.OperatorName);
+                context.MemberIdCard, context.DeathDate, context.DeathTime,
+                context.DeathReason, context.OperatorName);
             if (deathInsertResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
@@ -491,6 +496,10 @@ public partial class ChangeService
 
         if (context.NewHeadMemberId <= 0)
             return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择新户主");
+
+        // 死亡确切时间必填（双门校验的服务侧门；表单侧见 HouseholdDeathChangeViewModel）
+        if (context.DeathTime is null)
+            return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择死亡确切时间");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -975,14 +984,14 @@ public partial class ChangeService
             // 13. 写死亡记录（is_household_head=true，回填新档案ID）
             var deathSql = @"INSERT INTO nc_biz_death_records
                 (application_id, member_id, member_name, member_id_card, relationship_to_head,
-                 death_date, death_reason, death_certificate_no,
+                 death_date, death_time, death_reason, death_certificate_no,
                  is_household_head, new_head_id_card, new_head_name, new_application_id,
                  operator_name, created_by, created_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$12,NOW());";
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12,$13,$13,NOW());";
             var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
                 context.ApplicationId, deceasedHead.Id, deceasedHead.Name, deceasedHead.IdCard,
                 string.IsNullOrEmpty(deceasedHead.RelationshipToHead) ? "本人/户主" : deceasedHead.RelationshipToHead,
-                context.DeathDate, context.DeathReason, context.DeathCertificateNo,
+                context.DeathDate, context.DeathTime, context.DeathReason, context.DeathCertificateNo,
                 context.NewHeadIdCard, context.NewHeadName, newApplicationId,
                 context.OperatorName);
             if (deathInsertResult.IsFailure)

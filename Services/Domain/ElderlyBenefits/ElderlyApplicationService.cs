@@ -921,7 +921,12 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                 FROM nc_biz_applications
                 WHERE id = $1 AND deleted_at IS NULL AND current_step = $2";
             var appResult = await _db.QuerySingleAsync<ArchivedApplicationRow>(appSql, ct, applicationId, WorkflowSteps.ARCHIVED);
-            if (appResult.IsFailure || appResult.Value == null)
+            // 查询失败如实上抛：调用方（ApplicationService 归档联动）已有 IsFailure 分支，仅告警不阻断；
+            // 折叠成 Success(0) 会把"数据库出错"报成"成功创建 0 份草稿"。
+            // 查无此档案才是"无需创建"→ Success(0)
+            if (appResult.IsFailure)
+                return Result.Failure<int>(appResult.ErrorCode!, appResult.Message!);
+            if (appResult.Value == null)
                 return Result.Success(0);
 
             var app = appResult.Value;

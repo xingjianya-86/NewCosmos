@@ -54,51 +54,13 @@ public partial class OrganizationImportViewModel : ViewModelBase
     private bool _hasImportResult;
 
     [ObservableProperty]
+    private ObservableCollection<string> _importErrors = new();
+
+    [ObservableProperty]
+    private bool _hasImportErrors;
+
+    [ObservableProperty]
     private ObservableCollection<OrganizationPreviewRow> _previewRows = new();
-
-    #region SnackBar
-
-    [ObservableProperty]
-    private string _snackBarMessage = string.Empty;
-
-    [ObservableProperty]
-    private SnackBarType _snackBarType;
-
-    [ObservableProperty]
-    private bool _isSnackBarVisible;
-
-    private int _snackBarVersion;
-
-    private Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Success)
-    {
-        SnackBarMessage = message;
-        SnackBarType = type;
-        IsSnackBarVisible = true;
-
-        // 非阻塞隐藏：不延长调用命令的执行时间；版本号防止旧的隐藏任务关闭新消息
-        var version = ++_snackBarVersion;
-        _ = HideSnackBarAfterDelayAsync(version);
-        return Task.CompletedTask;
-    }
-
-    private async Task HideSnackBarAfterDelayAsync(int version)
-    {
-        try
-        {
-            await Task.Delay(3000);
-            if (version == _snackBarVersion)
-            {
-                IsSnackBarVisible = false;
-            }
-        }
-        catch
-        {
-            // fire-and-forget：忽略异常，避免未观察的任务异常
-        }
-    }
-
-    #endregion
-
     public OrganizationImportViewModel(
         IOrganizationService organizationService,
         ILoggerService logger,
@@ -138,11 +100,13 @@ public partial class OrganizationImportViewModel : ViewModelBase
         {
             PreviewRows.Clear();
             HasImportResult = false;
+            ImportErrors.Clear();
+            HasImportErrors = false;
             SuccessCount = 0;
             FailureCount = 0;
             TotalCount = 0;
 
-            var preview = await Task.Run(() => _organizationService.PreviewCsvImport(SelectedFilePath, 5));
+            var preview = await Task.Run(() => _organizationService.PreviewImport(SelectedFilePath, 5));
 
             if (preview.TotalRows == 0)
             {
@@ -177,6 +141,8 @@ public partial class OrganizationImportViewModel : ViewModelBase
         ImportProgressText = "正在导入...";
         SuccessCount = 0;
         FailureCount = 0;
+        ImportErrors.Clear();
+        HasImportErrors = false;
 
         try
         {
@@ -185,7 +151,17 @@ public partial class OrganizationImportViewModel : ViewModelBase
                 ImportProgressText = msg;
             });
 
-            var result = await _organizationService.ImportFromCsvAsync(SelectedFilePath, progress, CancellationToken);
+            var result = await _organizationService.ImportFromFileAsync(SelectedFilePath, progress, CancellationToken);
+
+            // 失败结果要显式失败：原实现无视 result.Success，一律显示"导入完成"
+            if (!result.Success)
+            {
+                _logger.Error($"组织导入失败: {result.Message}");
+                HasImportResult = true;
+                ImportProgressText = result.Message ?? "导入失败";
+                await ShowSnackBarAsync(ImportProgressText, SnackBarType.Error);
+                return;
+            }
 
             SuccessCount = result.ImportedCount;
             FailureCount = result.ErrorCount;
@@ -194,8 +170,26 @@ public partial class OrganizationImportViewModel : ViewModelBase
             ImportProgressText = result.Message ?? $"导入完成：成功{SuccessCount}，失败{FailureCount}";
             _logger.LogBusiness("组织导入完成", ("Success", SuccessCount), ("Failure", FailureCount));
 
-            await ShowSnackBarAsync($"导入完成：成功{SuccessCount}条",
-                FailureCount > 0 ? SnackBarType.Warning : SnackBarType.Success);
+            if (FailureCount > 0 && result.Errors.Count > 0)
+            {
+                foreach (var err in result.Errors.Take(50))
+                    ImportErrors.Add(err);
+                if (result.Errors.Count > 50)
+                    ImportErrors.Add($"……另有 {result.Errors.Count - 50} 条，完整明细见导入日志");
+                HasImportErrors = true;
+                _logger.Warn($"组织导入失败明细({result.Errors.Count}条): {string.Join("；", result.Errors)}");
+
+                await ShowSnackBarAsync($"成功 {SuccessCount} 条，失败 {FailureCount} 条，详见下方明细",
+                    SnackBarType.Warning);
+            }
+            else
+            {
+                await ShowSnackBarAsync($"导入完成：成功{SuccessCount}条", SnackBarType.Success);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await ShowSnackBarAsync("导入已取消", SnackBarType.Warning);
         }
         catch (Exception ex)
         {

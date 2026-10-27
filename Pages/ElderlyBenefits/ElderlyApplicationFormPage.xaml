@@ -195,8 +195,15 @@
                         </VerticalStackLayout>
                     </Border>
 
-                    <!-- 卡片2：户籍与住址 -->
-                    <Border Style="{StaticResource CardBorder}">
+                    <!-- 2026-10-27 账号未绑定区划：整个地址区禁用（严格阻断） -->
+                    <Border BackgroundColor="#FEE2E2" StrokeThickness="0" Padding="12,8"
+                            IsVisible="{Binding IsAddressScopeAvailable, Converter={StaticResource BoolToInverseConverter}}">
+                        <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「用户与权限管理 → 经办机构管理」为本单位补齐省/市/县/镇/村后再录入。"
+                               FontSize="12" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
+                    </Border>
+
+                    <!-- 卡片2：户籍与住址（2026-10-27：补省→五级；户籍限本单位管辖范围，住址全国可选） -->
+                    <Border Style="{StaticResource CardBorder}" IsEnabled="{Binding IsAddressScopeAvailable}">
                         <Border.Shadow>
                             <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
                         </Border.Shadow>
@@ -210,33 +217,45 @@
                                 </Border>
                                 <Label Grid.Column="1" Text="户籍与住址" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                             </Grid>
+                            <Label Text="{Binding AddressScopeDescription}" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
-                            <Label Text="户籍地址" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
-                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12" RowSpacing="12">
+                            <Label Text="户籍地址（限本单位管辖范围）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="8" RowSpacing="12">
                                 <VerticalStackLayout Spacing="6">
+                                    <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker ItemsSource="{Binding HukouProvinceOptions}"
+                                            SelectedItem="{Binding SelectedHukouProvince}"
+                                            Style="{StaticResource FormFieldPickerStyle}"
+                                            IsEnabled="{Binding IsHukouProvinceLocked, Converter={StaticResource BoolToInverseConverter}}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
                                     <Label Text="城市 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding HukouCityOptions}"
                                             SelectedItem="{Binding SelectedHukouCity}"
-                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                            Style="{StaticResource FormFieldPickerStyle}"
+                                            IsEnabled="{Binding IsHukouCityLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                <VerticalStackLayout Grid.Column="2" Spacing="6">
                                     <Label Text="区县 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding HukouCountyOptions}"
                                             SelectedItem="{Binding SelectedHukouCounty}"
-                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                            Style="{StaticResource FormFieldPickerStyle}"
+                                            IsEnabled="{Binding IsHukouCountyLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="2" Spacing="6">
+                                <VerticalStackLayout Grid.Column="3" Spacing="6">
                                     <Label Text="乡镇 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding HukouTownOptions}"
                                             SelectedItem="{Binding SelectedHukouTown}"
-                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                            Style="{StaticResource FormFieldPickerStyle}"
+                                            IsEnabled="{Binding IsHukouTownLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="3" Spacing="6">
+                                <VerticalStackLayout Grid.Column="4" Spacing="6">
                                     <Label Text="村/社区 *" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding HukouVillageOptions}"
                                             SelectedItem="{Binding SelectedHukouVillage}"
-                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                            Style="{StaticResource FormFieldPickerStyle}"
+                                            IsEnabled="{Binding IsHukouVillageLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                                 </VerticalStackLayout>
                             </Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
@@ -249,27 +268,33 @@
 
                             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
-                            <Label Text="家庭住址（独立区划）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
-                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12" RowSpacing="12">
+                            <Label Text="家庭住址（独立区划 · 全国可选）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
+                            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="8" RowSpacing="12">
                                 <VerticalStackLayout Spacing="6">
+                                    <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>
+                                    <Picker ItemsSource="{Binding FamilyProvinceOptions}"
+                                            SelectedItem="{Binding SelectedFamilyProvince}"
+                                            Style="{StaticResource FormFieldPickerStyle}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
                                     <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding FamilyCityOptions}"
                                             SelectedItem="{Binding SelectedFamilyCity}"
                                             Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                <VerticalStackLayout Grid.Column="2" Spacing="6">
                                     <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding FamilyCountyOptions}"
                                             SelectedItem="{Binding SelectedFamilyCounty}"
                                             Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="2" Spacing="6">
+                                <VerticalStackLayout Grid.Column="3" Spacing="6">
                                     <Label Text="乡镇" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding FamilyTownOptions}"
                                             SelectedItem="{Binding SelectedFamilyTown}"
                                             Style="{StaticResource FormFieldPickerStyle}"/>
                                 </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="3" Spacing="6">
+                                <VerticalStackLayout Grid.Column="4" Spacing="6">
                                     <Label Text="村/社区" Style="{StaticResource FormFieldLabelStyle}"/>
                                     <Picker ItemsSource="{Binding FamilyVillageOptions}"
                                             SelectedItem="{Binding SelectedFamilyVillage}"

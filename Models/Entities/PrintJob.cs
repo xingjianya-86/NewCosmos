@@ -63,7 +63,7 @@ public class PrintJob
     /// <summary>任务类型：Template=模板文书（默认）, Photo=照片（手机采集照片远程打印）</summary>
     public string JobKind { get; set; } = PrintJobConstants.JobKindTemplate;
 
-    /// <summary>照片二进制（JPEG，JobKind=Photo 时有值；PC 代理直接打印，无需回查照片表）</summary>
+    /// <summary>照片二进制（WebP/JPEG/PNG，JobKind=Photo 时有值；PC 代理转 JPEG 后打印，无需回查照片表）</summary>
     public byte[]? PhotoData { get; set; }
 
     /// <summary>照片打印版式（PhotoLayoutConstants：整页/半页/证件原寸）</summary>
@@ -162,7 +162,7 @@ public class PrintJobRequest
     /// <summary>任务类型：Template=模板文书（默认）, Photo=照片（手机采集照片远程打印）</summary>
     public string JobKind { get; set; } = PrintJobConstants.JobKindTemplate;
 
-    /// <summary>照片二进制（JPEG，JobKind=Photo 时必填）</summary>
+    /// <summary>照片二进制（WebP/JPEG/PNG，JobKind=Photo 时必填；PC 代理转 JPEG 打印）</summary>
     public byte[]? PhotoData { get; set; }
 
     /// <summary>照片打印版式（PhotoLayoutConstants）</summary>

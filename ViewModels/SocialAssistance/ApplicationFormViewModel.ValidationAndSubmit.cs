@@ -1209,6 +1209,7 @@ public partial class ApplicationFormViewModel
                     ReasonCode = r?.ReasonCode ?? string.Empty,
                     ReasonName = r?.ReasonName ?? string.Empty,
                     EventDate = r?.EventDate ?? DateTime.Today,
+                    EventTime = r?.EventTime,
                     Remark = r?.Remark ?? string.Empty
                 };
             }));
@@ -1223,6 +1224,7 @@ public partial class ApplicationFormViewModel
                 ReasonCode = e.Reason.ReasonCode,
                 ReasonName = e.Reason.ReasonName,
                 EventDate = e.Reason.EventDate,
+                EventTime = e.Reason.EventTime,
                 Remark = e.Reason.Remark
             }));
 

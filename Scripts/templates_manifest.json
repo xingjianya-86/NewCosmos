@@ -1,5 +1,13 @@
 [
   {
+    "name": "证明_死亡情况说明",
+    "file": "Templates_NEW/证明_死亡情况说明.docx",
+    "configFile": "Templates_NEW/证明_死亡情况说明.config.json",
+    "categories": ["证明文件"],
+    "sortOrder": 0,
+    "note": "死亡情况核实说明·三联出具（村留存/镇政府/卫生院，推送单位三份不同）；模板内 {印章} 已改为 (印章) 纯文本不参与替换"
+  },
+  {
     "name": "档案_定期复核审批表",
     "file": "Templates_NEW/档案_定期复核审批表.xlsx",
     "configFile": "Templates_NEW/档案_定期复核审批表.config.json",

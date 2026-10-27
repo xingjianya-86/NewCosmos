@@ -68,18 +68,26 @@
             <!-- 左侧面板：三级行政区划树 -->
             <Border Grid.Column="0" Style="{StaticResource CardBorderElevated}" Padding="0" Margin="16">
                 <ScrollView>
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0">
+
+                        <!-- 省选择器（2026-10-26 真级联：选省 → 筛市；不选=全部市） -->
+                        <Picker Grid.Row="0"
+                                Title="请选择省/直辖市"
+                                ItemsSource="{Binding Provinces}"
+                                ItemDisplayBinding="{Binding ProvinceName, x:DataType=ent:RegionProvince}"
+                                SelectedItem="{Binding SelectedProvince}"
+                                Margin="8,8,8,0" FontSize="15"/>
 
                         <!-- 地级市选择器 -->
-                        <Picker Grid.Row="0"
+                        <Picker Grid.Row="1"
                                 Title="请选择地级市"
                                 ItemsSource="{Binding Cities}"
                                 ItemDisplayBinding="{Binding CityName, x:DataType=ent:RegionCity}"
                                 SelectedItem="{Binding SelectedCity}"
                                 Margin="8,8,8,0" FontSize="15"/>
 
-                        <Label Grid.Row="1" Text="{Binding CountyHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
-                        <CollectionView Grid.Row="2" ItemsSource="{Binding Counties}" SelectionMode="Single" SelectedItem="{Binding SelectedCounty}" MaximumHeightRequest="200">
+                        <Label Grid.Row="2" Text="{Binding CountyHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="3" ItemsSource="{Binding Counties}" SelectionMode="Single" SelectedItem="{Binding SelectedCounty}" MaximumHeightRequest="200">
                             <CollectionView.EmptyView>
                                 <Label Text="选择地级市后显示区县数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
                             </CollectionView.EmptyView>
@@ -114,8 +122,8 @@
                             </CollectionView.ItemTemplate>
                         </CollectionView>
 
-                        <Label Grid.Row="3" Text="{Binding TownHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
-                        <CollectionView Grid.Row="4" ItemsSource="{Binding Towns}" SelectionMode="Single" SelectedItem="{Binding SelectedTown}" MaximumHeightRequest="200">
+                        <Label Grid.Row="4" Text="{Binding TownHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="5" ItemsSource="{Binding Towns}" SelectionMode="Single" SelectedItem="{Binding SelectedTown}" MaximumHeightRequest="200">
                             <CollectionView.EmptyView>
                                 <Label Text="选择区县后显示乡镇数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
                             </CollectionView.EmptyView>
@@ -150,8 +158,8 @@
                             </CollectionView.ItemTemplate>
                         </CollectionView>
 
-                        <Label Grid.Row="5" Text="{Binding VillageHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
-                        <CollectionView Grid.Row="6" ItemsSource="{Binding Villages}" SelectionMode="Single" SelectedItem="{Binding SelectedVillage}" MaximumHeightRequest="200">
+                        <Label Grid.Row="6" Text="{Binding VillageHeaderText}" FontSize="15" TextColor="{StaticResource TextSecondary}" Margin="8,12,8,4"/>
+                        <CollectionView Grid.Row="7" ItemsSource="{Binding Villages}" SelectionMode="Single" SelectedItem="{Binding SelectedVillage}" MaximumHeightRequest="200">
                             <CollectionView.EmptyView>
                                 <Label Text="选择乡镇后显示村级数据" Style="{StaticResource EmptyStateLabel}" Margin="0,16"/>
                             </CollectionView.EmptyView>

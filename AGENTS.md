@@ -46,6 +46,8 @@ dotnet build NewCosmos.csproj -f net10.0-windows10.0.19041.0     # Windows
   - 共享前缀全局可用：`components:` `converters:` `controls:` `constants:` `cat:` `results:` `pages:` `assetsvc:` `chg:` `domain:` `sys:`（`GlobalXmlns.cs` 尾部 `XmlnsPrefix` 列表为准）。
   - 唯一类型直接无前缀引用（如 `x:DataType="LoginViewModel"`）；`ent:`/`uent:` 因重名（Application、Role）须在各文件内保留经典 `clr-namespace` 声明；`App.xaml` 是例外文件，保留经典 MAUI 命名空间。
   - **值转换器不在 App.xaml 注册**，靠 `converters:` 前缀在页面直接引用。
+  - **图片资源**：本工具链**没有** `Resources\Images\**` 默认 `MauiImage` glob（实证：`obj\...\mauiimage.inputs` 只有 `MauiIcon` 一条），新图片必须在 csproj 显式 `<MauiImage Include>` 才能被 XAML `Source="xxx.png"` 解析；应用图标走 `Resources\AppIcon\appicon.png` 的 `MauiIcon`（换图即全端生效，csproj 不用改）。
+    ⚠️ 换 `appicon.png` 后若 `obj\{配置}\{tfm}\win-x64\resizetizer\` 里的瓦片 / `appicon.ico` 仍是**旧图**（20261025 实测出现过一次：源文件已是新图、产物 mtime 也刷新、内容却是旧的），删掉该目录与同级 `mauiimage.*` 重建即可，此后增量构建正常跟随。
 
 ## §2 构建、运行、发版与凭据
 
@@ -135,7 +137,9 @@ NewCosmos/
 │                   PatchTool、UpdateSigningTool、README.md（本机参数 *.local.ps1 不入库）
 ├── installer/      Inno Setup：NewCosmosSetup.iss、Languages\、appicon.ico
 ├── Scripts/        Lottery\（彩票 Python：lstm_entry.py 统一入口 + 内嵌原版 KittenCN/predict_Lottery_ticket「基于tensorflow lstm模型的彩票预测」GPL-3.0，运行时数据/模型在 %APPDATA%\NewCosmos\LotteryLSTM）、import_templates.ps1|.bat、
-│                   templates_manifest.json；脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
+│                   templates_manifest.json；吉祥物素材生成 prepare_mascot_assets.ps1（读仓库根 newcosmos_*_v2.png 去白底/裁边，
+│                   产出 Resources\AppIcon\appicon.png、installer\appicon.ico、Resources\Images\mascot_icon.png、newcosmos_character.png）；
+│                   脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
 ├── python-embed/   嵌入式 Python（彩票训练/预测用，不入库）
 ├── Templates_NEW/   模板资源（入库 7 文件）；公文字体/、keystore/ 为本机资产，**不入库**（§2）
 ├── publish/        发布产物（不入库）

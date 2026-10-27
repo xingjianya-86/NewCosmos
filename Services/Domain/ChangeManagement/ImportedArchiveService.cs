@@ -13,7 +13,7 @@ namespace NewCosmos.Services.Domain.ChangeManagement;
 
 /// <summary>
 /// 导入库档案服务实现
-/// 说明：5 个导入库的表结构由 Excel 导入服务（BaseCombinedImportService 系列）写入，
+/// 说明：6 个导入库的表结构由 Excel 导入服务（BaseCombinedImportService 系列）写入，
 /// 各域列略有差异，以下按域给出显式 SQL 表达式（表名全部来自本类白名单，禁止外部传入）。
 /// </summary>
 public class ImportedArchiveService : BaseService, IImportedArchiveService
@@ -103,6 +103,15 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
             "COALESCE(f.bank_name,'')", "COALESCE(NULLIF(f.one_card_account,''), f.bank_account, '')"),
         new LibraryDef(ArchiveSearchSource.RigidExpenditure,
             "nc_biz_rigid_expenditure_families", "nc_biz_rigid_expenditure_persons",
+            "f.address",
+            "f.guarantee_size", "NULL::numeric", "NULL::numeric",
+            "f.hukou_type", "NULL::varchar",
+            "p.monthly_income * 12", "NULL::date", "NULL::integer", "p.work_capacity",
+            "NULL::numeric", "NULL::numeric", "NULL::numeric",
+            "f.include_month", "f.apply_reason",
+            "''", "''"),
+        new LibraryDef(ArchiveSearchSource.OtherDifficulty,
+            "nc_biz_other_difficulty_families", "nc_biz_other_difficulty_persons",
             "f.address",
             "f.guarantee_size", "NULL::numeric", "NULL::numeric",
             "f.hukou_type", "NULL::varchar",
@@ -206,7 +215,7 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
     }
 
     /// <summary>
-    /// 组合搜索 SQL：5 个域 ×（家庭直查 + 成员回查），家庭命中排前，总体 LIMIT 20
+    /// 组合搜索 SQL：6 个域 ×（家庭直查 + 成员回查），家庭命中排前，总体 LIMIT 20
     /// </summary>
     private static string BuildSearchSql()
     {
@@ -289,6 +298,8 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
             ArchiveSearchSource.Destitute => DeriveDestituteCode(supportMode),
             ArchiveSearchSource.RigidExpenditure => isUrban
                 ? ClassificationConstants.UrbanRigidExpenditure : ClassificationConstants.RuralRigidExpenditure,
+            // 其他困难人员不是分类认定类别（业务确认不新增认定码）：留空，界面回退显示来源名
+            ArchiveSearchSource.OtherDifficulty => string.Empty,
             _ => string.Empty
         };
     }

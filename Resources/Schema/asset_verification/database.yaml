@@ -211,6 +211,28 @@ tables:
         type: VARCHAR(64)
         nullable: false
         comment: SHA256文件哈希(去重用)
+      - name: head_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 户主身份证号（按户报告版本/读取的唯一键）
+      - name: version
+        type: INTEGER
+        nullable: false
+        defaultValue: 1
+        comment: 户内报告版本号（每户从1递增）
+      - name: is_current
+        type: BOOLEAN
+        nullable: false
+        defaultValue: 'true'
+        comment: 是否当前版本（每户只允许一条 TRUE）
+      - name: superseded_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 被新版本替换的时间
+      - name: report_size
+        type: INTEGER
+        nullable: true
+        comment: PDF字节数（octet_length(report_data)，容量监控用）
       - name: is_valid
         type: BOOLEAN
         nullable: false
@@ -241,6 +263,12 @@ tables:
         columns: [check_id]
       - name: idx_check_reports_file_hash
         columns: [file_hash]
+      - name: idx_check_reports_head_id_card
+        columns: [head_id_card]
+      - name: ux_check_reports_current_per_head
+        columns: [head_id_card]
+        unique: true
+        where: "is_current AND head_id_card IS NOT NULL"
 
   # ── 按档案的资产核查表（生产库缺失，依代码重建）──
   # 使用方：AssetVerificationService（增改查）、StatisticsService（Pending 计数）

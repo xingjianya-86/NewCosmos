@@ -6,6 +6,7 @@ namespace NewCosmos.Services.Domain.ArchiveManagement;
 /// <summary>
 /// 档案照片服务：手机端采集的证件/核查照片的存取。
 /// 照片按人（applicant_id_card）+ 申请（application_id）+ 类别（photo_category）归档，存库 bytea。
+/// 新采集统一由保存入口压缩为 WebP（单张 ≤500KB）；旧 JPEG/PNG 通过 image_format 兼容。
 /// </summary>
 public interface IArchivePhotoService
 {

@@ -496,7 +496,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         Source = t,
         Name = t.ArchiveName,
         IdCard = t.ArchiveIdCard,
-        StatusText = "有报告",
+        StatusText = "有报告未建档",
         StatusKind = "Warning",
         MetaLabel = "与户主关系",
         MetaValue = DictDisplayHelper.GetFamilyRelationshipDisplay(t.Relationship),

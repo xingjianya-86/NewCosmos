@@ -7,11 +7,17 @@ public static class AssetCheckStatusConstants
     public const string INCLUDED = "2";
     public const string REFUSED = "3";
 
+    /// <summary>
+    /// 单个核查报告 PDF 大小上限（写死）：业务实测一般 ≤300KB，留 5MB 安全上限，
+    /// 防止 report_data(bytea) 无节制膨胀。超限文件在批次扫描阶段直接跳过并提示。
+    /// </summary>
+    public const long MaxReportFileSizeBytes = 5 * 1024 * 1024;
+
     public static string GetDescription(string status) => status switch
     {
         SUBMITTED => "已提交",
-        VERIFIED => "已核查",
-        INCLUDED => "已纳入低收入人口",
+        VERIFIED => "有报告未建档",
+        INCLUDED => "已建档（已纳入）",
         REFUSED => "不予认定",
         _ => "未知"
     };

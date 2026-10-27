@@ -1041,7 +1041,8 @@ public partial class ElderlyApplicationService
                 FROM nc_biz_elderly_applications
                 WHERE id_card = ANY($1) AND deleted_at IS NULL
                 ORDER BY (status = 'Confirmed') DESC, id DESC";
-            var appResult = await _db.QueryAsync<Age90AppRow>(appSql, ct, cards);
+            // cards 是 string[]：唯一实参会被 params object[] 当成形参数组本身 → $1 退化为首张卡
+            var appResult = await _db.QueryAsync<Age90AppRow>(appSql, ct, new object[] { cards });
             if (appResult.IsFailure)
                 return Result.Failure<List<ElderlyAge90Row>>(appResult.ErrorCode!, appResult.Message!);
             var appMap = new Dictionary<string, Age90AppRow>(StringComparer.Ordinal);
@@ -1063,7 +1064,9 @@ public partial class ElderlyApplicationService
                     FROM nc_biz_elderly_subsidy_history
                     WHERE id_card = ANY($1) AND address IS NOT NULL AND address <> ''
                     ORDER BY id_card, id DESC";
-                var histResult = await _db.QueryAsync<HistoryAddrRow>(histSql, ct, needFallback);
+                // needFallback 是 string[]（引用类型数组）：作为唯一实参会被 params object[] 按 normal form
+                // 当成形参数组本身 → 元素被摊成 $1..$N，$1 退化为首张证件号，ANY($1) 报 42809/22P02
+                var histResult = await _db.QueryAsync<HistoryAddrRow>(histSql, ct, new object[] { needFallback });
                 if (histResult.IsFailure)
                     return Result.Failure<List<ElderlyAge90Row>>(histResult.ErrorCode!, histResult.Message!);
                 foreach (var h in histResult.Value ?? new List<HistoryAddrRow>())

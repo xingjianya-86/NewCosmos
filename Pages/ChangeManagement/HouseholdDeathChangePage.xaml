@@ -109,6 +109,10 @@
                             </VerticalStackLayout>
                         </Grid>
                         <VerticalStackLayout Spacing="8">
+                            <Label Text="死亡确切时间（必填）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <TimePicker Time="{Binding DeathTime}" Format="HH:mm"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="8">
                             <Label Text="死亡原因" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             <Picker ItemsSource="{Binding DeathReasonOptions}"
                                     SelectedItem="{Binding SelectedDeathReason}"

@@ -103,6 +103,7 @@ public static class TempReliefConstants
         "nc_biz_urban_subsistence_families" => "最低生活保障台账",
         "nc_biz_low_income_edge_families" => "最低生活保障边缘台账",
         "nc_biz_rigid_expenditure_families" => "刚性支出台账",
+        "nc_biz_other_difficulty_families" => "其他困难人员台账",
         "nc_biz_destitute_families" => "特困人员台账",
         "nc_biz_applications" => "最低生活保障申请库",
         _ => tableName ?? string.Empty
@@ -131,6 +132,7 @@ public static class TempReliefConstants
         "nc_biz_urban_subsistence_families" => "最低生活保障家庭",
         "nc_biz_low_income_edge_families" => "最低生活保障边缘家庭",
         "nc_biz_rigid_expenditure_families" => "其他困难类型家庭",
+        "nc_biz_other_difficulty_families" => "其他困难类型家庭",
         "nc_biz_destitute_families" => "特困人员",
         "nc_biz_applications" => "最低生活保障家庭",
         _ => tableName ?? string.Empty
@@ -157,6 +159,8 @@ public static class TempReliefConstants
                 or "农村最低生活保障边缘家庭成员" or "城市最低生活保障边缘家庭成员"
                 or "农村刚性支出困难家庭成员" or "城市刚性支出困难家庭成员"
                 or "支出型困难家庭" => "最低生活保障边缘家庭",
+            "其他困难人员" or "其他困难人员家庭" or "其他困难人员家庭成员" or "其他困难"
+                => "其他困难类型家庭",
             "特困" or "特困供养家庭" or "特困分散供养" or "特困集中供养" or "特困人员"
                 or "特困供养对象" or "农村特困人员（分散供养）" or "农村特困人员（集中供养）"
                 or "城市特困人员（分散供养）" or "城市特困人员（集中供养）"
@@ -253,6 +257,7 @@ public static class TempReliefConstants
         "nc_biz_urban_subsistence_families",
         "nc_biz_low_income_edge_families",
         "nc_biz_rigid_expenditure_families",
+        "nc_biz_other_difficulty_families",
         "nc_biz_destitute_families",
         "nc_biz_applications"
     };
@@ -268,20 +273,29 @@ public static class TempReliefConstants
         "nc_biz_urban_subsistence_families" => "nc_biz_urban_subsistence_persons",
         "nc_biz_low_income_edge_families" => "nc_biz_low_income_edge_persons",
         "nc_biz_rigid_expenditure_families" => "nc_biz_rigid_expenditure_persons",
+        "nc_biz_other_difficulty_families" => "nc_biz_other_difficulty_persons",
         "nc_biz_destitute_families" => "nc_biz_destitute_persons",
         _ => string.Empty
     };
 
-    /// <summary>persons 成员表关系英文枚举 → 中文（未知值保留原文）</summary>
-    public static string GetRelationshipDisplayName(string? relationship) => relationship switch
+    /// <summary>
+    /// 成员关系字典键（Head/Spouse/...）→ 中文显示（未知值/已是中文时原样返回）。
+    /// 临时救助成员关系在申请库快照、台账人员表、历史落库中均可能以字典键存在，
+    /// 表单/打印/审批表统一经本方法转换，避免输出英文（如 Spouse）。
+    /// </summary>
+    public static string GetRelationshipDisplayName(string? relationship) => relationship?.Trim() switch
     {
+        null or "" => string.Empty,
         "Head" => "户主",
         "Spouse" => "配偶",
         "Son" => "儿子",
         "Daughter" => "女儿",
         "Parent" => "父母",
         "Grandchild" => "孙子女",
-        _ => relationship ?? string.Empty
+        "Grandparent" => "祖父母/外祖父母",
+        "Sibling" => "兄弟姐妹",
+        "Other" => "其他",
+        _ => relationship!.Trim()
     };
 
     /// <summary>

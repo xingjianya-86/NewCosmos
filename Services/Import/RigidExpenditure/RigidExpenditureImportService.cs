@@ -7,8 +7,8 @@ namespace NewCosmos.Services.Import.RigidExpenditure;
 public class RigidExpenditureImportService : BaseCombinedImportService
 {
     public override string ImportTypeName => ImportTypeCodes.RIGID_EXPENDITURE;
-    public override string FamilyFilePattern => "刚性支出家庭查询_*.xlsx";
-    public override string PersonFilePattern => "刚性支出人员查询_*.xlsx";
+    public override string FamilyFilePattern => "刚性支出困难家庭查询_*.xlsx";
+    public override string PersonFilePattern => "刚性支出困难人员查询_*.xlsx";
     protected override string FamilyTableName => "nc_biz_rigid_expenditure_families";
     protected override string PersonTableName => "nc_biz_rigid_expenditure_persons";
 

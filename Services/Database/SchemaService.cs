@@ -43,6 +43,31 @@ public partial class SchemaService : BaseService, ISchemaService
         Logger.Info("SchemaService initialized");
     }
 
+    /// <summary>
+    /// 已废弃的 Schema 目录：源文件已删除，但旧安装目录/增量发布可能残留。
+    /// 加载时直接跳过，避免旧表定义触发"缺少数据库表结构"误报（旧表已由
+    /// docs/migrations/20261021_annual_planting_subsidy_merge.sql 合并并 DROP）。
+    /// 当前：soybean_imports（高油/高蛋白大豆，2026-10-21 四合一后废弃）。
+    /// </summary>
+    private static readonly HashSet<string> ObsoleteSchemaDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "soybean_imports"
+    };
+
+    /// <summary>
+    /// 已废弃的 Schema 文件（相对 Resources/Schema 的路径，统一用 '/' 分隔）：
+    /// 2026-10-21 年度种植补贴四合一后，这三张旧补贴表及其 database.yaml 已删除；
+    /// 旧安装目录/增量发布可能残留这些 YAML，若不跳过会被 SchemaService 当成“缺少表”误报，
+    /// 甚至在“初始化 Schema”时把旧表重新建出来。新表定义保留 annual_planting_subsidy.yaml。
+    /// </summary>
+    private static readonly HashSet<string> ObsoleteSchemaFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "subsidy_imports/database.yaml",
+        "subsidy_imports/planting_subsidy.yaml",
+        "subsidy_imports/rotation_subsidy.yaml",
+        "subsidy_imports/soil_subsidy.yaml"
+    };
+
     private static string FindSchemaDirectory()
     {
         string[] possiblePaths =
@@ -103,6 +128,13 @@ public partial class SchemaService : BaseService, ISchemaService
         var schemaDirectories = Directory.GetDirectories(_schemaDirectory);
         foreach (var dir in schemaDirectories)
         {
+            var dirName = Path.GetFileName(dir);
+            if (ObsoleteSchemaDirectories.Contains(dirName))
+            {
+                Logger.Warn($"忽略已废弃的 Schema 目录: {dirName}（旧安装残留，可安全删除）");
+                continue;
+            }
+
             var yamlFiles = Directory.GetFiles(dir, "*.yaml")
                 .Where(f => !f.EndsWith(".back", StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -115,6 +147,13 @@ public partial class SchemaService : BaseService, ISchemaService
 
             foreach (var yamlPath in yamlFiles)
             {
+                var relativePath = Path.GetRelativePath(_schemaDirectory, yamlPath).Replace('\\', '/');
+                if (ObsoleteSchemaFiles.Contains(relativePath))
+                {
+                    Logger.Warn($"忽略已废弃的 Schema 文件: {relativePath}（旧安装残留，可安全删除）");
+                    continue;
+                }
+
                 try
                 {
                     var yamlContent = File.ReadAllText(yamlPath);
@@ -1077,6 +1116,12 @@ public partial class SchemaService : BaseService, ISchemaService
     {
         if (_schemaCache.TryGetValue(databaseName, out var cached))
             return cached;
+
+        if (ObsoleteSchemaDirectories.Contains(databaseName))
+        {
+            Logger.Warn($"忽略已废弃的 Schema: {databaseName}（旧安装残留，可安全删除）");
+            return null;
+        }
 
         var filePath = GetSchemaFilePath(databaseName);
         if (!File.Exists(filePath))

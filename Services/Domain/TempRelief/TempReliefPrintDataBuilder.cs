@@ -33,12 +33,45 @@ public static class TempReliefPrintDataBuilder
     {
         var acceptance = acceptanceDate ?? app.PublicizeEndDate ?? DateTime.Today;
 
+        // 表单无成员时会保留一行空白占位行，历史落库也可能残留；打印前统一剔除，
+        // 否则空白行会被当成一名成员（授权承诺书会多印一个"居民身份证"）。
+        var effectiveMembers = members?
+            .Where(m => !string.IsNullOrWhiteSpace(m.MemberName))
+            .ToList() ?? new List<TempReliefMember>();
+
+        // 审批表成员行 / 授权承诺书槽位共用：剔除户主本人与重复身份证（历史脏数据），
+        // 避免同一人占两行；无身份证时按"户主关系 + 姓名"兜底识别户主。
+        string? applicantIdCardRaw = app.ApplicantIdCard;
+        string? applicantNameRaw = app.ApplicantName;
+        var applicantIdCard = (applicantIdCardRaw ?? string.Empty).Trim();
+        var applicantName = (applicantNameRaw ?? string.Empty).Trim();
+        var seenIdCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (applicantIdCard.Length > 0)
+            seenIdCards.Add(applicantIdCard);
+
+        var memberRows = new List<TempReliefMember>(effectiveMembers.Count);
+        foreach (var m in effectiveMembers)
+        {
+            var idCard = (m.IdCard ?? string.Empty).Trim();
+            if (idCard.Length > 0)
+            {
+                if (!seenIdCards.Add(idCard)) continue;
+            }
+            else if (TempReliefConstants.GetRelationshipDisplayName(m.Relation) == TempReliefConstants.RelationHead
+                     && string.Equals(m.MemberName?.Trim(), applicantName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            memberRows.Add(m);
+        }
+
         // 家庭人口统一口径（户主 1 人 + 有效家庭成员行数；赡养抚养扶养义务人不计入）：
         // 打印时按实际成员明细重算，保证与逐行家庭成员自洽、不受历史快照影响；
         // 无成员明细时退回主表存储快照（纯台账来源、历史导入记录）。
         // 口径唯一实现见 TempReliefConstants.ResolveFamilySize。
         var familySize = TempReliefConstants.ResolveFamilySize(
-            app.FamilySize, TempReliefConstants.CountEffectiveMembers(members?.Select(m => m.MemberName)));
+            app.FamilySize, TempReliefConstants.CountEffectiveMembers(memberRows.Select(m => m.MemberName)));
 
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -74,7 +107,7 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.TEMP_BENEFICIARY_ID_CARD] = FirstNonEmpty(app.BeneficiaryIdCard, app.ApplicantIdCard),
             [FieldKeys.TEMP_BENEFICIARY_GENDER] = FirstNonEmpty(app.BeneficiaryGender, app.Gender),
             [FieldKeys.TEMP_BENEFICIARY_AGE] = (app.BeneficiaryAge ?? app.Age)?.ToString() ?? string.Empty,
-            [FieldKeys.TEMP_BENEFICIARY_RELATION] = app.BeneficiaryRelation ?? string.Empty,
+            [FieldKeys.TEMP_BENEFICIARY_RELATION] = TempReliefConstants.GetRelationshipDisplayName(app.BeneficiaryRelation),
             [FieldKeys.TEMP_DIFFICULTY_TYPE] = string.IsNullOrWhiteSpace(app.DifficultyType)
                 ? TempReliefConstants.DifficultyTypeOther : app.DifficultyType,
             [FieldKeys.TEMP_DIFFICULTY_DETAILS] = BuildDifficultyDetails(app),
@@ -134,34 +167,36 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.COPYRIGHT_INFO] = CopyrightHelper.BuildCopyrightInfo(app.ApplicantIdCard)
         };
 
-        // 家庭成员索引槽位（审批表 5 行）
-        if (members != null)
+        // 家庭成员索引槽位（审批表 5 行）：只用有效成员（空白占位行/户主本人/重复身份证不占行）
+        for (var i = 0; i < TempReliefConstants.MaxMemberRows; i++)
         {
-            for (var i = 0; i < TempReliefConstants.MaxMemberRows; i++)
-            {
-                var idx = i + 1;
-                var member = i < members.Count ? members[i] : null;
-                fields[FieldKeys.TEMP_MEMBER_NAME + "_" + idx] = member?.MemberName ?? string.Empty;
-                fields[FieldKeys.TEMP_MEMBER_GENDER + "_" + idx] = member?.Gender ?? string.Empty;
-                fields[FieldKeys.TEMP_MEMBER_RELATION + "_" + idx] = member?.Relation ?? string.Empty;
-                fields[FieldKeys.TEMP_MEMBER_ID_CARD + "_" + idx] = member?.IdCard ?? string.Empty;
-                fields[FieldKeys.TEMP_MEMBER_WORK_UNIT + "_" + idx] = member?.WorkUnit ?? string.Empty;
-                fields[FieldKeys.TEMP_MEMBER_ANNUAL_INCOME + "_" + idx] = member?.AnnualIncome?.ToString("F2") ?? string.Empty;
-            }
+            var idx = i + 1;
+            var member = i < memberRows.Count ? memberRows[i] : null;
+            fields[FieldKeys.TEMP_MEMBER_NAME + "_" + idx] = member?.MemberName ?? string.Empty;
+            fields[FieldKeys.TEMP_MEMBER_GENDER + "_" + idx] = member?.Gender ?? string.Empty;
+            fields[FieldKeys.TEMP_MEMBER_RELATION + "_" + idx] = TempReliefConstants.GetRelationshipDisplayName(member?.Relation);
+            fields[FieldKeys.TEMP_MEMBER_ID_CARD + "_" + idx] = member?.IdCard ?? string.Empty;
+            fields[FieldKeys.TEMP_MEMBER_WORK_UNIT + "_" + idx] = member?.WorkUnit ?? string.Empty;
+            fields[FieldKeys.TEMP_MEMBER_ANNUAL_INCOME + "_" + idx] = member?.AnnualIncome?.ToString("F2") ?? string.Empty;
         }
 
         // 授权承诺书家庭成员槽位（1..6）：户主（申请人）恒为索引 1（与 FamilyFieldBuilder 约定一致），
-        // Members 依次占槽位 2..6（表单成员不含户主，最多 5 人）；证件类型固定居民身份证。
+        // 有效成员依次占槽位 2..6（最多 5 人）；关系转中文，空槽不写证件类型
+        //（曾因空白占位行姓名是空串而非 null，单成员家庭多印一个"居民身份证"）。
         // 不依赖 Members 是否为空：无成员数据时仍输出户主一行
         var archiveMembers = new List<(string? Name, string Gender, string Relation, string IdCard)>(ArchiveMemberSlots)
         {
-            (app.ApplicantName, app.Gender, TempReliefConstants.RelationHead, app.ApplicantIdCard)
+            (applicantName, app.Gender, TempReliefConstants.RelationHead, applicantIdCard)
         };
-        if (members != null)
+
+        foreach (var m in memberRows)
         {
-            foreach (var m in members.Take(ArchiveMemberSlots - 1))
-                archiveMembers.Add((m.MemberName, m.Gender, m.Relation, m.IdCard));
+            if (archiveMembers.Count >= ArchiveMemberSlots) break;
+
+            archiveMembers.Add((m.MemberName?.Trim() ?? string.Empty, m.Gender ?? string.Empty,
+                TempReliefConstants.GetRelationshipDisplayName(m.Relation), (m.IdCard ?? string.Empty).Trim()));
         }
+
         while (archiveMembers.Count < ArchiveMemberSlots)
             archiveMembers.Add((null, string.Empty, string.Empty, string.Empty));
 
@@ -170,7 +205,7 @@ public static class TempReliefPrintDataBuilder
             var idx = i + 1;
             var slot = archiveMembers[i];
             fields[FieldKeys.FAMILY_MEMBER_NAME + "_" + idx] = slot.Name ?? string.Empty;
-            fields[FieldKeys.FAMILY_MEMBER_CERT_TYPE + "_" + idx] = slot.Name == null ? string.Empty : "居民身份证";
+            fields[FieldKeys.FAMILY_MEMBER_CERT_TYPE + "_" + idx] = string.IsNullOrWhiteSpace(slot.Name) ? string.Empty : "居民身份证";
             fields[FieldKeys.FAMILY_MEMBER_ID_CARD + "_" + idx] = slot.IdCard ?? string.Empty;
             fields[FieldKeys.FAMILY_MEMBER_RELATION + "_" + idx] = slot.Relation ?? string.Empty;
         }

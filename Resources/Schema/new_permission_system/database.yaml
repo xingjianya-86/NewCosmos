@@ -154,6 +154,10 @@ tables:
         type: character varying(50)
         nullable: true
         comment: 机构类别，如"集中供养"、"分散供养"
+      - name: province_id
+        type: integer
+        nullable: true
+        comment: 所属省ID（2026-10-26 真级联省，关联 nc_regions_provinces；省名由 JOIN 取不落库）
       - name: city_id
         type: integer
         nullable: true
@@ -178,6 +182,14 @@ tables:
         type: timestamp without time zone
         nullable: true
         comment: 最后更新时间
+    indexes:
+      # 组织名称唯一（2026-10-25）：应用层 CheckNameExistsAsync 与 INSERT 之间存在并发窗口，
+      # 查重通过 ≠ 一定能插进去，用唯一索引兜底。
+      # ⚠️ 存量若已有重名，CREATE UNIQUE INDEX 会失败——SchemaService 只记 Warn 不中断启动，
+      # 需先按 docs/migrations/20261025_organizations_name_unique.sql 清理后才会生效。
+      - name: ux_nc_sys_organizations_name
+        columns: [name]
+        unique: true
 
   # ── 权限定义表 ──
   - name: nc_sys_permissions

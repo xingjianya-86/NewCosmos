@@ -130,7 +130,7 @@ public partial class BankFlowImportService : BaseImportService
         }
         if (map.BalanceCols.Count != map.FlowCols.Count)
         {
-            LogWarn($"余额列({map.BalanceCols.Count})与流水列({map.FlowCols.Count})数量不一致，按最小数量配对");
+            LogWarn($"余额列({map.BalanceCols.Count})与流水列({map.FlowCols.Count})数量不一致，按最近余额列配对，多余余额列流水记 0");
         }
 
         progress?.Report("解析数据行...");
@@ -257,10 +257,11 @@ public partial class BankFlowImportService : BaseImportService
     {
         var map = new ColumnMap();
         var bankNames = new List<string>();
+        var header = BuildMergedHeader(reader, headerRow);
 
-        for (var c = 1; c <= reader.ColumnCount; c++)
+        for (var c = 1; c <= header.Length; c++)
         {
-            var h = reader.GetCellText(headerRow, c).Trim();
+            var h = header[c - 1];
             if (h.Length == 0) continue;
 
             if (h.Contains("序号")) map.SeqCol = c;
@@ -283,7 +284,82 @@ public partial class BankFlowImportService : BaseImportService
 
         // 银行名取余额列（与顺序配对的流水列同属一家银行）
         foreach (var n in bankNames) map.BankNames.Add(n);
+
+        // 合并单元格可能吞掉流水表头：4 月 xlsx 的"农信社（余额）"占两列，
+        // 流水列表头为空但数据列存在。仅当流水列少于余额列时，把余额列后紧跟的空列补为该行流水列。
+        var missingFlows = map.BalanceCols.Count - map.FlowCols.Count;
+        if (missingFlows > 0)
+        {
+            var used = new HashSet<int>(map.FlowCols);
+            var limit = map.MachineryCol > 0 ? map.MachineryCol : header.Length + 1;
+
+            foreach (var balanceCol in map.BalanceCols)
+            {
+                if (missingFlows <= 0) break;
+
+                var candidate = balanceCol + 1;
+                if (candidate >= limit || candidate > header.Length) continue;
+                if (header[candidate - 1].Length != 0 || used.Contains(candidate)) continue;
+
+                used.Add(candidate);
+                map.FlowCols.Add(candidate);
+                missingFlows--;
+            }
+
+            map.FlowCols.Sort();
+        }
+
         return map;
+    }
+
+    /// <summary>
+    /// 合并主表头行与相邻表头行：真实上游文件存在"银行列在第 2 行、姓名/身份证在第 3 行"的分行表头
+    /// （2 月/4 月样例），只读主行会识别不到任何银行余额列。规则：主行非空优先，空单元格再从
+    /// 上一行/下一行补；相邻行必须是表头特征行，数据行（如 7 月 R3）不会被误并入。
+    /// </summary>
+    private static string[] BuildMergedHeader(IExcelSheetReader reader, int headerRow)
+    {
+        var columnCount = reader.ColumnCount;
+        var header = new string[columnCount];
+        for (var c = 1; c <= columnCount; c++)
+            header[c - 1] = reader.GetCellText(headerRow, c).Trim();
+
+        foreach (var r in new[] { headerRow - 1, headerRow + 1 })
+        {
+            if (r < 1 || r > reader.RowCount) continue;
+            if (!LooksLikeHeaderRow(reader, r, columnCount)) continue;
+
+            for (var c = 1; c <= columnCount; c++)
+            {
+                if (header[c - 1].Length == 0)
+                    header[c - 1] = reader.GetCellText(r, c).Trim();
+            }
+        }
+
+        return header;
+    }
+
+    /// <summary>判断某行是否仍属表头（避免把 7 月 R3 这种数据行并入表头）。</summary>
+    private static bool LooksLikeHeaderRow(IExcelSheetReader reader, int row, int columnCount)
+    {
+        for (var c = 1; c <= columnCount; c++)
+        {
+            var v = reader.GetCellText(row, c).Trim();
+            if (v is "序号"
+                || v.Contains("与户主关系")
+                || v.Contains("人员姓名")
+                || v.Contains("身份证号")
+                || v.Contains("家庭地址")
+                || v.Contains("余额")
+                || v.Contains("流水")
+                || v.StartsWith("房产")
+                || v.Contains("农机"))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>"农信社（余额）"→"农信社"；兼容全/半角括号混排（样例"农行(余额）"）。</summary>
@@ -296,6 +372,75 @@ public partial class BankFlowImportService : BaseImportService
     [GeneratedRegex(@"[\（(]?\s*余额\s*[\）)]?\s*$")]
     private static partial Regex BalanceSuffixRegex();
 
+    private sealed class BankColumnPair
+    {
+        public string Bank { get; set; } = "";
+        public int BalanceCol { get; set; }
+        /// <summary>0 表示该余额列没有可配对的流水列</summary>
+        public int FlowCol { get; set; }
+    }
+
+    /// <summary>
+    /// 余额/流水列配对。正常文件一余额一流水；真实 7 月样例存在连续两个"工行（余额）"后只跟一个流水列，
+    /// 此时流水归最靠近它的余额列，另一个余额列保留金额、流水记 0，避免把后面的建设银行流水错配给工行。
+    /// </summary>
+    private static List<BankColumnPair> BuildBankPairs(ColumnMap map)
+    {
+        var pairs = new List<BankColumnPair>();
+        var balanceIndex = 0;
+        var flowIndex = 0;
+
+        while (balanceIndex < map.BalanceCols.Count && flowIndex < map.FlowCols.Count)
+        {
+            var run = new List<int>();
+            while (balanceIndex < map.BalanceCols.Count && map.BalanceCols[balanceIndex] < map.FlowCols[flowIndex])
+            {
+                run.Add(balanceIndex);
+                balanceIndex++;
+            }
+
+            if (run.Count == 0)
+            {
+                // 流水列出现在任何余额列之前：无可配对，跳过该流水列
+                flowIndex++;
+                continue;
+            }
+
+            var paired = run[^1];
+            pairs.Add(new BankColumnPair
+            {
+                Bank = map.BankNames[paired],
+                BalanceCol = map.BalanceCols[paired],
+                FlowCol = map.FlowCols[flowIndex]
+            });
+
+            foreach (var extra in run.Take(run.Count - 1))
+            {
+                pairs.Add(new BankColumnPair
+                {
+                    Bank = map.BankNames[extra],
+                    BalanceCol = map.BalanceCols[extra],
+                    FlowCol = 0
+                });
+            }
+
+            flowIndex++;
+        }
+
+        while (balanceIndex < map.BalanceCols.Count)
+        {
+            pairs.Add(new BankColumnPair
+            {
+                Bank = map.BankNames[balanceIndex],
+                BalanceCol = map.BalanceCols[balanceIndex],
+                FlowCol = 0
+            });
+            balanceIndex++;
+        }
+
+        return pairs;
+    }
+
     #endregion
 
     #region 数据行解析
@@ -304,8 +449,7 @@ public partial class BankFlowImportService : BaseImportService
         ImportResult result, CancellationToken ct)
     {
         var rows = new List<ParsedRow>();
-        var pairCount = Math.Min(map.BalanceCols.Count, map.FlowCols.Count);
-        var bankCount = Math.Min(pairCount, map.BankNames.Count);
+        var bankPairs = BuildBankPairs(map);
         var skipCount = 0;
 
         for (var r = headerRow + 1; r <= reader.RowCount; r++)
@@ -346,13 +490,15 @@ public partial class BankFlowImportService : BaseImportService
             }
 
             decimal balanceSum = 0, flowMax = 0;
-            for (var i = 0; i < bankCount; i++)
+            foreach (var pair in bankPairs)
             {
-                var balance = ParseAmount(reader.GetCellText(r, map.BalanceCols[i]));
-                var flow = ParseAmount(reader.GetCellText(r, map.FlowCols[i]));
+                var balance = ParseAmount(reader.GetCellText(r, pair.BalanceCol));
+                var flow = pair.FlowCol > 0
+                    ? ParseAmount(reader.GetCellText(r, pair.FlowCol))
+                    : 0;
                 balanceSum += balance;
                 if (flow > flowMax) flowMax = flow;
-                row.Banks.Add((map.BankNames[i], balance, flow));
+                row.Banks.Add((pair.Bank, balance, flow));
             }
             row.TotalBalance = balanceSum;
             row.MaxFlow = flowMax;

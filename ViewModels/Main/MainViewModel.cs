@@ -37,6 +37,7 @@ public partial class MainViewModel : ViewModelBase
     private readonly ISessionLifecycleService _sessionLifecycle = null!;
     private readonly IElderlyApplicationService _elderlyApplicationService = null!;
     private readonly ICollegeStudentService _collegeStudentService = null!;
+    private readonly Services.Domain.ArchiveManagement.IDeathStatementService _deathStatementService = null!;
     private readonly AppOptions _appOptions = null!;
 
     #region 抽象属性实现
@@ -144,6 +145,8 @@ public partial class MainViewModel : ViewModelBase
     public int AssetVerificationCol { get; private set; }
     public int ArchiveQueryRow { get; private set; }
     public int ArchiveQueryCol { get; private set; }
+    public int DeathStatementRow { get; private set; }
+    public int DeathStatementCol { get; private set; }
     public int DatabaseManagementRow { get; private set; }
     public int DatabaseManagementCol { get; private set; }
     public int UserManagementRow { get; private set; }
@@ -186,6 +189,8 @@ public partial class MainViewModel : ViewModelBase
         Place(CanAccessElderlyBenefit, (r, c) => { ElderlyBenefitRow = r; ElderlyBenefitCol = c; }, nameof(ElderlyBenefitRow), nameof(ElderlyBenefitCol));
         Place(CanAccessAssetVerification, (r, c) => { AssetVerificationRow = r; AssetVerificationCol = c; }, nameof(AssetVerificationRow), nameof(AssetVerificationCol));
         Place(CanAccessArchiveQuery, (r, c) => { ArchiveQueryRow = r; ArchiveQueryCol = c; }, nameof(ArchiveQueryRow), nameof(ArchiveQueryCol));
+        // 死亡情况说明：紧随救助档案管理，入口在中间业务模块（侧栏不放）
+        Place(CanAccessArchiveQuery, (r, c) => { DeathStatementRow = r; DeathStatementCol = c; }, nameof(DeathStatementRow), nameof(DeathStatementCol));
         Place(CanAccessDatabaseManagement, (r, c) => { DatabaseManagementRow = r; DatabaseManagementCol = c; }, nameof(DatabaseManagementRow), nameof(DatabaseManagementCol));
         Place(CanAccessUserManagement, (r, c) => { UserManagementRow = r; UserManagementCol = c; }, nameof(UserManagementRow), nameof(UserManagementCol));
         Place(CanAccessReprint, (r, c) => { ReprintCenterRow = r; ReprintCenterCol = c; }, nameof(ReprintCenterRow), nameof(ReprintCenterCol));
@@ -324,6 +329,24 @@ public partial class MainViewModel : ViewModelBase
 
     #endregion
 
+    #region 死亡申报联动提醒
+
+    /// <summary>本村死亡申报中仍有未办关联流程的条数（口径见 DeathStatementService.GetPendingLinkageCountAsync）</summary>
+    [ObservableProperty]
+    private int _deathLinkagePendingCount;
+
+    /// <summary>是否显示死亡申报联动提醒横幅</summary>
+    [ObservableProperty]
+    private bool _showDeathLinkageReminder;
+
+    /// <summary>横幅文案（计数由单一 SQL 判定，与页面联动卡片同口径）</summary>
+    public string DeathLinkageBannerText =>
+        $"有 {DeathLinkagePendingCount} 条死亡申报仍有未办关联流程（高龄停发 / 档案变更等），请前往「死亡情况说明」处理";
+
+    partial void OnDeathLinkagePendingCountChanged(int value) => OnPropertyChanged(nameof(DeathLinkageBannerText));
+
+    #endregion
+
     public MainViewModel(
         ILoggerService logger,
         ISystemService systemService,
@@ -341,7 +364,8 @@ public partial class MainViewModel : ViewModelBase
         IUpdateService updateService,
         IAppUpdateCoordinator updateCoordinator,
         NewCosmos.Services.System.IClientVersionService clientVersionService,
-        ISessionLifecycleService sessionLifecycle)
+        ISessionLifecycleService sessionLifecycle,
+        Services.Domain.ArchiveManagement.IDeathStatementService deathStatementService)
     {
         _logger = logger;
         _systemService = systemService;
@@ -360,6 +384,7 @@ public partial class MainViewModel : ViewModelBase
         _updateCoordinator = updateCoordinator;
         _clientVersionService = clientVersionService;
         _sessionLifecycle = sessionLifecycle;
+        _deathStatementService = deathStatementService;
 
         _appOptions = _configService.GetAppOptions();
         Title = _appOptions.WindowTitle;
@@ -393,7 +418,8 @@ public partial class MainViewModel : ViewModelBase
             await Task.WhenAll(
                 LoadGracePeriodReminderAsync(),
                 LoadElderlyReminderAsync(),
-                LoadCollegeStudentReminderAsync());
+                LoadCollegeStudentReminderAsync(),
+                LoadDeathLinkageReminderAsync());
             return;
         }
         _initialized = true;
@@ -448,6 +474,7 @@ public partial class MainViewModel : ViewModelBase
             LoadGracePeriodReminderAsync(),
             LoadElderlyReminderAsync(),
             LoadCollegeStudentReminderAsync(),
+            LoadDeathLinkageReminderAsync(),
             CheckSchemaStatusAsync(),
             WarmupDictCacheAsync());
 
@@ -835,6 +862,34 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 加载死亡申报联动提醒（失败容忍：查询失败仅记日志、不显示横幅，
+    /// 账号未绑定村社区时服务返回 Success(0) 同样不亮横幅）
+    /// </summary>
+    private async Task LoadDeathLinkageReminderAsync()
+    {
+        try
+        {
+            var result = await _deathStatementService.GetPendingLinkageCountAsync();
+            if (result.IsSuccess)
+            {
+                DeathLinkagePendingCount = result.Value;
+                ShowDeathLinkageReminder = result.Value > 0;
+                _logger.Info($"死亡申报联动提醒加载完成: 待联动 {DeathLinkagePendingCount} 条");
+            }
+            else
+            {
+                ShowDeathLinkageReminder = false;
+                _logger.Warn($"死亡申报联动计数查询失败: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowDeathLinkageReminder = false;
+            _logger.LogError(ex, "死亡申报联动提醒加载异常");
+        }
+    }
+
     #region 侧边栏导航命令
 
     /// <summary>
@@ -874,6 +929,12 @@ public partial class MainViewModel : ViewModelBase
                 case "Archive":
                     if (!CanAccessArchiveQuery) { await ShowNoPermissionAlertAsync(); return; }
                     await NavigateToAsync<Pages.ArchiveManagement.ArchiveQueryPage>("救助档案管理");
+                    break;
+
+                // 死亡情况说明：入口跟随档案查看权（Android 由 ResolvePage 解析 MobileDeathStatementPage）
+                case "DeathStatement":
+                    if (!CanAccessArchiveQuery) { await ShowNoPermissionAlertAsync(); return; }
+                    await NavigateToAsync<Pages.ArchiveManagement.DeathStatementPage>("死亡情况说明");
                     break;
 
                 case "Database":
@@ -1025,6 +1086,25 @@ public partial class MainViewModel : ViewModelBase
         {
             _logger.LogError(ex, "导航到大学生管理失败");
             await _dialogService.DisplayAlertAsync("错误", $"打开大学生管理页面失败: {ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 导航到死亡情况说明页面
+    /// 由首页死亡申报联动提醒横幅点击触发
+    /// </summary>
+    [RelayCommand]
+    private async Task NavigateToDeathStatementAsync()
+    {
+        _logger.LogBusiness("导航到死亡情况说明", ("Module", "DeathStatement"));
+        try
+        {
+            await NavigateToPageAsync<Pages.ArchiveManagement.DeathStatementPage>("死亡情况说明");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "导航到死亡情况说明失败");
+            await _dialogService.DisplayAlertAsync("错误", $"打开死亡情况说明页面失败: {ex.Message}", "确定");
         }
     }
 

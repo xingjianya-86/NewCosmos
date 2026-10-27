@@ -176,7 +176,7 @@ public class AssetVerificationReportService : BaseService, IAssetVerificationRep
             ws.Cells[1, 1, 1, 10].Merge = true;
             ws.Cells[1, 1].Style.Font.Bold = true;
             ws.Cells[1, 1].Style.Font.Size = 14;
-            ws.Cells[2, 1].Value = $"总数: {data.Stats.TotalCount}  已提交: {data.Stats.SubmittedCount}  有报告: {data.Stats.HasReportCount}  已建档: {data.Stats.ArchivedCount}  已拒绝: {data.Stats.RejectedCount}";
+            ws.Cells[2, 1].Value = $"总户数: {data.Stats.TotalCount}  名册人数: {data.Tasks.Count}  已提交: {data.Stats.SubmittedCount}  有报告未建档: {data.Stats.HasReportCount}  已建档: {data.Stats.ArchivedCount}  不予认定: {data.Stats.RejectedCount}";
             ws.Cells[2, 1, 2, 10].Merge = true;
             ws.Cells[3, 1].Value = $"生成时间: {data.GeneratedAt:yyyy-MM-dd HH:mm}  生成人: {data.GeneratedBy}";
             ws.Cells[3, 1, 3, 10].Merge = true;
@@ -203,7 +203,7 @@ public class AssetVerificationReportService : BaseService, IAssetVerificationRep
                 ws.Cells[row, 6].Value = task.ContactPhone;
                 ws.Cells[row, 7].Value = task.ApplicationDate == default ? "" : task.ApplicationDate.ToString("yyyy-MM-dd");
                 ws.Cells[row, 8].Value = task.BatchId;
-                ws.Cells[row, 9].Value = task.StatusDisplay;
+                ws.Cells[row, 9].Value = AssetCheckStatusConstants.GetDescription(task.Status);
                 ws.Cells[row, 10].Value = task.VerificationResult;
                 row++;
             }

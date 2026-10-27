@@ -231,6 +231,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
             var savedCount = 0;
             var failedCount = 0;
+            string? firstError = null;
 
             await ExecuteAsync(async () =>
             {
@@ -252,12 +253,11 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                             continue;
                         }
 
-                        // 压缩后存库
-                        var compressed = Helpers.ImageCompressor.Compress(raw);
-
+                        // 原始字节交给 ArchivePhotoService 统一压缩为 WebP（单张 ≤500KB）并落库；
+                        // 不在 ViewModel 里压缩，避免绕过服务层体积约束。
                         var photo = new ArchivePhoto
                         {
-                            PhotoData = compressed,
+                            PhotoData = raw,
                             ApplicantIdCard = ApplicantIdCard.Trim(),
                             ApplicationId = ApplicationId,
                             PhotoCategory = SelectedCategoryCode,
@@ -270,6 +270,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                         if (save.IsFailure)
                         {
                             failedCount++;
+                            firstError ??= save.Message;
                             _logger.Warn($"照片保存失败: {file.FileName} {save.Message}");
                             continue;
                         }
@@ -279,11 +280,14 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                             ("ApplicationId", ApplicationId?.ToString() ?? ""),
                             ("Category", SelectedCategoryCode),
                             ("PhotoId", save.Value.ToString()),
-                            ("Size", compressed.Length.ToString()));
+                            ("OriginalSize", raw.Length.ToString()),
+                            ("StoredSize", photo.PhotoData.Length.ToString()),
+                            ("Format", photo.ImageFormat));
                     }
                     catch (Exception ex)
                     {
                         failedCount++;
+                        firstError ??= ex.Message;
                         _logger.Warn($"照片处理失败: {file.FileName} {ex.Message}");
                     }
                 }
@@ -298,7 +302,8 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
             var message = failedCount == 0
                 ? $"已保存 {savedCount} 张照片（{SelectedCategoryName}）"
-                : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）";
+                : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）" +
+                  (string.IsNullOrWhiteSpace(firstError) ? string.Empty : $"\n原因：{firstError}");
             await ShowTipAsync(message);
         }
         catch (FeatureNotSupportedException)
@@ -332,14 +337,19 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             if (data.IsFailure || data.Value == null || data.Value.Length == 0)
                 return Result.Failure(data.ErrorCode ?? ErrorCodes.NOT_FOUND, data.Message ?? "照片读取失败");
 
-            var fileName = $"NewCosmos_{photo.ApplicantIdCard}_{photo.PhotoCategory}_{DateTime.Now:yyyyMMddHHmmss}_{photo.Id}.jpg";
-            var saved = await album.SaveToAlbumAsync(fileName, data.Value, CancellationToken);
+            var format = Helpers.ImageTranscoder.DetectFormat(data.Value);
+            if (string.IsNullOrEmpty(format))
+                format = photo.ImageFormat;
+            var fileName = $"NewCosmos_{photo.ApplicantIdCard}_{photo.PhotoCategory}_{DateTime.Now:yyyyMMddHHmmss}_{photo.Id}{PhotoFormatConstants.GetExtension(format)}";
+            var saved = await album.SaveToAlbumAsync(
+                fileName, data.Value, PhotoFormatConstants.GetMimeType(format), CancellationToken);
             if (saved.IsFailure)
                 return Result.Failure(saved.ErrorCode!, saved.Message!);
 
             _logger.LogBusiness("档案照片导出到相册",
                 ("PhotoId", photo.Id),
                 ("Category", photo.PhotoCategory),
+                ("Format", format),
                 ("Target", saved.Value ?? string.Empty));
             return Result.Success();
         }, "导出到相册...");

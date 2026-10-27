@@ -64,6 +64,13 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     private DateTime _deathDate = DateTime.Today;
 
     /// <summary>
+    /// 死亡确切时间（TimePicker 恒有值，必填在结构上成立；表单标签显式标注必填，
+    /// 服务侧另有 DeathTime 空值校验（ChangeService）双门把关。
+    /// </summary>
+    [ObservableProperty]
+    private TimeSpan _deathTime = new(12, 0, 0);
+
+    /// <summary>
     /// 死亡原因（提交时由预设选择组装，不由 UI 直接编辑）
     /// </summary>
     [ObservableProperty]
@@ -228,6 +235,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                 NewHeadName = SelectedNewHead.Name,
                 NewHeadIdCard = SelectedNewHead.IdCard,
                 DeathDate = DeathDate,
+                DeathTime = DeathTime,
                 DeathReason = DeathReason,
                 DeathCertificateNo = DeathCertificateNo,
                 OperatorName = operatorName
@@ -283,6 +291,13 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
             return false;
         }
 
+        // 死亡确切时间必填（TimePicker 恒有值，此处为防御性校验，防绑定异常导致 0 值以外的非法时刻）
+        if (DeathTime < TimeSpan.Zero || DeathTime >= TimeSpan.FromDays(1))
+        {
+            _dialogService.DisplayAlertAsync("验证失败", "请选择死亡确切时间", "确定");
+            return false;
+        }
+
         if (SelectedDeathReason == null || string.IsNullOrWhiteSpace(SelectedDeathReason.Display))
         {
             _dialogService.DisplayAlertAsync("验证失败", "请选择死亡原因", "确定");
@@ -303,6 +318,40 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 跨流程联动预填（死亡情况说明「户主死亡」卡片跳转）：
+    /// 只回填表单字段，仍走本页自身的校验与确认，不代替审批。
+    /// </summary>
+    public void ApplyDeathPrefill(DateTime? deathDate, string? deathTime, string? deathReason, string? deathCertificateNo)
+    {
+        if (deathDate is { } date && date != default)
+            DeathDate = date;
+
+        if (!string.IsNullOrWhiteSpace(deathTime) && TimeSpan.TryParse(deathTime, out var time))
+            DeathTime = time;
+
+        if (!string.IsNullOrWhiteSpace(deathReason))
+        {
+            var option = DeathReasonOptions.FirstOrDefault(o => o.Display == deathReason);
+            if (option != null)
+            {
+                SelectedDeathReason = option;
+            }
+            else
+            {
+                var other = DeathReasonOptions.FirstOrDefault(o => o.Display == DeathReasonOther);
+                if (other != null)
+                {
+                    SelectedDeathReason = other;
+                    OtherDeathReasonText = deathReason;
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(deathCertificateNo))
+            DeathCertificateNo = deathCertificateNo;
     }
 
     #endregion

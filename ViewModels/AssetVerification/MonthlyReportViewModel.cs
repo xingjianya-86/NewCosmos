@@ -46,6 +46,10 @@ public partial class MonthlyReportViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isMonthSelected;
 
+    /// <summary>仅导出状态筛选命中的人员，不展开同户其他状态成员（默认整户名册）</summary>
+    [ObservableProperty]
+    private bool _onlyCurrentStatusPersons;
+
     // ===== 周报支持 =====
     [ObservableProperty]
     private ReportPeriodMode _reportMode;
@@ -161,7 +165,8 @@ public partial class MonthlyReportViewModel : ViewModelBase
         {
             if (SelectedWeekNumber == 0)
             {
-                PeriodText = "A线 核查周期（过渡周）：2026-07-11 ~ 2026-08-02";
+                var (start, end) = ReportPeriodHelper.GetWeeklyPeriod(SelectedYear, 0);
+                PeriodText = $"A线 核查周期（过渡周）：{start:yyyy-MM-dd} ~ {end.AddDays(-1):yyyy-MM-dd}";
             }
             else
             {
@@ -202,22 +207,19 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 : GetALinePeriod(SelectedYear, SelectedMonth);
 
             var result = await _verificationService.GetStatsByDateRangeAsync(start, end, ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.IsFailure || result.Value == null)
             {
-                TotalCount = result.Value.TotalCount;
-                SubmittedCount = result.Value.SubmittedCount;
-                HasReportCount = result.Value.HasReportCount;
-                ArchivedCount = result.Value.ArchivedCount;
-                RejectedCount = result.Value.RejectedCount;
+                // 失败不置 0：保留上次统计并显式提示，避免“查询失败”被当成“本月无人”
+                ErrorMessage = "核查统计加载失败: " + (result.Message ?? "未知错误");
+                return;
             }
-            else
-            {
-                TotalCount = 0;
-                SubmittedCount = 0;
-                HasReportCount = 0;
-                ArchivedCount = 0;
-                RejectedCount = 0;
-            }
+
+            TotalCount = result.Value.TotalCount;
+            SubmittedCount = result.Value.SubmittedCount;
+            HasReportCount = result.Value.HasReportCount;
+            ArchivedCount = result.Value.ArchivedCount;
+            RejectedCount = result.Value.RejectedCount;
+            ErrorMessage = null;
         }, "加载统计...");
     }
 
@@ -260,13 +262,15 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 var result = await _verificationService.SearchByDateRangePagedAsync(
                     startDate, endDate, null, status, pageIndex, pageSize, ct);
 
-                if (result.IsSuccess && result.Value != null)
+                if (result.IsFailure || result.Value == null)
                 {
-                    allItems.AddRange(result.Value.Items);
-                    if (allItems.Count >= result.Value.TotalCount) break;
-                    pageIndex++;
+                    ErrorMessage = $"加载{label}数据失败: " + (result.Message ?? "未知错误");
+                    return;
                 }
-                else break;
+
+                allItems.AddRange(result.Value.Items);
+                if (allItems.Count >= result.Value.TotalCount) break;
+                pageIndex++;
             }
 
             if (allItems.Count == 0)
@@ -275,12 +279,14 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 return;
             }
 
-            // 同户全员展开（含各状态成员行），再按身份证去重只保留最新一条
+            // 默认同户全员展开（含各状态成员行）；勾选“仅当前状态人员”时保持状态筛选结果
             var beforeCount = allItems.Count;
-            allItems = await ExpandHasReportFamilyMembersAsync(allItems, ct);
+            if (!OnlyCurrentStatusPersons)
+                allItems = await ExpandHasReportFamilyMembersAsync(allItems, ct);
             _logger.LogBusiness($"导出全部{label}人员",
                 ("TotalCount", beforeCount),
-                ("ExpandedCount", allItems.Count));
+                ("ExpandedCount", allItems.Count),
+                ("RosterScope", OnlyCurrentStatusPersons ? "当前状态人员" : "整户名册"));
 
             var dedupedItems = allItems
                 .GroupBy(x => x.ArchiveIdCard)
@@ -304,6 +310,7 @@ public partial class MonthlyReportViewModel : ViewModelBase
             PrintNavigationData.FieldData = new Dictionary<string, string>
             {
                 ["REPORT_PERIOD"] = "全部月份",
+                ["REPORT_ROSTER_SCOPE"] = OnlyCurrentStatusPersons ? "当前状态人员" : "整户名册",
                 ["REPORT_LABEL"] = label,
                 ["REPORT_START_DATE"] = "2000-01-01",
                 ["REPORT_END_DATE"] = "2100-12-31"
@@ -365,13 +372,15 @@ public partial class MonthlyReportViewModel : ViewModelBase
             {
                 var result = await _verificationService.SearchByDateRangePagedAsync(start, end, null, statusFilter, pageIndex, pageSize, ct);
 
-                if (result.IsSuccess && result.Value != null)
+                if (result.IsFailure || result.Value == null)
                 {
-                    allItems.AddRange(result.Value.Items);
-                    if (allItems.Count >= result.Value.TotalCount) break;
-                    pageIndex++;
+                    ErrorMessage = $"加载{label}数据失败: " + (result.Message ?? "未知错误");
+                    return;
                 }
-                else break;
+
+                allItems.AddRange(result.Value.Items);
+                if (allItems.Count >= result.Value.TotalCount) break;
+                pageIndex++;
             }
 
             if (allItems.Count == 0)
@@ -380,12 +389,14 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 return;
             }
 
-            // 所有导出（已提交申请/有报告未建档/全部导出）统一口径：同户全员展开，家庭成员随户主一并进入名册
+            // 默认整户名册；勾选“仅当前状态人员”时只保留状态筛选命中的人员
             var beforeCount = allItems.Count;
-            allItems = await ExpandHasReportFamilyMembersAsync(allItems, ct);
-            _logger.LogBusiness($"核查报表-同户成员展开-{label}",
+            if (!OnlyCurrentStatusPersons)
+                allItems = await ExpandHasReportFamilyMembersAsync(allItems, ct);
+            _logger.LogBusiness($"核查报表-名册范围-{label}",
                 ("Before", beforeCount),
-                ("After", allItems.Count));
+                ("After", allItems.Count),
+                ("RosterScope", OnlyCurrentStatusPersons ? "当前状态人员" : "整户名册"));
 
             // 按身份证去重，只保留最新一条
             allItems = allItems
@@ -410,6 +421,7 @@ public partial class MonthlyReportViewModel : ViewModelBase
             PrintNavigationData.FieldData = new Dictionary<string, string>
             {
                 ["REPORT_PERIOD"] = periodDesc,
+                ["REPORT_ROSTER_SCOPE"] = OnlyCurrentStatusPersons ? "当前状态人员" : "整户名册",
                 ["REPORT_LABEL"] = label,
                 ["REPORT_START_DATE"] = start.ToString("yyyy-MM-dd"),
                 ["REPORT_END_DATE"] = end.AddDays(-1).ToString("yyyy-MM-dd")

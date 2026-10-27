@@ -12,6 +12,8 @@ using NewCosmos.Services.Platform;
 using NewCosmos.Services.System;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NewCosmos.ViewModels.AssetVerification;
 
@@ -47,6 +49,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     [ObservableProperty] private int _uploadTotal;
     [ObservableProperty] private string _uploadProgressText = string.Empty;
     [ObservableProperty] private bool _isUploading;
+    [ObservableProperty] private bool _includeSubfolders;
 
     public double UploadProgressPercent => UploadTotal > 0 ? (double)UploadProgress / UploadTotal : 0;
 
@@ -68,15 +71,37 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     [ObservableProperty] private string _matchInfoText = string.Empty;
     [ObservableProperty] private string _pdfPreviewUrl = string.Empty;
     [ObservableProperty] private bool _hasPdfPreview;
+    [ObservableProperty] private string _reportVersionInfoText = string.Empty;
+    [ObservableProperty] private bool _hasReportVersions;
+    [ObservableProperty] private ReportVersionItem? _selectedReportVersion;
+
+    public ObservableCollection<ReportVersionItem> ReportVersions { get; } = new();
 
     /// <summary>
     /// 打印按钮可用：已选中待核查人员且无其他操作占用忙碌状态
     /// </summary>
     public bool CanPrintReport => HasSelectedMatchTask && !IsBusy;
 
+    /// <summary>打印历史版本按钮可用</summary>
+    public bool CanPrintSelectedVersion => SelectedReportVersion != null && !IsBusy;
+
     protected override void OnBusyStateChanged()
     {
         OnPropertyChanged(nameof(CanPrintReport));
+        OnPropertyChanged(nameof(CanPrintSelectedVersion));
+    }
+
+    partial void OnSelectedReportVersionChanged(ReportVersionItem? value)
+    {
+        OnPropertyChanged(nameof(CanPrintSelectedVersion));
+        if (value != null)
+            _ = LoadReportVersionPreviewAsync(value);
+    }
+
+    partial void OnHasReportVersionsChanged(bool value)
+    {
+        if (!value)
+            ReportVersionInfoText = string.Empty;
     }
 
     // 待核查人员搜索（姓名/身份证号关键字）
@@ -123,6 +148,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        ErrorMessage = null;
         UpdatePeriodText();
         await LoadMatchTasksAsync();
         await LoadUploadStatsAsync();
@@ -161,6 +187,8 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     {
         try
         {
+            // 两段查询共用同一个错误条：先清空，任一失败由对应方法写入，另一段成功不再清空
+            ErrorMessage = null;
             // 顺序加载，避免并行查询导致UI卡顿
             await LoadUploadStatsAsync(token);
             await LoadMatchTasksAsync(token);
@@ -188,15 +216,29 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
     #region 批量上传
 
+    private CancellationTokenSource? _batchCts;
+
+    [RelayCommand]
+    private void CancelBatchUpload()
+    {
+        _batchCts?.Cancel();
+        UploadProgressText = "正在取消...";
+    }
+
     [RelayCommand]
     private async Task BatchUploadAsync()
     {
+        _batchCts?.Dispose();
+        _batchCts = new CancellationTokenSource();
+        var token = _batchCts.Token;
+
         try
         {
             var folderPath = await PickExportFolderAsync("选择包含PDF核查报告的文件夹", cancelMessage: "已取消选择");
             if (string.IsNullOrEmpty(folderPath)) return;
 
-            var pdfFiles = Directory.GetFiles(folderPath, "*.pdf");
+            var searchOption = IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var pdfFiles = Directory.GetFiles(folderPath, "*.pdf", searchOption);
             if (pdfFiles.Length == 0)
             {
                 await _dialogService.DisplayAlertAsync("提示", "所选文件夹中没有PDF文件", "确定");
@@ -214,21 +256,36 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
             for (int i = 0; i < pdfFiles.Length; i++)
             {
+                token.ThrowIfCancellationRequested();
                 var pdfFile = pdfFiles[i];
                 var fileName = Path.GetFileNameWithoutExtension(pdfFile);
-                var matchName = MatchNameFromFileName(fileName);
+                var identity = ParseFileIdentity(fileName);
 
                 UploadProgressText = $"扫描中 {i + 1}/{pdfFiles.Length} - {fileName}";
 
                 var result = new UploadResultItem
                 {
                     FileName = fileName,
-                    MatchName = matchName,
+                    MatchName = identity.Name,
+                    FileIdCard = identity.IdCard,
                     FilePath = pdfFile
                 };
 
-                // 尝试匹配申请人
-                var searchResult = await _verificationService.SearchByNameOrIdCardAsync(matchName);
+                var fileInfo = new FileInfo(pdfFile);
+                if (fileInfo.Length > AssetCheckStatusConstants.MaxReportFileSizeBytes)
+                {
+                    result.IsMatched = false;
+                    result.StatusIcon = "✗";
+                    result.StatusText = $"文件过大（>{AssetCheckStatusConstants.MaxReportFileSizeBytes / 1024 / 1024}MB）";
+                    result.StatusColor = "#DC2626";
+                    UploadErrorCount++;
+                    UploadResults.Add(result);
+                    UploadProgress = i + 1;
+                    continue;
+                }
+
+                // 优先用文件名里的身份证精确匹配；没有身份证再按姓名
+                var searchResult = await _verificationService.SearchByNameOrIdCardAsync(identity.Keyword, token);
                 if (searchResult.IsSuccess && searchResult.Value != null && searchResult.Value.Count > 0)
                 {
                     // 多条结果时让用户选择
@@ -244,7 +301,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                             .Select((t, idx) => $"{idx + 1}. {t.ArchiveName}（{DataMasker.MaskIdCard(t.ArchiveIdCard)}）")
                             .ToArray();
                         var selected = await _dialogService.DisplayActionSheetAsync(
-                            $"「{matchName}」匹配到多条记录，请选择", "取消", null, candidateNames);
+                            $"「{identity.Name}」匹配到多条记录，请选择", "取消", null, candidateNames);
 
                         if (!string.IsNullOrEmpty(selected))
                         {
@@ -267,29 +324,57 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                     }
                     else
                     {
+                        // 报告统一落到户主 check_id；身份判定用户主，避免匹配到配偶时状态被误判
+                        var headTask = ResolveHeadTask(searchResult.Value, match);
+                        var headIdCard = !string.IsNullOrWhiteSpace(match.HeadIdCard)
+                            ? match.HeadIdCard
+                            : match.ArchiveIdCard;
+                        var headCheckId = await ResolveHeadCheckIdAsync(match, headTask);
+
                         result.IsMatched = true;
                         result.MatchedName = match.ArchiveName;
-                        result.CheckId = match.Id;
+                        result.HeadName = headTask?.ArchiveName ?? match.ArchiveName;
+                        result.HeadIdCard = headIdCard;
+                        result.CheckId = headCheckId;
                         result.BatchId = match.BatchId;
-                        result.ApplicantName = match.ArchiveName;
-                        result.ApplicantIdCard = match.ArchiveIdCard;
+                        result.ApplicantName = headTask?.ArchiveName ?? match.ArchiveName;
+                        result.ApplicantIdCard = headTask?.ArchiveIdCard ?? headIdCard;
 
-                        // 检查是否是更新的报告
-                        var pdfBytes = await File.ReadAllBytesAsync(pdfFile);
+                        // 同户同 hash：当前版本=未变更；历史版本=待恢复为当前（一样则替换，不新增行）
+                        var pdfBytes = await File.ReadAllBytesAsync(pdfFile, token);
                         var fileHash = ComputeFileHash(pdfBytes);
-                        var existsResult = await _pdfVerificationService.ReportExistsByFileHashAsync(fileHash);
+                        result.FileHash = fileHash;
+                        var matchResult = await _pdfVerificationService.FindHouseholdReportByHashAsync(headCheckId, fileHash, token);
 
-                        if (existsResult.IsSuccess && existsResult.Value == true)
+                        if (matchResult.IsFailure)
                         {
-                            result.StatusIcon = "○";
-                            result.StatusText = "未变更";
-                            result.StatusColor = "#6B7280";
-                            UploadSuccessCount++;
+                            result.StatusIcon = "✗";
+                            result.StatusText = "哈希检查失败";
+                            result.StatusColor = "#DC2626";
+                            UploadErrorCount++;
+                        }
+                        else if (matchResult.Value is { } hashMatch)
+                        {
+                            if (hashMatch.IsCurrent)
+                            {
+                                result.StatusIcon = "○";
+                                result.StatusText = "未变更";
+                                result.StatusColor = "#6B7280";
+                                UploadSuccessCount++;
+                            }
+                            else
+                            {
+                                result.IsUpdate = true;
+                                result.StatusIcon = "↻";
+                                result.StatusText = $"待恢复（v{hashMatch.Version}）";
+                                result.StatusColor = "#2563EB";
+                                UploadPendingCount++;
+                            }
                         }
                         else
                         {
                             // 检查是否已有报告（有则为更新）
-                            var hasReport = await _pdfVerificationService.ReportExistsByCheckIdAsync(match.Id);
+                            var hasReport = await _pdfVerificationService.ReportExistsByCheckIdAsync(headCheckId, token);
                             if (hasReport.IsSuccess && hasReport.Value == true)
                             {
                                 result.IsUpdate = true;
@@ -321,40 +406,59 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                 UploadProgress = i + 1;
             }
 
-            // 上传匹配成功的文件（排除未变更的）
-            var toUpload = UploadResults.Where(r => r.IsMatched && r.StatusText != "未变更").ToList();
-            if (toUpload.Count > 0)
+            // 处理所有匹配成功的文件：未变更的也补更一次核查状态（自愈历史状态），但不重复插入报告
+            var toProcess = UploadResults.Where(r => r.IsMatched).ToList();
+            var toInsert = toProcess.Where(r => r.StatusText != "未变更").ToList();
+            if (toProcess.Count > 0)
             {
-                var updateCount = toUpload.Count(r => r.IsUpdate);
-                var newCount = toUpload.Count - updateCount;
-                var msg = $"找到 {toUpload.Count} 个需要上传的文件";
-                if (updateCount > 0) msg += $"（{newCount} 新增，{updateCount} 更新）";
-                msg += "，是否上传？";
+                var updateCount = toInsert.Count(r => r.IsUpdate);
+                var newCount = toInsert.Count - updateCount;
+                var unchangedCount = toProcess.Count - toInsert.Count;
+                var msg = toInsert.Count > 0
+                    ? $"找到 {toInsert.Count} 个需要上传的文件"
+                    : $"有 {unchangedCount} 个未变更文件，是否按当前身份补更核查状态？";
+                if (toInsert.Count > 0 && updateCount > 0)
+                    msg += $"（{newCount} 新增，{updateCount} 更新）";
+                if (toInsert.Count > 0 && unchangedCount > 0)
+                    msg += $"；另有 {unchangedCount} 个未变更，仅补状态";
+                if (toInsert.Count > 0) msg += "，是否上传？";
 
-                var confirm = await _dialogService.DisplayAlertAsync("确认", msg, "上传", "取消");
+                var confirm = await _dialogService.DisplayAlertAsync("确认", msg, "确定", "取消");
 
                 if (confirm)
                 {
-                    UploadPendingCount = toUpload.Count;
+                    UploadPendingCount = toProcess.Count;
                     UploadSuccessCount = 0;
                     UploadErrorCount = 0;
 
-                    for (int i = 0; i < toUpload.Count; i++)
+                    for (int i = 0; i < toProcess.Count; i++)
                     {
-                        var item = toUpload[i];
-                        UploadProgressText = $"上传中 {i + 1}/{toUpload.Count} - {item.FileName}";
+                        var item = toProcess[i];
+                        UploadProgressText = $"上传中 {i + 1}/{toProcess.Count} - {item.FileName}";
 
                         try
                         {
-                            await UploadSingleReportAsync(item);
-                            UploadSuccessCount++;
+                            var uploadResult = await UploadSingleReportAsync(item, token);
+                            if (uploadResult.IsSuccess)
+                            {
+                                UploadSuccessCount++;
+                            }
+                            else
+                            {
+                                UploadErrorCount++;
+                                item.StatusIcon = "✗";
+                                if (string.IsNullOrWhiteSpace(item.StatusText))
+                                    item.StatusText = "上传失败";
+                                item.StatusColor = "#DC2626";
+                            }
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
                             UploadErrorCount++;
                             item.StatusIcon = "✗";
                             item.StatusText = "上传失败";
                             item.StatusColor = "#DC2626";
+                            Logger.LogError(ex, $"上传核查报告失败: {item.FileName}");
                         }
 
                         UploadProgress = i + 1;
@@ -363,17 +467,26 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                     await _dialogService.DisplayAlertAsync("完成",
                         $"上传完成，成功 {UploadSuccessCount} 个，失败 {UploadErrorCount} 个", "确定");
 
+                    ErrorMessage = null;
                     await LoadMatchTasksAsync();
                     await LoadUploadStatsAsync();
+                    if (SelectedMatchTask != null)
+                        await LoadReportVersionsAsync(SelectedMatchTask.Id);
                 }
             }
             else
             {
-                await _dialogService.DisplayAlertAsync("提示", "所有文件均已存在或未匹配", "确定");
+                await _dialogService.DisplayAlertAsync("提示", "所有文件均未匹配到核查记录", "确定");
             }
 
             IsUploading = false;
             UploadProgressText = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+            IsUploading = false;
+            UploadProgressText = "已取消";
+            await _dialogService.DisplayAlertAsync("已取消", "批量上传已取消，已处理的结果保留。", "确定");
         }
         catch (Exception ex)
         {
@@ -381,36 +494,91 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             UploadProgressText = string.Empty;
             await _dialogService.DisplayAlertAsync("错误", $"批量上传失败: {ex.Message}", "确定");
         }
+        finally
+        {
+            _batchCts?.Dispose();
+            _batchCts = null;
+        }
     }
 
-    private async Task UploadSingleReportAsync(UploadResultItem item)
+    private async Task<Result> UploadSingleReportAsync(UploadResultItem item, CancellationToken ct = default)
     {
-        var pdfBytes = await File.ReadAllBytesAsync(item.FilePath);
-        var fileHash = ComputeFileHash(pdfBytes);
-
-        // 检查是否已存在（哈希去重）：即使已存在也按当前身份补更核查状态
-        var existsResult = await _pdfVerificationService.ReportExistsByFileHashAsync(fileHash);
-        if (existsResult.IsSuccess && existsResult.Value == true)
-        {
-            item.StatusIcon = "✓";
-            item.StatusText = "已存在";
-            item.StatusColor = "#D97706";
-
-            if (item.CheckId.HasValue)
-                await UpdateCheckStatusByIdentityAsync(item.CheckId.Value, item.ApplicantName, item.ApplicantIdCard);
-            return;
-        }
-
         if (!item.CheckId.HasValue)
         {
             item.StatusIcon = "✗";
             item.StatusText = "缺少核查ID";
             item.StatusColor = "#DC2626";
-            return;
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED, "缺少核查ID");
+        }
+
+        var fileInfo = new FileInfo(item.FilePath);
+        if (fileInfo.Length > AssetCheckStatusConstants.MaxReportFileSizeBytes)
+        {
+            item.StatusIcon = "✗";
+            item.StatusText = $"文件过大（>{AssetCheckStatusConstants.MaxReportFileSizeBytes / 1024 / 1024}MB）";
+            item.StatusColor = "#DC2626";
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                $"PDF 超过大小上限 {AssetCheckStatusConstants.MaxReportFileSizeBytes / 1024 / 1024}MB");
+        }
+
+        var pdfBytes = await File.ReadAllBytesAsync(item.FilePath, ct);
+        var validation = ValidateReportFile(pdfBytes, item);
+        if (validation.IsBlocking)
+        {
+            item.StatusIcon = "✗";
+            item.StatusText = "校验失败：" + validation.Notes;
+            item.StatusColor = "#DC2626";
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED, validation.Notes);
+        }
+
+        var fileHash = string.IsNullOrWhiteSpace(item.FileHash)
+            ? ComputeFileHash(pdfBytes)
+            : item.FileHash;
+
+        // 同户同 hash：当前版本=未变更；历史版本=恢复为当前（一样则替换，不新增行）
+        var matchResult = await _pdfVerificationService.FindHouseholdReportByHashAsync(item.CheckId.Value, fileHash, ct);
+        if (matchResult.IsFailure)
+        {
+            item.StatusIcon = "✗";
+            item.StatusText = "哈希检查失败";
+            item.StatusColor = "#DC2626";
+            return Result.Failure(matchResult.ErrorCode!, matchResult.Message!);
+        }
+
+        if (matchResult.Value is { } hashMatch)
+        {
+            if (!hashMatch.IsCurrent)
+            {
+                var restoreResult = await _pdfVerificationService.SetCurrentReportAsync(hashMatch.ReportId, ct);
+                if (restoreResult.IsFailure)
+                {
+                    item.StatusIcon = "✗";
+                    item.StatusText = "恢复历史版本失败";
+                    item.StatusColor = "#DC2626";
+                    return restoreResult;
+                }
+            }
+
+            var statusResult = await UpdateCheckStatusByIdentityAsync(
+                item.CheckId.Value, item.HeadName, item.HeadIdCard, ct);
+            if (statusResult.IsFailure)
+            {
+                item.StatusIcon = "✗";
+                item.StatusText = hashMatch.IsCurrent ? "已存在，状态更新失败" : "已恢复，状态更新失败";
+                item.StatusColor = "#DC2626";
+                return statusResult;
+            }
+
+            item.StatusIcon = "✓";
+            item.StatusText = hashMatch.IsCurrent
+                ? (validation.IsValid ? "未变更" : "未变更（校验警告）")
+                : $"已恢复历史版本（v{hashMatch.Version}）";
+            item.StatusColor = "#D97706";
+            return Result.Success();
         }
 
         // 上传报告
-        await _pdfVerificationService.UploadReportAsync(
+        var uploadResult = await _pdfVerificationService.UploadReportAsync(
             item.CheckId.Value,
             item.BatchId,
             item.ApplicantName,
@@ -418,43 +586,142 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             item.FileName + ".pdf",
             pdfBytes,
             fileHash,
-            true,
-            null);
+            validation.IsValid,
+            validation.Notes,
+            ct);
+        if (uploadResult.IsFailure)
+        {
+            item.StatusIcon = "✗";
+            item.StatusText = "上传失败";
+            item.StatusColor = "#DC2626";
+            return uploadResult;
+        }
 
-        // 更新状态：按低收入身份判定 已纳入(2)/有报告(1)，与 PDF 批量验证流程口径一致
-        await UpdateCheckStatusByIdentityAsync(item.CheckId.Value, item.ApplicantName, item.ApplicantIdCard);
+        // 更新状态：按低收入身份判定 已纳入(2)/有报告(1)，终态 2/3 不被覆盖
+        var statusUpdate = await UpdateCheckStatusByIdentityAsync(
+            item.CheckId.Value, item.HeadName, item.HeadIdCard, ct);
+        if (statusUpdate.IsFailure)
+        {
+            item.StatusIcon = "✗";
+            item.StatusText = "报告已上传，状态更新失败";
+            item.StatusColor = "#D97706";
+            return statusUpdate;
+        }
 
         item.StatusIcon = "✓";
-        item.StatusText = "已上传";
-        item.StatusColor = "#059669";
+        item.StatusText = validation.IsValid ? "已上传" : "已上传（校验警告）";
+        item.StatusColor = validation.IsValid ? "#059669" : "#D97706";
+        return Result.Success();
     }
 
     /// <summary>
-    /// 按申请人当前低收入身份更新核查状态：
-    /// 已具有低保/边缘/特困身份 → 已纳入(INCLUDED)；否则 → 有报告未建档(VERIFIED)。
-    /// 与 PdfVerificationViewModel 上传判定逻辑保持同一口径。
+    /// PDF 内容校验：
+    /// - 非 PDF 文件头 / PDF 已加密 → 阻止上传；
+    /// - 文件名不含匹配人姓名或身份证 → 允许上传但 is_valid=false，写 notes。
     /// </summary>
-    private async Task UpdateCheckStatusByIdentityAsync(long checkId, string applicantName, string applicantIdCard)
+    private static (bool IsValid, bool IsBlocking, string Notes) ValidateReportFile(
+        byte[] data, UploadResultItem item)
     {
-        var hasLowIncome = await _pdfVerificationService.HasLowIncomeIdentityAsync(applicantName, applicantIdCard);
-        var targetStatus = (hasLowIncome.IsSuccess && hasLowIncome.Value)
-            ? AssetCheckStatusConstants.INCLUDED
-            : AssetCheckStatusConstants.VERIFIED;
-        await _pdfVerificationService.UpdateCheckStatusAsync(checkId, targetStatus);
+        if (data.Length < 5
+            || data[0] != (byte)'%' || data[1] != (byte)'P'
+            || data[2] != (byte)'D' || data[3] != (byte)'F' || data[4] != (byte)'-')
+            return (false, true, "非PDF文件头");
+
+        var ascii = Encoding.ASCII.GetString(data);
+        if (ascii.Contains("/Encrypt", StringComparison.Ordinal))
+            return (false, true, "PDF已加密，无法预览/打印");
+
+        var nameOk = !string.IsNullOrWhiteSpace(item.MatchName)
+                     && item.FileName.Contains(item.MatchName, StringComparison.OrdinalIgnoreCase);
+        var idOk = !string.IsNullOrWhiteSpace(item.FileIdCard)
+                   && item.FileName.Contains(item.FileIdCard, StringComparison.OrdinalIgnoreCase);
+        if (!nameOk && !idOk)
+            return (false, false, "文件名未包含匹配人姓名/身份证");
+
+        return (true, false, string.Empty);
     }
 
-    private static string MatchNameFromFileName(string fileName)
+    /// <summary>
+    /// 按户主当前低收入身份更新核查状态：
+    /// 已具有低保/单人/边缘/特困身份 → 已纳入(INCLUDED)；否则 → 有报告未建档(VERIFIED)。
+    /// 身份查询失败时不改状态；状态更新只允许 0/1 变更，终态 2/3 不动。
+    /// </summary>
+    private async Task<Result> UpdateCheckStatusByIdentityAsync(
+        long checkId, string identityName, string identityIdCard, CancellationToken ct = default)
     {
-        // 去掉扩展名
+        if (string.IsNullOrWhiteSpace(identityIdCard))
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED, "缺少户主身份证，无法判定低收入身份");
+
+        var hasLowIncome = await _pdfVerificationService.HasLowIncomeIdentityAsync(
+            identityName ?? string.Empty, identityIdCard, ct);
+        if (hasLowIncome.IsFailure)
+            return Result.Failure(hasLowIncome.ErrorCode!, "低收入身份查询失败，状态未更新: " + hasLowIncome.Message);
+
+        var targetStatus = hasLowIncome.Value
+            ? AssetCheckStatusConstants.INCLUDED
+            : AssetCheckStatusConstants.VERIFIED;
+
+        var updateResult = await _pdfVerificationService.UpdateCheckStatusFromUploadAsync(checkId, targetStatus, ct);
+        if (updateResult.IsFailure)
+            return Result.Failure(updateResult.ErrorCode!, "核查状态更新失败: " + updateResult.Message);
+
+        return Result.Success();
+    }
+
+    private static readonly Regex IdCardRegex = new(@"(?<!\d)(\d{17}[\dXx])(?!\d)", RegexOptions.Compiled);
+
+    /// <summary>
+    /// 解析 PDF 文件名：优先提取 18 位身份证用于精确匹配；否则取“第一部分_姓名_…”的第二段姓名。
+    /// 返回 (Keyword=匹配关键字, Name=显示姓名, IdCard=文件内身份证)。
+    /// </summary>
+    private static (string Keyword, string Name, string IdCard) ParseFileIdentity(string fileName)
+    {
         var name = Path.GetFileNameWithoutExtension(fileName);
+        var idMatch = IdCardRegex.Match(name);
+        var idCard = idMatch.Success ? idMatch.Value.ToUpperInvariant() : string.Empty;
+
         var parts = name.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        var displayName = parts.Length >= 2 ? parts[1] : name;
+        // 第二段是纯数字/日期时说明不是姓名，回退第一段
+        if (string.IsNullOrWhiteSpace(displayName) || Regex.IsMatch(displayName, @"^\d+$"))
+            displayName = parts.Length >= 1 ? parts[0] : name;
 
-        if (parts.Length < 2)
-            return name;
+        return (string.IsNullOrEmpty(idCard) ? displayName : idCard, displayName, idCard);
+    }
 
-        // 两种格式都是：第一部分_姓名_第三部分
-        // 第一部分是数字ID，第二部分是姓名
-        return parts[1];
+    /// <summary>从匹配结果中找户主行；找不到返回 null。</summary>
+    private static AssetVerificationTask? ResolveHeadTask(
+        List<AssetVerificationTask> candidates, AssetVerificationTask matched)
+    {
+        var head = candidates.FirstOrDefault(t => t.IsHead)
+                   ?? candidates.FirstOrDefault(t =>
+                       !string.IsNullOrWhiteSpace(t.HeadIdCard)
+                       && string.Equals(t.ArchiveIdCard, t.HeadIdCard, StringComparison.OrdinalIgnoreCase));
+        if (head != null) return head;
+
+        if (matched.IsHead
+            || (!string.IsNullOrWhiteSpace(matched.HeadIdCard)
+                && string.Equals(matched.ArchiveIdCard, matched.HeadIdCard, StringComparison.OrdinalIgnoreCase)))
+            return matched;
+
+        return null;
+    }
+
+    /// <summary>解析报告应挂的户主 check_id；找不到户主行时回退当前匹配行。</summary>
+    private async Task<long> ResolveHeadCheckIdAsync(AssetVerificationTask matched, AssetVerificationTask? headTask)
+    {
+        if (headTask != null)
+            return headTask.Id;
+
+        var headIdCard = !string.IsNullOrWhiteSpace(matched.HeadIdCard)
+            ? matched.HeadIdCard
+            : matched.ArchiveIdCard;
+        var latest = await _verificationService.GetLatestIdByIdCardAsync(headIdCard);
+        if (latest.IsSuccess && latest.Value.HasValue)
+            return latest.Value.Value;
+
+        Logger.Warn($"未解析到户主核查记录，回退匹配行: CheckId={matched.Id}, HeadIdCard={DataMasker.MaskIdCard(headIdCard)}");
+        return matched.Id;
     }
 
     private static string ComputeFileHash(byte[] data)
@@ -475,13 +742,17 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
         if (value != null)
         {
             MatchInfoText = $"申请人：{value.ArchiveName}  |  身份证：{value.ArchiveIdCard}";
-            _ = LoadExistingReportAsync(value.Id);
+            _ = LoadReportVersionsAsync(value.Id);
         }
         else
         {
             MatchInfoText = string.Empty;
             HasPdfPreview = false;
             PdfPreviewUrl = string.Empty;
+            ReportVersions.Clear();
+            HasReportVersions = false;
+            SelectedReportVersion = null;
+            ReportVersionInfoText = string.Empty;
         }
     }
 
@@ -502,7 +773,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     {
         if (task == null) return;
 
-        if (task.Status != "1")
+        if (!task.CanReject)
         {
             await _dialogService.DisplayAlertAsync("提示", "仅\"有报告未建档\"状态的核查申请可执行不予认定", "确定");
             return;
@@ -535,51 +806,128 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadExistingReportAsync(long checkId)
+    private async Task LoadReportVersionsAsync(long checkId)
     {
         try
         {
-            Logger.Debug($"尝试加载核查ID={checkId}的已有报告");
-
-            var result = await _pdfVerificationService.GetReportDataByCheckIdAsync(checkId);
-            if (result.IsSuccess && result.Value != null)
+            var result = await _pdfVerificationService.GetReportHistoryByCheckIdAsync(checkId);
+            if (result.IsFailure || result.Value == null)
             {
-                Logger.Debug($"找到报告数据，大小={result.Value.Length}字节");
-
-                // 存储到应用临时目录（避免污染桌面）
-                var previewDir = OutputPathHelper.GetTempDirectory();
-                Directory.CreateDirectory(previewDir);
-
-                // 清理前一天的旧预览文件
-                var yesterday = DateTime.Today.AddDays(-1);
-                foreach (var oldFile in Directory.GetFiles(previewDir, "cosmos_preview_*.pdf"))
-                {
-                    if (File.GetCreationTime(oldFile) <= yesterday)
-                        File.Delete(oldFile);
-                }
-
-                var filePath = Path.Combine(previewDir, $"cosmos_preview_{checkId}.pdf");
-                await File.WriteAllBytesAsync(filePath, result.Value);
-
-                var fileExists = File.Exists(filePath);
-                Logger.Debug($"PDF文件写入: {filePath}, 文件存在: {fileExists}, 大小: {new FileInfo(filePath).Length}");
-
-                PdfPreviewUrl = filePath;
-                HasPdfPreview = true;
-                MatchInfoText += "  |  已加载历史报告";
-                Logger.Debug($"PDF预览路径已设置: {PdfPreviewUrl}, HasPdfPreview: {HasPdfPreview}");
-            }
-            else
-            {
-                Logger.Debug($"未找到核查ID={checkId}的报告: {result.Message}");
+                ReportVersions.Clear();
+                HasReportVersions = false;
+                SelectedReportVersion = null;
                 HasPdfPreview = false;
+                ReportVersionInfoText = "报告版本加载失败: " + (result.Message ?? "未知错误");
+                return;
+            }
+
+            ReportVersions.Clear();
+            foreach (var r in result.Value)
+            {
+                ReportVersions.Add(new ReportVersionItem
+                {
+                    ReportId = r.Id,
+                    Version = r.Version,
+                    IsCurrent = r.IsCurrent,
+                    CreatedAt = r.VerifiedAt,
+                    ReportSize = r.ReportSize,
+                    IsValid = r.IsValid,
+                    Notes = r.Notes
+                });
+            }
+
+            HasReportVersions = ReportVersions.Count > 0;
+            SelectedReportVersion = ReportVersions.FirstOrDefault(v => v.IsCurrent)
+                                    ?? ReportVersions.FirstOrDefault();
+            if (SelectedReportVersion == null)
+            {
+                HasPdfPreview = false;
+                ReportVersionInfoText = "暂无核查报告";
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "加载报告预览失败");
+            Logger.LogError(ex, "加载报告版本失败");
+            ReportVersions.Clear();
+            HasReportVersions = false;
+            SelectedReportVersion = null;
             HasPdfPreview = false;
+            ReportVersionInfoText = "报告版本加载失败";
         }
+    }
+
+    private async Task LoadReportVersionPreviewAsync(ReportVersionItem version)
+    {
+        try
+        {
+            var result = await _pdfVerificationService.GetReportDataByReportIdAsync(version.ReportId);
+            if (result.IsFailure || result.Value is not { Length: > 0 })
+            {
+                HasPdfPreview = false;
+                ReportVersionInfoText = "该版本报告数据不存在";
+                return;
+            }
+
+            var previewDir = OutputPathHelper.GetTempDirectory();
+            Directory.CreateDirectory(previewDir);
+            var yesterday = DateTime.Today.AddDays(-1);
+            foreach (var oldFile in Directory.GetFiles(previewDir, "cosmos_preview_*.pdf"))
+            {
+                if (File.GetCreationTime(oldFile) <= yesterday)
+                    File.Delete(oldFile);
+            }
+
+            var checkId = SelectedMatchTask?.Id ?? 0;
+            var filePath = Path.Combine(previewDir, $"cosmos_preview_{checkId}_v{version.Version}.pdf");
+            await File.WriteAllBytesAsync(filePath, result.Value);
+
+            PdfPreviewUrl = filePath;
+            HasPdfPreview = true;
+            ReportVersionInfoText = version.IsCurrent
+                ? $"当前查看：v{version.Version}（当前版本）"
+                : $"当前查看：v{version.Version}（历史版本，只读）";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载报告版本预览失败");
+            HasPdfPreview = false;
+            ReportVersionInfoText = "报告版本预览失败";
+        }
+    }
+
+    [RelayCommand]
+    private async Task PrintSelectedVersionAsync()
+    {
+        if (SelectedMatchTask == null || SelectedReportVersion == null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先选择报告版本", "确定");
+            return;
+        }
+
+        var task = SelectedMatchTask;
+        var version = SelectedReportVersion;
+
+        await ExecuteAsync(async ct =>
+        {
+            var reportResult = await _pdfVerificationService.GetReportDataByReportIdAsync(version.ReportId, ct);
+            if (reportResult.IsFailure || reportResult.Value is not { Length: > 0 })
+            {
+                await _dialogService.DisplayAlertAsync("提示", reportResult.Message ?? "该版本报告数据不存在", "确定");
+                return;
+            }
+
+            var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
+            Directory.CreateDirectory(reportDir);
+            var reportPath = Path.Combine(reportDir,
+                $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}_v{version.Version}.pdf");
+            await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
+            await ShellPrintPdfAsync(reportPath);
+
+            Logger.LogBusiness("打印核查报告版本",
+                ("CheckId", task.Id),
+                ("Version", version.Version),
+                ("Name", DataMasker.MaskName(task.ArchiveName)));
+        });
     }
 
     #endregion
@@ -713,6 +1061,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     private async Task SearchAsync(CancellationToken token = default)
     {
         // 单独检索：全时间范围（不受报表周期限制）——有关键字按姓名/身份证过滤，清空关键字列出全部待核查户主
+        ErrorMessage = null;
         await LoadMatchTasksAsync(token, fullRange: true);
     }
 
@@ -737,7 +1086,9 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     {
         try
         {
-            var (start, end) = ALinePeriodHelper.GetPeriod(SelectedYear, SelectedMonth ?? 1);
+            var (start, end) = SelectedMonth.HasValue
+                ? ALinePeriodHelper.GetPeriod(SelectedYear, SelectedMonth.Value)
+                : ALinePeriodHelper.GetYearPeriod(SelectedYear);
             Logger.Debug($"加载统计: 年={SelectedYear}, 月={SelectedMonth}, 周期={start:yyyy-MM-dd}~{end:yyyy-MM-dd}");
 
             var result = await _verificationService.GetStatsByDateRangeAsync(start, end, token);
@@ -754,6 +1105,8 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             }
             else
             {
+                // 失败不置 0：保留上次统计，显式提示，避免把“查询失败”当成“本月无人”
+                ErrorMessage = "核查统计加载失败: " + (result.Message ?? "未知错误");
                 Logger.Debug($"统计查询失败: {result.Message}");
             }
         }
@@ -763,6 +1116,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            ErrorMessage = "核查统计加载失败: " + ex.Message;
             Logger.LogError(ex, "加载统计失败");
         }
     }
@@ -771,29 +1125,51 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     {
         try
         {
-            // fullRange=false：按 A线周期（上月11日~本月11日）加载当期名单（页面初始化/年月切换）；
-            // fullRange=true：全时间范围单独检索（搜索按钮触发），关键字透传服务端过滤（姓名/身份证号 ILIKE）
+            // fullRange=false：按 A线周期（上月11日~本月11日）加载当期名单；月=null 时按 A线整年。
+            // fullRange=true：全时间范围单独检索（搜索按钮触发），关键字透传服务端过滤。
             var (start, end) = fullRange
                 ? (FullRangeStart, FullRangeEnd)
-                : ALinePeriodHelper.GetPeriod(SelectedYear, SelectedMonth ?? 1);
+                : SelectedMonth.HasValue
+                    ? ALinePeriodHelper.GetPeriod(SelectedYear, SelectedMonth.Value)
+                    : ALinePeriodHelper.GetYearPeriod(SelectedYear);
             var keyword = string.IsNullOrWhiteSpace(SearchKeyword) ? null : SearchKeyword.Trim();
-            var result = await _verificationService.SearchByDateRangePagedAsync(
-                start, end, keyword, null, 1, 1000, token);
 
-            if (token.IsCancellationRequested) return;
-
-            if (result.IsSuccess && result.Value != null)
+            // 分页拉全，避免超过 1000 户时静默截断
+            var allItems = new List<AssetVerificationTask>();
+            var pageIndex = 1;
+            const int pageSize = 500;
+            while (true)
             {
-                // 按户主身份证号去重，只保留户主记录
-                var headTasks = result.Value.Items
-                    .GroupBy(x => x.HeadIdCard)
-                    .Select(g => g.FirstOrDefault(x => x.HeadIdCard == x.ArchiveIdCard) ?? g.First())
-                    .ToList();
+                var result = await _verificationService.SearchByDateRangePagedAsync(
+                    start, end, keyword, null, pageIndex, pageSize, token);
+                if (token.IsCancellationRequested) return;
 
-                MatchTasks.Clear();
-                foreach (var task in headTasks)
-                    MatchTasks.Add(task);
+                if (result.IsFailure || result.Value == null)
+                {
+                    ErrorMessage = "待核查人员加载失败: " + (result.Message ?? "未知错误");
+                    return;
+                }
+
+                if (result.Value.Items.Count == 0)
+                    break;
+
+                allItems.AddRange(result.Value.Items);
+                if (allItems.Count >= result.Value.TotalCount)
+                    break;
+                pageIndex++;
             }
+
+            // 按户主身份证号去重，只保留户主记录（优先 is_head，其次身份证=户主身份证）
+            var headTasks = allItems
+                .GroupBy(x => x.HeadIdCard)
+                .Select(g => g.FirstOrDefault(x => x.IsHead)
+                             ?? g.FirstOrDefault(x => string.Equals(x.ArchiveIdCard, x.HeadIdCard, StringComparison.OrdinalIgnoreCase))
+                             ?? g.First())
+                .ToList();
+
+            MatchTasks.Clear();
+            foreach (var task in headTasks)
+                MatchTasks.Add(task);
         }
         catch (OperationCanceledException)
         {
@@ -801,6 +1177,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            ErrorMessage = "待核查人员加载失败: " + ex.Message;
             Logger.LogError(ex, "加载待核查人员失败");
         }
     }
@@ -810,13 +1187,31 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
 #region 辅助类
 
+public class ReportVersionItem
+{
+    public long ReportId { get; set; }
+    public int Version { get; set; }
+    public bool IsCurrent { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int ReportSize { get; set; }
+    public bool IsValid { get; set; }
+    public string Notes { get; set; } = string.Empty;
+
+    public string DisplayText =>
+        $"v{Version}{(IsCurrent ? " 当前" : "")} · {CreatedAt:MM-dd HH:mm} · {ReportSize / 1024.0:F0}KB{(IsValid ? "" : " ⚠")}";
+}
+
 public class UploadResultItem
 {
     public string FileName { get; set; } = string.Empty;
     public string MatchName { get; set; } = string.Empty;
+    public string FileIdCard { get; set; } = string.Empty;
+    public string FileHash { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public bool IsMatched { get; set; }
     public string MatchedName { get; set; } = string.Empty;
+    public string HeadName { get; set; } = string.Empty;
+    public string HeadIdCard { get; set; } = string.Empty;
     public long? CheckId { get; set; }
     public string BatchId { get; set; } = string.Empty;
     public string ApplicantName { get; set; } = string.Empty;

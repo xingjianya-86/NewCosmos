@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Runtime.InteropServices;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -9,8 +10,8 @@ using NewCosmos.Services.Templates;
 namespace NewCosmos.Services.Domain.Printing;
 
 /// <summary>
-/// 照片打印服务实现（PC 端，无模板）：Word COM 建空白文档 → 按版式插入 JPEG 并等比缩放 →
-/// 存临时 docx → 复用既有 <see cref="OfficeComDocuments.PrintFileAsync"/> 打印管线输出。
+/// 照片打印服务实现（PC 端，无模板）：入参 WebP/JPEG/PNG 统一转 JPEG，Word COM 建空白文档 →
+/// 按版式插入并等比缩放 → 存临时 docx → 复用既有打印管线输出。
 /// COM 调用统一走 <see cref="OfficeComWorker"/>（STA 串行 + 超时保护），与 WordEngine 同源。
 /// </summary>
 public class PhotoPrintService : IPhotoPrintService
@@ -25,15 +26,18 @@ public class PhotoPrintService : IPhotoPrintService
     }
 
     public async Task<Result> PrintPhotoAsync(
-        byte[] photoJpeg,
+        byte[] photoData,
         string? layout,
         string? printerName,
         bool isDuplex,
         int copies,
         CancellationToken ct = default)
     {
-        if (photoJpeg == null || photoJpeg.Length == 0)
+        if (photoData == null || photoData.Length == 0)
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "照片数据为空，无法打印");
+
+        if (!ImageTranscoder.TryToJpeg(photoData, out var printJpeg))
+            return Result.Failure(ErrorCodes.PRINT_FAILED, "照片格式无法转换为打印格式");
 
         var imgPath = string.Empty;
         var docxPath = string.Empty;
@@ -41,7 +45,7 @@ public class PhotoPrintService : IPhotoPrintService
         {
             // 1) 照片字节落临时文件（AddPicture 按文件插入，SaveWithDocument 内嵌进 docx）
             imgPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".jpg", prefix: "photo_");
-            await File.WriteAllBytesAsync(imgPath, photoJpeg, ct);
+            await File.WriteAllBytesAsync(imgPath, printJpeg, ct);
 
             // 2) 建空白文档 → 插图 → 按版式缩放 → 存临时 docx（COM 在 STA worker 上串行执行）
             docxPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".docx", prefix: "photo_print_");

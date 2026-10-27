@@ -1,7 +1,7 @@
 namespace NewCosmos.Models.Results;
 
 /// <summary>
-/// 档案搜索来源（当前库 + 5 个历史导入库）
+/// 档案搜索来源（当前库 + 6 个历史导入库）
 /// </summary>
 public enum ArchiveSearchSource
 {
@@ -21,7 +21,10 @@ public enum ArchiveSearchSource
     Destitute = 4,
 
     /// <summary>刚性支出导入库</summary>
-    RigidExpenditure = 5
+    RigidExpenditure = 5,
+
+    /// <summary>其他困难人员导入库</summary>
+    OtherDifficulty = 6
 }
 
 /// <summary>
@@ -89,6 +92,7 @@ public class ArchiveSearchResultItem
         ArchiveSearchSource.LowIncomeEdge => "最低生活保障边缘",
         ArchiveSearchSource.Destitute => "特困供养",
         ArchiveSearchSource.RigidExpenditure => "刚性支出",
+        ArchiveSearchSource.OtherDifficulty => "其他困难人员",
         _ => "未知来源"
     };
 }

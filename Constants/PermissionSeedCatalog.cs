@@ -5,7 +5,7 @@ namespace NewCosmos.Constants;
 /// <summary>
 /// 权限系统唯一权威目录（单一事实来源）：
 /// 默认角色、权限定义、角色-权限映射矩阵、角色数据范围均以此为准。
-/// InitializationService（系统初始化建库）与 NewPermissionService（启动幂等补种/矩阵重建）共用本目录。
+/// NewPermissionService（启动幂等补种/矩阵重建）以本目录为准。
 /// 矩阵或数据范围发生变更时，递增 <see cref="MatrixVersion"/>，
 /// 启动检测到版本不一致即对 6 个默认角色执行一次性重建（旧映射清空后按矩阵重写）。
 /// </summary>

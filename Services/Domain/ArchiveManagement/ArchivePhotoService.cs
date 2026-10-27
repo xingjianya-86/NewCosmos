@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -8,6 +9,7 @@ namespace NewCosmos.Services.Domain.ArchiveManagement;
 
 /// <summary>
 /// 档案照片服务实现：证件/核查照片 bytea 存库（仿 nc_biz_signatures 先例，避开输出根迁移断链）。
+/// 新采集统一压缩为 WebP（单张 ≤500KB）后入库；旧 JPEG/PNG 通过 image_format 与魔数识别兼容。
 /// 列表查询只取元数据（不含 photo_data），预览/打印时按 Id 单独取二进制，避免列表传输大字段。
 /// </summary>
 public class ArchivePhotoService : BaseService, IArchivePhotoService
@@ -30,19 +32,45 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
         if (string.IsNullOrWhiteSpace(photo.ApplicantIdCard))
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "照片缺少身份证号关联");
 
+        // 唯一写入收口：统一压缩为 WebP 并校验 500KB 硬上限，禁止原图旁路入库。
+        var compressResult = await Task.Run(
+            () => ImageCompressor.CompressToWebP(photo.PhotoData, photo.PhotoCategory), ct);
+        if (compressResult.IsFailure)
+        {
+            LogWarn($"照片压缩失败: {compressResult.Message}");
+            return Result.Failure<long>(compressResult.ErrorCode!, compressResult.Message!);
+        }
+
+        var compressed = compressResult.Value;
+        photo.PhotoData = compressed.Data;
+        photo.FileSize = compressed.Data.LongLength;
+        photo.ImageFormat = PhotoFormatConstants.WebP;
+
+        if (!ImageCompressor.IsWebP(photo.PhotoData))
+        {
+            return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "照片压缩结果不是 WebP，拒绝入库");
+        }
+
+        if (photo.PhotoData.LongLength > PhotoCompressionConstants.HardMaxBytes)
+        {
+            return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED,
+                $"照片超过 {PhotoCompressionConstants.HardMaxBytes / 1024}KB 上限，拒绝入库");
+        }
+
         const string sql = @"INSERT INTO nc_biz_archive_photos
-                (photo_data, applicant_id_card, application_id, photo_category,
+                (photo_data, image_format, applicant_id_card, application_id, photo_category,
                  photo_name, file_size, created_by, created_by_name, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
                 RETURNING id";
 
         var result = await _db.ExecuteScalarAsync<long>(sql, ct,
             photo.PhotoData,
+            photo.ImageFormat,
             photo.ApplicantIdCard,
             photo.ApplicationId,
             string.IsNullOrWhiteSpace(photo.PhotoCategory) ? PhotoCategoryConstants.OTHER_CERT : photo.PhotoCategory,
             photo.PhotoName,
-            photo.PhotoData.LongLength,
+            photo.FileSize,
             photo.CreatedBy,
             photo.CreatedByName);
 
@@ -52,7 +80,9 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
             return result;
         }
 
-        LogInfo($"照片保存成功: Id={result.Value}, Category={photo.PhotoCategory}, Size={photo.PhotoData.LongLength}B");
+        LogInfo($"照片保存成功: Id={result.Value}, Category={photo.PhotoCategory}, Format={photo.ImageFormat}, " +
+                $"Size={photo.FileSize}B, Original={compressed.OriginalBytes}B, " +
+                $"{compressed.Width}x{compressed.Height}, Q={compressed.Quality}");
         return Result.Success(result.Value);
     }
 
@@ -64,7 +94,7 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
 
         // 列表只取元数据，排除 photo_data 大字段
         const string sql = @"SELECT id, applicant_id_card, application_id, photo_category,
-                photo_name, file_size, created_by, created_by_name, created_at
+                photo_name, file_size, image_format, created_by, created_by_name, created_at
                 FROM nc_biz_archive_photos
                 WHERE applicant_id_card = $1
                   AND ($2::varchar IS NULL OR photo_category = $2)
@@ -225,7 +255,7 @@ WHERE ($1::text = '' OR applicant_id_card ILIKE '%' || $1::text || '%'
 
         var listResult = await _db.QueryAsync<ArchivePhoto>(
             @"SELECT id, applicant_id_card, application_id, photo_category, photo_name,
-                     file_size, created_by, created_by_name, created_at
+                     file_size, image_format, created_by, created_by_name, created_at
               FROM nc_biz_archive_photos" + where + @"
               ORDER BY created_at DESC, id DESC
               LIMIT $3 OFFSET $4",

@@ -431,6 +431,9 @@ public partial class PrintService : BaseService, IPrintService
                 // 最低生活保障边缘家庭：停止、减员汇总表（固定标题，含县名与"停止、减员"）
                 var isEdgeFamilyStopForm = baseForm == "停保汇总表"
                     && string.Equals(category, "最低生活保障边缘家庭", StringComparison.Ordinal);
+                // 其他困难人员：停止、减员汇总表（复用边缘家庭版式，数据源为独立停止表）
+                var isOtherDifficultyStopForm = baseForm == "停保汇总表"
+                    && string.Equals(category, "其他困难人员", StringComparison.Ordinal);
                 foreach (var rural in new[] { true, false })
                 {
                     var titleSuffix = rural ? "_农村" : "_城市";
@@ -438,7 +441,9 @@ public partial class PrintService : BaseService, IPrintService
                     {
                         [FieldKeys.REPORT_TITLE] = isEdgeFamilyStopForm
                             ? $"林口县{titleYear}年{titleMonth}月城乡低保边缘家庭停止、减员汇总表"
-                            : reportTit + areaTag,
+                            : isOtherDifficultyStopForm
+                                ? $"林口县{titleYear}年{titleMonth}月其他困难人员停止、减员汇总表"
+                                : reportTit + areaTag,
                         ["REPORT_UNIT"] = fillUnit,
                         ["REPORT_DATE"] = fillDate
                     };
@@ -870,7 +875,7 @@ public partial class PrintService : BaseService, IPrintService
             .ToList();
 
     /// <summary>
-    /// 拆分 "基础名_分类"（分类: 最低生活保障/最低生活保障边缘家庭/特困人员/刚性支出困难家庭）；无分类后缀则原样返回
+    /// 拆分 "基础名_分类"（分类: 最低生活保障/最低生活保障边缘家庭/特困人员/刚性支出困难家庭/其他困难人员）；无分类后缀则原样返回
     /// </summary>
     private static (string BaseForm, string? Category) SplitMonthlyFormKey(string formKey)
     {
@@ -878,7 +883,7 @@ public partial class PrintService : BaseService, IPrintService
         if (tail > 0)
         {
             var suffix = formKey[(tail + 1)..];
-            if (suffix is "最低生活保障" or "最低生活保障边缘家庭" or "特困人员" or "刚性支出困难家庭")
+            if (suffix is "最低生活保障" or "最低生活保障边缘家庭" or "特困人员" or "刚性支出困难家庭" or "其他困难人员")
                 return (formKey[..tail], suffix);
         }
         return (formKey, null);
@@ -946,7 +951,9 @@ public partial class PrintService : BaseService, IPrintService
         var name = baseForm switch
         {
             "新增救助明细" => category == "最低生活保障边缘家庭" ? "月报_新增救助明细_最低生活保障边缘家庭" : "月报_新增救助明细",
-            "停保汇总表" => category == "最低生活保障边缘家庭" ? "月报_停保汇总表_最低生活保障边缘家庭" : "月报_停保汇总表",
+            "停保汇总表" => category is "最低生活保障边缘家庭" or "其他困难人员"
+                ? "月报_停保汇总表_最低生活保障边缘家庭"
+                : "月报_停保汇总表",
             "保障金增发表" => "月报_保障金增发表",
             "保障金减发表" => "月报_保障金减发表",
             "施保金减发" => "月报_施保金减发",

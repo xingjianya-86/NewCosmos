@@ -423,7 +423,8 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             var stoppedResult = await _db.QueryAsync<IdCardRow>(
                 $@"SELECT applicant_id_card FROM nc_biz_applications
                   WHERE status = $1 AND stop_date IS NOT NULL AND stop_date <= $2::date AND deleted_at IS NULL
-                  {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}",
+                  {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
+                  {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}",
                 ct, ApplicationStatusCodes.STOPPED, monthEnd);
             if (stoppedResult.IsFailure)
                 return Result.Failure<HashSet<string>>(stoppedResult.ErrorCode!, stoppedResult.Message!);

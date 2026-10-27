@@ -219,6 +219,13 @@ public static class DictionaryConstants
         /// 分类施保增发表仅收低保导入库满 60 来源）。
         /// </summary>
         public const string CLASSIFIED_SUBSIDY_ADD = "ClassifiedSubsidyAdd";
+
+        /// <summary>
+        /// 户内单人保转出（挂旧户档案）：旧户档案继续有效、成员行不删除，
+        /// 仅记录该成员转出为独立单人保，供「最低生活保障边缘家庭停止、减员汇总表」体现减员。
+        /// 明细 field_name=MemberRemove、field_label=成员姓名、new_value='转出单人保'。
+        /// </summary>
+        public const string SINGLE_RESCUE_OUT = "SingleRescueOut";
     }
 
     /// <summary>

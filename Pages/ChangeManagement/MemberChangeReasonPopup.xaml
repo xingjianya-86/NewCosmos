@@ -102,6 +102,14 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- 事由时刻（仅减员原因=人员死亡；死亡确切时间必填，落 nc_biz_death_records.death_time） -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsDeathTimeVisible}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="死亡确切时间（必填）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <TimePicker Time="{Binding EventTime}" Format="HH:mm"/>
+                    </VerticalStackLayout>
+                </Border>
+
                 <!-- 备注 -->
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="12">

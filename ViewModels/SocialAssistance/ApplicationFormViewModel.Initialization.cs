@@ -315,10 +315,16 @@ public partial class ApplicationFormViewModel
         _isLoadingDefaults = true;
         try
         {
-            ProvinceOptions.Clear();
-            ProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
-            if (string.IsNullOrEmpty(SelectedProvince))
-                SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
+            // ① 解析账号管辖范围（户籍地址逐级限制的唯一口径）。
+            // 解析失败=账号未绑区划 → IsAddressScopeAvailable=false，UI 整个地址区禁用（决策：严格阻断）
+            var scopeResult = await _addressScopeService.ResolveAsync();
+            _addressScope = scopeResult.IsSuccess ? scopeResult.Value : null;
+            if (_addressScope == null)
+                _logger.Warn($"地址管辖范围解析失败（地址区将被禁用）: {scopeResult.Message}");
+            NotifyAddressScopeChanged();
+
+            // ② 省 → 全国 34 省可选（原实现只放一个写死的「黑龙江省」，省不可选）
+            await LoadProvinceOptionsAsync();
 
             await LoadCityOptionsAsync();
 
@@ -343,12 +349,103 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 拉取城市列表并同步填充现住址与户籍的城市选项（同一数据源，防止户籍城市 Picker 恒空）
+    /// 加载省级行政区（2026-10-27：家庭住址省改为**全国 34 省可选**，原实现只放一个写死的「黑龙江省」）。
+    /// 省表缺失（迁移未跑）时回退单值占位，保证表单仍可用。
+    /// </summary>
+    private async Task LoadProvinceOptionsAsync()
+    {
+        try
+        {
+            var provincesResult = await _regionService.GetProvincesAsync();
+
+            ProvinceOptions.Clear();
+            _provinceIdMap.Clear();
+
+            if (provincesResult.IsSuccess && provincesResult.Value is { Count: > 0 })
+            {
+                foreach (var province in provincesResult.Value)
+                {
+                    ProvinceOptions.Add(province.ProvinceName);
+                    _provinceIdMap[province.ProvinceName] = province.Id;
+                }
+
+                // 默认选中：账号所在省 → 常量兜底（家庭住址不限范围，只给默认值）
+                var preferred = _addressScope?.ProvinceName;
+                if (string.IsNullOrWhiteSpace(preferred))
+                    preferred = DefaultValuesConstants.HOME_PROVINCE;
+
+                if (!string.IsNullOrEmpty(preferred) && ProvinceOptions.Contains(preferred))
+                    SelectedProvince = preferred;
+                else if (ProvinceOptions.Count > 0 && string.IsNullOrEmpty(SelectedProvince))
+                    SelectedProvince = ProvinceOptions[0];
+
+                _logger.Info($"省级选项加载完成: {ProvinceOptions.Count} 个省，当前={SelectedProvince}");
+            }
+            else
+            {
+                // 省表缺失/查询失败 → 退回单值占位（原行为），不阻断表单
+                if (provincesResult.IsFailure)
+                    _logger.Warn($"省级选项加载失败（回退单值）: {provincesResult.Message}");
+                ProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
+                if (string.IsNullOrEmpty(SelectedProvince))
+                    SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"加载省级数据失败（回退单值）: {ex.Message}");
+            if (ProvinceOptions.Count == 0)
+            {
+                ProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
+                if (string.IsNullOrEmpty(SelectedProvince))
+                    SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
+            }
+        }
+    }
+
+    /// <summary>省名 → 省ID（按省筛市用；省表缺失时为空 → 市列表回退全量）</summary>
+    private readonly Dictionary<string, int> _provinceIdMap = new();
+
+    // ── 户籍地址管辖范围限制（2026-10-27）──
+    // 账号绑定的那一级及以上 → 只留本单位该项（其余不可见）；以下级开放。
+    // 家庭住址（现住址）不受此限制（居住地可全国任选）。
+
+    /// <summary>户籍市级：锁定时只留本单位市</summary>
+    private bool AllowHukouCity(string cityName) =>
+        _addressScope is not { IsCityLocked: true }
+        || string.Equals(cityName, _addressScope.CityName, StringComparison.Ordinal);
+
+    /// <summary>户籍县级：锁定时只留本单位县</summary>
+    private bool AllowHukouCounty(string countyName) =>
+        _addressScope is not { IsCountyLocked: true }
+        || string.Equals(countyName, _addressScope.CountyName, StringComparison.Ordinal);
+
+    /// <summary>户籍镇级：锁定时只留本单位镇</summary>
+    private bool AllowHukouTown(string townName) =>
+        _addressScope is not { IsTownLocked: true }
+        || string.Equals(townName, _addressScope.TownName, StringComparison.Ordinal);
+
+    /// <summary>户籍村级：锁定时只留本单位村（如账号绑到柳树村 → 村下拉只有柳树村）</summary>
+    private bool AllowHukouVillage(string villageName) =>
+        _addressScope is not { IsVillageLocked: true }
+        || string.Equals(villageName, _addressScope.VillageName, StringComparison.Ordinal);
+
+    /// <summary>
+    /// 拉取城市列表并同步填充现住址与户籍的城市选项（同一数据源，防止户籍城市 Picker 恒空）。
+    /// 2026-10-27：① 按当前选中省筛市（省已可选全国）；② 户籍城市按管辖范围过滤。
     /// </summary>
     private async Task LoadCityOptionsAsync()
     {
-        var citiesResult = await _regionService.GetCitiesAsync();
-        _logger.Info($"城市数据加载结果: IsSuccess={citiesResult.IsSuccess}, Count={citiesResult.Value?.Count ?? 0}");
+        // 选了具体省且省表可用 → 按省筛市；省表缺失/未选 → 全量（原行为）
+        var provinceId = 0;
+        if (!string.IsNullOrEmpty(SelectedProvince))
+            _provinceIdMap.TryGetValue(SelectedProvince, out provinceId);
+
+        var citiesResult = provinceId > 0
+            ? await _regionService.GetCitiesByProvinceIdAsync(provinceId)
+            : await _regionService.GetCitiesAsync();
+
+        _logger.Info($"城市数据加载结果: IsSuccess={citiesResult.IsSuccess}, Count={citiesResult.Value?.Count ?? 0}, ProvinceId={provinceId}");
 
         if (citiesResult.IsSuccess && citiesResult.Value is { Count: > 0 })
         {
@@ -356,10 +453,17 @@ public partial class ApplicationFormViewModel
             HukouCityOptions.Clear();
             foreach (var city in citiesResult.Value)
             {
-                CityOptions.Add(city.CityName);
-                HukouCityOptions.Add(city.CityName);
+                CityOptions.Add(city.CityName);          // 家庭住址：全国不限
+                if (AllowHukouCity(city.CityName))       // 户籍：管辖范围内
+                    HukouCityOptions.Add(city.CityName);
             }
-            _logger.Info($"CityOptions 加载完成: {CityOptions.Count} 个城市");
+
+            // 户籍锁定时（账号绑到市级及以下）：预选本单位市
+            if (_addressScope is { IsCityLocked: true } && !string.IsNullOrEmpty(_addressScope.CityName)
+                && HukouCityOptions.Count > 0 && string.IsNullOrEmpty(HukouCity))
+                HukouCity = _addressScope.CityName;
+
+            _logger.Info($"CityOptions 加载完成: {CityOptions.Count} 个城市 / 户籍 {HukouCityOptions.Count} 个");
         }
         else if (citiesResult.IsFailure)
         {
@@ -452,17 +556,42 @@ public partial class ApplicationFormViewModel
                 SelectedVillage = VillageOptions[0];
             }
 
-            // 5. 同步设置户籍地址（新建默认与现住址一致，之后各自独立）
-            HukouProvince = DefaultValuesConstants.HOME_PROVINCE;
-            HukouCity = SelectedCity;
-            HukouDistrict = SelectedDistrict;
-            HukouTown = SelectedTown;
-            HukouVillage = SelectedVillage;
+            // 5/6. 户籍级联：**先装本级选项 → 再赋值 → 再装下一级**。
+            // 为什么不能像原来那样"先把五级值全赋了再统一 LoadHukou*"：
+            // Picker 的 SelectedItem 是 TwoWay 绑定，选项集合 Clear() 时会把已选值回写成 null，
+            // 于是刚赋的县/镇/村被清空（诊断A 实证：县 Options=1 但 HukouDistrict=''、镇/村 Options=0）。
+            // 现住址之所以正常，正是它每级都是"赋值 → 装下一级选项"，Clear 打的是尚未赋值的那一级。
+            // 2026-10-27：户籍省取账号管辖范围的省（原实现写死常量「黑龙江省」）；
+            // 锁定级（账号绑到哪一级，哪一级就取本单位的值，以下级随现住址）。
+            HukouProvince = string.IsNullOrWhiteSpace(_addressScope?.ProvinceName)
+                ? DefaultValuesConstants.HOME_PROVINCE
+                : _addressScope!.ProvinceName;
+            HukouCity = _addressScope is { IsCityLocked: true } && !string.IsNullOrEmpty(_addressScope.CityName)
+                ? _addressScope.CityName
+                : SelectedCity;
 
-            // 6. 预热户籍级联选项与区划 ID（Picker 需要选项集合才能回显选中值）
-            await LoadHukouDistrictsForCityAsync(HukouCity);
-            await LoadHukouTownsForDistrictAsync(HukouDistrict);
-            await LoadHukouVillagesForTownAsync(HukouTown);
+            await LoadHukouDistrictsForCityAsync(HukouCity);          // 装县选项（内部会 Clear 县列表）
+            HukouDistrict = _addressScope is { IsCountyLocked: true } && !string.IsNullOrEmpty(_addressScope.CountyName)
+                ? _addressScope.CountyName
+                : SelectedDistrict;                                   // 赋值在装选项之后 → 不会被 Clear 回写掉
+            if (HukouDistrictOptions.Count > 0 && !HukouDistrictOptions.Contains(HukouDistrict))
+                HukouDistrict = HukouDistrictOptions[0];              // 值不在选项内 → 取首项，防 Picker 显示空白
+
+            await LoadHukouTownsForDistrictAsync(HukouDistrict);      // 装镇选项（依赖非空的县）
+            HukouTown = _addressScope is { IsTownLocked: true } && !string.IsNullOrEmpty(_addressScope.TownName)
+                ? _addressScope.TownName
+                : SelectedTown;
+            if (HukouTownOptions.Count > 0 && !HukouTownOptions.Contains(HukouTown))
+                HukouTown = HukouTownOptions[0];
+
+            await LoadHukouVillagesForTownAsync(HukouTown);           // 装村选项（依赖非空的镇）
+            HukouVillage = _addressScope is { IsVillageLocked: true } && !string.IsNullOrEmpty(_addressScope.VillageName)
+                ? _addressScope.VillageName
+                : SelectedVillage;
+            if (HukouVillageOptions.Count > 0 && !HukouVillageOptions.Contains(HukouVillage))
+                HukouVillage = HukouVillageOptions[0];
+
+            // 预热区划 ID（保存时写库用；必须在上面各级值都定下来之后）
             await LoadHukouTownIdByNameAsync(HukouCity, HukouTown);
             await LoadHukouVillageIdByNameAsync(HukouVillage);
 
@@ -472,6 +601,9 @@ public partial class ApplicationFormViewModel
             _isLoadingDefaults = false;
 
             _logger.Info($"默认地区加载完成: {SelectedCity} {SelectedDistrict} {SelectedTown} {SelectedVillage}");
+            _logger.Debug(
+                $"户籍默认值: {HukouProvince}/{HukouCity}/{HukouDistrict}/{HukouTown}/{HukouVillage} | " +
+                $"opts 市{HukouCityOptions.Count} 县{HukouDistrictOptions.Count} 镇{HukouTownOptions.Count} 村{HukouVillageOptions.Count}");
         }
         catch (Exception ex)
         {
@@ -1258,7 +1390,10 @@ public partial class ApplicationFormViewModel
         if (countiesResult.IsSuccess && countiesResult.Value != null)
         {
             foreach (var county in countiesResult.Value)
-                HukouDistrictOptions.Add(county.CountyName);
+            {
+                if (AllowHukouCounty(county.CountyName))   // 管辖范围内（锁定时只留本单位县）
+                    HukouDistrictOptions.Add(county.CountyName);
+            }
         }
         else if (countiesResult.IsFailure)
         {
@@ -1287,7 +1422,10 @@ public partial class ApplicationFormViewModel
                 if (townsResult.IsSuccess && townsResult.Value != null)
                 {
                     foreach (var town in townsResult.Value)
-                        HukouTownOptions.Add(town.TownName);
+                    {
+                        if (AllowHukouTown(town.TownName))   // 管辖范围内（锁定时只留本单位镇）
+                            HukouTownOptions.Add(town.TownName);
+                    }
                 }
             }
         }
@@ -1335,7 +1473,10 @@ public partial class ApplicationFormViewModel
         if (villagesResult.IsSuccess && villagesResult.Value != null)
         {
             foreach (var village in villagesResult.Value)
-                HukouVillageOptions.Add(village.VillageName);
+            {
+                if (AllowHukouVillage(village.VillageName))   // 管辖范围内（锁定时只留本单位村）
+                    HukouVillageOptions.Add(village.VillageName);
+            }
         }
         else if (villagesResult.IsFailure)
         {
@@ -1582,7 +1723,14 @@ public partial class ApplicationFormViewModel
             // 治本：城市选项必须来自地级市列表。原实现用省名查 GetCountiesByCityAsync
             //（city_name='黑龙江省' 必空），返回后 Clear 掉刚加载的 CityOptions——
             // 这正是“小概率申请人所在地城市读不进”的根因竞态
-            var citiesResult = await _regionService.GetCitiesAsync(cancellationToken);
+            // 2026-10-27：① 按所选省筛市（省已改为全国 34 省可选）；② 户籍城市按管辖范围过滤。
+            var provinceId = 0;
+            if (!string.IsNullOrEmpty(province))
+                _provinceIdMap.TryGetValue(province, out provinceId);
+
+            var citiesResult = provinceId > 0
+                ? await _regionService.GetCitiesByProvinceIdAsync(provinceId, cancellationToken)
+                : await _regionService.GetCitiesAsync(cancellationToken);
             if (cancellationToken.IsCancellationRequested) return;
 
             if (citiesResult.IsSuccess && citiesResult.Value is { Count: > 0 })
@@ -1591,15 +1739,31 @@ public partial class ApplicationFormViewModel
                 HukouCityOptions.Clear();
                 foreach (var city in citiesResult.Value)
                 {
-                    CityOptions.Add(city.CityName);
-                    HukouCityOptions.Add(city.CityName);
+                    CityOptions.Add(city.CityName);          // 家庭住址：不限范围
+                    if (AllowHukouCity(city.CityName))       // 户籍：管辖范围内
+                        HukouCityOptions.Add(city.CityName);
                 }
                 if (CityOptions.Count > 0 && string.IsNullOrEmpty(SelectedCity))
                 {
                     SelectedCity = CityOptions[0];
                 }
             }
-            // 空结果不清空已有选项（保留既有数据，杜绝清空竞态）
+            else
+            {
+                // 该省数据未导入（全国数据后补）：清空市及以下，提示而不是静默
+                CityOptions.Clear();
+                HukouCityOptions.Clear();
+                DistrictOptions.Clear();
+                TownOptions.Clear();
+                VillageOptions.Clear();
+                SelectedCity = string.Empty;
+                SelectedDistrict = string.Empty;
+                SelectedTown = string.Empty;
+                SelectedVillage = string.Empty;
+                if (provinceId > 0)
+                    _logger.Warn($"所选省（{province}）的地级市数据尚未导入，市/县/镇/村为空");
+            }
+            // 空结果不清空已有选项（保留既有数据，杜绝清空竞态）——上述「所选省无数据」分支除外
         }
         catch (OperationCanceledException)
         {

@@ -134,7 +134,10 @@ public class BankFlowQueryService : BaseService, IBankFlowQueryService
                   AND UPPER(r.id_card) = ANY($1)
                   AND r.import_id = (SELECT MAX(id) FROM nc_biz_bank_flow_imports WHERE deleted_at IS NULL)";
 
-            var result = await _db.QueryAsync<BankFlowRecordBatchRow>(sql, ct, normalized);
+            // normalized 是 string[]（引用类型数组）：作为唯一实参会被 params object[] 按 normal form
+            // 当成形参数组本身 → 元素被摊成 $1..$N，$1 退化为首个标量，ANY($1) 报 42809/22P02。
+            // 必须包成"1 个数组参数"。（同 SubsidyDataService / ElderlyApplicationService 处的注释）
+            var result = await _db.QueryAsync<BankFlowRecordBatchRow>(sql, ct, new object[] { normalized });
             if (result.IsFailure)
                 return Result.Failure<Dictionary<string, BankFlowPersonData>>(result.ErrorCode, result.Message);
 

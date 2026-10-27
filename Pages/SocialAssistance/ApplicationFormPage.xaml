@@ -380,16 +380,29 @@
 
                                     <!-- 字段名 + 值 -->
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                        <Label Text="{Binding DisplayName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="{Binding DisplayName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Text="{Binding Source}" FontSize="10" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                        </HorizontalStackLayout>
                                         <Label Text="{Binding Value}" FontSize="14" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding MissingText}" FontSize="11" TextColor="{StaticResource WarningDark}"
+                                               IsVisible="{Binding IsMissing}"/>
                                     </VerticalStackLayout>
 
-                                    <!-- 填充按钮 -->
+                                    <!-- 填充按钮（有值）；无值时改为“去填写”跳转对应步骤 -->
                                     <Button Grid.Column="2" Text="填充"
                                             FontSize="12" Padding="8,4" HeightRequest="28"
                                             BackgroundColor="{StaticResource Primary}" TextColor="White"
                                             CornerRadius="4"
+                                            IsVisible="{Binding HasValue}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationFormViewModel}}, Path=FillFieldCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="2" Text="去填写"
+                                            FontSize="12" Padding="8,4" HeightRequest="28"
+                                            BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
+                                            CornerRadius="4"
+                                            IsVisible="{Binding IsMissing}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationFormViewModel}}, Path=GoToFieldStepCommand}"
                                             CommandParameter="{Binding .}"/>
                                 </Grid>
                             </DataTemplate>

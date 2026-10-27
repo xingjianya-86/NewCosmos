@@ -7,6 +7,7 @@ using NewCosmos.Services.Core;
 using NewCosmos.Navigation;
 using NewCosmos.Services.Platform;
 using System.Reflection;
+using SnackBarType = NewCosmos.Components.SnackBarType;
 
 namespace NewCosmos.ViewModels.Base;
 
@@ -283,6 +284,53 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             _currentCts.Dispose();
         }
         _currentCts = new CancellationTokenSource();
+    }
+
+    #endregion
+
+    #region SnackBar
+
+    [ObservableProperty]
+    private string _snackBarMessage = string.Empty;
+
+    [ObservableProperty]
+    private SnackBarType _snackBarType;
+
+    [ObservableProperty]
+    private bool _isSnackBarVisible;
+
+    /// <summary>连续弹出的序号：旧的延迟隐藏任务不得关掉新消息</summary>
+    private int _snackBarVersion;
+
+    /// <summary>
+    /// 显示轻提示（非阻塞：3 秒后自行隐藏，不延长调用命令的执行时间）。
+    /// 这段逻辑原先在 8 个 ViewModel 里逐字重复，现统一收敛到基类。
+    /// </summary>
+    protected Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Success)
+    {
+        SnackBarMessage = message;
+        SnackBarType = type;
+        IsSnackBarVisible = true;
+
+        var version = ++_snackBarVersion;
+        _ = HideSnackBarAfterDelayAsync(version);
+        return Task.CompletedTask;
+    }
+
+    private async Task HideSnackBarAfterDelayAsync(int version)
+    {
+        try
+        {
+            await Task.Delay(3000);
+            if (version == _snackBarVersion)
+            {
+                IsSnackBarVisible = false;
+            }
+        }
+        catch
+        {
+            // fire-and-forget：忽略异常，避免未观察的任务异常
+        }
     }
 
     #endregion

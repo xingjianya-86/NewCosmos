@@ -73,24 +73,25 @@
                                 </Border>
                                 <Border Grid.Column="1" Grid.Row="0" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="有报告" FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="有报告未建档" FontSize="14" TextColor="{StaticResource WarningDark}"/>
                                         <Label Text="{Binding HasReportCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="0" Grid.Row="1" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="已完成" FontSize="14" TextColor="{StaticResource SecondaryDark}"/>
+                                        <Label Text="已建档" FontSize="14" TextColor="{StaticResource SecondaryDark}"/>
                                         <Label Text="{Binding ArchivedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" Grid.Row="1" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="已拒绝" FontSize="14" TextColor="{StaticResource Error}"/>
+                                        <Label Text="不予认定" FontSize="14" TextColor="{StaticResource Error}"/>
                                         <Label Text="{Binding RejectedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
-                            <Label HorizontalOptions="End" TextColor="{StaticResource TextSecondary}" FontSize="14" Text="{Binding TotalCount, StringFormat='总计 {0} 条'}"/>
+                            <Label HorizontalOptions="End" TextColor="{StaticResource TextSecondary}" FontSize="14" Text="{Binding TotalCount, StringFormat='总计 {0} 户'}"/>
+                            <Label Text="统计按户；名单/报告按人" FontSize="11" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -132,19 +133,19 @@
                                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                                 <Label Grid.Column="0" Text="{Binding ArchiveName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
 
-                                                <!-- 状态徽章（柔和 Chip：已提交/有报告/已完成/已拒绝） -->
+                                                <!-- 状态徽章（柔和 Chip：已提交/有报告未建档/已建档/不予认定） -->
                                                 <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
                                                     <Border.Triggers>
                                                         <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已提交">
                                                             <Setter Property="BackgroundColor" Value="{StaticResource InfoSoft}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="有报告">
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="有报告未建档">
                                                             <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已完成">
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已建档（已纳入）">
                                                             <Setter Property="BackgroundColor" Value="{StaticResource SuccessSoft}"/>
                                                         </DataTrigger>
-                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="已拒绝">
+                                                        <DataTrigger TargetType="Border" Binding="{Binding StatusDisplay}" Value="不予认定">
                                                             <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
                                                         </DataTrigger>
                                                     </Border.Triggers>
@@ -153,13 +154,13 @@
                                                             <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已提交">
                                                                 <Setter Property="TextColor" Value="{StaticResource PrimaryDark}"/>
                                                             </DataTrigger>
-                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="有报告">
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="有报告未建档">
                                                                 <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
                                                             </DataTrigger>
-                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已完成">
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已建档（已纳入）">
                                                                 <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
                                                             </DataTrigger>
-                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="已拒绝">
+                                                            <DataTrigger TargetType="Label" Binding="{Binding StatusDisplay}" Value="不予认定">
                                                                 <Setter Property="TextColor" Value="{StaticResource Error}"/>
                                                             </DataTrigger>
                                                         </Label.Triggers>
@@ -201,6 +202,16 @@
                                 </Border>
                             </Grid>
                             <Button Text="选择文件夹并批量上传" Style="{StaticResource ButtonPrimary}" Command="{Binding BatchUploadCommand}" HeightRequest="44" FontSize="16" IsEnabled="{Binding IsUploading, Converter={x:Static converters:BoolToInverseConverter.Instance}}"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <HorizontalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
+                                    <CheckBox IsChecked="{Binding IncludeSubfolders}" VerticalOptions="Center"/>
+                                    <Label Text="包含子文件夹" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                                <Button Grid.Column="1" Text="取消上传" FontSize="13" Padding="12,0" HeightRequest="34"
+                                        BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
+                                        CornerRadius="6" IsVisible="{Binding IsUploading}"
+                                        Command="{Binding CancelBatchUploadCommand}"/>
+                            </Grid>
                             <Grid IsVisible="{Binding IsUploading}" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <ProgressBar Grid.Column="0" Progress="{Binding UploadProgressPercent}" HeightRequest="16"/>
                                 <Label Grid.Column="1" Text="{Binding UploadProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
@@ -219,13 +230,51 @@
                 </VerticalStackLayout>
             </ScrollView>
 
-            <!-- 右侧 PDF 预览 -->
+            <!-- 右侧 PDF 预览 + 报告版本（只读） -->
             <Border Grid.Column="1" BackgroundColor="{StaticResource SurfaceVariant}" StrokeThickness="0">
-                <Grid>
-                    <controls:PdfPreviewView x:Name="PdfPreview" PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
-                    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16" IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}">
-                        <Label Text="选择左侧人员后显示PDF预览" Style="{StaticResource EmptyStateLabel}" FontSize="20"/>
-                    </VerticalStackLayout>
+                <Grid RowDefinitions="*,Auto">
+                    <Grid Grid.Row="0">
+                        <controls:PdfPreviewView x:Name="PdfPreview" PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16" IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}">
+                            <Label Text="选择左侧人员后显示PDF预览" Style="{StaticResource EmptyStateLabel}" FontSize="20"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Border Grid.Row="1" IsVisible="{Binding HasReportVersions}" BackgroundColor="White"
+                            StrokeThickness="0" Padding="12,8">
+                        <VerticalStackLayout Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="报告版本（只读）" FontSize="13" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                <Button Grid.Column="1" Text="打印此版本" FontSize="12" Padding="12,2" HeightRequest="30"
+                                        BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                        CornerRadius="6" Command="{Binding PrintSelectedVersionCommand}"
+                                        IsEnabled="{Binding CanPrintSelectedVersion}"/>
+                            </Grid>
+                            <CollectionView ItemsSource="{Binding ReportVersions}"
+                                            SelectedItem="{Binding SelectedReportVersion}"
+                                            SelectionMode="Single" HeightRequest="64">
+                                <CollectionView.ItemsLayout>
+                                    <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8"/>
+                                </CollectionView.ItemsLayout>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="ReportVersionItem">
+                                        <Border Padding="10,6" StrokeThickness="1" Stroke="{StaticResource Gray200}"
+                                                StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray50}">
+                                            <Border.Triggers>
+                                                <DataTrigger TargetType="Border" Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="BackgroundColor" Value="{StaticResource PrimarySoft}"/>
+                                                    <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <Label Text="{Binding DisplayText}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                            <Label Text="{Binding ReportVersionInfoText}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                        </VerticalStackLayout>
+                    </Border>
                 </Grid>
             </Border>
 

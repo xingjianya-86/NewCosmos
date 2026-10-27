@@ -1,0 +1,505 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ArchiveManagement.DeathStatementPage"
+             x:DataType="DeathStatementViewModel"
+             Title="死亡情况说明"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <!-- 标准页面骨架（对齐低收入认定表单）：蓝条 / 范围提示 / Tab 行 / 内容 / 底部操作条 -->
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- ═══════ Row0 蓝色渐变标题栏 ═══════ -->
+        <Border Grid.Row="0" Padding="20" BackgroundColor="{StaticResource Primary}" StrokeThickness="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource PrimaryDark}" Offset="0,4" Radius="8" Opacity="0.3"/>
+            </Border.Shadow>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <components:BackButton Grid.Column="0" Command="{Binding GoBackCommand}" IconColor="White" VerticalOptions="Center"/>
+                <HorizontalStackLayout Grid.Column="1" Spacing="16" VerticalOptions="Center">
+                    <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26B0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="30" TextColor="{StaticResource White}" VerticalOptions="Center"/>
+                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="死亡情况说明" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
+                        <Label Text="死亡申报 · 身份聚合 · 文书出具" FontSize="15" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+                <!-- 范围徽标（村/社区：X  或  乡镇：柳树镇（全镇范围）） -->
+                <Border Grid.Column="2" BackgroundColor="{StaticResource White}" Opacity="0.95" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 6" Padding="12,6" VerticalOptions="Center">
+                    <Label Text="{Binding VillageLabel}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ═══════ Row1 范围提示（黄=镇级降级提示，红=真失败） ═══════ -->
+        <VerticalStackLayout Grid.Row="1">
+            <Border BackgroundColor="#FFF3CD" StrokeThickness="0" Padding="16,8"
+                    IsVisible="{Binding ScopeNotice, Converter={StaticResource StringNotEmptyConverter}}">
+                <Label Text="{Binding ScopeNotice}" FontSize="12" TextColor="#856404" LineBreakMode="WordWrap"/>
+            </Border>
+            <Border BackgroundColor="#FEE2E2" StrokeThickness="0" Padding="16,8"
+                    IsVisible="{Binding ScopeError, Converter={StaticResource StringNotEmptyConverter}}">
+                <Label Text="{Binding ScopeError}" FontSize="12" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
+            </Border>
+        </VerticalStackLayout>
+
+        <!-- ═══════ Row2 Tab 行（标准 ButtonTab + 双色互斥） ═══════ -->
+        <Border Grid.Row="2" BackgroundColor="White" Padding="16,10" StrokeThickness="0" Margin="0,1,0,0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="3" Opacity="0.03"/>
+            </Border.Shadow>
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                <Button Grid.Column="0" Style="{StaticResource ButtonTab}" Text="① 申报填写"
+                        BackgroundColor="{Binding IsTab1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#FFFFFF'}"
+                        TextColor="{Binding IsTab1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"
+                        BorderColor="{Binding IsTab1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#E8EEF4'}"
+                        Command="{Binding SwitchTabCommand}" CommandParameter="1"/>
+                <Button Grid.Column="1" Style="{StaticResource ButtonTab}" Text="② 身份与提醒"
+                        BackgroundColor="{Binding IsTab2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#FFFFFF'}"
+                        TextColor="{Binding IsTab2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"
+                        BorderColor="{Binding IsTab2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#E8EEF4'}"
+                        Command="{Binding SwitchTabCommand}" CommandParameter="2"/>
+                <Button Grid.Column="2" Style="{StaticResource ButtonTab}" Text="③ 文书输出"
+                        BackgroundColor="{Binding IsTab3, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#FFFFFF'}"
+                        TextColor="{Binding IsTab3, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"
+                        BorderColor="{Binding IsTab3, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#E8EEF4'}"
+                        Command="{Binding SwitchTabCommand}" CommandParameter="3"/>
+            </Grid>
+        </Border>
+
+        <!-- ═══════ Row3 内容区 ═══════ -->
+        <Grid Grid.Row="3">
+
+            <!-- ────────── Tab1 申报填写：检索条 + 两段步骤表单 ────────── -->
+            <ScrollView IsVisible="{Binding IsTab1}">
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <!-- 检索条（从库内选已有申报 / 未申报死亡登记） -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="从库内带出（本范围）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Button Grid.Column="1" Text="手工录入" Style="{StaticResource ButtonOutline}" Command="{Binding ManualEntryCommand}"/>
+                            </Grid>
+                            <Entry Placeholder="姓名或身份证号（留空按日期范围）" Text="{Binding SearchKeyword}"
+                                   ReturnCommand="{Binding SearchCommand}" ClearButtonVisibility="WhileEditing"/>
+                            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="起始日期" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <DatePicker Date="{Binding SearchFrom}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="截止日期" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <DatePicker Date="{Binding SearchTo}"/>
+                                </VerticalStackLayout>
+                                <Button Grid.Column="2" Text="搜索" Style="{StaticResource ButtonPrimary}" Command="{Binding SearchCommand}" VerticalOptions="End"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" VerticalOptions="Center">
+                                <Label Text="含作废申报" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Switch Grid.Column="1" IsToggled="{Binding ShowAll}" OnColor="{StaticResource Primary}" HorizontalOptions="Start"/>
+                            </Grid>
+                            <Label Text="{Binding SearchSummary}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <CollectionView ItemsSource="{Binding SearchResults}" IsVisible="{Binding HasSearchResults}"
+                                            SelectionMode="None" MaximumHeightRequest="200">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="DeathSearchItem">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="8" Style="{StaticResource TableRowInteractive}">
+                                            <VerticalStackLayout Spacing="2">
+                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                    <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center"
+                                                            IsVisible="{Binding HasDeclaration, Converter={StaticResource BoolToInverseConverter}}">
+                                                        <Label Text="{Binding Badge}" Style="{StaticResource ChipWarningText}"/>
+                                                    </Border>
+                                                    <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center" IsVisible="{Binding HasDeclaration}">
+                                                        <Label Text="{Binding Badge}" Style="{StaticResource ChipInfoText}"/>
+                                                    </Border>
+                                                    <Label Grid.Column="1" Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                                </Grid>
+                                                <Label Text="{Binding IdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding Subtitle}" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                            </VerticalStackLayout>
+                                            <Button Grid.Column="1" Text="带出" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="14,0" VerticalOptions="Center"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type DeathStatementViewModel}}, Path=SelectItemCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="本范围暂无申报/死亡登记记录，可点「手工录入」直接申报" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,6"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 卡片式分段指示器（①基本信息 ②死亡与申报） -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Border Padding="14,12" StrokeThickness="1" Stroke="#E8EEF4"
+                                BackgroundColor="{Binding IsStep1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8F0FE|#FFFFFF'}"
+                                StrokeShape="RoundRectangle 10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SwitchStepCommand}" CommandParameter="1"/>
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="① 填写基本信息" FontSize="14" FontAttributes="Bold"
+                                       TextColor="{Binding IsStep1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#1F2937'}"/>
+                                <Label Text="死者姓名 · 身份证 · 档案带出" FontSize="11"
+                                       TextColor="{Binding IsStep1, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#6B7280'}"/>
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="1" Padding="14,12" StrokeThickness="1" Stroke="#E8EEF4"
+                                BackgroundColor="{Binding IsStep2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#E8F0FE|#FFFFFF'}"
+                                StrokeShape="RoundRectangle 10">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding SwitchStepCommand}" CommandParameter="2"/>
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="② 填写死亡与申报" FontSize="14" FontAttributes="Bold"
+                                       TextColor="{Binding IsStep2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#1F2937'}"/>
+                                <Label Text="死亡确切时间 · 申报人" FontSize="11"
+                                       TextColor="{Binding IsStep2, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#6B7280'}"/>
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+
+                    <!-- 分段① 基本信息 -->
+                    <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding IsStep1}">
+                        <VerticalStackLayout Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="死者基本信息" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center" IsVisible="{Binding IsDeclared}">
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                                </Border>
+                            </Grid>
+
+                            <Label Text="死者姓名（必填）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Name}" Placeholder="请填写死者姓名"/>
+
+                            <Label Text="死者身份证号（必填）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="18 位身份证号，填满自动带出本范围档案"/>
+
+                            <Label Text="档案带出信息" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding ArchiveInfo, Converter={StaticResource StringNotEmptyConverter}}"/>
+                            <Label Text="{Binding ArchiveInfo}" FontSize="13" TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"
+                                   IsVisible="{Binding ArchiveInfo, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 分段② 死亡与申报 -->
+                    <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding IsStep2}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="死亡信息（时间必填）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="死亡日期（必填）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <DatePicker Date="{Binding DeathDate}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="死亡确切时间（必填）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <TimePicker Time="{Binding DeathTime}" Format="HH:mm"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="死亡原因" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding DeathReason}" Placeholder="选填"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="死亡证明编号" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeathCertNo}" Placeholder="缺失会进数据提醒"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="死亡地点" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeathPlace}" Placeholder="选填"/>
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                            <Label Text="申报人信息（必填前两项）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <Label Text="申报人类型" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Picker ItemsSource="{Binding DeclaredByTypeOptions}" SelectedItem="{Binding DeclaredByType}"/>
+                            <Label Text="申报人姓名" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding DeclaredByName}" Placeholder="如：张三"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="申报人电话" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeclaredByPhone}" Placeholder="选填"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="死者与申报人关系" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeclaredRelation}" Placeholder="如：父子"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Label Text="{Binding DeclaredAtText, StringFormat='申报受理时间：{0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding DeclaredAtText, Converter={StaticResource StringNotEmptyConverter}}"/>
+
+                            <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+
+                            <!-- ── 核实说明要素（《死亡情况核实说明》正文所需，2026-10-26） ── -->
+                            <Label Text="核实说明要素" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="死者性别（自动）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeathGender}" Placeholder="档案/身份证推导" IsReadOnly="True" BackgroundColor="{StaticResource Gray50}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="死者民族（自动）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding DeathEthnicity}" Placeholder="档案带出，无档案留空" IsReadOnly="True" BackgroundColor="{StaticResource Gray50}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <Label Text="所在村（镇级账号必填，落款用）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding DeclaredVillage}" Placeholder="如：土甸子村"/>
+
+                            <Label Text="发现（报告）人姓名（必填，与申报人独立）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReporterName}" Placeholder="最先发现或报告死亡的人"/>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="报告人与死者关系" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding ReporterRelation}" Placeholder="如：邻居"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="报告人联系电话" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding ReporterPhone}" Placeholder="选填"/>
+                                </VerticalStackLayout>
+                            </Grid>
+
+                            <Label Text="现场所见情况（模板 {死者情况描述}）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding SituationDesc}" Placeholder="派员到场了解的现场所见…" HeightRequest="96"/>
+
+                            <Label Text="遗体安置情况" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding RemainsArrangement}" Placeholder="如：已由亲属接走火化…" HeightRequest="72"/>
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="业务办理人" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding BusinessAgent}" Placeholder="默认经办人"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="相关业务事项" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Entry Text="{Binding BusinessMatter}" Placeholder="默认：申请居民死亡医学证明"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- ────────── Tab2 身份与提醒 ────────── -->
+            <ScrollView IsVisible="{Binding IsTab2}">
+                <VerticalStackLayout Padding="16" Spacing="12">
+
+                    <!-- 身份清单 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="在库身份（本范围）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center" IsVisible="{Binding HasIdentities}">
+                                    <Label Text="{Binding Identities.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
+                                </Border>
+                            </Grid>
+                            <Label Text="{Binding IdentitySummary}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <CollectionView ItemsSource="{Binding Identities}" SelectionMode="None" MaximumHeightRequest="260">
+                                <CollectionView.Header>
+                                    <Grid ColumnDefinitions="130,100,*" BackgroundColor="{StaticResource CardOptionBackground}" Padding="10,6">
+                                        <Label Text="身份" Style="{StaticResource TableHeaderLabel}"/>
+                                        <Label Grid.Column="1" Text="状态" Style="{StaticResource TableHeaderLabel}"/>
+                                        <Label Grid.Column="2" Text="起止 / 备注" Style="{StaticResource TableHeaderLabel}"/>
+                                    </Grid>
+                                </CollectionView.Header>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="DeathIdentityItem">
+                                        <Grid ColumnDefinitions="130,100,*" Padding="10,6" Style="{StaticResource TableRowInteractive}">
+                                            <Label Text="{Binding TypeLabel}" FontSize="13" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                            <Label Grid.Column="1" Text="{Binding StatusLabel}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                            <Label Grid.Column="2" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation">
+                                                <Label.FormattedText>
+                                                    <FormattedString>
+                                                        <Span Text="{Binding Period}"/>
+                                                        <Span Text="{Binding Note, StringFormat=' {0}'}"/>
+                                                    </FormattedString>
+                                                </Label.FormattedText>
+                                            </Label>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="系统内无该人身份记录（可切回「申报填写」填写身份证后重新汇总）" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,8"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 数据提醒 -->
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Label Grid.Column="0" Text="数据信息提醒" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Border Grid.Column="1" Style="{StaticResource ChipWarning}" VerticalOptions="Center" IsVisible="{Binding HasReminders}">
+                                    <Label Text="{Binding Reminders.Count}" Style="{StaticResource ChipWarningText}" FontAttributes="Bold"/>
+                                </Border>
+                            </Grid>
+                            <CollectionView ItemsSource="{Binding Reminders}" SelectionMode="None" MaximumHeightRequest="260">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="DeathReminderItem">
+                                        <Border Padding="10,8" Margin="0,3" StrokeThickness="0" StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource WarningSoft}">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                                    <Label Text="{Binding Level}" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                                                    <Label Grid.Column="1" Text="{Binding Message}" FontSize="12" TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                                                </Grid>
+                                                <Label Text="{Binding SuggestAction}" FontSize="11" TextColor="{StaticResource WarningDark}"
+                                                       IsVisible="{Binding SuggestAction, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="无数据提醒" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,8"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- 关联流程（只读 + 预填跳转） -->
+                    <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasLinks}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="关联流程办理" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <CollectionView ItemsSource="{Binding Links}" SelectionMode="None" MaximumHeightRequest="260">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="DeathLinkAction">
+                                        <Border Padding="10,8" Margin="0,3" StrokeThickness="0" StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray50}">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <VerticalStackLayout Spacing="2">
+                                                    <Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                                                    <Label Text="{Binding StateText}" FontSize="11" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                                </VerticalStackLayout>
+                                                <Button Grid.Column="1" Text="{Binding ActionText}" Style="{StaticResource ButtonSmall}" VerticalOptions="Center"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type DeathStatementViewModel}}, Path=OpenLinkCommand}"
+                                                        CommandParameter="{Binding .}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- ────────── Tab3 文书输出（左设置 / 右预览，同档案查询页两列） ────────── -->
+            <Grid IsVisible="{Binding IsTab3}" ColumnDefinitions="440,*" ColumnSpacing="0">
+                <ScrollView Grid.Column="0" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Border Style="{StaticResource CardBorder}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="文书模板" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                                <Label Text="{Binding SelectedTemplateName, StringFormat='模板：{0}'}" FontSize="13" TextColor="{StaticResource Primary}"
+                                       IsVisible="{Binding HasTemplate}"/>
+                                <Label Text="{Binding NoTemplateHint}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding HasTemplate, Converter={StaticResource BoolToInverseConverter}}"/>
+                                <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                                    <Label Grid.Row="0" Text="打印机" FontSize="14" VerticalOptions="Center"/>
+                                    <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding PrinterNames}" SelectedItem="{Binding SelectedPrinter}"/>
+                                    <Label Grid.Row="1" Text="份数" FontSize="14" VerticalOptions="Center"/>
+                                    <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
+                                        <Button Text="&#x2212;" Command="{Binding DecreaseCopiesCommand}" WidthRequest="34" HeightRequest="34" FontSize="18" FontAttributes="Bold" Padding="0" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                        <Entry Text="{Binding Copies}" Keyboard="Numeric" WidthRequest="56" HeightRequest="34" HorizontalTextAlignment="Center" VerticalOptions="Center"/>
+                                        <Button Text="+" Command="{Binding IncreaseCopiesCommand}" WidthRequest="34" HeightRequest="34" FontSize="18" FontAttributes="Bold" Padding="0" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="2" Text="双面打印" FontSize="14" VerticalOptions="Center"/>
+                                    <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}" HorizontalOptions="Start" VerticalOptions="Center"/>
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- 三联出具（村留存 / 镇政府 / 镇中心卫生院；推送单位三份不同 → 逐份生成） -->
+                        <Border Style="{StaticResource CardBorder}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="三联出具" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                                <Label Text="一份村里留存、一份交镇政府相关部门、一份给镇中心卫生院（申报申请死亡证明）。三联「推送单位」不同，故逐份生成而非份数复制；各份独立批次号与留痕。"
+                                       FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+
+                                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" VerticalOptions="Center">
+                                    <Switch IsToggled="{Binding PrintRetain}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="村留存" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" WidthRequest="52"/>
+                                    <Entry Grid.Column="2" Text="{Binding PushUnitRetain}" Placeholder="如：土甸子村村民委员会（本委存档）" FontSize="13"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" VerticalOptions="Center">
+                                    <Switch IsToggled="{Binding PrintGov}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="镇政府" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" WidthRequest="52"/>
+                                    <Entry Grid.Column="2" Text="{Binding PushUnitGov}" Placeholder="如：柳树镇人民政府" FontSize="13"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" VerticalOptions="Center">
+                                    <Switch IsToggled="{Binding PrintClinic}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="卫生院" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" WidthRequest="52"/>
+                                    <Entry Grid.Column="2" Text="{Binding PushUnitClinic}" Placeholder="如：柳树镇中心卫生院" FontSize="13"/>
+                                </Grid>
+
+                                <Button Text="三联打印（按勾选出件）" Style="{StaticResource ButtonPrimary}"
+                                        Command="{Binding PrintTripleCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                                <Label Text="推送单位按组织镇/村名推导，改一次会记住；预览默认展示「镇政府」联。" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Label Text="{Binding OpenOutputFolderActionText, StringFormat='{0}（输出根目录）'}" FontSize="12" TextColor="{StaticResource Primary}"
+                               IsVisible="{Binding HasPdf, Converter={StaticResource BoolToInverseConverter}}"/>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <Border Grid.Column="1" BackgroundColor="{StaticResource SurfaceVariant}" StrokeThickness="0">
+                    <Grid>
+                        <controls:PdfPreviewView PdfFilePath="{Binding PdfFilePath}" IsVisible="{Binding HasPdf}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                        <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16"
+                                             IsVisible="{Binding HasPdf, Converter={StaticResource BoolToInverseConverter}}">
+                            <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                            <Label Text="选好模板后点下方「预览」生成死亡情况说明" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="14"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+            </Grid>
+
+        </Grid>
+
+        <!-- ═══════ Row4 底部操作条（按 Tab 切换按钮集） ═══════ -->
+        <Border Grid.Row="4" BackgroundColor="White" Padding="16,10" StrokeThickness="0">
+            <Border.Shadow>
+                <Shadow Brush="{StaticResource Black}" Offset="0,-1" Radius="3" Opacity="0.05"/>
+            </Border.Shadow>
+
+            <!-- Tab1：上一步 / 下一步 / 提交申报 -->
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10" IsVisible="{Binding IsTab1}">
+                <Button Grid.Column="0" Text="上一步" Style="{StaticResource ButtonOutline}" Command="{Binding PreviousStepCommand}" IsVisible="{Binding IsPreviousVisible}"/>
+                <Button Grid.Column="1" Text="下一步" Style="{StaticResource ButtonPrimary}" Command="{Binding NextStepCommand}" IsVisible="{Binding IsNextVisible}"/>
+                <Button Grid.Column="3" Text="提交申报" Style="{StaticResource ButtonPrimary}" Command="{Binding DeclareCommand}" IsEnabled="{Binding IsNotBusy}"/>
+            </Grid>
+
+            <!-- Tab2：重新汇总 / 提交申报 / 跳文书输出 -->
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10" IsVisible="{Binding IsTab2}">
+                <Button Grid.Column="0" Text="重新汇总" Style="{StaticResource ButtonOutline}" Command="{Binding BuildManualContextCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                <Button Grid.Column="1" Text="提交申报" Style="{StaticResource ButtonPrimary}" Command="{Binding DeclareCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                <Button Grid.Column="2" Text="文书输出" Style="{StaticResource ButtonPrimary}" Command="{Binding SwitchTabCommand}" CommandParameter="3"/>
+                <Button Grid.Column="3" Text="{Binding PreviewActionText}" Style="{StaticResource ButtonSuccess}" Command="{Binding PreviewCommand}" IsEnabled="{Binding IsNotBusy}"/>
+            </Grid>
+
+            <!-- Tab3：预览 / 打印 / 保存 / 打开输出目录 -->
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="10" IsVisible="{Binding IsTab3}">
+                <Button Grid.Column="0" Text="{Binding PreviewActionText}" Style="{StaticResource ButtonPrimary}" Command="{Binding PreviewCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                <Button Grid.Column="1" Text="{Binding PrintActionText}" Style="{StaticResource ButtonPrimary}" Command="{Binding PrintCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                <Button Grid.Column="2" Text="{Binding SaveActionText}" Style="{StaticResource ButtonSuccess}" Command="{Binding SaveCommand}" IsEnabled="{Binding IsNotBusy}"/>
+                <Button Grid.Column="4" Text="{Binding OpenOutputFolderActionText}" Style="{StaticResource ButtonOutline}" Command="{Binding OpenOutputFolderCommand}"/>
+            </Grid>
+        </Border>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="5" IsLoading="{Binding IsOverallBusy}" LoadingText="正在加载..."/>
+    </Grid>
+</ContentPage>

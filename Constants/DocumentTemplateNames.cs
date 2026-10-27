@@ -19,6 +19,9 @@ public static class DocumentTemplateNames
     /// <summary>变更告知书（与 ArchiveOutputViewModel 按名追加一致）</summary>
     public const string ChangeNotice = "档案_变更告知书";
 
+    /// <summary>死亡情况说明（村内死亡申报出具；分类挂「证明文件」，模板名须与 nc_biz_templates.name 一致）</summary>
+    public const string DeathStatement = "证明_死亡情况说明";
+
     /// <summary>清单展示名 → 模板名</summary>
     public static readonly (string Label, string TemplateName)[] SheetItems =
     {
@@ -26,5 +29,6 @@ public static class DocumentTemplateNames
         ("渐退期审批表", GraceApproval),
         ("保障金减少", GrantReduce),
         ("变更告知书", ChangeNotice),
+        ("死亡情况说明", DeathStatement),
     };
 }

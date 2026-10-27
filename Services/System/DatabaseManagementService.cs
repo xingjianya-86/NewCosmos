@@ -351,12 +351,58 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         !string.IsNullOrEmpty(name) && name.Length <= 64 &&
         global::System.Text.RegularExpressions.Regex.IsMatch(name, "^nc_[a-z0-9_]+$");
 
-    private async Task<List<string>> GetSoftDeleteTablesAsync(CancellationToken ct)
+    private async Task<Result<List<string>>> GetSoftDeleteTablesAsync(CancellationToken ct)
     {
         var r = await _dbService.QueryAsync<string>(
             "SELECT table_name FROM information_schema.columns WHERE column_name='deleted_at' AND table_schema='public' ORDER BY table_name", ct);
-        return (r.IsSuccess ? r.Value : null)?
-            .Where(t => IsSafeTableName(t) && !t.Contains("_bak_")).ToList() ?? new List<string>();
+        // 失败必须上抛：拿空清单会报出"未发现软删除行"，而下一步就是物理清理（AGENTS §7）
+        if (r.IsFailure)
+            return Result.Failure<List<string>>(r.ErrorCode!, r.Message!);
+
+        return Result.Success((r.Value ?? new List<string>())
+            .Where(t => IsSafeTableName(t) && !t.Contains("_bak_")).ToList());
+    }
+
+    /// <summary>
+    /// 统计某张表里"清理时真会删"的行数——口径必须与 CleanupSoftDeletedAsync
+    /// 的 2.2 / 2.3 / 2.4 / 2.5 逐条对应。
+    /// 查询失败一律上抛：用 <c>.Value ?? 0</c> 会把失败算成 0，让报告凭空变干净（AGENTS §7）。
+    /// </summary>
+    private async Task<Result<int>> CountToDeleteAsync(string table, int softDeleted, CancellationToken ct)
+    {
+        Result<int?> r;
+        switch (table)
+        {
+            case "nc_biz_applications":
+                // = 清理 2.3：非停保、无变更链、不是存活档案之父
+                r = await _dbService.ExecuteScalarAsync<int?>(@"
+                    SELECT count(*) FROM nc_biz_applications a
+                    WHERE a.deleted_at IS NOT NULL AND a.status <> $1
+                      AND NOT EXISTS (SELECT 1 FROM nc_biz_change_records cr WHERE cr.application_id=a.id OR cr.original_application_id=a.id OR cr.new_application_id=a.id)
+                      AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED);
+                break;
+
+            case "nc_biz_elderly_applications":
+            case "nc_biz_temp_relief_applications":
+                // = 清理 2.4 / 2.5：非停保
+                r = await _dbService.ExecuteScalarAsync<int?>(
+                    $"SELECT count(*) FROM {table} WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED);
+                break;
+
+            case "nc_biz_family_members":
+                // = 清理 2.1 保留(活档+停保) 的反面 + 2.2 删除 + 2.3 级联
+                r = await _dbService.ExecuteScalarAsync<int?>(
+                    "SELECT count(*) FROM nc_biz_family_members fm JOIN nc_biz_applications a ON a.id=fm.application_id WHERE fm.deleted_at IS NOT NULL AND NOT(a.deleted_at IS NULL AND a.status=$1)", ct, ApplicationStatusCodes.STOPPED);
+                break;
+
+            default:
+                // 其余表由清理 2.6/2.7 整段 `WHERE deleted_at IS NOT NULL` 删除 → 全部计入
+                return Result.Success(softDeleted);
+        }
+
+        return r.IsFailure
+            ? Result.Failure<int>(r.ErrorCode!, r.Message!)
+            : Result.Success(r.Value ?? 0);
     }
 
     /// <summary>检测全库软删除行（只读）。</summary>
@@ -367,25 +413,25 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             LogInfo("检测全库软删除行");
             var census = new SoftDeleteCensus { DetectedAt = DateTime.Now };
 
-            foreach (var t in await GetSoftDeleteTablesAsync(ct))
+            // 表清单查询失败必须上抛：拿空清单会报出"未发现软删除行"，而下一步就是物理清理（AGENTS §7）
+            var tablesResult = await GetSoftDeleteTablesAsync(ct);
+            if (tablesResult.IsFailure)
+                return Result.Failure<SoftDeleteCensus>(tablesResult.ErrorCode!, tablesResult.Message!);
+
+            foreach (var t in tablesResult.Value)
             {
+                // 计数失败必须上抛：`.Value ?? 0` 会把"查不到"伪装成"没有软删行"，
+                // 用一份凭空变干净的报告去支撑物理删除
                 var n = await _dbService.ExecuteScalarAsync<int?>($"SELECT count(*) FROM {t} WHERE deleted_at IS NOT NULL", ct);
+                if (n.IsFailure)
+                    return Result.Failure<SoftDeleteCensus>(n.ErrorCode!, n.Message!);
                 var softDeleted = n.Value ?? 0;
                 if (softDeleted == 0) continue;
 
-                var toDelete = t switch
-                {
-                    "nc_biz_applications" => (await _dbService.ExecuteScalarAsync<int?>(@"
-                        SELECT count(*) FROM nc_biz_applications a
-                        WHERE a.deleted_at IS NOT NULL AND a.status <> $1
-                          AND NOT EXISTS (SELECT 1 FROM nc_biz_change_records cr WHERE cr.application_id=a.id OR cr.original_application_id=a.id OR cr.new_application_id=a.id)
-                          AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
-                    "nc_biz_elderly_applications" or "nc_biz_temp_relief_applications" =>
-                        (await _dbService.ExecuteScalarAsync<int?>($"SELECT count(*) FROM {t} WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
-                    "nc_biz_family_members" => (await _dbService.ExecuteScalarAsync<int?>(
-                        "SELECT count(*) FROM nc_biz_family_members fm JOIN nc_biz_applications a ON a.id=fm.application_id WHERE fm.deleted_at IS NOT NULL AND NOT(a.deleted_at IS NULL AND a.status=$1)", ct, ApplicationStatusCodes.STOPPED)).Value ?? 0,
-                    _ => softDeleted
-                };
+                var toDeleteResult = await CountToDeleteAsync(t, softDeleted, ct);
+                if (toDeleteResult.IsFailure)
+                    return Result.Failure<SoftDeleteCensus>(toDeleteResult.ErrorCode!, toDeleteResult.Message!);
+                var toDelete = toDeleteResult.Value;
 
                 census.Tables.Add(new SoftDeleteTableStat
                 {
@@ -397,6 +443,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             }
 
             // 档案链一致性：停旧建新的旧档案应 Stopped（单人保/导入建档豁免）
+            // 失败必须上抛：否则这里会返回"档案链异常 0 条"，正好给下一步的清理开绿灯
             var chainRows = await _dbService.QueryAsync<ChainRow>(@"
                 SELECT p.id AS old_application_id,
                        p.applicant_name AS old_name,
@@ -408,17 +455,17 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
                 WHERE p.deleted_at IS NULL AND p.status <> $1
                   AND c.chain_type IN ('CategoryRebuild', 'HeadChange', 'HouseholdDeath')
                 ORDER BY p.id", ct, ApplicationStatusCodes.STOPPED);
-            if (chainRows.IsSuccess && chainRows.Value != null)
+            if (chainRows.IsFailure)
+                return Result.Failure<SoftDeleteCensus>(chainRows.ErrorCode!, chainRows.Message!);
+
+            census.ChainIssues = (chainRows.Value ?? new List<ChainRow>()).Select(r => new ChainInconsistency
             {
-                census.ChainIssues = chainRows.Value.Select(r => new ChainInconsistency
-                {
-                    OldApplicationId = r.OldApplicationId,
-                    OldName = r.OldName ?? "",
-                    OldStatus = r.OldStatus ?? "",
-                    NewApplicationId = r.NewApplicationId,
-                    ChainType = r.ChainType ?? ""
-                }).ToList();
-            }
+                OldApplicationId = r.OldApplicationId,
+                OldName = r.OldName ?? "",
+                OldStatus = r.OldStatus ?? "",
+                NewApplicationId = r.NewApplicationId,
+                ChainType = r.ChainType ?? ""
+            }).ToList();
 
             LogInfo($"检测完成: 待删 {census.TotalToDelete} 行，保留 {census.TotalKept} 行，档案链异常 {census.ChainIssues.Count} 条");
             return Result.Success(census);
@@ -520,7 +567,12 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             result.DeletedRows += (await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_records WHERE deleted_at IS NOT NULL", ct)).Value;
 
             // 2.7 其它含 deleted_at 的表：删除软删行
-            foreach (var t in await GetSoftDeleteTablesAsync(ct))
+            // 清单查询失败必须中止：拿空清单会把整段清理静默跳过却照常报"成功"
+            var allSoftTables = await GetSoftDeleteTablesAsync(ct);
+            if (allSoftTables.IsFailure)
+                return Result.Failure<SoftDeleteCleanupResult>(allSoftTables.ErrorCode!, allSoftTables.Message!);
+
+            foreach (var t in allSoftTables.Value)
             {
                 if (SpecialSoftDeleteTables.Contains(t)) continue;
                 result.DeletedRows += (await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE deleted_at IS NOT NULL", ct)).Value;
@@ -617,6 +669,9 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             "nc_biz_urban_subsistence_persons" => "最低生活保障人员表",
             "nc_biz_destitute_families" => "特困供养家庭表",
             "nc_biz_destitute_persons" => "特困供养人员表",
+            "nc_biz_other_difficulty_families" => "其他困难人员家庭表",
+            "nc_biz_other_difficulty_persons" => "其他困难人员人员表",
+            "nc_biz_other_difficulty_stops" => "其他困难人员停止表",
             "nc_biz_elderly_subsidy_history" => "普惠高龄补贴历史表",
             "nc_biz_special_approvals" => "一事一议豁免表",
             "nc_biz_templates" => "模板表",

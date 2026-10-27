@@ -119,6 +119,18 @@ public static class ClassificationConstants
         IneligibleWithLabor, Ineligible, IneligibleOther
     };
 
+    /// <summary>
+    /// 受保护的低收入身份分类（低保含单人保 / 最低生活保障边缘家庭 / 特困人员）。
+    /// 资产核查“是否已具有低收入身份”的唯一口径：不含刚性支出困难家庭、其他困难人员。
+    /// 调用点：PdfVerificationService.HasLowIncomeIdentityAsync、ApplicationService.TryMarkAssetChecksIncludedAsync。
+    /// </summary>
+    public static readonly string[] ProtectedLowIncomeCategoryCodes =
+        SubsistenceCategoryCodes
+            .Concat(LowIncomeCategoryCodes)
+            .Concat(DestituteCategoryCodes)
+            .Distinct()
+            .ToArray();
+
     private static readonly HashSet<string> SubsistenceCodes = new(SubsistenceCategoryCodes);
 
     private static readonly HashSet<string> LowIncomeCodes = new(LowIncomeCategoryCodes);
@@ -130,6 +142,8 @@ public static class ClassificationConstants
     private static readonly HashSet<string> RigidExpenditureCodes = new(RigidExpenditureCategoryCodes);
 
     private static readonly HashSet<string> StopCodes = new(StopCategoryCodes);
+
+    private static readonly HashSet<string> ProtectedLowIncomeCodes = new(ProtectedLowIncomeCategoryCodes);
 
     private static readonly HashSet<string> RuralCodes = new()
     {
@@ -164,6 +178,13 @@ public static class ClassificationConstants
 
     public static bool IsCodeStop(string code) =>
         !string.IsNullOrEmpty(code) && (StopCodes.Contains(code) || code == SimplifiedCodes.INCOME_EXCEEDED);
+
+    /// <summary>
+    /// 是否为受保护的低收入身份分类（低保含单人/边缘/特困；不含刚性支出、其他困难）。
+    /// 资产核查身份判定与建档联动共用的唯一口径。
+    /// </summary>
+    public static bool IsProtectedLowIncomeCode(string? code) =>
+        !string.IsNullOrEmpty(code) && ProtectedLowIncomeCodes.Contains(code);
 
     public static bool IsCodeRural(string code) =>
         !string.IsNullOrEmpty(code) && RuralCodes.Contains(code);

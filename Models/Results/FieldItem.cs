@@ -28,6 +28,26 @@ public partial class FieldItem : ObservableObject
     public string Group { get; set; } = string.Empty;
 
     /// <summary>
+    /// 数据来源（资产核查 / 历史档案 / 导入台账 / 系统默认 / 无）
+    /// </summary>
+    public string Source { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 该字段所在表单步骤（1~5）；无默认值时"去填写"跳转用
+    /// </summary>
+    public int TargetStep { get; set; }
+
+    /// <summary>
+    /// 是否无默认值（需手动填写；已填充的不再算缺失）
+    /// </summary>
+    public bool IsMissing => !HasValue && !IsFilled;
+
+    /// <summary>
+    /// 无默认值提示文案
+    /// </summary>
+    public string MissingText => IsMissing ? "无默认值，需手填" : string.Empty;
+
+    /// <summary>
     /// 是否选中
     /// </summary>
     [ObservableProperty]
@@ -37,6 +57,8 @@ public partial class FieldItem : ObservableObject
     /// 是否已填充
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMissing))]
+    [NotifyPropertyChangedFor(nameof(MissingText))]
     private bool _isFilled;
 
     /// <summary>
@@ -46,11 +68,14 @@ public partial class FieldItem : ObservableObject
 
     public FieldItem() { }
 
-    public FieldItem(string displayName, string value, string targetProperty, string group = "")
+    public FieldItem(string displayName, string value, string targetProperty, string group = "",
+        int targetStep = 0, string source = "")
     {
         DisplayName = displayName;
         Value = value ?? string.Empty;
         TargetProperty = targetProperty;
         Group = group;
+        TargetStep = targetStep;
+        Source = source;
     }
 }

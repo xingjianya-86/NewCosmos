@@ -257,6 +257,9 @@ public class MemberChangeEntry
     /// <summary>事由日期（死亡减员=死亡日期，其余=生效日期）</summary>
     public DateTime EventDate { get; set; } = DateTime.Today;
 
+    /// <summary>事由时刻（死亡减员=死亡确切时刻；其余事由可空）——落 nc_biz_death_records.death_time</summary>
+    public TimeSpan? EventTime { get; set; }
+
     public string Remark { get; set; } = string.Empty;
 }
 
@@ -270,6 +273,10 @@ public class MemberDeathContext
     public string MemberName { get; set; } = string.Empty;
     public string MemberIdCard { get; set; } = string.Empty;
     public DateTime DeathDate { get; set; } = DateTime.Today;
+
+    /// <summary>死亡确切时刻（必填：应用层双门校验的入参侧，空值由 ProcessMemberDeathAsync 拒绝）</summary>
+    public TimeSpan? DeathTime { get; set; }
+
     public string DeathReason { get; set; } = string.Empty;
     public string OperatorName { get; set; } = string.Empty;
 }
@@ -332,6 +339,11 @@ public class HouseholdDeathContext
     /// 死亡日期
     /// </summary>
     public DateTime DeathDate { get; set; } = DateTime.Today;
+
+    /// <summary>
+    /// 死亡确切时刻（必填：应用层双门校验的入参侧，空值由 ExecuteHouseholdDeathAsync 拒绝）
+    /// </summary>
+    public TimeSpan? DeathTime { get; set; }
 
     /// <summary>
     /// 死亡原因

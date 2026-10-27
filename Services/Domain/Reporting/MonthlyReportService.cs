@@ -232,7 +232,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 COUNT(*) FILTER (WHERE status = $4 AND (stop_date IS NULL OR stop_date >= $3::date)) AS total_archives,
                 COUNT(*) FILTER (WHERE status = $4 AND {NewArchiveFilter.IsNewArchiveExpr("nc_biz_applications")} AND first_approved_at >= $1::timestamp AND first_approved_at < $2::timestamp) AS new_archives,
                 COUNT(*) FILTER (WHERE status = $5 AND stop_date >= $1::date AND stop_date < $2::date
-                    {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}) AS stopped_archives,
+                    {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
+                    {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS stopped_archives,
                 COALESCE(SUM(total_guarantee_amount) FILTER (WHERE status = $4 AND (stop_date IS NULL OR stop_date >= $3::date)), 0) AS total_amount
             FROM nc_biz_applications
             WHERE deleted_at IS NULL;
@@ -530,7 +531,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         // ① 状态门：下游新档案须已生效（Approved/Completed）——Draft 未审批不算"开始享受"
         //    （卢永华 80 实测错例：户主死亡接续链 9-25 判类写 CategoryAdd，档案至今 Draft 却上了新增名单）；
         // ② 渐退期豁免：新档案存在渐退期行 = 待遇延续（封顶减发），不计新增
-        //    （与保障金变更登记"渐退期链跳过"同口径；此类户由停保汇总表/退出对象纠治表承载）。
+        //    （与保障金变更登记"渐退期链跳过"同口径；此类户仅由退出对象兜底纠治表承载——
+        //    2026-10 业务确认：渐退期接续不算停保，停保汇总表也不再出现，见 StoppedArchiveFilter.NotGraceContinuationSql）。
         var crossParams = new List<object> { c.Start, c.End, town ?? "" };
         var crossCategorySql = string.Empty;
         if (codes != null)
@@ -867,6 +869,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
 
     public async Task<Result<List<MonthlyStoppedRow>>> GetStoppedRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default)
     {
+        // 其他困难人员不是认定分类（无 nc_biz_applications 分类码），走独立停止表；
+        // 不能落到下方 CategoryCodes(null)=不过滤 的分支，否则会把全部停保档案当成本表数据。
+        if (string.Equals(category, "其他困难人员", StringComparison.Ordinal))
+            return await GetOtherDifficultyStopRowsAsync(year, month, town, ct);
+
         var cycle = await GetCycleRangeAsync(year, month, ct);
         if (cycle.IsFailure) return Result.Failure<List<MonthlyStoppedRow>>(cycle.ErrorCode!, cycle.Message!);
         var c = cycle.Value;
@@ -895,6 +902,9 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                        {categorySql}
                        -- 停旧建新接续（同大类继续享受，如成员变更/同类别复核/户主变更）不算停保
                        {StoppedArchiveFilter.NotRebuildContinuationSql("a")}
+                       -- 渐退期接续（跨大类但仍在渐退期内按原额续发，如户主死亡 低保→低收入）不算停保，
+                       -- 该户由「退出对象兜底情况纠治表」承载（樊万河 68→80 实测错例）
+                       {StoppedArchiveFilter.NotGraceContinuationSql("a")}
                        -- 终结档（停旧建新产物自身为停保码）与被停的旧档是同一户，避免重复计数
                        {StoppedArchiveFilter.TerminalRebuildArchiveSql("a")}
                      ORDER BY a.stop_date ASC, a.first_approved_at DESC";
@@ -927,6 +937,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                        -- 停保状态（Stopped）的档案由普通停保行显示（含户月保障金/分类施保），
                        -- 排除跨类 CategoryStop 行，避免停旧建新户重复（解维平 44）
                        AND a.status <> $4
+                       -- 跨类后下游新档在效渐退期 = 待遇延续，不算停保（与 NotGraceContinuationSql 同口径）
+                       AND NOT EXISTS (
+                           SELECT 1 FROM nc_biz_grace_periods g
+                           WHERE g.application_id = cr.new_application_id
+                             AND g.deleted_at IS NULL AND g.is_active = TRUE)
                        AND ($3 = '' OR a.town = $3)
                        {crossCategorySql}";
         var crossResult = await _db.QueryAsync<StoppedRowData>(crossSql, ct, crossParams.ToArray());
@@ -1037,8 +1052,90 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     }
 
     /// <summary>
-    /// 成员减员行数据（边缘家庭停止、减员汇总表）：成员变更减员 / 成员死亡变更记录，
-    /// change_date∈周期，旧分类属于最低生活保障边缘家庭；家庭人口取变更后（After 快照）。
+    /// 其他困难人员停止、减员汇总表：读独立停止表 nc_biz_other_difficulty_stops（B 线周期），
+    /// 台账原行不删，停止表记录转出事实。停止/减员类型由写入方判定（整户转出=停止，部分成员转出=减员）。
+    /// </summary>
+    public async Task<Result<List<MonthlyStoppedRow>>> GetOtherDifficultyStopRowsAsync(
+        int year, int month, string town, CancellationToken ct = default)
+    {
+        var cycle = await GetCycleRangeAsync(year, month, ct);
+        if (cycle.IsFailure) return Result.Failure<List<MonthlyStoppedRow>>(cycle.ErrorCode!, cycle.Message!);
+        var c = cycle.Value;
+
+        var sql = @"SELECT s.person_name, s.person_id_card, s.head_name, s.head_id_card, s.family_size,
+                           s.hukou_type, s.district, s.street, s.community, s.address,
+                           s.old_category, s.stop_type, s.stop_date, s.stop_reason, s.target_classification,
+                           s.include_month
+                    FROM nc_biz_other_difficulty_stops s
+                    WHERE s.stop_date >= $1::date AND s.stop_date < $2::date
+                      AND ($3 = '' OR s.street = $3)
+                    ORDER BY s.stop_date, s.person_id_card";
+        var result = await _db.QueryAsync<OtherDifficultyStopRow>(sql, ct, c.Start, c.End, town ?? "");
+        if (result.IsFailure)
+            return Result.Failure<List<MonthlyStoppedRow>>(result.ErrorCode!, result.Message!);
+
+        var outRows = new List<MonthlyStoppedRow>();
+        foreach (var item in result.Value ?? new List<OtherDifficultyStopRow>())
+        {
+            var headName = !string.IsNullOrWhiteSpace(item.HeadName) ? item.HeadName : item.PersonName;
+            var headIdCard = !string.IsNullOrWhiteSpace(item.HeadIdCard) ? item.HeadIdCard : item.PersonIdCard;
+            var isRural = !ClassificationConstants.HukouType.IsHukouUrban(item.HukouType ?? string.Empty);
+            var reason = item.StopType == "减员"
+                ? (string.IsNullOrWhiteSpace(item.StopReason)
+                    ? item.PersonName ?? ""
+                    : $"{item.PersonName}（{item.StopReason}）")
+                : (item.StopReason ?? string.Empty);
+
+            outRows.Add(new MonthlyStoppedRow
+            {
+                HeadName = headName ?? "",
+                HeadIdCard = headIdCard ?? "",
+                HeadBirth = string.IsNullOrEmpty(headIdCard)
+                    ? ""
+                    : IdCardValidator.ExtractBirthDate(headIdCard)?.ToString("yyyy-MM-dd") ?? "",
+                FamilySize = item.FamilySize?.ToString() ?? "",
+                Address = JoinFullAddress(item.District, item.Street, item.Community, item.Address),
+                Category = string.IsNullOrWhiteSpace(item.OldCategory) ? "其他困难人员" : item.OldCategory!,
+                Classification = "",
+                MonthAmount = "",
+                StopReason = reason,
+                StopDate = item.StopDate?.ToString("yyyy-MM-dd") ?? "",
+                EnjoyDate = !string.IsNullOrWhiteSpace(item.IncludeMonth)
+                    ? item.IncludeMonth!
+                    : item.StopDate?.ToString("yyyy-MM-dd") ?? "",
+                CategoryCode = "",
+                BizType = item.StopType ?? "停止",
+                IsRural = isRural
+            });
+        }
+        return Result.Success(outRows);
+    }
+
+    /// <summary>其他困难人员停止表读取行</summary>
+    private sealed class OtherDifficultyStopRow
+    {
+        public string? PersonName { get; set; }
+        public string? PersonIdCard { get; set; }
+        public string? HeadName { get; set; }
+        public string? HeadIdCard { get; set; }
+        public int? FamilySize { get; set; }
+        public string? HukouType { get; set; }
+        public string? District { get; set; }
+        public string? Street { get; set; }
+        public string? Community { get; set; }
+        public string? Address { get; set; }
+        public string? OldCategory { get; set; }
+        public string? StopType { get; set; }
+        public DateTime? StopDate { get; set; }
+        public string? StopReason { get; set; }
+        public string? TargetClassification { get; set; }
+        public string? IncludeMonth { get; set; }
+    }
+
+    /// <summary>
+    /// 成员减员行数据（边缘家庭停止、减员汇总表）：成员变更减员 / 成员死亡变更记录 / 户内单人保转出，
+    /// change_date∈周期，旧分类属于最低生活保障边缘家庭；家庭人口取变更后（After 快照；
+    /// 单人保转出无快照，按旧档人口−1 计）。旧户档案与成员行均保留，不删除。
     /// </summary>
     private async Task<Result<List<MemberReductionRowData>>> QueryMemberReductionRowsAsync(
         MonthlyCycleRange c, string? town, CancellationToken ct)
@@ -1049,10 +1146,13 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
 
         var sql = @"SELECT cr.id AS change_id, cr.application_id, cr.change_date, cr.old_classification,
                            a.applicant_name AS head_name, a.applicant_id_card AS head_id_card,
-                           COALESCE((SELECT s.snapshot_data->>'FamilySize'
-                                     FROM nc_biz_change_snapshots s
-                                     WHERE s.change_id = cr.id AND s.snapshot_type = 'After'
-                                     LIMIT 1), a.family_size::text)::int AS family_size,
+                           CASE WHEN cr.change_type = 'SingleRescueOut'
+                                THEN GREATEST(COALESCE(a.family_size, 0) - 1, 0)
+                                ELSE COALESCE((SELECT s.snapshot_data->>'FamilySize'
+                                               FROM nc_biz_change_snapshots s
+                                               WHERE s.change_id = cr.id AND s.snapshot_type = 'After'
+                                               LIMIT 1), a.family_size::text)::int
+                           END AS family_size,
                            a.district, a.town, a.community, a.address,
                            COALESCE((SELECT string_agg(d.field_label || '|' || COALESCE(d.new_value, ''), E'\n' ORDER BY d.id)
                                      FROM nc_biz_change_details d
@@ -1064,7 +1164,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                     FROM nc_biz_change_records cr
                     JOIN nc_biz_applications a ON a.id = cr.application_id AND a.deleted_at IS NULL
                     WHERE cr.deleted_at IS NULL
-                      AND cr.change_type IN ('MemberRemove','MemberDeath')
+                      AND cr.change_type IN ('MemberRemove','MemberDeath','SingleRescueOut')
                       AND cr.change_date >= $1::date AND cr.change_date < $2::date
                       AND ($3 = '' OR a.town = $3)
                       AND cr.old_classification = ANY($4::text[])

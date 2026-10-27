@@ -44,13 +44,21 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         GenderFromIdCard,
         /// <summary>birth_date：文本可解析则用文本，否则由 18 位身份证推导（可能为 null）。</summary>
         BirthDateFromIdCard,
+        /// <summary>常量列（不从 Excel 读取，写入 ConstantValue；用于 source='import' 这类溯源列）。</summary>
+        Constant,
     }
 
     /// <summary>
     /// 一列的导入规格。DbColumn 同时是数据库列名与列映射（别名字典）的键。
     /// Kind=String 且 DictCategory 非空时经 MapFieldToKey 归一化为字典 key。
+    /// Kind=Constant 时写入 ConstantValue（不参与表头映射）。
     /// </summary>
-    protected sealed record ImportColumnSpec(string DbColumn, ImportValueKind Kind, int DefaultInt = 0, string? DictCategory = null);
+    protected sealed record ImportColumnSpec(
+        string DbColumn,
+        ImportValueKind Kind,
+        int DefaultInt = 0,
+        string? DictCategory = null,
+        string? ConstantValue = null);
 
     /// <summary>家庭文件的有序列规格（不含末尾 imported_at，由基类以 CURRENT_TIMESTAMP 追加）。</summary>
     protected abstract IReadOnlyList<ImportColumnSpec> FamilyColumns { get; }
@@ -677,6 +685,7 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
                 ImportValueKind.HeadIdCard => ReadHeadIdCardOrFallback(reader, row, mapping, spec.DbColumn, key),
                 ImportValueKind.GenderFromIdCard => ReadGenderOrDerive(reader, row, mapping, spec.DbColumn, key),
                 ImportValueKind.BirthDateFromIdCard => ReadBirthDateOrDerive(reader, row, mapping, spec.DbColumn, key),
+                ImportValueKind.Constant => spec.ConstantValue ?? string.Empty,
                 _ => throw new BusinessException(ErrorCodes.VALIDATION_FAILED, $"未知的列规格类型: {spec.Kind}"),
             };
         }

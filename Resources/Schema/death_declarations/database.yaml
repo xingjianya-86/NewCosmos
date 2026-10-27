@@ -1,0 +1,195 @@
+# 死亡申报台账 Schema 定义
+# 用途：村内死亡申报留痕——「谁在什么时候什么时间，申报了谁的死亡」，死亡确切时间为必填。
+# 关联：application_id 可空（无档案的普通村民也能申报）；death_record_id 一期不回填，
+#       与 nc_biz_death_records 靠 deceased_id_card + application_id 语义关联。
+# 设计文档：docs/20261026_死亡情况说明与申报台账规范.md
+database: 死亡申报台账
+version: 1.0
+description: 死亡申报台账 - 记录申报人、申报时间、死者信息与死亡确切时刻，支撑「死亡情况说明」文书输出
+
+tables:
+  - name: nc_biz_death_declarations
+    comment: "[流程] 死亡申报台账 - 村内死亡申报留痕（可无关联档案，允许多次申报+作废）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+
+      # ── 死者（申报了谁）──
+      - name: deceased_name
+        type: character varying(100)
+        nullable: false
+        comment: 死者姓名
+      - name: deceased_id_card
+        type: character varying(18)
+        nullable: false
+        comment: 死者身份证号
+      - name: deceased_relation
+        type: character varying(50)
+        nullable: true
+        comment: 死者与申报人关系（配偶/子女/村委干部等）
+
+      # ── 死亡确切时间（date + time 合成完整时间点）──
+      - name: death_date
+        type: date
+        nullable: false
+        comment: 死亡日期
+      - name: death_time
+        type: time without time zone
+        nullable: false
+        comment: 死亡确切时刻（新表全量新数据，必填）
+      - name: death_reason
+        type: character varying(200)
+        nullable: true
+        comment: 死亡原因（字典 death_reason）
+      - name: death_certificate_no
+        type: character varying(50)
+        nullable: true
+        comment: 死亡证明编号
+      - name: death_place
+        type: character varying(200)
+        nullable: true
+        comment: 死亡地点
+
+      # ── 申报（谁在什么时候申报）──
+      - name: declared_by_name
+        type: character varying(100)
+        nullable: false
+        comment: 申报人姓名（与 operator_name 录入者分列）
+      - name: declared_by_id_card
+        type: character varying(18)
+        nullable: true
+        comment: 申报人身份证号
+      - name: declared_by_phone
+        type: character varying(20)
+        nullable: true
+        comment: 申报人联系电话
+      - name: declared_by_type
+        type: character varying(20)
+        nullable: false
+        comment: 申报人类型（家属/村民委员会/医疗机构/公安机关/其他）
+      - name: declared_at
+        type: timestamp without time zone
+        nullable: false
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 申报（受理）时间
+      - name: declare_channel
+        type: character varying(20)
+        nullable: false
+        defaultValue: 'PC'
+        comment: 申报渠道（PC/Android/Window）
+      - name: status
+        type: character varying(20)
+        nullable: false
+        defaultValue: 'Pending'
+        comment: 状态（Pending 待核实 / Verified 已核实 / Revoked 已作废）
+
+      # ── 核实说明要素（《死亡情况核实说明》模板字段，2026-10-26 迁移 20261026_death_declaration_verify_details.sql）──
+      # 报告人与申报人语义独立、分别手填；全部可空（历史行与"只出文书"场景兼容）
+      - name: reporter_name
+        type: character varying(100)
+        nullable: true
+        comment: 发现（报告）人姓名（模板 {死者报告人}，与 declared_by_* 独立）
+      - name: reporter_relation
+        type: character varying(50)
+        nullable: true
+        comment: 报告人与死者关系（模板 {死者报告人与死者关系}）
+      - name: reporter_phone
+        type: character varying(20)
+        nullable: true
+        comment: 报告人联系电话（模板 {死者报告人联系方式}）
+      - name: situation_desc
+        type: text
+        nullable: true
+        comment: 现场所见情况描述（模板 {死者情况描述}）
+      - name: remains_arrangement
+        type: text
+        nullable: true
+        comment: 遗体安置情况（模板 {死亡人遗体安置情况}）
+      - name: business_agent
+        type: character varying(100)
+        nullable: true
+        comment: 业务办理人（模板 {业务办理人}）
+      - name: business_matter
+        type: character varying(200)
+        nullable: true
+        comment: 相关业务事项，如「申请居民死亡医学证明」（模板 {相关业务事项}）
+
+      # ── 关联（可空，兼容无档案场景）──
+      - name: application_id
+        type: bigint
+        nullable: true
+        comment: 关联申请ID（可空：无档案的普通村民为 NULL）
+      - name: death_record_id
+        type: bigint
+        nullable: true
+        comment: 关联死亡登记ID（nc_biz_death_records.id，一期不回填）
+
+      # ── 归属与系统 ──
+      - name: village_id
+        type: integer
+        nullable: true
+        comment: 所属村/社区ID（nc_regions_villages.id，本村范围过滤主键）
+      - name: town_id
+        type: integer
+        nullable: true
+        comment: 所属乡镇ID（nc_regions_towns.id）
+      - name: village_name
+        type: character varying(100)
+        nullable: true
+        comment: 所属村/社区名称（文本冗余：展示 + community 同口径归一化兜底）
+      - name: operator_name
+        type: character varying(100)
+        nullable: false
+        comment: 录入操作人（当前登录用户，≠申报人）
+      - name: remark
+        type: text
+        nullable: true
+        comment: 备注
+      - name: created_by
+        type: character varying(100)
+        nullable: true
+        comment: 创建人
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 创建时间
+      - name: updated_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 更新时间
+      - name: deleted_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 删除时间（软删除标记）
+
+    indexes:
+      - name: idx_biz_decl_id_card
+        columns: [deceased_id_card]
+      - name: idx_biz_decl_death_date
+        columns: [death_date]
+      - name: idx_biz_decl_village
+        columns: [village_id]
+      - name: idx_biz_decl_declared_at
+        columns: [declared_at]
+
+    # 全部可空：允许申报不落关联对象；外键补建失败只告警不中断（存量脏数据惯例）
+    foreignKeys:
+      - name: fk_biz_decl_application
+        columns: [application_id]
+        references:
+          table: nc_biz_applications
+          columns: [id]
+      - name: fk_biz_decl_death_record
+        columns: [death_record_id]
+        references:
+          table: nc_biz_death_records
+          columns: [id]
+      - name: fk_biz_decl_village
+        columns: [village_id]
+        references:
+          table: nc_regions_villages
+          columns: [id]

@@ -215,7 +215,8 @@ public class NewPermissionService : BaseService, INewPermissionService
             if (clearGrantsResult.IsFailure)
                 throw new BusinessException(ErrorCodes.DB_QUERY_ERROR, $"清空用户直授权限失败: {clearGrantsResult.Message}");
 
-            // 5) 确保 admin 具备 SUPER_ADMIN（admin 不存在时由 InitializationService 负责）
+            // 5) 确保 admin 具备 SUPER_ADMIN（admin 账号需预先存在——本处只补角色映射；
+            //    历史上由 InitializationService 建号，该服务已随"系统初始化已拆"删除）
             var assignSql = @"
                 INSERT INTO nc_sys_user_roles (user_id, role_id)
                 SELECT u.id, r.id

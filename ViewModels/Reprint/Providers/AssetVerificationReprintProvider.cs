@@ -92,9 +92,9 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
                     head.ArchiveName ?? "",
                     head.ArchiveIdCard ?? "",
                     head.BatchId ?? "",
-                    head.Status ?? "",
+                    AssetCheckStatusConstants.GetDescription(head.Status),
                     head.CreatedAt,
-                    $"{head.VerificationYear}年{head.VerificationMonth}月 · {head.StatusDisplay} · 该户{g.Count()}人核查");
+                    $"{head.VerificationYear}年{head.VerificationMonth}月 · {AssetCheckStatusConstants.GetDescription(head.Status)} · 该户{g.Count()}人核查");
             })
             .ToList();
     }
@@ -313,7 +313,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             ApplicationDate = headRecord.ApplicationDate,
             ContactPhone = headRecord.ContactPhone,
             HeadIdCard = headRecord.ArchiveIdCard,
-            Status = headRecord.Status,
+            Status = AssetCheckStatusConstants.GetDescription(headRecord.Status),
             Community = headRecord.Community,
             DetailAddress = headRecord.FamilyAddress,
             OperatorName = operatorName,

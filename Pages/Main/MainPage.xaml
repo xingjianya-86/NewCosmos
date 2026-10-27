@@ -47,7 +47,8 @@
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="20">
                 <!-- Logo 和标题 -->
                 <HorizontalStackLayout Grid.Column="0" Spacing="12">
-                    <Label Text="{OnPlatform WinUI='&#xE80F;', Android='&#x2696;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                    <!-- 应用内 Logo：吉祥物图标（与系统图标同源，Resources\Images\mascot_icon.png） -->
+                    <Image Source="mascot_icon.png" WidthRequest="30" HeightRequest="30" Aspect="AspectFill" VerticalOptions="Center"/>
                     <VerticalStackLayout VerticalOptions="Center" Spacing="0">
                         <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="现代化 · 专业 · 高效" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
@@ -137,6 +138,22 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE774;', Android='&#x1F393;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding CollegeStudentReminderText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
+                    <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
+                </Grid>
+            </Border>
+
+            <!-- 死亡申报联动提醒横幅（点击跳转到死亡情况说明页面） -->
+            <Border IsVisible="{Binding ShowDeathLinkageReminder}"
+                    BackgroundColor="#FFF3CD"
+                    StrokeShape="RoundRectangle 0"
+                    Padding="16,10"
+                    Margin="10,5,10,5">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding NavigateToDeathStatementCommand}"/>
+                </Border.GestureRecognizers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <Label Grid.Column="0" Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26B0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="#856404" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding DeathLinkageBannerText}" FontSize="16" TextColor="#856404" VerticalOptions="Center" HorizontalOptions="Fill"/>
                     <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#856404" VerticalOptions="Center" Opacity="0.6"/>
                 </Grid>
             </Border>
@@ -303,10 +320,11 @@
                 </ScrollView>
             </Border>
 
-            <!-- 右侧工作区：仅仪表盘（统计概览 + 一域一卡直达入口） -->
-            <Grid Grid.Column="1" BackgroundColor="#F1F5F9">
+            <!-- 右侧工作区：仅仪表盘（统计概览 + 一域一卡直达入口）；
+                 列 0 = 内容滚动区，列 1 = 看板娘立绘栏（Auto：隐藏时列宽归零，不影响卡片列宽） -->
+            <Grid Grid.Column="1" BackgroundColor="#F1F5F9" ColumnDefinitions="*,Auto">
 
-                <ScrollView>
+                <ScrollView Grid.Column="0">
                     <VerticalStackLayout Padding="20" Spacing="20">
 
                         <!-- 统计概览区 -->
@@ -446,6 +464,26 @@
                                     </HorizontalStackLayout>
                                     <Label Grid.Row="1" Text="现存低收入人口历史档案查询" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
                                     <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="Archive"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 死亡情况说明（村内死亡申报 → 身份聚合 → 文书出具） -->
+                            <Border Grid.Column="{Binding DeathStatementCol}" Grid.Row="{Binding DeathStatementRow}" Style="{StaticResource ModuleCard}" IsVisible="{Binding CanAccessArchiveQuery}">
+                                <Border.Shadow>
+                                    <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
+                                </Border.Shadow>
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <HorizontalStackLayout Spacing="12">
+                                        <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#F1F0FB" StrokeShape="RoundRectangle 12">
+                                            <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26B0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="#6D28D9" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Border>
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="2">
+                                            <Label Text="死亡情况说明" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="死亡申报 · 身份聚合 · 文书出具" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                        </VerticalStackLayout>
+                                    </HorizontalStackLayout>
+                                    <Label Grid.Row="1" Text="覆盖村内死亡申报、在库身份聚合、数据提醒与情况说明出具" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                    <Button Grid.Row="2" Text="进入模块" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding NavigateCommand}" CommandParameter="DeathStatement"/>
                                 </Grid>
                             </Border>
 
@@ -593,6 +631,32 @@
 
                     </VerticalStackLayout>
                 </ScrollView>
+
+                <!-- 看板娘立绘栏：固定在工作区右下角，不随内容滚动、不遮挡业务卡片。
+                     立绘是浅色调，直接贴浅灰工作区会糊，故垫一张与仪表盘卡片同语言的
+                     圆角白卡（浅蓝渐变 + 轻阴影）衬托；Android（数据录入端）整栏隐藏。 -->
+                <Grid Grid.Column="1"
+                      WidthRequest="200"
+                      IsVisible="{OnPlatform WinUI=true, Android=false}">
+                    <Border Margin="0,0,16,20"
+                            Padding="10,12,10,10"
+                            VerticalOptions="End"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 16">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="White" Offset="0"/>
+                                <GradientStop Color="#E7F0FE" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Shadow>
+                            <Shadow Brush="#000000" Offset="0,4" Radius="12" Opacity="0.10"/>
+                        </Border.Shadow>
+                        <Image Source="newcosmos_character.png"
+                               Aspect="AspectFit"
+                               InputTransparent="True"/>
+                    </Border>
+                </Grid>
 
             </Grid>
 

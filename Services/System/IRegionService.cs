@@ -25,6 +25,12 @@ public interface IRegionService
     #endregion
 
     #region 地级市查询
+    /// <summary>省级行政区列表（2026-10-26 真级联省；34 个省级行政单位）</summary>
+    Task<Result<List<RegionProvince>>> GetProvincesAsync(CancellationToken ct = default);
+
+    /// <summary>按省取地级市（选省 → 筛市 的级联）；省ID非法返回空列表而非报错</summary>
+    Task<Result<List<RegionCity>>> GetCitiesByProvinceIdAsync(int provinceId, CancellationToken ct = default);
+
     Task<Result<List<RegionCity>>> GetCitiesAsync(CancellationToken ct = default);
 
     Task<Result<RegionCity>> GetCityByIdAsync(int id, CancellationToken ct = default);
@@ -64,6 +70,13 @@ public interface IRegionService
     Task<Result<RegionVillage>> GetVillageByIdAsync(int id, CancellationToken ct = default);
 
     Task<Result<RegionVillage>> GetVillageByCodeAsync(string villageCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// 按编码**批量**查村/社区（一次取回），供地址预热使用，替代逐条
+    /// <see cref="GetVillageByCodeAsync"/> 造成的 N+1。
+    /// 只返回查到的实体；查不到的记入负缓存但不报错；查询失败返回 Failure（不折叠成空集合）。
+    /// </summary>
+    Task<Result<List<RegionVillage>>> GetVillagesByCodesAsync(IEnumerable<string> villageCodes, CancellationToken ct = default);
 
     Task<Result<List<RegionVillage>>> SearchVillagesAsync(string keyword, CancellationToken ct = default);
 

@@ -75,9 +75,9 @@ public class ApplicationService : BaseService, IApplicationService
 
     /// <summary>
     /// 建档/审批成为保障对象后，联动升级资产核查状态为"已纳入低收入人口"。
-    /// 分类口径与 PdfVerificationService.HasLowIncomeIdentityAsync 一致
-    /// （低保/单人/边缘/特困，不含刚性支出）；失败仅记日志不阻断主流程。
-    /// 处于环境事务中时自动随事务提交/回滚。
+    /// 分类口径与 PdfVerificationService.HasLowIncomeIdentityAsync 共用
+    /// ClassificationConstants.IsProtectedLowIncomeCode（低保/单人/边缘/特困，不含刚性支出）；
+    /// 失败仅记日志不阻断主流程。处于环境事务中时自动随事务提交/回滚。
     /// </summary>
     private async Task TryMarkAssetChecksIncludedAsync(ApplicationEntity app, CancellationToken ct)
     {
@@ -87,10 +87,7 @@ public class ApplicationService : BaseService, IApplicationService
             if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(app.ApplicantIdCard))
                 return;
 
-            var isProtectedCategory = ClassificationConstants.IsCodeSubsistence(code)
-                || ClassificationConstants.IsCodeLowIncome(code)
-                || ClassificationConstants.IsCodeDestitute(code);
-            if (!isProtectedCategory)
+            if (!ClassificationConstants.IsProtectedLowIncomeCode(code))
                 return;
 
             var markResult = await _pdfVerificationService.MarkIncludedByIdCardAsync(app.ApplicantIdCard, ct);

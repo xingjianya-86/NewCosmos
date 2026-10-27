@@ -27,19 +27,29 @@
 
         <!-- 查询条 -->
         <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="16,10">
-            <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
-                <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片备注关键词"
-                       MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
-                <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
-                        ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
-                        SelectedItem="{Binding SelectedCategoryOption}"/>
-                <Button Grid.Column="2" Text="查询" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
-                        Command="{Binding ApplySearchCommand}"/>
-                <Button Grid.Column="3" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
-                        Command="{Binding ExportAllCommand}"/>
-                <Button Grid.Column="4" Text="导出选中" Style="{StaticResource ButtonOutline}" HeightRequest="40"
-                        Command="{Binding ExportSelectedCommand}"/>
-            </Grid>
+            <VerticalStackLayout Spacing="8">
+                <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                    <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片备注关键词"
+                           MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
+                    <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
+                            ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedCategoryOption}"/>
+                    <Button Grid.Column="2" Text="查询" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                            Command="{Binding ApplySearchCommand}"/>
+                    <Button Grid.Column="3" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
+                            Command="{Binding ExportAllCommand}"/>
+                    <Button Grid.Column="4" Text="导出选中" Style="{StaticResource ButtonOutline}" HeightRequest="40"
+                            Command="{Binding ExportSelectedCommand}"/>
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="{Binding ConvertWebPButtonText}"
+                            Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding ConvertLegacyPhotosCommand}"
+                            IsEnabled="{Binding CanConvertWebP}"/>
+                    <Label Grid.Column="1" Text="旧 JPEG 统一压缩为 WebP（单张 ≤500KB），转换前请先备份数据库"
+                           FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                </Grid>
+            </VerticalStackLayout>
         </Border>
 
         <!-- 列表 + 预览 -->
@@ -98,6 +108,23 @@
                         Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
             </HorizontalStackLayout>
         </Border>
+
+        <!-- 历史照片转 WebP 进度 -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+              IsVisible="{Binding Progress.IsProgressVisible}">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="10">
+                <components:ProgressPopupView
+                    Title="{Binding Progress.ProgressTitle}"
+                    Progress="{Binding Progress.ProgressValue}"
+                    ProgressText="{Binding Progress.ProgressText}"
+                    Steps="{Binding Progress.ProgressSteps}"
+                    CanClose="{Binding Progress.CanCloseProgress}"
+                    CloseCommand="{Binding Progress.CloseProgressCommand}"/>
+                <Button Text="取消转换" Command="{Binding CancelConvertCommand}"
+                        IsVisible="{Binding IsConverting}"
+                        Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+            </VerticalStackLayout>
+        </Grid>
 
         <!-- 加载蒙版 -->
         <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"

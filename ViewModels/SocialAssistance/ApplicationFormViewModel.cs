@@ -40,6 +40,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private readonly IDictionaryService _dictionaryService;
     private readonly IUserService _userService;
     private readonly IOrganizationService _organizationService;
+    private readonly IAddressScopeService _addressScopeService;
+
+    /// <summary>账号管辖范围（户籍地址逐级限制的唯一口径；解析失败=未绑区划，整个地址区禁用）</summary>
+    private AddressScope? _addressScope;
     private readonly ILandContractService _landContractService;
     private readonly ISubsidyDataService _subsidyDataService;
     private readonly IAssetVerificationService _assetVerificationService;
@@ -367,6 +371,32 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     public ObservableCollection<string> HukouDistrictOptions { get; } = new();
     public ObservableCollection<string> HukouTownOptions { get; } = new();
     public ObservableCollection<string> HukouVillageOptions { get; } = new();
+
+    /// <summary>
+    /// 户籍级锁定（2026-10-27 管辖范围限制）：账号绑定的那一级**及以上** Picker 置灰禁点、
+    /// 选项只留本单位一项（=「其他全部禁用」）；**以下**级才开放选择。
+    /// </summary>
+    public bool IsHukouCityLocked => _addressScope?.IsCityLocked == true;
+    public bool IsHukouDistrictLocked => _addressScope?.IsCountyLocked == true;
+    public bool IsHukouTownLocked => _addressScope?.IsTownLocked == true;
+    public bool IsHukouVillageLocked => _addressScope?.IsVillageLocked == true;
+
+    /// <summary>地址区是否可用（false=账号未绑定区划 → 整个地址区禁用 + 红条提示）</summary>
+    public bool IsAddressScopeAvailable => _addressScope?.IsAvailable != false;
+
+    /// <summary>户籍范围提示文案（表单顶部一行说明）</summary>
+    public string AddressScopeDescription => _addressScope?.ScopeDescription ?? string.Empty;
+
+    /// <summary>范围解析后刷新所有锁定态绑定（锁定属性是计算属性，不走字段通知）</summary>
+    private void NotifyAddressScopeChanged()
+    {
+        OnPropertyChanged(nameof(IsHukouCityLocked));
+        OnPropertyChanged(nameof(IsHukouDistrictLocked));
+        OnPropertyChanged(nameof(IsHukouTownLocked));
+        OnPropertyChanged(nameof(IsHukouVillageLocked));
+        OnPropertyChanged(nameof(IsAddressScopeAvailable));
+        OnPropertyChanged(nameof(AddressScopeDescription));
+    }
 
     /// <summary>户籍级联过程中解析出的区划 ID（保存时写入 hukou_city_id/town_id/village_id）</summary>
     private int? _hukouCityId;
@@ -1425,6 +1455,33 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     public bool HasAssetCheckData => AssetCheckData != null;
 
+    /// <summary>来源数据侧栏是否展开（手机端底部抽屉 / 桌面端始终显示）</summary>
+    [ObservableProperty]
+    private bool _isFieldPanelVisible;
+
+    /// <summary>来源数据摘要（可回填/需手填计数）</summary>
+    [ObservableProperty]
+    private string _fieldPanelSummary = string.Empty;
+
+    /// <summary>无默认值字段数</summary>
+    public int MissingFieldCount => AvailableFields.Count(f => f.IsMissing);
+
+    [RelayCommand]
+    private void ToggleFieldPanel() => IsFieldPanelVisible = !IsFieldPanelVisible;
+
+    [RelayCommand]
+    private void CloseFieldPanel() => IsFieldPanelVisible = false;
+
+    /// <summary>无默认值字段：跳到其所在步骤手动填写（手机端关闭抽屉，桌面端保持列表）</summary>
+    [RelayCommand]
+    private void GoToFieldStep(FieldItem? field)
+    {
+        if (field == null || field.TargetStep is < 1 or > 5)
+            return;
+        CurrentStep = field.TargetStep;
+        IsFieldPanelVisible = false;
+    }
+
     /// <summary>
     /// 数据来源描述
     /// </summary>
@@ -1481,8 +1538,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             AssetCheckData = detailResult.Value;
             DataSourceDescription = $"来源: 资产核查 | {AssetCheckData.ApplicantName}";
 
-            BuildAvailableFields();
+            await BuildAvailableFieldsAsync();
             BuildAssetCheckFamilyMembers();
+
+            // 读入即回填地址：asset_checks 存的是村编码 + 详细地址，而表单默认值在组织未绑村时
+            // 会兜底取 VillageOptions[0]（柳树镇 sort_order=1 = 柞木村委会）→ 现象"打开就成了柞木村"。
+            // 这里以资产核查为准覆盖：村按编码解析成村名；详细地址仅在当前为空时填入，不覆盖已有输入。
+            await ApplyAssetCheckAddressAsync(CancellationToken.None);
 
             OnPropertyChanged(nameof(HasAssetCheckData));
 
@@ -1503,36 +1565,123 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     }
 
     /// <summary>
-    /// 构建可用字段列表
+    /// 构建可用字段列表（来源链：资产核查 → 历史档案/导入台账 → 系统默认）。
+    /// 无值字段保留在列表中并标记 IsMissing，供"去填写"跳转对应步骤；
+    /// 仅收录表单真实可回填的字段（代理人/经办人表单无对应控件，不再列出）。
     /// </summary>
-    private void BuildAvailableFields()
+    private async Task BuildAvailableFieldsAsync(CancellationToken ct = default)
     {
         AvailableFields.Clear();
 
-        if (AssetCheckData == null) return;
-
-        // 基本信息
-        AvailableFields.Add(new FieldItem("申请人姓名", AssetCheckData.ApplicantName, nameof(ApplicantName), "基本信息"));
-        AvailableFields.Add(new FieldItem("身份证号", AssetCheckData.ApplicantIdCard, nameof(ApplicantIdCard), "基本信息"));
-        AvailableFields.Add(new FieldItem("联系电话", AssetCheckData.ContactPhone, nameof(ApplicantPhone), "基本信息"));
-        AvailableFields.Add(new FieldItem("申请原因", AssetCheckData.ApplicationReason, nameof(ApplicationReason), "基本信息"));
-        AvailableFields.Add(new FieldItem("申请日期", AssetCheckData.ApplicationDate.ToString("yyyy-MM-dd"), "ApplicationDate", "基本信息"));
-
-        // 地址信息
-        AvailableFields.Add(new FieldItem("家庭地址", AssetCheckData.FamilyAddress, nameof(Address), "地址信息"));
-        AvailableFields.Add(new FieldItem("社区", AssetCheckData.Community, nameof(SelectedVillage), "地址信息"));
-
-        // 代理人信息
-        if (AssetCheckData.HasAgent)
+        if (AssetCheckData == null)
         {
-            AvailableFields.Add(new FieldItem("代理人姓名", AssetCheckData.AgentName, "AgentName", "代理人"));
-            AvailableFields.Add(new FieldItem("代理人身份证", AssetCheckData.AgentIdCard, "AgentIdCard", "代理人"));
-            AvailableFields.Add(new FieldItem("代理关系", AssetCheckData.AgentRelationship, "AgentRelationship", "代理人"));
+            UpdateFieldPanelSummary();
+            return;
         }
 
-        // 经办人信息
-        AvailableFields.Add(new FieldItem("经办人", AssetCheckData.OperatorName, "OperatorName", "经办人"));
-        AvailableFields.Add(new FieldItem("经办单位", AssetCheckData.OperatorUnitName, "OperatorUnit", "经办人"));
+        // 身份证 → 历史档案/导入台账兜底（电话、社区）
+        PersonSearchResult? fallback = null;
+        if (!string.IsNullOrWhiteSpace(AssetCheckData.ApplicantIdCard))
+        {
+            var search = await _personSearchService.SearchByIdCardAsync(AssetCheckData.ApplicantIdCard.Trim(), ct);
+            if (search.IsSuccess && search.Value is { Count: > 0 })
+            {
+                fallback = search.Value.FirstOrDefault(r =>
+                               !string.IsNullOrWhiteSpace(r.Phone) || !string.IsNullOrWhiteSpace(r.Village))
+                           ?? search.Value[0];
+            }
+        }
+
+        void Add(string name, string? value, string targetProperty, string group, int step,
+            string sourceWhenValue, string? fallbackValue = null, string fallbackSource = "历史档案/导入台账")
+        {
+            var final = !string.IsNullOrWhiteSpace(value)
+                ? value!
+                : (fallbackValue ?? string.Empty);
+            var source = !string.IsNullOrWhiteSpace(value)
+                ? sourceWhenValue
+                : !string.IsNullOrWhiteSpace(fallbackValue) ? fallbackSource : "无";
+            AvailableFields.Add(new FieldItem(name, final, targetProperty, group, step, source));
+        }
+
+        Add("申请人姓名", AssetCheckData.ApplicantName, nameof(ApplicantName), "基本信息", 1,
+            "资产核查", fallback?.Name);
+        Add("身份证号", AssetCheckData.ApplicantIdCard, nameof(ApplicantIdCard), "基本信息", 1,
+            "资产核查", fallback?.IdCard);
+        Add("联系电话", AssetCheckData.ContactPhone, nameof(ApplicantPhone), "基本信息", 1,
+            "资产核查", fallback?.Phone);
+        Add("申请原因", AssetCheckData.ApplicationReason, nameof(ApplicationReason), "基本信息", 1,
+            "资产核查", SelectedApplicationReasonObj?.Display, "系统默认");
+        Add("申请日期",
+            AssetCheckData.ApplicationDate == default ? "" : AssetCheckData.ApplicationDate.ToString("yyyy-MM-dd"),
+            nameof(SurveyDate), "基本信息", 1,
+            "资产核查", (SurveyDate ?? DateTime.Today).ToString("yyyy-MM-dd"), "系统默认");
+        // 资产核查 community 存的是**村编码**（297 行里 291 行为编码、0 行为村名），
+        // 直接当村名塞进 Picker 永远匹配不上选项（现象：村社区显示成列表第一项）。
+        var communityName = await ResolveAssetCheckCommunityAsync(AssetCheckData.Community, ct);
+
+        Add("家庭地址", AssetCheckData.FamilyAddress, nameof(Address), "地址信息", 1,
+            "资产核查", Address, "系统默认");
+        Add("社区", communityName, nameof(SelectedVillage), "地址信息", 1,
+            "资产核查",
+            !string.IsNullOrWhiteSpace(fallback?.Village) ? fallback!.Village : SelectedVillage,
+            !string.IsNullOrWhiteSpace(fallback?.Village) ? "历史档案/导入台账" : "系统默认");
+
+        UpdateFieldPanelSummary();
+    }
+
+    /// <summary>
+    /// 资产核查 community → 村名：纯数字（6~12 位）按村编码查区划表；已是村名则原样返回。
+    /// 查无此村/查询失败一律**保留原值**（编码原样显示），只记日志不吞不改写，
+    /// 免得把来源数据静默丢掉（AGENTS §7：加载失败不许当空值）。
+    /// </summary>
+    private async Task<string> ResolveAssetCheckCommunityAsync(string? raw, CancellationToken ct)
+    {
+        var value = raw?.Trim() ?? string.Empty;
+        if (value.Length < 6 || value.Length > 12 || !value.All(char.IsDigit))
+            return value;   // 非编码（已是村名/空）原样返回
+
+        var result = await _regionService.GetVillageByCodeAsync(value, ct);
+        if (result.IsSuccess && !string.IsNullOrEmpty(result.Value?.VillageName))
+            return result.Value!.VillageName;
+
+        _logger.Warn($"资产核查村编码未能解析为村名（保留原值）: code='{value}', " +
+                     $"{result.ErrorCode} {(result.Value == null && result.IsSuccess ? "查无此村" : result.Message)}");
+        return value;
+    }
+
+    /// <summary>
+    /// 读入资产核查时回填地址（村社区 + 详细地址）。
+    /// 村：按编码解析成村名并选中（解析失败不动默认值，避免把来源编码塞进 Picker）。
+    /// 详细地址：仅在当前为空时填入，已有输入不覆盖。
+    /// 两者都不改户籍级联（户籍另有 _isHukouAddressManuallyEdited 保护）。
+    /// </summary>
+    private async Task ApplyAssetCheckAddressAsync(CancellationToken ct)
+    {
+        if (AssetCheckData == null) return;
+
+        var villageName = (await ResolveAssetCheckCommunityAsync(AssetCheckData.Community, ct)).Trim();
+        // 仍是纯数字编码 = 没解析出村名 → 不动默认值，避免把编码塞进 Picker
+        if (villageName.Length > 0 && !villageName.All(char.IsDigit))
+        {
+            if (!VillageOptions.Contains(villageName))
+                VillageOptions.Add(villageName);
+            SelectedVillage = villageName;
+            _logger.Info($"资产核查回填村社区: {villageName}");
+        }
+
+        if (string.IsNullOrWhiteSpace(Address) && !string.IsNullOrWhiteSpace(AssetCheckData.FamilyAddress))
+        {
+            Address = AssetCheckData.FamilyAddress.Trim();
+            _logger.Info($"资产核查回填详细地址: {Address}");
+        }
+    }
+
+    /// <summary>刷新来源数据侧栏摘要（可回填/需手填计数）</summary>
+    private void UpdateFieldPanelSummary()
+    {
+        FieldPanelSummary = $"可回填 {AvailableFields.Count(f => f.HasValue)} 项 / 需手填 {AvailableFields.Count(f => f.IsMissing)} 项";
+        OnPropertyChanged(nameof(MissingFieldCount));
     }
 
     /// <summary>
@@ -1574,6 +1723,18 @@ public partial class ApplicationFormViewModel : FormViewModelBase
                 case nameof(Address):
                     Address = field.Value;
                     break;
+                case nameof(SelectedVillage):
+                    // 社区/村：来源可能是村编码（资产核查存的是编码）→ 先解析成村名，
+                    // 否则编码会混进 VillageOptions 且 Picker 匹配不到任何村（显示成空白/第一项）
+                    var villageDisplay = await ResolveAssetCheckCommunityAsync(field.Value, CancellationToken.None);
+                    if (!VillageOptions.Contains(villageDisplay))
+                        VillageOptions.Add(villageDisplay);
+                    SelectedVillage = villageDisplay;
+                    break;
+                case nameof(SurveyDate):
+                    if (!IsSurveyDateLocked && DateTime.TryParse(field.Value, out var surveyDate))
+                        SurveyDate = surveyDate.Date;
+                    break;
                 case nameof(ApplicationReason):
                     // 查找对应的申请原因选项
                     var reasonOption = ApplicationReasonOptions.FirstOrDefault(o => o.Key == field.Value || o.Display == field.Value);
@@ -1583,6 +1744,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             }
 
             field.IsFilled = true;
+            UpdateFieldPanelSummary();
             var maskedFieldValue = field.TargetProperty switch
             {
                 nameof(ApplicantIdCard) => DataMasker.MaskIdCard(field.Value),
@@ -1641,6 +1803,20 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     {
         ShowMemberImportPopup();
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 手机端来源数据抽屉：直接导入资产核查的全部家庭成员（无弹窗，适配窄屏）
+    /// </summary>
+    [RelayCommand]
+    private async Task ImportAllAssetCheckMembersAsync()
+    {
+        var members = AssetCheckData?.FamilyMembers;
+        if (members == null || members.Count == 0)
+            return;
+
+        await ImportMembersAsync(members.ToList());
+        IsFieldPanelVisible = false;
     }
 
     /// <summary>
@@ -1804,6 +1980,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         IHouseholdSurveyService householdSurveyService,
         IChangeService changeService,
         IVisitRecordService visitRecordService,
+        IAddressScopeService addressScopeService,
         ILoggerService logger)
     {
         _serviceProvider = serviceProvider;
@@ -1818,6 +1995,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         _dictionaryService = dictionaryService;
         _userService = userService;
         _organizationService = organizationService;
+        _addressScopeService = addressScopeService;
         _landContractService = landContractService;
         _subsidyDataService = subsidyDataService;
         _assetVerificationService = assetVerificationService;

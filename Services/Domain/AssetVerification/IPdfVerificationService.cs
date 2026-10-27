@@ -31,14 +31,31 @@ public interface IPdfVerificationService
         string fileName, byte[] fileData, string fileHash, bool isValid, string notes,
         CancellationToken ct = default);
 
-    Task<Result<bool>> ReportExistsByFileHashAsync(
-        string fileHash, CancellationToken ct = default);
+    /// <summary>同户同 hash 报告匹配（含历史版本）；用于“未变更/恢复历史版本”。</summary>
+    Task<Result<ReportHashMatch?>> FindHouseholdReportByHashAsync(
+        long checkId, string fileHash, CancellationToken ct = default);
+
+    /// <summary>把指定历史报告恢复为同户当前版本（旧当前版本转历史，不新增行）。</summary>
+    Task<Result> SetCurrentReportAsync(
+        long reportId, CancellationToken ct = default);
+
+    /// <summary>上传报告后的状态更新：只允许 0/1 → 1/2，终态 2/3 不被覆盖。</summary>
+    Task<Result> UpdateCheckStatusFromUploadAsync(
+        long checkId, string status, CancellationToken ct = default);
 
     Task<Result<bool>> ReportExistsByCheckIdAsync(
         long checkId, CancellationToken ct = default);
 
     Task<Result<List<PdfVerificationRecord>>> GetVerificationHistoryAsync(
         int limit = 50, CancellationToken ct = default);
+
+    /// <summary>按户（head_id_card）取全部报告版本，version 倒序，当前版本 is_current=true。</summary>
+    Task<Result<List<PdfVerificationRecord>>> GetReportHistoryByCheckIdAsync(
+        long checkId, CancellationToken ct = default);
+
+    /// <summary>按报告行 ID 取 PDF 数据（用于历史版本预览/打印）。</summary>
+    Task<Result<byte[]>> GetReportDataByReportIdAsync(
+        long reportId, CancellationToken ct = default);
 
     Task<Result<byte[]>> GetReportDataByCheckIdAsync(
         long checkId, CancellationToken ct = default);

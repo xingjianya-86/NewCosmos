@@ -139,7 +139,8 @@ public class StatisticsService : BaseService, IStatisticsService
                 FROM
                     (SELECT COUNT(*) FILTER (WHERE status = $5 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
                             COUNT(*) FILTER (WHERE status = $6 AND stop_date >= $1::date AND stop_date < $2::date
-                                {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}) AS monthly_exits
+                                {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
+                                {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS monthly_exits
                      FROM nc_biz_applications
                      WHERE deleted_at IS NULL) f
                 CROSS JOIN
@@ -209,7 +210,8 @@ public class StatisticsService : BaseService, IStatisticsService
                     COUNT(*) FILTER (WHERE status = $3) AS active_count,
                     COUNT(*) FILTER (WHERE status = $3 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
                     COUNT(*) FILTER (WHERE status = $4 AND stop_date >= $1::date AND stop_date < $2::date
-                        {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}) AS monthly_exits
+                        {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
+                        {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS monthly_exits
                 FROM nc_biz_applications
                 WHERE deleted_at IS NULL";
 
@@ -292,26 +294,34 @@ public class StatisticsService : BaseService, IStatisticsService
 
         try
         {
-            // 口径：
-            // - 待上传报告 = status=SUBMITTED（已提交待核查，不限时间，与 GetAssetVerificationsCountAsync 一致）
-            // - 本月已完成 = status=VERIFIED 且 updated_at∈当月自然月
-            // - 本月新增申请 = application_date∈当月自然月
-            // - 全年累计申请 = application_date∈当年（end 复用次月1日：12 月时即次年1月1日，恰好覆盖全年）
+            // 口径（2026-10 确认）：
+            // - 待上传报告 = status=SUBMITTED（已提交待核查，不限时间）
+            // - 本月已完成 = status=VERIFIED 且 application_date ∈ A线周期（资产核查专用周期，上月11日~本月10日）
+            // - 本月新增申请 = application_date ∈ A线周期
+            // - 全年累计申请 = application_date ∈ A线整年
             var now = DateTime.Now;
-            var mStart = new DateTime(now.Year, now.Month, 1); // 当月1日
-            var mEnd = mStart.AddMonths(1);                    // 次月1日
-            var yStart = new DateTime(now.Year, 1, 1);         // 当年1月1日
+            var (aStart, aEnd) = ALinePeriodHelper.GetPeriod(now.Year, now.Month);
+            var (yStart, yEnd) = ALinePeriodHelper.GetYearPeriod(now.Year);
 
             var sql = @"
+                WITH h AS (
+                    SELECT DISTINCT ON (COALESCE(NULLIF(head_id_card, ''), 'APP:' || id))
+                           COALESCE(NULLIF(head_id_card, ''), 'APP:' || id) AS household_key,
+                           status, application_date
+                    FROM nc_biz_asset_checks
+                    WHERE deleted_at IS NULL
+                    ORDER BY COALESCE(NULLIF(head_id_card, ''), 'APP:' || id),
+                             (applicant_id_card = head_id_card) DESC,
+                             created_at DESC
+                )
                 SELECT
-                    COUNT(*) FILTER (WHERE status = $4) AS pending_report_count,
-                    COUNT(*) FILTER (WHERE status = $5 AND updated_at >= $1 AND updated_at < $2) AS monthly_completed,
+                    COUNT(*) FILTER (WHERE status = $5) AS pending_report_count,
+                    COUNT(*) FILTER (WHERE status = $6 AND application_date >= $1::date AND application_date < $2::date) AS monthly_completed,
                     COUNT(*) FILTER (WHERE application_date >= $1::date AND application_date < $2::date) AS monthly_new,
-                    COUNT(*) FILTER (WHERE application_date >= $3::date AND application_date < $2::date) AS year_total
-                FROM nc_biz_asset_checks
-                WHERE deleted_at IS NULL";
+                    COUNT(*) FILTER (WHERE application_date >= $3::date AND application_date < $4::date) AS year_total
+                FROM h";
 
-            var result = await _dbService.QuerySingleAsync<AssetVerificationModuleStats>(sql, ct, mStart, mEnd, yStart,
+            var result = await _dbService.QuerySingleAsync<AssetVerificationModuleStats>(sql, ct, aStart, aEnd, yStart, yEnd,
                 AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED);
 
             if (result.IsFailure || result.Value is null)
@@ -462,7 +472,7 @@ public class StatisticsService : BaseService, IStatisticsService
 
         try
         {
-            // 归档总数 = 当前库已归档（current_step=6）+ 5 张历史导入库户数（无 deleted_at 软删列）。
+            // 归档总数 = 当前库已归档（current_step=6）+ 6 张历史导入库户数（无 deleted_at 软删列）。
             // 不查 nc_biz_archives：唯一写入方是「一事一议申报表生成」冷门流程，主归档链路从不写入，实测 0 行。
             const string sql = @"SELECT (
                         (SELECT COUNT(*) FROM nc_biz_applications WHERE current_step = $1 AND deleted_at IS NULL)
@@ -471,6 +481,7 @@ public class StatisticsService : BaseService, IStatisticsService
                       + (SELECT COUNT(*) FROM nc_biz_low_income_edge_families)
                       + (SELECT COUNT(*) FROM nc_biz_destitute_families)
                       + (SELECT COUNT(*) FROM nc_biz_rigid_expenditure_families)
+                      + (SELECT COUNT(*) FROM nc_biz_other_difficulty_families)
                     ) AS total_archives";
 
             var result = await _dbService.QuerySingleAsync<ArchiveStats>(sql, ct, WorkflowSteps.ARCHIVED);

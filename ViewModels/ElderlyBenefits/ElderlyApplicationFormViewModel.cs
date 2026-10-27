@@ -24,6 +24,10 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
     private readonly IServiceProvider _serviceProvider = null!;
     private readonly IDialogService _dialogService = null!;
     private readonly IRegionService _regionService = null!;
+    private readonly IAddressScopeService _addressScopeService = null!;
+
+    /// <summary>账号管辖范围（户籍地址逐级限制；未绑区划=null → 整个地址区禁用）</summary>
+    private AddressScope? _addressScope;
     private readonly IUserService _userService = null!;
     private readonly IOrganizationService _organizationService = null!;
     private readonly IDictCacheService _dictCache = null!;
@@ -108,6 +112,7 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
         IRegionService regionService,
         IUserService userService,
         IOrganizationService organizationService,
+        IAddressScopeService addressScopeService,
         IDictCacheService dictCache)
     {
         _applicationService = applicationService;
@@ -117,6 +122,7 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
         _regionService = regionService;
         _userService = userService;
         _organizationService = organizationService;
+        _addressScopeService = addressScopeService;
         _dictCache = dictCache;
     }
 

@@ -200,11 +200,8 @@ public partial class MobileMainViewModel : ViewModelBase
 
     #region SnackBar
 
-    [ObservableProperty] private string _snackBarMessage = string.Empty;
-    [ObservableProperty] private SnackBarType _snackBarType = SnackBarType.Warning;
-    [ObservableProperty] private bool _isSnackBarVisible;
-
-    private async Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Warning)
+    // 隐藏基类同名成员：本实现语义不同（阻塞 4 秒 + 先复位再显示），故保留而不是改用基类
+    private new async Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Warning)
     {
         SnackBarMessage = message;
         SnackBarType = type;
@@ -348,6 +345,7 @@ public partial class MobileMainViewModel : ViewModelBase
         AddWorkspaceCard("📊", "救助月报表", "救助统计月度报表", "#EFF6FF", CanAccessSocialAssistanceReport, NavigateToSocialAssistanceMonthlyReportAsync);
         AddWorkspaceCard("👴", "高龄津贴发放", "申请登记 · 停发 · 复核", "#F5F3FF", CanAccessElderlyBenefit, NavigateToElderlyBenefitsAsync);
         AddWorkspaceCard("🔄", "保障对象动态管理", "户主变更 · 成员增减 · 死亡减员", "#ECFDF5", CanAccessChange, NavigateToChangeManagementAsync);
+        AddWorkspaceCard("⚰️", "死亡情况说明", "死亡申报 · 身份聚合 · 文书出具", "#F1F0FB", CanAccessArchiveQuery, NavigateToDeathStatementAsync);
         AddWorkspaceCard("🆘", "临时救助", "急难型 · 支出型救助办理", "#FFF7ED", CanAccessTempRelief, NavigateToTempReliefAsync);
         AddWorkspaceCard("⏳", "渐退期管理", "进行中与已到期的渐退户", "#EFF6FF", CanAccessSocialAssistance, NavigateToGracePeriodAsync);
         // 救助档案管理入口仅保留「档案」Tab（MobileArchiveQueryPage 孪生页），工作台不再重复
@@ -495,6 +493,12 @@ public partial class MobileMainViewModel : ViewModelBase
     private async Task NavigateToMobileArchiveAsync()
     {
         await NavigateToPageAsync<Pages.Mobile.MobileArchiveQueryPage>("救助档案管理");
+    }
+
+    /// <summary>死亡情况说明（工作台卡片入口：申报填写 → 身份与提醒 → 文书输出）</summary>
+    private async Task NavigateToDeathStatementAsync()
+    {
+        await NavigateToPageAsync<Pages.Mobile.MobileDeathStatementPage>("死亡情况说明");
     }
 
     /// <summary>照片补传（独立功能）：按人搜索 → 勾选补传/打印/导出，已传过的也可继续补传。</summary>

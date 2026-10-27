@@ -54,12 +54,12 @@
                         </OnIdiom>
                     </VerticalStackLayout.IsVisible>
 
-                    <!-- Logo 圆形 -->
+                    <!-- Logo：吉祥物图标（与系统图标同源，四角透明，圆角与图标自带圆角一致） -->
                     <Border WidthRequest="80"
                             HeightRequest="80"
-                            StrokeShape="Ellipse"
+                            StrokeShape="RoundRectangle 10"
                             StrokeThickness="0"
-                            BackgroundColor="{StaticResource Primary}"
+                            BackgroundColor="Transparent"
                             Padding="0"
                             HorizontalOptions="Center">
                         <Border.Shadow>
@@ -68,10 +68,8 @@
                                     Radius="8"
                                     Opacity="0.3" />
                         </Border.Shadow>
-                        <Label Text="{OnPlatform WinUI=&#xE80F;, Android=⚖️}"
-                               FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                               FontSize="36"
-                               TextColor="White"
+                        <Image Source="mascot_icon.png"
+                               Aspect="AspectFill"
                                HorizontalOptions="Center"
                                VerticalOptions="Center" />
                     </Border>
@@ -123,32 +121,22 @@
                             <VerticalStackLayout Spacing="16"
                                                 HorizontalOptions="Center">
 
-                                <!-- Logo 圆形 -->
+                                <!-- Logo：吉祥物图标（与系统图标同源，四角透明，圆角与图标自带圆角一致） -->
                                 <Border WidthRequest="100"
                                         HeightRequest="100"
-                                        StrokeShape="Ellipse"
+                                        StrokeShape="RoundRectangle 12"
                                         StrokeThickness="0"
+                                        BackgroundColor="Transparent"
                                         Padding="0"
                                         HorizontalOptions="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0"
-                                                            EndPoint="1,1">
-                                            <GradientStop Color="{StaticResource Primary}"
-                                                        Offset="0" />
-                                            <GradientStop Color="{StaticResource PrimaryDark}"
-                                                        Offset="1" />
-                                        </LinearGradientBrush>
-                                    </Border.Background>
                                     <Border.Shadow>
                                         <Shadow Brush="Black"
                                                 Offset="0,6"
                                                 Radius="12"
                                                 Opacity="0.3" />
                                     </Border.Shadow>
-                                    <Label Text="{OnPlatform WinUI=&#xE80F;, Android=⚖️}"
-                                           FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                           FontSize="48"
-                                           TextColor="White"
+                                    <Image Source="mascot_icon.png"
+                                           Aspect="AspectFill"
                                            HorizontalOptions="Center"
                                            VerticalOptions="Center" />
                                 </Border>

@@ -1,11 +1,12 @@
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Services.Core;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ElderlyBenefits;
 
 namespace NewCosmos.Pages.ElderlyBenefits;
 
-public partial class ElderlyStopPage : ContentPage, IParameterizedPage<ElderlyApplication>
+public partial class ElderlyStopPage : ContentPage, IParameterizedPage<ElderlyApplication>, IParameterizedPage<ElderlyStopPrefill>
 {
     private readonly ElderlyStopViewModel _viewModel;
     private readonly ILoggerService _logger;
@@ -33,5 +34,13 @@ public partial class ElderlyStopPage : ContentPage, IParameterizedPage<ElderlyAp
     {
         _viewModel.LoadApplication(app);
         return Task.CompletedTask;
+    }
+
+    /// <summary>联动预填入口（死亡情况说明跳转）：先加载档案再回填死亡日期/原因</summary>
+    async Task IParameterizedPage<ElderlyStopPrefill>.SetParameterAsync(ElderlyStopPrefill prefill)
+    {
+        _viewModel.LoadApplication(prefill.Application);
+        _viewModel.ApplyDeathPrefill(prefill.DeathDate, prefill.DeathReason);
+        await Task.CompletedTask;
     }
 }

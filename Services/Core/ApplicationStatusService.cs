@@ -3,6 +3,7 @@ using NewCosmos.Helpers;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Database;
+using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.StateMachine;
 using NewCosmos.Services.Utilities;
 
@@ -13,14 +14,20 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
 {
     private readonly IDatabaseService _db;
     private readonly IBusinessTimelineService _timelineService;
+    private readonly IOtherDifficultyLedgerService _otherDifficultyLedger;
 
     protected override string ServiceName => "ApplicationStatusService";
 
-    public ApplicationStatusService(IDatabaseService db, ILoggerService logger, IBusinessTimelineService timelineService)
+    public ApplicationStatusService(
+        IDatabaseService db,
+        ILoggerService logger,
+        IBusinessTimelineService timelineService,
+        IOtherDifficultyLedgerService otherDifficultyLedger)
         : base(logger)
     {
         _db = db;
         _timelineService = timelineService;
+        _otherDifficultyLedger = otherDifficultyLedger;
     }
 
     /// <inheritdoc />
@@ -158,9 +165,23 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
                     : "归档完结：status=Approved、current_step=6、first_approved_at 落库",
                 current.Status, targetStatus.GetCode(), operatorName, ct);
 
+            // 归档终结判不合格同样属于非死亡性停保 → 按同一规则尝试转入其他困难人员台账
+            if (targetStatus == ApplicationStatus.Stopped)
+                await TryTransferToOtherDifficultyAsync(applicationId, BuildIneligibleStopReason(current.ClassificationResult), DateTime.Today, ct);
+
             // 时序闸口（告警不拦）：转 Approved 时检查建档/审批与受理截止、公示期的先后
             if (targetStatus == ApplicationStatus.Approved)
                 await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
+
+            // 户内单人保审批通过 → 在旧户档案记一条"转出单人保"减员记录（旧档/成员行均不删）
+            if (targetStatus == ApplicationStatus.Approved)
+                await TryWriteSingleRescueTransferAsync(applicationId, ct);
+
+            // 审批通过 → 若保障成员已在其他困难人员台账中，登记"转出/停止"（台账原行保留）
+            if (targetStatus == ApplicationStatus.Approved)
+                await TryRecordOtherDifficultyTransferOutAsync(applicationId, ct);
+            else if (targetStatus == ApplicationStatus.Stopped)
+                await TryRemoveOtherDifficultyTransferOutAsync(applicationId, ct);
 
             Logger.LogBusiness("完成归档", ("ApplicationId", applicationId),
                 ("Status", targetStatus.GetCode()), ("Operator", operatorName ?? string.Empty));
@@ -261,6 +282,17 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             // 时序闸口（告警不拦）：恢复在保等同转 Approved，检查建档/审批与受理截止、公示期的先后
             await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
 
+            // 恢复在保的单人保档案：幂等补写旧户"转出单人保"记录（此前若未写过）
+            await TryWriteSingleRescueTransferAsync(applicationId, ct);
+
+            // 恢复在保 → 撤回该档案停保时转入其他困难人员台账的行（导入行不受影响）
+            var removeLedger = await _otherDifficultyLedger.RemoveOnResumeAsync(applicationId, ct);
+            if (removeLedger.IsFailure)
+                LogWarn($"撤回其他困难人员台账失败: ApplicationId={applicationId}, {removeLedger.Message}");
+
+            // 撤回停保转入行之后，若成员仍在导入台账中，重新登记转出（避免把刚撤回的停保转入行又当成转出）
+            await TryRecordOtherDifficultyTransferOutAsync(applicationId, ct);
+
             Logger.LogBusiness(action, ("ApplicationId", applicationId),
                 ("Operator", operatorName ?? string.Empty));
             LogInfo($"{action}: ApplicationId={applicationId}, {currentStatus.GetDescription()} → {ApplicationStatus.Approved.GetDescription()}");
@@ -359,9 +391,23 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             await WriteAuditAsync(applicationId, action, detail,
                 currentStatus.GetDescription(), target.GetDescription(), operatorName, ct);
 
+            // 非死亡性停保 → 转入其他困难人员台账（失败只告警：停保本身已落库，台账可后续人工核对）
+            if (target == ApplicationStatus.Stopped)
+                await TryTransferToOtherDifficultyAsync(applicationId, stopReason, stopDate, ct);
+
             // 时序闸口（告警不拦）：审批通过时检查建档/审批与受理截止、公示期的先后
             if (target == ApplicationStatus.Approved)
                 await LogTimelineOrderWarningsAsync(applicationId, operatorName, ct);
+
+            // 户内单人保审批通过 → 在旧户档案记一条"转出单人保"减员记录（旧档/成员行均不删）
+            if (target == ApplicationStatus.Approved)
+                await TryWriteSingleRescueTransferAsync(applicationId, ct);
+
+            // 审批通过 → 其他困难人员台账转出登记；停保 → 撤回该档案的自动转出记录
+            if (target == ApplicationStatus.Approved)
+                await TryRecordOtherDifficultyTransferOutAsync(applicationId, ct);
+            else if (target == ApplicationStatus.Stopped)
+                await TryRemoveOtherDifficultyTransferOutAsync(applicationId, ct);
 
             Logger.LogBusiness(action, ("ApplicationId", applicationId),
                 ("From", currentStatus.GetDescription()), ("To", target.GetDescription()),
@@ -373,6 +419,161 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
         {
             LogException(ex, action);
             return Result.FromException(ex);
+        }
+    }
+
+    /// <summary>
+    /// 非死亡性停保转台账：调用台账服务转入其他困难人员（服务内部自带死亡/接续/已存在等门槛）。
+    /// 失败只告警不抛错——停保状态已落库，台账缺失可人工补录；异常在调用方事务内会使事务回滚，属预期护栏。
+    /// </summary>
+    private async Task TryTransferToOtherDifficultyAsync(long applicationId, string? stopReason, DateTime? stopDate, CancellationToken ct)
+    {
+        try
+        {
+            var transfer = await _otherDifficultyLedger.TransferOnStopAsync(applicationId, stopReason, stopDate, ct);
+            if (transfer.IsFailure)
+                LogWarn($"停保转入其他困难人员台账失败: ApplicationId={applicationId}, {transfer.Message}");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"停保转入其他困难人员台账异常: ApplicationId={applicationId}, {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 户内单人保审批通过：在旧户档案写一条 <see cref="DictionaryConstants.ChangeType.SINGLE_RESCUE_OUT"/> 减员记录。
+    /// 业务口径（2026-10 确认）：旧户档案继续有效、成员行一律不删除，只记录该成员转出为独立单人保；
+    /// 供「最低生活保障边缘家庭停止、减员汇总表」体现减员，避免同一人同时计入低收入户与单人保。
+    /// 幂等（同一新档只写一次）；失败只告警，不阻断审批主流程。
+    /// </summary>
+    private async Task TryWriteSingleRescueTransferAsync(long applicationId, CancellationToken ct)
+    {
+        try
+        {
+            var appResult = await _db.QuerySingleAsync<SingleRescueTransferRow>(
+                @"SELECT id, applicant_name, applicant_id_card, original_application_id, chain_type,
+                         classification_result, first_approved_at
+                  FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, applicationId);
+            if (appResult.IsFailure || appResult.Value == null)
+                return;
+
+            var app = appResult.Value;
+            if (!string.Equals(app.ChainType, ChainTypeConstants.SINGLE_RESCUE, StringComparison.Ordinal)
+                || app.OriginalApplicationId is not > 0)
+                return;
+
+            var sourceResult = await _db.QuerySingleAsync<SingleRescueSourceRow>(
+                @"SELECT id, applicant_name, applicant_id_card, classification_result
+                  FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, app.OriginalApplicationId.Value);
+            if (sourceResult.IsFailure || sourceResult.Value == null)
+                return;
+
+            var source = sourceResult.Value;
+
+            var exists = await _db.ExecuteScalarAsync(
+                @"SELECT COUNT(*) FROM nc_biz_change_records
+                  WHERE application_id = $1 AND change_type = $2 AND new_application_id = $3 AND deleted_at IS NULL",
+                ct, source.Id, DictionaryConstants.ChangeType.SINGLE_RESCUE_OUT, app.Id);
+            if (exists.IsFailure)
+            {
+                LogWarn($"单人保转出记录幂等检查失败: ApplicationId={applicationId}, {exists.Message}");
+                return;
+            }
+            if (Convert.ToInt64(exists.Value) > 0)
+                return;
+
+            var changeDate = (app.FirstApprovedAt ?? DateTime.Today).Date;
+            var changeNo = $"SRO{DateTime.Now:yyyyMMddHHmmssfff}";
+            var reason = $"单人保转出: {app.ApplicantName}({app.ApplicantIdCard}) → 新档{app.Id}";
+            var changeIdResult = await _db.ExecuteScalarAsync<long?>(
+                @"INSERT INTO nc_biz_change_records
+                    (application_id, change_no, change_type, change_reason, change_reason_type, change_date,
+                     original_application_id, new_application_id, old_classification, new_classification,
+                     triggered_grace_period, triggered_stop, operator_name, changed_at)
+                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,FALSE,FALSE,'System',NOW())
+                  RETURNING id",
+                ct, source.Id, changeNo, DictionaryConstants.ChangeType.SINGLE_RESCUE_OUT, reason,
+                "转出单人保", changeDate, source.Id, app.Id,
+                source.ClassificationResult ?? string.Empty, app.ClassificationResult ?? string.Empty);
+            if (changeIdResult.IsFailure || changeIdResult.Value is not > 0)
+            {
+                LogWarn($"单人保转出记录写入失败: ApplicationId={applicationId}, {changeIdResult.Message}");
+                return;
+            }
+
+            var changeId = changeIdResult.Value.Value;
+            var detail = await _db.ExecuteNonQueryAsync(
+                @"INSERT INTO nc_biz_change_details
+                      (change_id, field_name, field_label, old_value, new_value, created_at)
+                  VALUES ($1,'MemberRemove',$2,$3,'转出单人保',NOW())",
+                ct, changeId, app.ApplicantName ?? string.Empty,
+                $"{app.ApplicantName}({app.ApplicantIdCard}) SharedLiving");
+            if (detail.IsFailure)
+                LogWarn($"单人保转出明细写入失败: ApplicationId={applicationId}, ChangeId={changeId}, {detail.Message}");
+            else
+                Logger.LogBusiness("单人保转出登记",
+                    ("SourceApplicationId", source.Id.ToString()),
+                    ("NewApplicationId", app.Id.ToString()),
+                    ("Member", DataMasker.MaskName(app.ApplicantName ?? string.Empty)),
+                    ("MemberIdCard", DataMasker.MaskIdCard(app.ApplicantIdCard ?? string.Empty)));
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"单人保转出登记异常（不影响审批）: ApplicationId={applicationId}, {ex.Message}");
+        }
+    }
+
+    /// <summary>单人保转出判定读取行</summary>
+    private sealed class SingleRescueTransferRow
+    {
+        public long Id { get; set; }
+        public string? ApplicantName { get; set; }
+        public string? ApplicantIdCard { get; set; }
+        public long? OriginalApplicationId { get; set; }
+        public string? ChainType { get; set; }
+        public string? ClassificationResult { get; set; }
+        public DateTime? FirstApprovedAt { get; set; }
+    }
+
+    /// <summary>单人保转出源档案读取行</summary>
+    private sealed class SingleRescueSourceRow
+    {
+        public long Id { get; set; }
+        public string? ApplicantName { get; set; }
+        public string? ApplicantIdCard { get; set; }
+        public string? ClassificationResult { get; set; }
+    }
+
+    /// <summary>
+    /// 审批通过 → 其他困难人员台账转出登记（服务内部按保障成员身份证匹配，台账原行保留）。
+    /// 失败只告警，不影响审批主流程。
+    /// </summary>
+    private async Task TryRecordOtherDifficultyTransferOutAsync(long applicationId, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _otherDifficultyLedger.RecordTransferOutAsync(applicationId, ct);
+            if (result.IsFailure)
+                LogWarn($"其他困难人员转出登记失败: ApplicationId={applicationId}, {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"其他困难人员转出登记异常: ApplicationId={applicationId}, {ex.Message}");
+        }
+    }
+
+    /// <summary>档案停保 → 撤回该档案审批时自动写入的其他困难人员转出记录（手工补录行不动）。</summary>
+    private async Task TryRemoveOtherDifficultyTransferOutAsync(long applicationId, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _otherDifficultyLedger.RemoveTransferOutAsync(applicationId, ct);
+            if (result.IsFailure)
+                LogWarn($"撤回其他困难人员转出记录失败: ApplicationId={applicationId}, {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"撤回其他困难人员转出记录异常: ApplicationId={applicationId}, {ex.Message}");
         }
     }
 

@@ -40,6 +40,10 @@ tables:
         type: date
         nullable: false
         comment: 死亡日期
+      - name: death_time
+        type: time without time zone
+        nullable: true
+        comment: 死亡确切时刻（新写入必填由应用层双门校验；存量历史行为 NULL=未采集）
       - name: death_reason
         type: character varying(200)
         nullable: true

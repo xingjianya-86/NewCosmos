@@ -1989,7 +1989,15 @@ public partial class ChangeService
                 && MemberChangeReasonConstants.IsDeath(e.ReasonCode)).ToList();
             if (deathEntries.Count > 0)
             {
-                const int deathParamsPerRow = 9;
+                // 死亡确切时刻必填（弹窗侧已校验；此处兜底拦截绕过 UI 的调用）
+                if (deathEntries.Any(e => e.EventTime is null))
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED,
+                        "死亡减员必须填写死亡确切时间");
+                }
+
+                const int deathParamsPerRow = 10;
                 var (deathValues, deathArgs) = NewCosmos.Helpers.MultiRowValuesBuilder.Build(
                     deathEntries.Count, deathParamsPerRow,
                     i =>
@@ -1998,19 +2006,19 @@ public partial class ChangeService
                         return new object?[]
                         {
                             context.ApplicationId, e.MemberId, e.Name, e.IdCard, e.RelationshipToHead,
-                            e.EventDate,
+                            e.EventDate, e.EventTime,
                             string.IsNullOrWhiteSpace(e.Remark) ? "成员变更-人员死亡" : e.Remark,
                             e.Remark, context.OperatorName
                         };
                     });
-                var deathSql = @"WITH input(application_id, member_id, member_name, member_id_card, relationship_to_head, death_date, death_reason, remark, operator_name) AS (
+                var deathSql = @"WITH input(application_id, member_id, member_name, member_id_card, relationship_to_head, death_date, death_time, death_reason, remark, operator_name) AS (
                         VALUES " + deathValues + @")
                     INSERT INTO nc_biz_death_records
                         (application_id, member_id, member_name, member_id_card, relationship_to_head,
-                         death_date, death_reason, is_household_head, remark, operator_name, created_at)
+                         death_date, death_time, death_reason, is_household_head, remark, operator_name, created_at)
                     SELECT DISTINCT ON (member_id_card)
                         application_id, member_id, member_name, member_id_card, relationship_to_head,
-                        death_date, death_reason, false, remark, operator_name, NOW()
+                        death_date, death_time, death_reason, false, remark, operator_name, NOW()
                     FROM input i
                     WHERE NOT EXISTS (
                         SELECT 1 FROM nc_biz_death_records d

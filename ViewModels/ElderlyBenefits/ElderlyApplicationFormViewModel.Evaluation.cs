@@ -225,6 +225,7 @@ public partial class ElderlyApplicationFormViewModel
     /// </summary>
     private async Task LoadRegionCascadesForEditAsync(Models.Entities.ElderlyApplication app)
     {
+        await EnsureAddressScopeAsync();   // 管辖范围 + 省列表（2026-10-27）
         await LoadHukouCitiesAsync();
         await LoadFamilyCitiesAsync();
 
@@ -306,6 +307,7 @@ public partial class ElderlyApplicationFormViewModel
     /// </summary>
     public async Task LoadInitialRegionAsync()
     {
+        await EnsureAddressScopeAsync();   // 管辖范围 + 省列表（2026-10-27）
         await LoadHukouCitiesAsync();
         await LoadFamilyCitiesAsync();
     }

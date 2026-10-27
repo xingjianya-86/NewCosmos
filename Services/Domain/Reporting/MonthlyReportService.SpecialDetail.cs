@@ -3,6 +3,7 @@ using System.Text.Json;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
@@ -665,20 +666,20 @@ public partial class MonthlyReportService
             var rebuildCode = rebuild.Class ?? "";
             var chainAppIds = rebuild.NewAppId > 0 ? new[] { appId, rebuild.NewAppId } : new[] { appId };
 
-            // 给予渐退期：档案生效期=办理月次月 1 日（提前办理档案），
-            // 渐退期在某月结束，次月新开档案不算在渐退期内。
-            // 判定口径 = 渐退期是否覆盖"生效日"（事件日期所在月的次月 1 日）。
-            // 渐退期行可能挂在下游接续新档案上（户主死亡/停旧建新），须连同下游档案一并匹配，
-            // 否则死亡/接续户会误显"否"（樊万河户 68→80 实测错例：渐退期挂在新档案 80 上）。
+            // 给予渐退期：判定口径 = 渐退期是否覆盖"生效日"。
+            // 生效日 = 事件日期所属 **B 线业务月** 的次月 1 日（与 GracePeriodConstants.CalculatePeriod 同源），
+            // 不是日历月次月1日——樊万河 68 停保 09-22 属 2026-10 业务月，渐退期 11-01 起；
+            // 按日历月会算成 10-01，误判为"未给予渐退期"（2026-10 实测错例）。
+            // 渐退期行可能挂在下游接续新档案上（户主死亡/停旧建新），须连同下游档案一并匹配。
+            // 渐退期满事件本身即"曾给予渐退期"的直接证据（其 end_date 就是渐退末日），直接记"是"。
             var eventDate = ev.EventDate;
-            var effectiveDate = eventDate.HasValue
-                ? new DateTime(eventDate.Value.Year, eventDate.Value.Month, 1).AddMonths(1)
-                : (DateTime?)null;
-            var hasGrace = effectiveDate.HasValue && graces.Any(g =>
-                g.ApplicationId.HasValue && chainAppIds.Contains(g.ApplicationId.Value)
-                && g.StartDate.HasValue && g.EndDate.HasValue
-                && g.StartDate.Value <= effectiveDate.Value
-                && g.EndDate.Value >= effectiveDate.Value);
+            var effectiveDate = eventDate.HasValue ? ResolveGraceEffectiveDate(eventDate.Value) : (DateTime?)null;
+            var hasGrace = ev.EventType == "渐退期满"
+                || (effectiveDate.HasValue && graces.Any(g =>
+                    g.ApplicationId.HasValue && chainAppIds.Contains(g.ApplicationId.Value)
+                    && g.StartDate.HasValue && g.EndDate.HasValue
+                    && g.StartDate.Value <= effectiveDate.Value
+                    && g.EndDate.Value >= effectiveDate.Value));
             var graceText = hasGrace ? "是" : "否";
 
             // 纳入类别：停旧建新（有下游新档案）优先用新档案分类（如解维平 44→45 特困）；
@@ -730,6 +731,17 @@ public partial class MonthlyReportService
             });
         }
         return Result.Success(outRows);
+    }
+
+    /// <summary>
+    /// 渐退期判定锚点：事件日期所属 B 线业务月的次月 1 日。
+    /// 与 <see cref="GracePeriodConstants.CalculatePeriod"/> 同源（业务月次月1日起算），
+    /// 禁止用日历月——樊万河 68 停保 09-22 属 10 月业务，渐退期 11-01 起，按日历月会误判。
+    /// </summary>
+    private DateTime ResolveGraceEffectiveDate(DateTime eventDate)
+    {
+        var business = _timelineService.GetTimelineForDate(eventDate, TimelineType.BusinessProcess);
+        return new DateTime(business.Year, business.Month, 1).AddMonths(1);
     }
 
     // ─────────────────── 临时救助新增汇总 ───────────────────

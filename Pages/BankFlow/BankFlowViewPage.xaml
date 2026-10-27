@@ -54,8 +54,9 @@
                         ItemDisplayBinding="{Binding BatchNo}"
                         SelectedItem="{Binding SelectedBatch, Mode=TwoWay}"
                         WidthRequest="160"
-                        HeightRequest="40"
-                        FontSize="14"
+                        HeightRequest="48"
+                        MinimumHeightRequest="48"
+                        FontSize="15"
                         BackgroundColor="{StaticResource Gray100}"
                         VerticalOptions="Center"/>
 

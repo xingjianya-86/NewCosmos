@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Runtime.InteropServices;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -370,7 +371,7 @@ public class WordEngine : ITemplateEngine
         });
     }
 
-    /// <summary>单个图片占位符插入（worker 线程）：Find 定位 → 临时 PNG → InlineShapes.AddPicture。</summary>
+    /// <summary>单个图片占位符插入（worker 线程）：Find 定位 → 临时 JPEG/PNG → InlineShapes.AddPicture。</summary>
     private void ReplaceImageFieldOnWorker(string placeholder, byte[] imageBytes)
     {
         if (_doc is null || string.IsNullOrEmpty(placeholder)) return;
@@ -379,8 +380,15 @@ public class WordEngine : ITemplateEngine
         string tempPath = string.Empty;
         try
         {
-            tempPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".png", prefix: "sig_");
-            File.WriteAllBytes(tempPath, imageBytes);
+            // Word 对 WebP 支持不一致：统一转成 JPEG/PNG 再插入（JPEG/PNG 原样透传）
+            if (!ImageTranscoder.TryGetWordCompatible(imageBytes, out var compatible, out var extension))
+            {
+                _logger.Warn($"WordEngine: 插入图片占位符 {placeholder} 失败: 图片格式不支持");
+                return;
+            }
+
+            tempPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, extension, prefix: "sig_");
+            File.WriteAllBytes(tempPath, compatible);
 
             var maxHits = 20; // 防御异常模板死循环
             var inserted = 0;

@@ -225,12 +225,12 @@ public class AssetVerificationTask
 
     public string StatusDisplay => Status switch
     {
-        "0" => "已提交",
-        "1" => "有报告",
-        "2" => "已完成",
-        "3" => "已拒绝",
+        AssetCheckStatusConstants.SUBMITTED => AssetCheckStatusConstants.GetDescription(Status),
+        AssetCheckStatusConstants.VERIFIED => AssetCheckStatusConstants.GetDescription(Status),
+        AssetCheckStatusConstants.INCLUDED => AssetCheckStatusConstants.GetDescription(Status),
+        AssetCheckStatusConstants.REFUSED => AssetCheckStatusConstants.GetDescription(Status),
         ApplicationStatusCodes.PENDING => "已提交",
-        ApplicationStatusCodes.COMPLETED => "有报告",
+        ApplicationStatusCodes.COMPLETED => "有报告未建档",
         "Error" => "异常",
         _ => Status
     };

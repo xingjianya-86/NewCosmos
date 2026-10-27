@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Mobile.MobileApplicationFormPage"
+             x:Name="FormPageRoot"
              x:DataType="ApplicationFormViewModel"
              Title="低收入人口认定申请"
              NavigationPage.HasNavigationBar="False"
@@ -22,6 +23,10 @@
                     </HorizontalStackLayout>
                     <!-- 录入环节照片采集 + 身份证扫描：均按申请人身份证归档 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="8">
+                        <Button Text="📋 来源" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                                BackgroundColor="#33FFFFFF" TextColor="White"
+                                IsVisible="{Binding HasAssetCheckData}"
+                                Command="{Binding ToggleFieldPanelCommand}"/>
                         <Button Text="🔍 扫描" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
                                 BackgroundColor="#33FFFFFF" TextColor="White"
                                 Command="{Binding ScanIdCardCommand}"/>
@@ -89,8 +94,85 @@
             </Grid>
         </Border>
 
+        <!-- 来源数据底部抽屉（与 PC 右侧“来源数据”侧栏同源，仅资产核查转申请时有数据） -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" IsVisible="{Binding IsFieldPanelVisible}" ZIndex="200">
+            <BoxView Color="#80000000">
+                <BoxView.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding CloseFieldPanelCommand}"/>
+                </BoxView.GestureRecognizers>
+            </BoxView>
+
+            <Border BackgroundColor="White" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 16,16,0,0"
+                    VerticalOptions="End" HeightRequest="480" MaximumHeightRequest="600" Padding="0">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <!-- 抽屉标题 -->
+                    <Grid Grid.Row="0" Padding="16,14" ColumnDefinitions="*,Auto" BackgroundColor="{StaticResource Gray50}">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="来源数据" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding FieldPanelSummary}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="✕" FontSize="16" FontAttributes="Bold"
+                                WidthRequest="36" HeightRequest="36" Padding="0" CornerRadius="18"
+                                BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
+                                Command="{Binding CloseFieldPanelCommand}"/>
+                    </Grid>
+
+                    <!-- 字段列表：有值可填充，无值显示“需手填”并跳转对应步骤 -->
+                    <CollectionView Grid.Row="1" ItemsSource="{Binding AvailableFields}" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="results:FieldItem">
+                                <Grid Padding="16,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center"
+                                              IsVisible="{Binding HasValue}"/>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <HorizontalStackLayout Spacing="6">
+                                            <Label Text="{Binding DisplayName}" FontSize="13" FontAttributes="Bold"
+                                                   TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding Source}" FontSize="10" TextColor="{StaticResource Primary}"
+                                                   VerticalOptions="Center"/>
+                                        </HorizontalStackLayout>
+                                        <Label Text="{Binding Value}" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                               LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding MissingText}" FontSize="11" TextColor="{StaticResource WarningDark}"
+                                               IsVisible="{Binding IsMissing}"/>
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="2" Text="填充" FontSize="12" Padding="10,4" HeightRequest="30"
+                                            BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
+                                            IsVisible="{Binding HasValue}"
+                                            Command="{Binding Source={x:Reference FormPageRoot}, Path=BindingContext.FillFieldCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                    <Button Grid.Column="2" Text="去填写" FontSize="12" Padding="10,4" HeightRequest="30"
+                                            BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
+                                            CornerRadius="6" IsVisible="{Binding IsMissing}"
+                                            Command="{Binding Source={x:Reference FormPageRoot}, Path=BindingContext.GoToFieldStepCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                        <CollectionView.EmptyView>
+                            <Label Text="暂无来源数据" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                                   HorizontalOptions="Center" Margin="0,30"/>
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+
+                    <!-- 抽屉底部操作 -->
+                    <VerticalStackLayout Grid.Row="2" Padding="16,10,16,18" Spacing="8">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Text="全选" Command="{Binding SelectAllFieldsCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="38" FontSize="13"/>
+                            <Button Grid.Column="1" Text="填充选中" Command="{Binding FillSelectedFieldsCommand}"
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="13"/>
+                        </Grid>
+                        <Button Text="导入全部家庭成员" Command="{Binding ImportAllAssetCheckMembersCommand}"
+                                Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="13"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </Grid>
+
         <!-- 加载蒙版 -->
-        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000"
+        <Border Grid.Row="0" Grid.RowSpan="4" BackgroundColor="#80000000" ZIndex="300"
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>

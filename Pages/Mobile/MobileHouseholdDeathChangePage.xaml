@@ -63,6 +63,10 @@
                             <DatePicker Date="{Binding DeathDate}" Format="yyyy-MM-dd" HeightRequest="46"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="4">
+                            <Label Text="死亡确切时间（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <TimePicker Time="{Binding DeathTime}" Format="HH:mm" HeightRequest="46"/>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="4">
                             <Label Text="死亡证明编号" Style="{StaticResource FormFieldLabelStyle}"/>
                             <Entry Text="{Binding DeathCertificateNo}" Placeholder="选填" Style="{StaticResource FormFieldEntryStyle}"/>
                         </VerticalStackLayout>

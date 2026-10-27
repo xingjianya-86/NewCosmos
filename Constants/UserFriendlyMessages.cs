@@ -153,6 +153,13 @@ public static class UserFriendlyMessages
 
         #endregion
 
+        #region 组织机构（经办机构管理）
+
+        [ErrorCodes.ORGANIZATION_NAME_DUPLICATE] = "组织名称已存在，请更换",
+        [ErrorCodes.ORGANIZATION_LOAD_FAILED] = "组织详情加载失败，请重新选择后再试",
+
+        #endregion
+
         #region 值班管理
 
         [ErrorCodes.DUTY_NO_MEMBERS] = "值班成员名单为空，请先在成员管理中维护各组成员",

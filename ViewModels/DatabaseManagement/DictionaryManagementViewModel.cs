@@ -41,15 +41,6 @@ public partial class DictionaryManagementViewModel : ViewModelBase
     private bool _canManageDictionary;
 
     [ObservableProperty]
-    private string _snackBarMessage = string.Empty;
-
-    [ObservableProperty]
-    private SnackBarType _snackBarType;
-
-    [ObservableProperty]
-    private bool _isSnackBarVisible;
-
-    [ObservableProperty]
     private bool _isAddingItem;
 
     [ObservableProperty]
@@ -292,37 +283,6 @@ public partial class DictionaryManagementViewModel : ViewModelBase
             _logger.Info($"加载完成: {Items.Count} 个字典项");
         }, "确定");
     }
-
-    private int _snackBarVersion;
-
-    private Task ShowSnackBarAsync(string message, SnackBarType type = SnackBarType.Success)
-    {
-        SnackBarMessage = message;
-        SnackBarType = type;
-        IsSnackBarVisible = true;
-
-        // 非阻塞隐藏：不延长调用命令的执行时间；版本号防止旧的隐藏任务关闭新消息
-        var version = ++_snackBarVersion;
-        _ = HideSnackBarAfterDelayAsync(version);
-        return Task.CompletedTask;
-    }
-
-    private async Task HideSnackBarAfterDelayAsync(int version)
-    {
-        try
-        {
-            await Task.Delay(3000);
-            if (version == _snackBarVersion)
-            {
-                IsSnackBarVisible = false;
-            }
-        }
-        catch
-        {
-            // fire-and-forget：忽略异常，避免未观察的任务异常
-        }
-    }
-
     [RelayCommand]
     private void StartAddItem()
     {

@@ -40,10 +40,10 @@
 
                         <!-- 模块统计栏 -->
                         <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                            <components:StatCapsule  Grid.Column="0"  Value="{Binding PendingReportCountText}" Caption="待上传报告（份）"/>
-                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyCompletedText}" Caption="本月已完成（件）"/>
-                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyNewText}" Caption="本月新增（件）"/>
-                            <components:StatCapsule  Grid.Column="3"  Value="{Binding YearTotalText}" Caption="全年累计（件）"/>
+                            <components:StatCapsule  Grid.Column="0"  Value="{Binding PendingReportCountText}" Caption="待上传（户）"/>
+                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyCompletedText}" Caption="本月已完成（户）"/>
+                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyNewText}" Caption="本月新增（户）"/>
+                            <components:StatCapsule  Grid.Column="3"  Value="{Binding YearTotalText}" Caption="全年累计（户）"/>
                         </Grid>
 
                     </VerticalStackLayout>

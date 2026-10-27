@@ -35,7 +35,10 @@ public class TempReliefService : BaseService, ITempReliefService
     }
 
     /// <summary>
-    /// 按"填报单位"名称查组织并取其联系电话；填报单位为空或组织查不到返回空串。
+    /// 按"填报单位"名称查组织并取其联系电话。
+    /// 填报单位为空、或组织查不到 → 返回空串（文档口径，报表字段尽力而为）。
+    /// 查询失败/异常 → 如实返回 Failure（§7）：四个调用点都取 <c>.Value ?? ""</c>，
+    /// 行为不变，但失败不再被伪装成"该单位没有电话"。
     /// </summary>
     public async Task<Result<string>> GetReportUnitPhoneAsync(string? reportUnit, CancellationToken ct = default)
     {
@@ -44,14 +47,16 @@ public class TempReliefService : BaseService, ITempReliefService
         try
         {
             var org = await _organizationService.GetByNameAsync(reportUnit.Trim(), ct);
-            if (org.IsFailure || org.Value == null)
+            if (org.IsFailure)
+                return Result.Failure<string>(org.ErrorCode!, org.Message!);
+            if (org.Value == null)
                 return Result.Success(string.Empty);
             return Result.Success(org.Value.Phone ?? string.Empty);
         }
         catch (Exception ex)
         {
-            LogWarn($"按填报单位取单位电话失败: {ex.Message}");
-            return Result.Success(string.Empty);
+            LogError(ex, "按填报单位取单位电话失败");
+            return Result.FromException<string>(ex);
         }
     }
 
@@ -201,9 +206,10 @@ public class TempReliefService : BaseService, ITempReliefService
                 $"COALESCE({p}bank_name,'') AS bank_name",
                 $"COALESCE({p}bank_account,'') AS bank_account",
                 $"COALESCE({p}one_card_account,'') AS one_card_account"),
-            // 低保边缘/刚性支出台账无 family_size 列，只有 guarantee_size；无 hukou_address 列
+            // 低保边缘/刚性支出/其他困难台账无 family_size 列，只有 guarantee_size；无 hukou_address 列
             "nc_biz_low_income_edge_families" or
-            "nc_biz_rigid_expenditure_families" => string.Join(", ",
+            "nc_biz_rigid_expenditure_families" or
+            "nc_biz_other_difficulty_families" => string.Join(", ",
                 p + "id AS source_family_id",
                 p + "applicant_name AS name",
                 p + "applicant_id_card AS id_card",
@@ -407,6 +413,7 @@ public class TempReliefService : BaseService, ITempReliefService
     {
         "nc_biz_rural_subsistence_persons" or "nc_biz_destitute_persons" => "annual_income",
         "nc_biz_urban_subsistence_persons" or "nc_biz_low_income_edge_persons" or "nc_biz_rigid_expenditure_persons"
+            or "nc_biz_other_difficulty_persons"
             => "COALESCE(monthly_income, 0) * 12",
         _ => "NULL::numeric"
     };
@@ -436,7 +443,9 @@ public class TempReliefService : BaseService, ITempReliefService
             {
                 MemberName = m.MemberName,
                 Gender = m.Gender,
-                Relation = m.Relation,
+                // 申请库 relationship_to_head 存的是字典键（Head/Spouse/...），
+                // 必须转中文后进快照，否则会随表单落库并在授权承诺书/审批表打印成英文
+                Relation = TempReliefConstants.GetRelationshipDisplayName(m.Relation),
                 IdCard = m.IdCard,
                 WorkUnit = m.WorkUnit,
                 AnnualIncome = m.AnnualIncome
@@ -478,7 +487,11 @@ public class TempReliefService : BaseService, ITempReliefService
 
         var namesSql = "SELECT COALESCE(member_names,'') AS member_names, COALESCE(member_id_cards,'') AS member_id_cards FROM " + sourceTable + " WHERE id = $1";
         var namesResult = await _db.QuerySingleAsync<TempReliefMemberNamesRow>(namesSql, ct, sourceFamilyId);
-        if (namesResult.IsFailure || namesResult.Value == null)
+        // 查询失败如实上抛（调用方 GetCandidateDetailAsync 已按 Failure 处理）：
+        // 折叠成空列表会让候选人带着空成员快照继续往下走，属于"失败当空集合"（§7）
+        if (namesResult.IsFailure)
+            return Result.Failure<List<TempReliefMemberSnapshot>>(namesResult.ErrorCode!, namesResult.Message!);
+        if (namesResult.Value == null)
             return Result.Success(new List<TempReliefMemberSnapshot>());
 
         var names = SplitSemicolon(namesResult.Value.MemberNames);
@@ -544,7 +557,9 @@ public class TempReliefService : BaseService, ITempReliefService
             if (byIdCard.TryGetValue(m.IdCard, out var detail))
             {
                 if (string.IsNullOrEmpty(m.Gender)) m.Gender = detail.Gender;
-                if (string.IsNullOrEmpty(m.Relation)) m.Relation = detail.Relation;
+                // detail.Relation 来自 nc_biz_family_members.relationship_to_head（字典键），
+                // 与申请库分支同口径转中文，避免打印/表单出现 Spouse 等英文
+                if (string.IsNullOrEmpty(m.Relation)) m.Relation = TempReliefConstants.GetRelationshipDisplayName(detail.Relation);
                 if (string.IsNullOrEmpty(m.WorkUnit)) m.WorkUnit = detail.WorkUnit;
                 if (!m.AnnualIncome.HasValue) m.AnnualIncome = detail.AnnualIncome;
             }
@@ -594,16 +609,33 @@ public class TempReliefService : BaseService, ITempReliefService
 
                 if (table == "nc_biz_applications")
                 {
-                    // 低保申请库：取最新有效申请的认定分类全称
-                    var classSql = @"SELECT COALESCE(classification_result,'') AS classification_result
+                    // 当前库申请：取最新一条"在申/在享"记录（Approved/Completed 优先，其次 Draft/Submitted）。
+                    // 停保/不予受理/收入超标等历史记录不算"正在申请"；
+                    // 已审批的档案应显示"享受{分类}"，不能一律显示"正在申请"（仲立亮 app95 实测错例）。
+                    var classSql = @"SELECT status, COALESCE(classification_result,'') AS classification_result
                                      FROM nc_biz_applications
                                      WHERE applicant_id_card = $1 AND deleted_at IS NULL
-                                     ORDER BY created_at DESC, id DESC LIMIT 1";
-                    var cls = await _db.QuerySingleAsync<PolicyClassRow>(classSql, ct, idCard);
-                    var name = cls.IsSuccess && cls.Value != null && !string.IsNullOrWhiteSpace(cls.Value.ClassificationResult)
-                        ? $"正在申请{ClassificationConstants.ConvertFromCode(cls.Value.ClassificationResult)}"
-                        : "正在申请最低生活保障";
-                    result.Add(name);
+                                       AND status = ANY($2::text[])
+                                     ORDER BY CASE status
+                                                  WHEN 'Approved' THEN 0
+                                                  WHEN 'Completed' THEN 0
+                                                  WHEN 'Submitted' THEN 1
+                                                  ELSE 2
+                                              END,
+                                              created_at DESC, id DESC
+                                     LIMIT 1";
+                    var activeStatuses = new[]
+                    {
+                        ApplicationStatusCodes.DRAFT, ApplicationStatusCodes.SUBMITTED,
+                        ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.COMPLETED
+                    };
+                    var cls = await _db.QuerySingleAsync<PolicyClassRow>(classSql, ct, idCard, activeStatuses);
+                    if (cls.IsSuccess && cls.Value != null && !string.IsNullOrWhiteSpace(cls.Value.ClassificationResult))
+                    {
+                        var isEnjoying = cls.Value.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
+                        var name = ClassificationConstants.ConvertFromCode(cls.Value.ClassificationResult);
+                        result.Add((isEnjoying ? "享受" : "正在申请") + name);
+                    }
                 }
                 else
                 {
@@ -651,7 +683,11 @@ public class TempReliefService : BaseService, ITempReliefService
                 LIMIT 20";
 
             var result = await _db.QueryAsync<FamilyStatusRow>(sql, ct, idCard);
-            if (result.IsFailure || result.Value == null || result.Value.Count == 0)
+            // 查询失败如实上抛（调用方只取 Success 分支，失败时留空、不覆盖已有状态）；
+            // 查不到家庭成员才是"状态为空"→ Success("")
+            if (result.IsFailure)
+                return Result.Failure<string>(result.ErrorCode!, result.Message!);
+            if (result.Value == null || result.Value.Count == 0)
                 return Result.Success(string.Empty);
 
             var parts = new List<string>();
@@ -705,7 +741,9 @@ public class TempReliefService : BaseService, ITempReliefService
         catch (Exception ex)
         {
             LogException(ex, "检索家庭成员状态失败");
-            return Result.Success(string.Empty);
+            // 与上面的 IsFailure 分支保持一致：失败如实上抛，不再伪装成"状态为空"。
+            // 调用方只取 .Value ?? ""，运行行为不变
+            return Result.FromException<string>(ex);
         }
     }
 
@@ -741,6 +779,12 @@ public class TempReliefService : BaseService, ITempReliefService
         var result = await _db.QueryAsync<TempReliefMember>(sql, ct, applicationId);
         if (result.IsFailure)
             return Result.Failure<List<TempReliefMember>>(result.ErrorCode!, result.Message!);
+
+        // 历史数据兼容：早期从申请库快照带入的关系可能是字典键（Spouse 等），
+        // 读取时统一转中文，保证表单回显、授权承诺书、审核审批表口径一致（不改库也能修正打印）。
+        foreach (var member in result.Value)
+            member.Relation = TempReliefConstants.GetRelationshipDisplayName(member.Relation);
+
         return Result.Success(result.Value);
     }
 
@@ -1200,7 +1244,7 @@ public class TempReliefService : BaseService, ITempReliefService
     }
 
     /// <summary>
-    /// 重建家庭成员明细（先删后插，保留户主在前）
+    /// 重建家庭成员明细（先删后插）：跳过姓名为空的表单占位行；关系统一转中文后落库
     /// </summary>
     private async Task<Result> ReplaceMembersAsync(long applicationId, List<TempReliefMember> members, CancellationToken ct)
     {
@@ -1209,13 +1253,17 @@ public class TempReliefService : BaseService, ITempReliefService
         if (deleteResult.IsFailure)
             return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
 
-        if (members == null || members.Count == 0)
+        // 表单在无成员时会保留一行空白占位行（供录入），不能落库：
+        // 否则打印授权承诺书时该空行仍会被写入"居民身份证"（单成员家庭出现两个证件类型）。
+        var effective = members?
+            .Where(m => !string.IsNullOrWhiteSpace(m.MemberName))
+            .ToList() ?? new List<TempReliefMember>();
+
+        if (effective.Count == 0)
             return Result.Success();
 
-        var sorted = members
+        var sorted = effective
             .Select((m, idx) => new { Member = m, Index = idx })
-            .OrderByDescending(x => string.Equals(x.Member.MemberName, string.Empty, StringComparison.Ordinal) ? 0 : 1)
-            .ThenBy(x => x.Index)
             .ToList();
 
         var (valuesClause, args) = MultiRowValuesBuilder.Build(sorted.Count, 8, i =>
@@ -1223,7 +1271,8 @@ public class TempReliefService : BaseService, ITempReliefService
             var m = sorted[i].Member;
             return new object?[]
             {
-                applicationId, m.MemberName, m.Gender ?? "", m.Relation ?? "", m.IdCard ?? "",
+                applicationId, m.MemberName, m.Gender ?? "",
+                TempReliefConstants.GetRelationshipDisplayName(m.Relation), m.IdCard ?? "",
                 m.WorkUnit ?? "", m.AnnualIncome, sorted[i].Index
             };
         }, o => $"(${o}, ${o + 1}, ${o + 2}, ${o + 3}, ${o + 4}, ${o + 5}, ${o + 6}, ${o + 7}, NOW(), NOW())");
@@ -1444,6 +1493,7 @@ public class TempReliefMemberNamesRow
 /// </summary>
 public class PolicyClassRow
 {
+    public string Status { get; set; } = string.Empty;
     public string ClassificationResult { get; set; } = string.Empty;
 }
 

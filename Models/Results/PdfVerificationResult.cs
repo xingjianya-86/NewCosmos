@@ -21,4 +21,15 @@ public class PdfVerificationRecord
     public string VerifiedByName { get; set; } = string.Empty;
     public DateTime VerifiedAt { get; set; }
     public string Notes { get; set; } = string.Empty;
+    public int Version { get; set; }
+    public bool IsCurrent { get; set; }
+    public int ReportSize { get; set; }
+}
+
+/// <summary>同户同 hash 报告匹配结果（重复上传时用于“未变更/恢复历史版本”）。</summary>
+public class ReportHashMatch
+{
+    public long ReportId { get; set; }
+    public bool IsCurrent { get; set; }
+    public int Version { get; set; }
 }

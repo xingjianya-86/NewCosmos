@@ -42,6 +42,27 @@ public static class StoppedArchiveFilter
     }
 
     /// <summary>
+    /// "渐退期接续"排除子句（追加到 WHERE 条件中）。
+    /// 户主死亡/经济复核等停旧建新后，下游新档存在在效渐退期（is_active=TRUE）时，
+    /// 户仍在渐退期内按原额续发，不属于真实停保；该户由「退出对象兜底情况纠治表」承载。
+    /// 与 <see cref="NotRebuildContinuationSql"/> 的区别：不看新旧分类是否同大类——
+    /// 户主死亡常伴低保→低收入跨大类，但仍属待遇延续（樊万河 68→80 实测错例）。
+    /// alias：nc_biz_applications 的别名或表名。
+    /// </summary>
+    public static string NotGraceContinuationSql(string alias)
+    {
+        return $@"
+        AND NOT EXISTS (
+            SELECT 1 FROM nc_biz_applications gc
+            JOIN nc_biz_grace_periods gp ON gp.application_id = gc.id
+            WHERE gc.original_application_id = {alias}.id
+              AND gc.deleted_at IS NULL
+              AND gp.deleted_at IS NULL
+              AND gp.is_active = TRUE
+        )";
+    }
+
+    /// <summary>
     /// "停旧建新终结档"排除子句（追加到 WHERE 条件中）。
     /// 经济复核/成员变更触发停保时，除了被停的旧档，还会生成一条"新档分类即停保码"的终结记录，
     /// 两者是同一户：不排除则普通停保行按户重复计数（2026-10 月报停保卡片 8 户、表格仅 5 户实测）。
