@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261025</ApplicationDisplayVersion>
-		<ApplicationVersion>20261025</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261027</ApplicationDisplayVersion>
+		<ApplicationVersion>20261027</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -89,6 +89,18 @@
 	<ItemGroup>
 		<MauiImage Include="Resources\Images\newcosmos_character.png" />
 		<MauiImage Include="Resources\Images\mascot_icon.png" />
+	</ItemGroup>
+
+	<!-- 启动动画资产（dsh-startup-screen 二次开发版，MIT，见 Resources\Splash\THIRD-PARTY-NOTICES.md）：
+	     Windows 复制到输出 splash\，首次运行由 SplashAssetsService 同步到 AppData，供 WebView2 虚拟主机映射；
+	     Android 打包进 APK assets\splash\，由 SplashWebViewClient 拦截虚拟主机直接返回。
+	     config.js 由 C# 每次启动生成（身份/品牌文案/音效开关），不随构建产物分发。 -->
+	<ItemGroup>
+		<None Include="Resources\Splash\**\*" Exclude="Resources\Splash\config.js" Link="splash\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidAsset Include="Resources\Splash\**\*" Exclude="Resources\Splash\config.js" Link="splash\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<!-- 排除备份文件 -->
