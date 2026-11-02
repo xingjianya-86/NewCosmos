@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261027</ApplicationDisplayVersion>
-		<ApplicationVersion>20261027</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261030</ApplicationDisplayVersion>
+		<ApplicationVersion>20261030</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -103,6 +103,13 @@
 		<AndroidAsset Include="Resources\Splash\**\*" Exclude="Resources\Splash\config.js" Link="splash\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- 内置字体（纸墨档案风：思源黑体/思源宋体/DM Mono 等宽）
+	     文件名必须小写字母数字（Android asset 硬性要求）；
+	     Windows 端按字体族名解析，族内含 Regular+Bold，FontAttributes=Bold 自动选字重。 -->
+	<ItemGroup>
+		<MauiFont Include="Resources\Fonts\*.ttf" />
+	</ItemGroup>
+
 	<!-- 排除备份文件 -->
 	<ItemGroup>
 		<Compile Remove="**\*.back" />
@@ -110,6 +117,10 @@
 		<Compile Remove="backup\**" />
 		<Compile Remove="Scripts\**" />
 		<Compile Remove="deploy\**" />
+		<!-- 单元测试项目独立编译（2026-11 新增；否则主项目 glob 会把测试 .cs 吞进来报 Xunit 引用错误） -->
+		<Compile Remove="NewCosmos.Tests\**" />
+		<EmbeddedResource Remove="NewCosmos.Tests\**" />
+		<None Remove="NewCosmos.Tests\**" />
 		<MauiXaml Remove="backups\**" />
 		<MauiXaml Remove="backup\**" />
 		<None Remove="backups\**" />

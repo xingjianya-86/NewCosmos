@@ -3,7 +3,7 @@
 ; 安全要点：config\database.ini 绝不随包分发，部署机首次启动由配置向导生成
 
 #define MyAppName "帝皇权杖δ-me13"
-#define MyAppVersion "1.2.20261027"
+#define MyAppVersion "1.2.20261030"
 #define MyAppPublisher "NewCosmos"
 #define MyAppExeName "NewCosmos.exe"
 #define SrcDir "..\publish\win-x64"
@@ -28,7 +28,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; 文件属性版本须为 4 段式且每段 ≤65535，20260915 超限故拆为 2026.915；安装向导显示版本见 MyAppVersion
-VersionInfoVersion=1.1.2026.1027
+VersionInfoVersion=1.2.2026.1030
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} 民政社会救助管理系统
 CloseApplications=yes
