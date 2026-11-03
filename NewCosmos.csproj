@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261103</ApplicationDisplayVersion>
-		<ApplicationVersion>20261103</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261104</ApplicationDisplayVersion>
+		<ApplicationVersion>20261104</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -180,9 +180,6 @@
 		<AndroidAsset Include="config\document_output.yaml" Link="document_output.yaml" />
 		<AndroidAsset Include="config\print_settings.yaml" Link="print_settings.yaml" />
 		<AndroidAsset Include="config\timeline_config.yaml" Link="timeline_config.yaml" />
-		<!-- 登录页背景图：打包进 APK assets（backgrounds/），首次启动由
-		     BackgroundLoaderService 复制到 AppData 可写目录（None+CopyToOutput 只对 Windows 生效） -->
-		<AndroidAsset Include="Resources\Backgrounds\**\*" Link="backgrounds\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<!-- Android AOT：NPOI.Core/OOXML 的元数据引用 SkiaSharp，但该传递依赖未进入 Android
@@ -201,13 +198,6 @@
 
 	<ItemGroup>
 		<MauiXaml Update="Pages\UserManagement\OrganizationImportPage.xaml" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Include="Resources\Backgrounds\**\*">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-			<Link>backgrounds\%(RecursiveDir)%(Filename)%(Extension)</Link>
-		</None>
 	</ItemGroup>
 
 	<!-- 值班模块：政务值班表模板存储于模板库 nc_biz_templates（文书模板管理页上传），
