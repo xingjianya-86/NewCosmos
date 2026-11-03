@@ -58,10 +58,10 @@
                             <DataTemplate x:DataType="local:LotteryDraw">
                                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,6" Padding="12">
                                     <Grid ColumnDefinitions="*,*,*,*,*,*" RowDefinitions="Auto">
-                                        <Label Text="{Binding DrawNumber}" TextColor="{StaticResource TextPrimary}" FontSize="15"/>
+                                        <Label Text="{Binding DrawNumber}" TextColor="{StaticResource TextPrimary}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                                         <Label Text="{Binding DrawDate, StringFormat='{0:MM-dd}'}" Grid.Column="1" TextColor="{StaticResource TextSecondary}" FontSize="14"/>
-                                        <Label Text="{Binding RedNumbersJson}" Grid.Column="2" TextColor="#E53935" FontSize="15"/>
-                                        <Label Text="{Binding BlueNumbersJson}" Grid.Column="3" TextColor="#1E88E5" FontSize="15"/>
+                                        <Label Text="{Binding RedNumbersJson}" Grid.Column="2" TextColor="#E53935" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
+                                        <Label Text="{Binding BlueNumbersJson}" Grid.Column="3" TextColor="#1E88E5" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                                         <Label Text="{Binding SalesAmount, StringFormat='{0:N0}'}" Grid.Column="4" TextColor="{StaticResource TextSecondary}" FontSize="14"/>
                                         <Label Text="{Binding PoolMoney, StringFormat='{0:N0}'}" Grid.Column="5" TextColor="{StaticResource TextSecondary}" FontSize="14"/>
                                     </Grid>

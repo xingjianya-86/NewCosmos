@@ -27,8 +27,8 @@
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                     <Switch IsToggled="{Binding IsEnabled}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                        <Label Text="{Binding Name}" FontSize="19" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                        <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                                        <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=19, Android=17, Default=19}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}">
                                             <Label.FormattedText>
                                                 <FormattedString>
                                                     <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/> <Span Text=" "/>
@@ -39,7 +39,7 @@
                                             </Label.FormattedText>
                                         </Label>
                                     </VerticalStackLayout>
-                                    <Button Grid.Column="2" Text="编辑详情" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource Primary}" FontSize="16" CornerRadius="8" Padding="12,0" HeightRequest="36"/>
+                                    <Button Grid.Column="2" Text="编辑详情" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource Primary}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" CornerRadius="8" Padding="12,0" HeightRequest="36"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>

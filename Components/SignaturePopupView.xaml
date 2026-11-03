@@ -15,7 +15,7 @@
             <!-- 标题 -->
             <Label x:Name="PromptLabel"
                    Text="请本人签名"
-                   FontSize="17"
+                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                    FontAttributes="Bold"
                    TextColor="{StaticResource TextPrimary}"
                    Margin="20,16,20,4"/>

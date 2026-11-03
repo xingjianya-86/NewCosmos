@@ -20,7 +20,7 @@
                         StrokeThickness="0"
                         StrokeShape="RoundRectangle 0">
                     <Label Text="{Binding GroupName}"
-                           FontSize="16"
+                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                            FontAttributes="Bold"
                            TextColor="{StaticResource Primary}"/>
                 </Border>
@@ -54,7 +54,7 @@
                                            FontSize="14"
                                            TextColor="{StaticResource TextSecondary}"/>
                                     <Label Text="{Binding Value}"
-                                           FontSize="16"
+                                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                            TextColor="{StaticResource TextPrimary}"
                                            LineBreakMode="WordWrap"/>
                                 </VerticalStackLayout>
@@ -84,7 +84,7 @@
                         StrokeThickness="0"
                         StrokeShape="RoundRectangle 0">
                     <Label Text="{Binding GroupName}"
-                           FontSize="16"
+                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                            FontAttributes="Bold"
                            TextColor="{StaticResource Primary}"/>
                 </Border>
@@ -118,7 +118,7 @@
                                            FontSize="14"
                                            TextColor="{StaticResource TextSecondary}"/>
                                     <Label Text="{Binding Value}"
-                                           FontSize="16"
+                                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                            TextColor="{StaticResource TextPrimary}"
                                            LineBreakMode="WordWrap"/>
                                 </VerticalStackLayout>
@@ -171,17 +171,17 @@
                             <Label Text="业务信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
 
                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="16">
-                                <Label Text="业务类型:" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding BusinessTypeDisplay}" FontSize="16" VerticalOptions="Center"/>
+                                <Label Text="业务类型:" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding BusinessTypeDisplay}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
 
-                                <Label Grid.Row="1" Text="申请人:" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding ApplicantName}" FontSize="16" VerticalOptions="Center"/>
+                                <Label Grid.Row="1" Text="申请人:" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding ApplicantName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
 
-                                <Label Grid.Row="2" Text="身份证号:" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                <Label Grid.Row="2" Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="16" VerticalOptions="Center"/>
+                                <Label Grid.Row="2" Text="身份证号:" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="2" Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
 
-                                <Label Grid.Row="3" Text="家庭信息:" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                <Label Grid.Row="3" Grid.Column="1" Text="{Binding FamilyInfo}" FontSize="16" VerticalOptions="Center"/>
+                                <Label Grid.Row="3" Text="家庭信息:" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Row="3" Grid.Column="1" Text="{Binding FamilyInfo}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
@@ -193,15 +193,15 @@
                             <Label Text="自动填充统计" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
                                 <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                                    <Label Text="{Binding AutoFilledCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding AutoFilledCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" FontAttributes="Bold" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
                                     <Label Text="已自动填充" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" Spacing="4">
-                                    <Label Text="{Binding SidebarTotalCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding SidebarTotalCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
                                     <Label Text="总字段数" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="4">
-                                    <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="30" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
+                                    <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" TextColor="{StaticResource Secondary}" HorizontalOptions="Center"/>
                                     <Label Text="点击右侧复制" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                             </Grid>
@@ -229,7 +229,7 @@
                     <Border Style="{StaticResource CardBorder}" Padding="40"
                             IsVisible="{Binding HasBusinessData, Converter={StaticResource BoolToInverseConverter}}">
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
-                            <Label Text="{OnPlatform WinUI='&#xE8F5;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE8F5;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="{OnPlatform WinUI=50, Android=36, Default=50}" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                             <Label Text="请从工作流页面选择记录进入" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                         </VerticalStackLayout>
                     </Border>
@@ -250,8 +250,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
-                        <Label Grid.Column="1" Text="来源数据" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="来源数据" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
                         <Label Grid.Column="2" Text="{Binding DataSourceType}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                     </Grid>
 
@@ -265,7 +265,7 @@
 
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,60">
-                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="38" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="{OnPlatform WinUI=38, Android=28, Default=38}" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                 <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
@@ -281,7 +281,7 @@
                         FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         Command="{Binding GoBackCommand}"
                         Style="{StaticResource ButtonOutline}"
-                        FontSize="15"
+                        FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                         HeightRequest="38"/>
                 <Button Grid.Column="2"
                         Text="{OnPlatform WinUI='&#xE8F5; 开始制作', Android='&#x1F50D; 开始制作'}"
@@ -289,7 +289,7 @@
                         Command="{Binding NavigateToOutputCommand}"
                         IsEnabled="{Binding IsReady}"
                         Style="{StaticResource ButtonPrimary}"
-                        FontSize="15"
+                        FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                         HeightRequest="38"/>
             </Grid>
         </Border>

@@ -27,7 +27,7 @@
                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                             TextColor="{StaticResource Ink}"
-                            FontSize="16"
+                            FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             Command="{Binding LoadCommand}"
                             VerticalOptions="Center"
                             Padding="16,10"
@@ -39,14 +39,14 @@
         <Border Grid.Row="1" BackgroundColor="White" Padding="20,12" Margin="0,1,0,0">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                    <Label Text="{Binding StatusMessage}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                    <Label Text="{Binding StatusMessage}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextPrimary}"/>
                     <Label Text="说明：被强制下线的设备会在下一次心跳（约 45 秒内）自动退出登录。"
                            FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                 </VerticalStackLayout>
 
                 <Button Grid.Column="1"
                         Text="全部下线"
-                        FontSize="15"
+                        FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                         BackgroundColor="{StaticResource Error}"
                         TextColor="White"
                         CornerRadius="18"
@@ -57,7 +57,7 @@
 
                 <Button Grid.Column="2"
                         Text="刷新"
-                        FontSize="15"
+                        FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                         BackgroundColor="{StaticResource Secondary}"
                         TextColor="White"
                         CornerRadius="18"
@@ -70,14 +70,14 @@
         <Grid Grid.Row="2" Padding="20" RowDefinitions="Auto,*" RowSpacing="0">
             <Grid Grid.Row="0" ColumnDefinitions="2.2*,1.4*,1.2*,1.4*,1.4*,1.4*,0.8*,Auto"
                   Padding="16,10" BackgroundColor="#E2E8F0" ColumnSpacing="8">
-                <Label Text="用户" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="1" Text="组织机构" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="2" Text="端" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="3" Text="设备" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="4" Text="登录时间" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="5" Text="最后活跃" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="6" Text="状态" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="7" Text="操作" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Text="用户" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="1" Text="组织机构" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="2" Text="端" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="3" Text="设备" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="4" Text="登录时间" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="5" Text="最后活跃" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="6" Text="状态" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="7" Text="操作" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
             </Grid>
 
             <CollectionView Grid.Row="1"
@@ -85,8 +85,8 @@
                             BackgroundColor="White">
                 <CollectionView.EmptyView>
                     <VerticalStackLayout Padding="40" Spacing="8" VerticalOptions="Center">
-                        <Label Text="当前没有活动会话" FontSize="18" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
-                        <Label Text="各端登录后会自动出现在这里" FontSize="15" TextColor="{StaticResource TextTertiary}" HorizontalTextAlignment="Center"/>
+                        <Label Text="当前没有活动会话" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
+                        <Label Text="各端登录后会自动出现在这里" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextTertiary}" HorizontalTextAlignment="Center"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
 
@@ -94,25 +94,25 @@
                     <DataTemplate x:DataType="OnlineSessionItem">
                         <Grid ColumnDefinitions="2.2*,1.4*,1.2*,1.4*,1.4*,1.4*,0.8*,Auto"
                               Padding="16,12" ColumnSpacing="8" BackgroundColor="White">
-                            <Label Text="{Binding UserText}" FontSize="16" TextColor="{StaticResource TextPrimary}"
+                            <Label Text="{Binding UserText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextPrimary}"
                                    LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-                            <Label Grid.Column="1" Text="{Binding OrganizationName}" FontSize="15"
+                            <Label Grid.Column="1" Text="{Binding OrganizationName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-                            <Label Grid.Column="2" Text="{Binding DeviceKindText}" FontSize="15"
+                            <Label Grid.Column="2" Text="{Binding DeviceKindText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="3" Spacing="1" VerticalOptions="Center">
-                                <Label Text="{Binding DeviceName}" FontSize="15" TextColor="{StaticResource TextPrimary}"
+                                <Label Text="{Binding DeviceName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}"
                                        LineBreakMode="TailTruncation"/>
-                                <Label Text="{Binding AppVersion}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding AppVersion}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextTertiary}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="4" Text="{Binding LoginAtText}" FontSize="15"
+                            <Label Grid.Column="4" Text="{Binding LoginAtText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                            <Label Grid.Column="5" Text="{Binding LastSeenText}" FontSize="15"
+                            <Label Grid.Column="5" Text="{Binding LastSeenText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <Border Grid.Column="6" Padding="8,3" StrokeShape="RoundRectangle 10"
                                     BackgroundColor="{Binding IsOnline, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#10B981|#94A3B8'}"
                                     VerticalOptions="Center" HorizontalOptions="Center">
-                                <Label Text="{Binding OnlineText}" FontSize="13" FontAttributes="Bold" TextColor="White"/>
+                                <Label Text="{Binding OnlineText}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" FontAttributes="Bold" TextColor="White"/>
                             </Border>
                             <Button Grid.Column="7"
                                     Text="下线"

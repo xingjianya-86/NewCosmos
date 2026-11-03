@@ -29,10 +29,10 @@
                         <VerticalStackLayout Spacing="10">
                             <Label Text="公示参数" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
-                                <Label Text="公示年月" FontSize="16" VerticalOptions="Center"/>
+                                <Label Text="公示年月" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="1" ItemsSource="{Binding YearOptions}"
                                         SelectedItem="{Binding SelectedYear}" Title="年"/>
-                                <Label Grid.Column="2" Text="年" FontSize="16" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="年" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="3" ItemsSource="{Binding MonthOptions}"
                                         SelectedItem="{Binding SelectedMonth}" Title="月"/>
                             </Grid>
@@ -59,7 +59,7 @@
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="PublicityVillageGroupItem">
                                         <Grid Padding="8,6" Style="{StaticResource TableRowInteractive}">
-                                            <Label Text="{Binding Display}" FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding Display}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
@@ -78,7 +78,7 @@
                 <VerticalStackLayout Spacing="8">
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="公示名单预览" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                        <Label Grid.Column="1" Text="{Binding SelectedVillage.Village, StringFormat='{0} 村'}" FontSize="15"
+                        <Label Grid.Column="1" Text="{Binding SelectedVillage.Village, StringFormat='{0} 村'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                TextColor="{StaticResource Warning}" FontAttributes="Bold" VerticalOptions="Center"/>
                     </Grid>
 
@@ -100,14 +100,14 @@
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="PublicityFamilyDisplayRow">
                                     <Grid ColumnDefinitions="50,*,110,80,110,100,110,*" Padding="10,6" Style="{StaticResource TableRowInteractive}">
-                                        <Label Text="{Binding Index}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="1" Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                                        <Label Text="{Binding Index}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="1" Text="{Binding Name}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                                                TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="2" Text="{Binding Category}" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="3" Text="{Binding GuaranteeSize}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="4" Text="{Binding BaseAmount, StringFormat='{0:N2}'}" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="5" Text="{Binding ClassifiedAmount, StringFormat='{0:N2}'}" FontSize="15" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                        <Label Grid.Column="6" Text="{Binding TotalAmount, StringFormat='{0:N2}'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="2" Text="{Binding Category}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="{Binding GuaranteeSize}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="4" Text="{Binding BaseAmount, StringFormat='{0:N2}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="5" Text="{Binding ClassifiedAmount, StringFormat='{0:N2}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="6" Text="{Binding TotalAmount, StringFormat='{0:N2}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                                         <Label Grid.Column="7" Text="{Binding Remark}" FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" LineBreakMode="TailTruncation"/>
                                     </Grid>
                                 </DataTemplate>
@@ -122,7 +122,7 @@
                     <Border Style="{StaticResource CardBorder}">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
-                                <Label Text="{Binding OutputHint}" FontSize="15" TextColor="{StaticResource WarningDark}"/>
+                                <Label Text="{Binding OutputHint}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource WarningDark}"/>
                                 <Label Text="按村逐份输出《公共_每月公示名单》，输出目录「输出\公示文件」" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 <Label Text="{Binding OutputMessage}" FontSize="14" TextColor="{StaticResource Success}" IsVisible="{Binding HasOutputMessage}"
                                        LineBreakMode="WordWrap"/>

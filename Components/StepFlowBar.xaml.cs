@@ -139,7 +139,7 @@ public partial class StepFlowBar : ContentView
         var label = new Label
         {
             Text = LabelAt(step) ?? $"第 {step} 步",
-            FontSize = 13,
+            FontSize = Microsoft.Maui.Devices.DeviceInfo.Platform == Microsoft.Maui.Devices.DevicePlatform.Android ? 12 : 13,
             FontAttributes = active ? FontAttributes.Bold : FontAttributes.None,
             TextColor = active ? ActiveLabelColor : filled ? DoneLabelColor : InactiveLabel,
             VerticalOptions = LayoutOptions.Center,

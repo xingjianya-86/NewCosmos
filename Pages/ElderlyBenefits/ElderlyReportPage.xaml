@@ -34,14 +34,14 @@
                             <Label Text="统计周期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
                                 <Picker Grid.Column="0" HeightRequest="40" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}"/>
-                                <Label Grid.Column="1" Text="年" FontSize="18" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="年" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="2" HeightRequest="40" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}"/>
-                                <Label Grid.Column="3" Text="月" FontSize="18" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="月" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </Grid>
-                            <Label Text="{Binding CycleRangeText}" FontSize="17" TextColor="{StaticResource Primary}"/>
-                            <Label Text="{Binding ReportTitleText}" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding CycleRangeText}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding ReportTitleText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"/>
                             <Button Text="刷新数据" Command="{Binding LoadRecordsCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="40"/>
-                            <Label Text="{Binding StatusText}" FontSize="17" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding StatusText}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource Primary}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -50,14 +50,14 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                             <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="新增" FontSize="16" TextColor="{StaticResource PrimaryDark}"/>
-                                    <Label Text="{Binding NewCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                    <Label Text="新增" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource PrimaryDark}"/>
+                                    <Label Text="{Binding NewCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="1" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="停止" FontSize="16" TextColor="{StaticResource WarningDark}"/>
-                                    <Label Text="{Binding StopCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                    <Label Text="停止" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource WarningDark}"/>
+                                    <Label Text="{Binding StopCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                                 </VerticalStackLayout>
                             </Border>
                         </Grid>
@@ -68,8 +68,8 @@
                         <VerticalStackLayout Spacing="8">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                 <Label Text="明细表" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                                <Button Grid.Column="1" Text="全选" Command="{Binding SelectAllFormsCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="15"/>
-                                <Button Grid.Column="2" Text="清空" Command="{Binding ClearFormSelectionCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="15"/>
+                                <Button Grid.Column="1" Text="全选" Command="{Binding SelectAllFormsCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
+                                <Button Grid.Column="2" Text="清空" Command="{Binding ClearFormSelectionCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="32" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                             </Grid>
                             <Border BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4">
                                 <CollectionView ItemsSource="{Binding Forms}" SelectionMode="None">
@@ -77,14 +77,14 @@
                                         <DataTemplate x:DataType="MonthlyFormOption">
                                             <Grid ColumnDefinitions="Auto,*" Padding="4,2">
                                                 <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalOptions="Center" Scale="0.9"/>
-                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="16" VerticalOptions="Center"/>
+                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
                                             </Grid>
                                         </DataTemplate>
                                     </CollectionView.ItemTemplate>
                                 </CollectionView>
                             </Border>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                <Label Text="打印份数" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Text="打印份数" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Entry Grid.Column="1" Text="{Binding Copies}" Keyboard="Numeric" WidthRequest="70" HeightRequest="34" HorizontalTextAlignment="Center"/>
                             </Grid>
                             <Button Text="{Binding PreviewSelectedActionText}" Command="{Binding PreviewSelectedCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
@@ -93,7 +93,7 @@
                                 <Button Text="{Binding SaveSelectedActionText}" Command="{Binding SaveSelectedCommand}" Style="{StaticResource ButtonSuccess}" HeightRequest="38"/>
                                 <Button Grid.Column="1" Text="{Binding SaveAllActionText}" Command="{Binding SaveAllCommand}" Style="{StaticResource ButtonSuccess}" HeightRequest="38"/>
                             </Grid>
-                            <Button Text="{Binding OpenOutputFolderActionText}" Command="{Binding OpenOutputFolderCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="36" FontSize="15"/>
+                            <Button Text="{Binding OpenOutputFolderActionText}" Command="{Binding OpenOutputFolderCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="36" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                     </Border>
 

@@ -18,14 +18,14 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="2">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
                                 <Label Text="{Binding MemberCategory}" Style="{StaticResource ChipNeutralText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding IdCard}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding GenderAgeDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding GenderAgeDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
                             <Label Text="{Binding HouseholdHeadName, StringFormat='户主: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             <Label Text="{Binding Phone, StringFormat='电话: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
@@ -44,14 +44,14 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="2">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
                                 <Label Text="{Binding MemberCategory}" Style="{StaticResource ChipNeutralText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding IdCard}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding GenderAgeDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding GenderAgeDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
                             <Label Text="{Binding HouseholdHeadName, StringFormat='户主: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             <Label Text="{Binding Phone, StringFormat='电话: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
@@ -75,17 +75,17 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -109,17 +109,17 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -148,16 +148,16 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -175,16 +175,16 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -207,17 +207,17 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -236,17 +236,17 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="3">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding StudentName}" FontSize="17" FontAttributes="Bold"
+                            <Label Text="{Binding StudentName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                 <Label Text="{Binding EducationLevel}" Style="{StaticResource ChipInfoText}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding SchoolName}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding SchoolName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding SchoolDurationDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding EnrollmentYear, StringFormat='入学 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding GraduationYear, StringFormat='毕业 {0}'}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
                         </HorizontalStackLayout>
                         <Border Style="{StaticResource ChipNeutral}" Padding="8,2" VerticalOptions="Start">
                             <Label Text="{Binding StatusDisplay}" Style="{StaticResource ChipNeutralText}"/>
@@ -283,7 +283,7 @@
                     BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}}">
                 <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="{Binding EligibleCountText}" FontSize="16" FontAttributes="Bold"
+                    <Label Text="{Binding EligibleCountText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="可关联"
                            FontSize="14"
@@ -300,7 +300,7 @@
                     BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}}">
                 <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="{Binding AssociatedCountText}" FontSize="16" FontAttributes="Bold"
+                    <Label Text="{Binding AssociatedCountText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="已关联"
                            FontSize="14"
@@ -317,7 +317,7 @@
                     BackgroundColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}}">
                 <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="{Binding NotInScopeCountText}" FontSize="16" FontAttributes="Bold"
+                    <Label Text="{Binding NotInScopeCountText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="已退出"
                            FontSize="14"
@@ -334,7 +334,7 @@
                     BackgroundColor="{Binding IsTab3Selected, Converter={StaticResource BoolToColorConverter}}">
                 <Border.Stroke><SolidColorBrush Color="{StaticResource Primary}"/></Border.Stroke>
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                    <Label Text="{Binding GraduatingCountText}" FontSize="16" FontAttributes="Bold"
+                    <Label Text="{Binding GraduatingCountText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="今年毕业"
                            FontSize="14"
@@ -358,10 +358,10 @@
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0" StrokeShape="RoundRectangle 20" Padding="12,6">
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-                                    <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="16"
+                                    <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                            TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
                                     <Entry Grid.Column="1" Placeholder="输入姓名或身份证号搜索"
-                                           Text="{Binding SearchKeyword}" FontSize="16"
+                                           Text="{Binding SearchKeyword}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                            BackgroundColor="Transparent"
                                            ReturnCommand="{Binding SearchMembersCommand}"/>
                                 </Grid>
@@ -376,10 +376,10 @@
                     ItemTemplate="{StaticResource EligibleStudentSelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
-                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="42"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=42, Android=30, Default=42}"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="未找到符合条件（18-23周岁且未关联）的家庭成员"
-                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="16" Margin="0,10,0,0"/>
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" Margin="0,10,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemsLayout>
@@ -396,10 +396,10 @@
                     ItemTemplate="{StaticResource AssociatedStudentSelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
-                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="42"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=42, Android=30, Default=42}"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="暂无已关联大学生档案"
-                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="16" Margin="0,10,0,0"/>
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" Margin="0,10,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemsLayout>
@@ -416,10 +416,10 @@
                     ItemTemplate="{StaticResource NotInScopeStudentSelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
-                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="42"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=42, Android=30, Default=42}"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="暂无不在范围内的人员"
-                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="16" Margin="0,10,0,0"/>
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" Margin="0,10,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemsLayout>
@@ -436,10 +436,10 @@
                     ItemTemplate="{StaticResource GraduatingStudentSelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,60">
-                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="42"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=42, Android=30, Default=42}"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="今年暂无毕业大学生"
-                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="16" Margin="0,10,0,0"/>
+                                       HorizontalOptions="Center" TextColor="{StaticResource Gray500}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" Margin="0,10,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemsLayout>
@@ -463,7 +463,7 @@
                     VerticalOptions="Center"
                     HorizontalOptions="Center">
                 <VerticalStackLayout Spacing="14">
-                    <Label Text="{Binding EditorTitle}" FontSize="20" FontAttributes="Bold"
+                    <Label Text="{Binding EditorTitle}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold"
                            TextColor="{StaticResource TextPrimary}"/>
                     <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
@@ -515,7 +515,7 @@
                                 Style="{StaticResource FormFieldPickerStyle}"/>
                     </VerticalStackLayout>
 
-                    <Label Text="{Binding ErrorMessage}" TextColor="Red" FontSize="15"
+                    <Label Text="{Binding ErrorMessage}" TextColor="Red" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                            IsVisible="{Binding HasError}" HorizontalOptions="Center"/>
 
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,8,0,0">

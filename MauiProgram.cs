@@ -125,6 +125,15 @@ public static class MauiProgram
                     if (handler.PlatformView is Android.Widget.TextView tv)
                         tv.SetIncludeFontPadding(false); // .NET 10 绑定 IncludeFontPadding 无 setter，走方法形态
                 }));
+        // SearchBar 平台控件是 SearchView（ViewGroup）文本在其内部 EditText，上面的 TextView
+        // 检查拿不到，递归补上（全库仅 UnifiedReprintPage 一处使用）。
+        builder.ConfigureMauiHandlers(handlers =>
+            Microsoft.Maui.Handlers.SearchBarHandler.Mapper.AppendToMapping("NoFontPadding",
+                static (handler, _) =>
+                {
+                    if (handler.PlatformView is Android.Views.ViewGroup group)
+                        NewCosmos.Platforms.Android.AndroidTextMetrics.DisableFontPadding(group);
+                }));
 #endif
 
         builder.Services.AddSingleton<IDictCacheService, DictCacheService>();

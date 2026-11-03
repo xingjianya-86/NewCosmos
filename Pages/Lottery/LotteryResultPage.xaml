@@ -73,7 +73,7 @@
                         <HorizontalStackLayout Spacing="10">
                             <Border WidthRequest="32" HeightRequest="32" StrokeShape="RoundRectangle 16"
                                     BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="{OnPlatform WinUI='&#xE71C;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="17"
+                                <Label Text="{OnPlatform WinUI='&#xE71C;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                                        TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <Label Text="筛选条件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
@@ -81,7 +81,7 @@
 
                         <!-- 彩种 + 立即验证 -->
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Text="彩种" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            <Label Text="彩种" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <Border Grid.Column="1" Style="{StaticResource FilterPickerBorder}">
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                     <Label Text="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}" Style="{StaticResource FilterPickerGlyph}"/>
@@ -147,7 +147,7 @@
                                         </HorizontalStackLayout>
                                         <Border Grid.Column="1" BackgroundColor="{Binding StatusBackgroundColor}" StrokeThickness="0"
                                                 StrokeShape="RoundRectangle 8" Padding="10,3">
-                                            <Label Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}" FontSize="13" FontAttributes="Bold"/>
+                                            <Label Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" FontAttributes="Bold"/>
                                         </Border>
 
                                         <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="12">

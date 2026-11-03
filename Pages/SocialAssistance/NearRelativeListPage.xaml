@@ -22,7 +22,7 @@
                 <Button Text="＋ 新增备案"
                         Command="{Binding NewEntryCommand}"
                         Style="{StaticResource ButtonOutline}"
-                        FontSize="16"
+                        FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                         Padding="18,8"
                         VerticalOptions="Center"/>
             </components:PageHeaderView.HeaderActions>
@@ -40,14 +40,14 @@
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                         <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                               FontSize="16"
+                               FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                TextColor="{StaticResource Gray500}"
                                VerticalOptions="Center"/>
                         <Border Grid.Column="1" BackgroundColor="Transparent" StrokeThickness="0" Padding="0,4">
                             <Grid>
                                 <Entry Text="{Binding SearchText}"
                                        Placeholder="搜索工作人员姓名、工作单位"
-                                       FontSize="18"
+                                       FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
                                        BackgroundColor="Transparent"
                                        Margin="0,-6"
                                        ReturnCommand="{Binding SearchCommand}"/>
@@ -76,7 +76,7 @@
                 StrokeThickness="0"
                 Padding="24,10">
             <Label Text="{Binding ErrorMessage}"
-                   FontSize="15"
+                   FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                    TextColor="{StaticResource Error}"/>
         </Border>
 
@@ -92,7 +92,7 @@
                 <!-- 表格标题行（code.html .table-head：宋体标题 + 计数 + 底部 2px 墨线） -->
                 <Grid Grid.Row="0" Padding="16,14,16,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
-                        <Label Text="备案名册" FontSize="21" FontAttributes="Bold"
+                        <Label Text="备案名册" FontSize="{OnPlatform WinUI=21, Android=18, Default=21}" FontAttributes="Bold"
                                FontFamily="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"
                                TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="{Binding StatusText}"
@@ -147,11 +147,11 @@
                                   Style="{StaticResource TableRowInteractive}"
                                   ColumnDefinitions="1.2*, 1.6*, 0.8*, Auto">
 
-                                <Label Text="{Binding StaffName}" FontSize="17" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding WorkUnit}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Text="{Binding StaffName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding WorkUnit}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
                                 <Label Grid.Column="2"
                                        Text="{Binding LinkCount, StringFormat='{0} 名'}"
-                                       FontSize="17" VerticalOptions="Center"/>
+                                       FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
 
                                 <!-- 操作列（code.html .link-btn/.btn.ghost：透明底 + 语义色描边，方角）
                                      三色分明：松绿=归档、墨黑=编辑、深朱砂(Error)=删除，

@@ -103,17 +103,17 @@
                         <Label Text="连接状态" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
-                            <Label Text="ZeroTier：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Column="1" Text="{Binding NetworkStatusText}" FontSize="15"
+                            <Label Text="ZeroTier：" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Column="1" Text="{Binding NetworkStatusText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
-                            <Label Grid.Row="1" Text="节点ID：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding NodeId}" FontSize="15"
+                            <Label Grid.Row="1" Text="节点ID：" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding NodeId}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextPrimary}"/>
-                            <Label Grid.Row="2" Text="分配IP：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding NetworkIpText}" FontSize="15"
+                            <Label Grid.Row="2" Text="分配IP：" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding NetworkIpText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextPrimary}"/>
-                            <Label Grid.Row="3" Text="版本：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding Version}" FontSize="15"
+                            <Label Grid.Row="3" Text="版本：" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding Version}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                    TextColor="{StaticResource TextPrimary}"/>
                         </Grid>
 

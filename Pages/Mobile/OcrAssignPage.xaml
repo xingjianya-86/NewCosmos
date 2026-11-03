@@ -21,7 +21,7 @@
                 BackgroundColor="#FFF7E6" Stroke="#FFD591" StrokeThickness="1"
                 StrokeShape="RoundRectangle 8" Padding="12,8" Margin="12,8,12,0">
             <Label Text="⚠ 有记录身份证校验位不符，回填后请人工核对证件号"
-                   FontSize="13" TextColor="#D46B08"/>
+                   FontSize="12" TextColor="#D46B08"/>
         </Border>
 
         <!-- 记录卡片列表 -->
@@ -35,7 +35,7 @@
                             <!-- 标题行：类别 + 校验警告徽标 -->
                             <Grid ColumnDefinitions="*,Auto">
                                 <Label Text="{Binding Category, StringFormat='识别记录 · {0}'}"
-                                       FontSize="15" FontAttributes="Bold"
+                                       FontSize="14" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}"/>
                                 <Label Grid.Column="1" IsVisible="{Binding IdCardChecksumInvalid}"
                                        Text="校验位不符" FontSize="12" TextColor="#D46B08"
@@ -48,7 +48,7 @@
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="results:OcrFieldItem">
                                         <Grid ColumnDefinitions="80,*" ColumnSpacing="8">
-                                            <Label Text="{Binding Label}" FontSize="13"
+                                            <Label Text="{Binding Label}" FontSize="12"
                                                    TextColor="{StaticResource TextSecondary}"
                                                    VerticalOptions="Center"/>
                                             <Entry Grid.Column="1" Text="{Binding Value, Mode=TwoWay}"
@@ -60,7 +60,7 @@
 
                             <!-- 目标选择 -->
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                <Label Text="回填到" FontSize="13"
+                                <Label Text="回填到" FontSize="12"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="1" FontSize="14"
                                         ItemsSource="{Binding TargetOptions}"
@@ -86,10 +86,10 @@
         <!-- 底部操作 -->
         <Grid Grid.Row="3" ColumnDefinitions="*,1.5*" ColumnSpacing="10" Padding="12,8,12,24">
             <Button Grid.Column="0" Text="全部不使用" HeightRequest="46" CornerRadius="12"
-                    FontSize="15" BackgroundColor="#F0EDE6" TextColor="{StaticResource TextSecondary}"
+                    FontSize="14" BackgroundColor="#F0EDE6" TextColor="{StaticResource TextSecondary}"
                     Command="{Binding IgnoreAllCommand}"/>
             <Button Grid.Column="1" Text="确认回填" HeightRequest="46" CornerRadius="12"
-                    FontSize="16" FontAttributes="Bold"
+                    FontSize="15" FontAttributes="Bold"
                     BackgroundColor="{StaticResource Primary}" TextColor="White"
                     Command="{Binding ConfirmCommand}"/>
         </Grid>

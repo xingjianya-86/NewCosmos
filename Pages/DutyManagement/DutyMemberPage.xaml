@@ -24,7 +24,7 @@
                                            BackCommand="{Binding GoBackCommand}"
                                            BackText="返回值班表">
                     <components:PageHeaderView.Stats>
-<Label Text="{Binding GroupSummaryText}" FontSize="15" TextColor="{StaticResource TextTertiary}"/>
+<Label Text="{Binding GroupSummaryText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextTertiary}"/>
                     </components:PageHeaderView.Stats>
                 </components:PageHeaderView>
 
@@ -33,13 +33,13 @@
                     <Picker Grid.Column="0" ItemsSource="{Binding GroupFilterOptions}"
                             SelectedItem="{Binding SelectedGroupFilter}"
                             WidthRequest="140" HeightRequest="34"/>
-                    <Button Grid.Column="2" Text="下载导入模板" FontSize="15" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                    <Button Grid.Column="2" Text="下载导入模板" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="34" CornerRadius="8" Padding="14,4"
                             Style="{StaticResource ButtonOutline}"
                             Command="{Binding DownloadImportTemplateCommand}"/>
-                    <Button Grid.Column="3" Text="批量导入" FontSize="15" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                    <Button Grid.Column="3" Text="批量导入" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="34" CornerRadius="8" Padding="14,4"
                             Style="{StaticResource ButtonOutline}" Opacity="{Binding ManageOpacity}"
                             Command="{Binding OpenImportPanelCommand}"/>
-                    <Button Grid.Column="4" Text="+ 新增成员" FontSize="15" HeightRequest="34" CornerRadius="8" Padding="14,4"
+                    <Button Grid.Column="4" Text="+ 新增成员" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="34" CornerRadius="8" Padding="14,4"
                             Style="{StaticResource ButtonPrimary}"
                             Command="{Binding StartAddMemberCommand}" Opacity="{Binding ManageOpacity}"/>
                 </Grid>
@@ -47,34 +47,34 @@
                 <!-- 编辑区 -->
                 <Border Margin="20,12,20,0" Style="{StaticResource CardBorder}" Padding="16" IsVisible="{Binding IsEditing}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="成员信息" FontAttributes="Bold" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="成员信息" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextPrimary}"/>
 
                         <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
-                            <Label Grid.Row="0" Grid.Column="0" Text="姓名 *" FontSize="15" VerticalOptions="Center"/>
+                            <Label Grid.Row="0" Grid.Column="0" Text="姓名 *" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             <Entry Grid.Row="0" Grid.Column="1" Text="{Binding EditName}" Placeholder="请输入姓名" HeightRequest="36"/>
 
-                            <Label Grid.Row="0" Grid.Column="2" Text="电话" FontSize="15" VerticalOptions="Center"/>
+                            <Label Grid.Row="0" Grid.Column="2" Text="电话" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             <Entry Grid.Row="0" Grid.Column="3" Text="{Binding EditPhone}" Placeholder="选填" HeightRequest="36" Keyboard="Telephone"/>
 
-                            <Label Grid.Row="1" Grid.Column="0" Text="备注" FontSize="15" VerticalOptions="Center"/>
+                            <Label Grid.Row="1" Grid.Column="0" Text="备注" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             <Entry Grid.Row="1" Grid.Column="1,3" Text="{Binding EditRemark}" Placeholder="选填" HeightRequest="36"/>
 
                             <HorizontalStackLayout Grid.Row="2" Grid.Column="0,3" Spacing="4">
                                 <CheckBox IsChecked="{Binding EditIsActive}" VerticalOptions="Center"/>
-                                <Label Text="启用（参与轮转）" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="启用（参与轮转）" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
 
                             <!-- 入职时间 -->
                             <HorizontalStackLayout Grid.Row="3" Grid.Column="0,2" Spacing="4">
                                 <CheckBox IsChecked="{Binding EditHasJoinDate}" VerticalOptions="Center"/>
-                                <Label Text="入职时间" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="入职时间" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <DatePicker Grid.Row="3" Grid.Column="1" Date="{Binding EditJoinDate}" IsEnabled="{Binding EditHasJoinDate}" HeightRequest="36"/>
 
                             <!-- 离职时间 -->
                             <HorizontalStackLayout Grid.Row="3" Grid.Column="2" Spacing="4">
                                 <CheckBox IsChecked="{Binding EditHasExitDate}" VerticalOptions="Center"/>
-                                <Label Text="离职时间" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="离职时间" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <DatePicker Grid.Row="3" Grid.Column="3" Date="{Binding EditExitDate}" IsEnabled="{Binding EditHasExitDate}" HeightRequest="36"/>
                         </Grid>
@@ -84,19 +84,19 @@
                         <HorizontalStackLayout Spacing="16">
                             <HorizontalStackLayout Spacing="4">
                                 <CheckBox IsChecked="{Binding EditInLeader}" VerticalOptions="Center"/>
-                                <Label Text="领导组" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="领导组" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Spacing="4">
                                 <CheckBox IsChecked="{Binding EditInMiddle}" VerticalOptions="Center"/>
-                                <Label Text="中层管理组" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="中层管理组" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Spacing="4">
                                 <CheckBox IsChecked="{Binding EditInMale}" VerticalOptions="Center"/>
-                                <Label Text="男生组" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="男生组" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Spacing="4">
                                 <CheckBox IsChecked="{Binding EditInFemale}" VerticalOptions="Center"/>
-                                <Label Text="女生组" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="女生组" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
                         </HorizontalStackLayout>
 
@@ -115,7 +115,7 @@
                                 <Grid ColumnDefinitions="150,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                                         <HorizontalStackLayout Spacing="6">
-                                            <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                             <Border StrokeShape="RoundRectangle 8" Padding="6,1" BackgroundColor="#E8F5E9" IsVisible="{Binding IsActive}">
                                                 <Label Text="启用" FontSize="12" TextColor="#2E7D32"/>
                                             </Border>
@@ -127,8 +127,8 @@
                                     </VerticalStackLayout>
 
                                     <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
-                                        <Label Text="{Binding GroupsDisplay}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
-                                        <Label FontSize="13" TextColor="{StaticResource TextTertiary}">
+                                        <Label Text="{Binding GroupsDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}"/>
+                                        <Label FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextTertiary}">
                                             <Label.Text>
                                                 <MultiBinding StringFormat="入职 {0} · 离职 {1}">
                                                     <Binding Path="JoinDateDisplay"/>
@@ -138,11 +138,11 @@
                                         </Label>
                                     </VerticalStackLayout>
 
-                                    <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74A;', Android='&#x2191;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="13"
+                                    <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE74A;', Android='&#x2191;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
                                             Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveUpMemberCommand}"
                                             CommandParameter="{Binding .}"/>
-                                    <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2193;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="13"
+                                    <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2193;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
                                             Style="{StaticResource ButtonSmall}" Opacity="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=ManageOpacity}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=MoveDownMemberCommand}"
                                             CommandParameter="{Binding .}"/>
@@ -170,7 +170,7 @@
                 <Border Style="{StaticResource CardBorder}" Padding="20" WidthRequest="500">
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="{Binding LeavePanelTitle}" FontAttributes="Bold" FontSize="17" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="0" Text="{Binding LeavePanelTitle}" FontAttributes="Bold" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseLeavePanelCommand}" Padding="4,0"/>
                         </Grid>
 
@@ -181,13 +181,13 @@
                                     <Border StrokeShape="RoundRectangle 8" Padding="12,8" Margin="0,0,0,6" BackgroundColor="#F8FAFC">
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                             <VerticalStackLayout Grid.Column="0" Spacing="1">
-                                                <Label Text="{Binding RangeDisplay}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
-                                                <Label Text="{Binding Reason}" FontSize="13" TextColor="{StaticResource TextTertiary}" IsVisible="{Binding HasReason}"/>
+                                                <Label Text="{Binding RangeDisplay}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Text="{Binding Reason}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextTertiary}" IsVisible="{Binding HasReason}"/>
                                             </VerticalStackLayout>
                                             <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="6,1" BackgroundColor="#FFF7ED" VerticalOptions="Center">
                                                 <Label Text="{Binding Days, StringFormat='{0} 天'}" FontSize="12" TextColor="#EA580C"/>
                                             </Border>
-                                            <Button Grid.Column="2" Text="删除" FontSize="13" Style="{StaticResource ButtonSmall}"
+                                            <Button Grid.Column="2" Text="删除" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" Style="{StaticResource ButtonSmall}"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DutyMemberViewModel}}, Path=DeleteLeaveCommand}"
                                                     CommandParameter="{Binding .}"/>
                                         </Grid>
@@ -202,11 +202,11 @@
                         <!-- 新增请假表单 -->
                         <Label Text="登记请假（会删除受影响月份排班、需到值班表页重新生成；支持补登记过去日期，须填写事由）" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                         <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="6">
-                            <Label Grid.Column="0" Text="开始" FontSize="15" VerticalOptions="Center"/>
+                            <Label Grid.Column="0" Text="开始" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"/>
                             <DatePicker Grid.Column="1" Date="{Binding LeaveStartDate}" WidthRequest="130" HeightRequest="36"/>
-                            <Label Grid.Column="2" Text="结束" FontSize="15" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <Label Grid.Column="2" Text="结束" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center" Margin="8,0,0,0"/>
                             <DatePicker Grid.Column="3" Date="{Binding LeaveEndDate}" WidthRequest="130" HeightRequest="36"/>
-                            <Label Grid.Column="4" Text="事由" FontSize="15" VerticalOptions="Center" Margin="8,0,0,0"/>
+                            <Label Grid.Column="4" Text="事由" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center" Margin="8,0,0,0"/>
                             <Entry Grid.Column="5" Text="{Binding LeaveReason}" Placeholder="选填；补登记必填" HeightRequest="36"/>
                         </Grid>
 
@@ -227,7 +227,7 @@
                 <Border Style="{StaticResource CardBorder}" Padding="20" WidthRequest="560">
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="批量导入值班成员" FontAttributes="Bold" FontSize="17" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="0" Text="批量导入值班成员" FontAttributes="Bold" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}" Command="{Binding CloseImportPanelCommand}" Padding="4,0"/>
                         </Grid>
 
@@ -236,13 +236,13 @@
 
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                             <Label Grid.Column="0" Text="{Binding ImportFilePath}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" LineBreakMode="MiddleTruncation"/>
-                            <Button Grid.Column="1" Text="选择文件" FontSize="15" HeightRequest="34" Padding="14,4"
+                            <Button Grid.Column="1" Text="选择文件" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="34" Padding="14,4"
                                     Style="{StaticResource ButtonOutline}" Command="{Binding SelectImportFileCommand}"/>
-                            <Button Grid.Column="2" Text="预览" FontSize="15" HeightRequest="34" Padding="14,4"
+                            <Button Grid.Column="2" Text="预览" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="34" Padding="14,4"
                                     Style="{StaticResource ButtonOutline}" Command="{Binding PreviewImportCommand}"/>
                         </Grid>
 
-                        <Label Text="{Binding ImportSummaryText}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                        <Label Text="{Binding ImportSummaryText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                                IsVisible="{Binding IsImportPreviewLoaded}"/>
 
                         <Border StrokeShape="RoundRectangle 8" Padding="10" BackgroundColor="#F8FAFC" IsVisible="{Binding HasImportLog}">

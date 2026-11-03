@@ -41,7 +41,7 @@
                             </Grid>
                             <Grid ColumnDefinitions="Auto,*" Margin="0,10,0,0">
                                 <Label Text="最新开奖日期" FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
-                                <Label Text="{Binding LatestDrawDate}" Grid.Column="1" FontSize="15" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
+                                <Label Text="{Binding LatestDrawDate}" Grid.Column="1" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
@@ -50,7 +50,7 @@
                 <!-- 预测结果列表 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
                     <Label Text="预测结果" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
-                    <Label Text="策略契合度不代表中奖概率；彩票中奖为随机事件，请理性购彩。" FontSize="13" TextColor="{StaticResource TextTertiary}" Margin="4,0,4,0"/>
+                    <Label Text="策略契合度不代表中奖概率；彩票中奖为随机事件，请理性购彩。" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextTertiary}" Margin="4,0,4,0"/>
                     <CollectionView ItemsSource="{Binding Predictions}" SelectionMode="None" HeightRequest="300">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="local:PredictionResult">

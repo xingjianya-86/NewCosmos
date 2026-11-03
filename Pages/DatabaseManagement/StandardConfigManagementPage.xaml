@@ -23,7 +23,7 @@
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="{StaticResource Ink}"
-                                FontSize="16"
+                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                 Command="{Binding SyncSchemaCommand}"
                                 VerticalOptions="Center"
                                 Padding="16,10"
@@ -33,7 +33,7 @@
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="White" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="{StaticResource Primary}"
-                                FontSize="16"
+                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                 FontAttributes="Bold"
                                 Command="{Binding InitializeFromSeedCommand}"
                                 VerticalOptions="Center"
@@ -81,7 +81,7 @@
                                                 </VisualStateGroup>
                                             </VisualStateGroupList>
                                         </VisualStateManager.VisualStateGroups>
-                                        <Label Text="{Binding DisplayName}" FontSize="18" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        <Label Text="{Binding DisplayName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>
@@ -115,10 +115,10 @@
                                 Margin="16,0">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="🧮 照料护理费计算方法公示"
-                                       FontSize="16" FontAttributes="Bold"
+                                       FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                                        TextColor="{StaticResource PrimaryDark}"/>
                                 <Label Text="{Binding CareAllowanceFormulaText}"
-                                       FontSize="15"
+                                       FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                        TextColor="{StaticResource TextSecondary}"
                                        LineHeight="1.4"/>
                             </VerticalStackLayout>
@@ -162,12 +162,12 @@
                                             </VisualStateGroupList>
                                         </VisualStateManager.VisualStateGroups>
                                         <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                            <Label Text="{Binding StandardName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                            <Label Text="{Binding Description}" FontSize="16" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding StandardName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding Description}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
                                         </VerticalStackLayout>
-                                        <Label Grid.Column="1" Text="{Binding StandardValue}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="End"/>
-                                        <Label Grid.Column="2" Text="{Binding Unit}" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
-                                        <Label Grid.Column="3" Text="{Binding HukouType}" FontSize="16" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
+                                        <Label Grid.Column="1" Text="{Binding StandardValue}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="End"/>
+                                        <Label Grid.Column="2" Text="{Binding Unit}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                        <Label Grid.Column="3" Text="{Binding HukouType}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>

@@ -10,15 +10,15 @@
 
         <!-- 顶部：标题 + 类别选择 -->
         <VerticalStackLayout Grid.Row="0" Padding="20,28,20,8" Spacing="6">
-            <Label Text="扫描证件" FontSize="22" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+            <Label Text="扫描证件" FontSize="18" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
             <Label Text="请将证件放入框内，保持光线充足、边角对齐"
-                   FontSize="15" TextColor="#CCFFFFFF" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
+                   FontSize="14" TextColor="#CCFFFFFF" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
         </VerticalStackLayout>
 
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" Padding="20,0,20,8">
-            <Label Text="证件类别" FontSize="15" TextColor="#CCFFFFFF" VerticalOptions="Center"/>
+            <Label Text="证件类别" FontSize="14" TextColor="#CCFFFFFF" VerticalOptions="Center"/>
             <Picker x:Name="CategoryPicker" Grid.Column="1"
-                    FontSize="15" TextColor="Black" BackgroundColor="#F0F0F0"
+                    FontSize="14" TextColor="Black" BackgroundColor="#F0F0F0"
                     SelectedIndexChanged="OnCategoryChanged"/>
         </Grid>
 
@@ -33,7 +33,7 @@
                         BackgroundColor="Transparent"
                         HorizontalOptions="Center" VerticalOptions="Center"
                         StrokeShape="RoundRectangle 14" />
-                <Label Text="证件正面" FontSize="15" TextColor="#FFD24D" Rotation="90"
+                <Label Text="证件正面" FontSize="14" TextColor="#FFD24D" Rotation="90"
                        VerticalOptions="Center" HorizontalOptions="Center" />
             </Grid>
 
@@ -41,22 +41,22 @@
             <Grid x:Name="BusyOverlay" BackgroundColor="#80000000" IsVisible="False" InputTransparent="False">
                 <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                     <ActivityIndicator x:Name="BusyIndicator" IsRunning="False" Color="White"/>
-                    <Label x:Name="BusyLabel" Text="正在识别证件..." TextColor="White" FontSize="16"/>
+                    <Label x:Name="BusyLabel" Text="正在识别证件..." TextColor="White" FontSize="15"/>
                 </VerticalStackLayout>
             </Grid>
         </Grid>
 
         <!-- 底部操作 -->
         <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Padding="20,16,20,32">
-            <Button Grid.Column="0" Text="取消" HeightRequest="50" CornerRadius="12" FontSize="18"
+            <Button Grid.Column="0" Text="取消" HeightRequest="50" CornerRadius="12" FontSize="16"
                     BackgroundColor="Transparent" TextColor="White"
                     BorderColor="#66FFFFFF" BorderWidth="1"
                     Clicked="OnCancelClicked"/>
-            <Button Grid.Column="1" Text="从相册选择" HeightRequest="50" CornerRadius="12" FontSize="17"
+            <Button Grid.Column="1" Text="从相册选择" HeightRequest="50" CornerRadius="12" FontSize="16"
                     BackgroundColor="Transparent" TextColor="White"
                     BorderColor="#66FFFFFF" BorderWidth="1"
                     Clicked="OnPickFromGalleryClicked"/>
-            <Button Grid.Column="2" Text="拍照" HeightRequest="50" CornerRadius="12" FontSize="18" FontAttributes="Bold"
+            <Button Grid.Column="2" Text="拍照" HeightRequest="50" CornerRadius="12" FontSize="16" FontAttributes="Bold"
                     BackgroundColor="{StaticResource Primary}" TextColor="White"
                     Clicked="OnCaptureClicked"/>
         </Grid>

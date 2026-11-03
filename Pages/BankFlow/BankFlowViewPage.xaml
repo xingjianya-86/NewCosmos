@@ -38,7 +38,7 @@
                         WidthRequest="160"
                         HeightRequest="48"
                         MinimumHeightRequest="48"
-                        FontSize="17"
+                        FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                         BackgroundColor="{StaticResource Gray100}"
                         VerticalOptions="Center"/>
 
@@ -51,14 +51,14 @@
                     <Grid ColumnDefinitions="Auto, *, Auto">
                         <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                               FontSize="16"
+                               FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                TextColor="{StaticResource Gray500}"
                                VerticalOptions="Center"
                                Margin="0,0,8,0"/>
                         <Entry Grid.Column="1"
                                Placeholder="搜索姓名 / 身份证 / 家庭地址"
                                Text="{Binding SearchText}"
-                               FontSize="17"
+                               FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                                BackgroundColor="Transparent"
                                ReturnCommand="{Binding SearchCommand}"/>
                         <Button Grid.Column="2"
@@ -75,7 +75,7 @@
                 <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
                     <Switch IsToggled="{Binding ExceedOnly, Mode=TwoWay}"/>
                     <Label Text="仅看超30月标准"
-                           FontSize="15"
+                           FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                            TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center"/>
                 </HorizontalStackLayout>
@@ -93,7 +93,7 @@
               BackgroundColor="{StaticResource White}">
             <Label Grid.Column="0"
                    Text="{Binding SummaryText}"
-                   FontSize="16"
+                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                    TextColor="{StaticResource TextSecondary}"
                    VerticalOptions="Center"/>
             <Button Grid.Column="1"
@@ -142,16 +142,16 @@
                                   Style="{StaticResource TableRowInteractive}"
                                   ColumnDefinitions="50, 1*, 1.8*, 1*, 1.2*, 1.2*, 2.4*, 1.1*">
 
-                                <Label Text="{Binding RowNo}" FontSize="17" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="17" VerticalOptions="Center"/>
-                                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="16" VerticalOptions="Center"/>
-                                <Label Grid.Column="3" Text="{Binding Relationship}" FontSize="16" VerticalOptions="Center"/>
-                                <Label Grid.Column="4" Text="{Binding TotalBalanceDisplay}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Text="{Binding RowNo}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="{Binding Relationship}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center"/>
+                                <Label Grid.Column="4" Text="{Binding TotalBalanceDisplay}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center"/>
 
                                 <!-- 超阈值仅红字提示 -->
                                 <Label Grid.Column="5"
                                        Text="{Binding MaxFlowAmountDisplay}"
-                                       FontSize="17" VerticalOptions="Center">
+                                       FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" VerticalOptions="Center">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsExceed}" Value="True">
                                             <Setter Property="TextColor" Value="{StaticResource Error}"/>
@@ -162,7 +162,7 @@
 
                                 <Label Grid.Column="6"
                                        Text="{Binding BankSummary}"
-                                       FontSize="15"
+                                       FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                        TextColor="{StaticResource TextSecondary}"
                                        LineBreakMode="TailTruncation"
                                        VerticalOptions="Center"/>
@@ -172,17 +172,17 @@
                                     <Border IsVisible="{Binding IsExceed}"
                                             BackgroundColor="#FEE2E2" StrokeThickness="0"
                                             StrokeShape="RoundRectangle 8" Padding="6,2">
-                                        <Label Text="超30月" FontSize="13" TextColor="{StaticResource Error}"/>
+                                        <Label Text="超30月" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource Error}"/>
                                     </Border>
                                     <Border IsVisible="{Binding IsIdCardSuspect}"
                                             BackgroundColor="#FEF3C7" StrokeThickness="0"
                                             StrokeShape="RoundRectangle 8" Padding="6,2">
-                                        <Label Text="证存疑" FontSize="13" TextColor="#D97706"/>
+                                        <Label Text="证存疑" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="#D97706"/>
                                     </Border>
                                     <Border IsVisible="{Binding IsMachineryExceed}"
                                             BackgroundColor="#FEE2E2" StrokeThickness="0"
                                             StrokeShape="RoundRectangle 8" Padding="6,2">
-                                        <Label Text="农机超60马力" FontSize="13" TextColor="{StaticResource Error}"/>
+                                        <Label Text="农机超60马力" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource Error}"/>
                                     </Border>
                                 </HorizontalStackLayout>
                             </Grid>

@@ -27,7 +27,7 @@
                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                             BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                             TextColor="{StaticResource Ink}"
-                            FontSize="16"
+                            FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             Command="{Binding SelectFileCommand}"
                             VerticalOptions="Center"
                             Padding="16,10"
@@ -49,15 +49,15 @@
                         </Grid>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                         <Label Text="支持 .xlsx / .xls / .csv 格式，需包含「名称」列"
-                               FontSize="16" TextColor="{StaticResource TextTertiary}"/>
+                               FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}"/>
 
                         <Grid IsVisible="{Binding HasSelectedFile}" Margin="0,4,0,0">
                             <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="12,8" StrokeShape="RoundRectangle 8">
                                 <HorizontalStackLayout Spacing="8">
                                     <Label Text="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                                           FontSize="20" TextColor="{StaticResource Primary}"
+                                           FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" TextColor="{StaticResource Primary}"
                                            VerticalOptions="Center"/>
-                                    <Label Text="{Binding SelectedFileName}" FontSize="18"
+                                    <Label Text="{Binding SelectedFileName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
                                            TextColor="{StaticResource TextPrimary}"
                                            VerticalOptions="Center"/>
                                 </HorizontalStackLayout>
@@ -91,17 +91,17 @@
                                         <Grid ColumnDefinitions="Auto,*,*,*,*,*" ColumnSpacing="8"
                                               Padding="8,6" Style="{StaticResource TableRowInteractive}">
                                             <Label Grid.Column="0" Text="{Binding RowNumber}"
-                                                   FontSize="17" TextColor="{StaticResource TextSecondary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextSecondary}"/>
                                             <Label Grid.Column="1" Text="{Binding Name}"
-                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="2" Text="{Binding Abbreviation}"
-                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="3" Text="{Binding Principal}"
-                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="4" Text="{Binding Phone}"
-                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="5" Text="{Binding Region}"
-                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
@@ -109,7 +109,7 @@
                         </Grid>
 
                         <Label Text="{Binding TotalCount, StringFormat='共 {0} 条数据'}"
-                               FontSize="17" TextColor="{StaticResource TextTertiary}"
+                               FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" TextColor="{StaticResource TextTertiary}"
                                HorizontalOptions="End"/>
                     </VerticalStackLayout>
                 </Border>
@@ -123,24 +123,24 @@
                             <Border Grid.Column="0" BackgroundColor="{StaticResource SuccessSoft}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="成功" FontSize="16" TextColor="#166534"/>
-                                    <Label Text="{Binding SuccessCount}" FontSize="30"
+                                    <Label Text="成功" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="#166534"/>
+                                    <Label Text="{Binding SuccessCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}"
                                            FontAttributes="Bold" TextColor="#166534"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="1" BackgroundColor="{StaticResource DangerSoft}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="失败" FontSize="16" TextColor="#991B1B"/>
-                                    <Label Text="{Binding FailureCount}" FontSize="30"
+                                    <Label Text="失败" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="#991B1B"/>
+                                    <Label Text="{Binding FailureCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}"
                                            FontAttributes="Bold" TextColor="#991B1B"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="2" BackgroundColor="{StaticResource CardOptionBackground}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="总计" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
-                                    <Label Text="{Binding TotalCount}" FontSize="30"
+                                    <Label Text="总计" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding TotalCount}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}"
                                            FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 </VerticalStackLayout>
                             </Border>
@@ -148,11 +148,11 @@
 
                         <!-- 失败明细：只有计数无法定位是哪一行（原实现明细只进日志，界面看不到） -->
                         <VerticalStackLayout IsVisible="{Binding HasImportErrors}" Spacing="6">
-                            <Label Text="失败明细" FontSize="17" FontAttributes="Bold" TextColor="#991B1B"/>
+                            <Label Text="失败明细" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="#991B1B"/>
                             <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding ImportErrors}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Label Text="{Binding .}" FontSize="16" TextColor="#991B1B"/>
+                                        <Label Text="{Binding .}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="#991B1B"/>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>
                             </VerticalStackLayout>

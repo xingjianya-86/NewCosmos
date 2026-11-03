@@ -30,7 +30,7 @@
                         <VerticalStackLayout Spacing="4">
                             <Label Text="当前目录" Style="{StaticResource FormFieldLabelStyle}"/>
                             <Border StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Gray100}" Padding="10,8">
-                                <Label Text="{Binding OutputRoot}" FontSize="15" TextColor="{StaticResource TextPrimary}"
+                                <Label Text="{Binding OutputRoot}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}"
                                        LineBreakMode="WordWrap"/>
                             </Border>
                         </VerticalStackLayout>
@@ -38,11 +38,11 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="来源" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Label Text="{Binding OutputRootSourceText}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding OutputRootSourceText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="预览临时目录" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Label Text="{Binding PreviewTempDirectory}" FontSize="15" TextColor="{StaticResource TextPrimary}"
+                                <Label Text="{Binding PreviewTempDirectory}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextPrimary}"
                                        LineBreakMode="WordWrap"/>
                             </VerticalStackLayout>
                         </Grid>
@@ -70,7 +70,7 @@
                         <Label Text="目录结构" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Label Text="例：月报表保存在 [输出根]\月报表\202610\（目录以方括号占位）"
-                               FontSize="15" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                               FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
                         <Label Text="各功能按类别分目录存放：月报表\{期间}\、高龄月报\{期间}\、核查报告\、以及按主体分目录的档案文书。配置优先级：本页选择（用户级）＞ config\document_output.yaml ＞ 历史相对“输出”目录。"
                                FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>

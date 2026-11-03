@@ -14,8 +14,8 @@
                 <VerticalStackLayout Spacing="8">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                            <Label Text="救助对象" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Label Text="{Binding ArchiveSourceText}" FontSize="13" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
+                            <Label Text="救助对象" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding ArchiveSourceText}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
                         </VerticalStackLayout>
                         <Button Grid.Column="1"
                                 Text="解除关联"
@@ -37,94 +37,94 @@
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="与工作人员关系" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="15"/>
+                            <Label Text="与工作人员关系" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="姓名" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="姓名" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="身份证号" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="身份证号" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="关联申请ID（可选）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="关联申请ID（可选）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="性别" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="性别" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="出生年月" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="出生年月" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="户籍地址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="户籍地址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="居住地址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="居住地址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭住址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="家庭住址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭人口/共同生活人数" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="家庭人口/共同生活人数" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="社会救助种类/保障类别" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="社会救助种类/保障类别" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="月保障金（元）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="月保障金（元）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="保障金额（元）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="保障金额（元）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="救助起始时间" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="救助起始时间" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭关系" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="15"/>
+                            <Label Text="家庭关系" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="申请时间" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="申请时间" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="申请原因" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="申请原因" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭主要困难" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="家庭主要困难" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="家庭经济情况调查情况" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="家庭经济情况调查情况" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="乡镇（街道）意见" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="乡镇（街道）意见" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0" Grid.ColumnSpan="2">
-                            <Label Text="动态管理记录" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="动态管理记录" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                     </Grid>
                 </VerticalStackLayout>
@@ -135,8 +135,8 @@
                 <VerticalStackLayout Spacing="8">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                            <Label Text="救助对象" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Label Text="{Binding ArchiveSourceText}" FontSize="13" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
+                            <Label Text="救助对象" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding ArchiveSourceText}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource Primary}" IsVisible="{Binding IsArchiveLinked}"/>
                         </VerticalStackLayout>
                         <Button Grid.Column="1"
                                 Text="解除关联"
@@ -158,94 +158,94 @@
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="与工作人员关系" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="15"/>
+                            <Label Text="与工作人员关系" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Relation}" Placeholder="如：父女" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="姓名" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="姓名" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Name}" Placeholder="救助对象姓名" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="身份证号" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="身份证号" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnLinkIdCardChanged" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="关联申请ID（可选）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="关联申请ID（可选）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplicationId}" Placeholder="档案输出关联用" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="性别" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="性别" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding Gender}" Placeholder="性别" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="出生年月" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="出生年月" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding BirthDate}" Placeholder="如：1968年3月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="户籍地址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="户籍地址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HukouAddress}" Placeholder="户籍地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="居住地址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="居住地址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ResidenceAddress}" Placeholder="居住地址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭住址" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="家庭住址" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyAddress}" Placeholder="家庭住址" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="4" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭人口/共同生活人数" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="家庭人口/共同生活人数" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilySize}" Placeholder="人数" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="社会救助种类/保障类别" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="社会救助种类/保障类别" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding HelpType}" Placeholder="如：最低生活保障对象" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="月保障金（元）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="月保障金（元）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding MonthAmount}" Placeholder="月保障金" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="保障金额（元）" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="保障金额（元）" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ReportAmount}" Placeholder="保障金额" Keyboard="Numeric" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="救助起始时间" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="救助起始时间" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding StartTime}" Placeholder="如：2026年1月" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭关系" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="15"/>
+                            <Label Text="家庭关系" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding FamilyRelation}" Placeholder="家庭关系" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="申请时间" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15"/>
+                            <Label Text="申请时间" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Entry Text="{Binding ApplyTime}" Placeholder="申请时间" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="申请原因" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="申请原因" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding ApplyReason}" Placeholder="申请原因" IsReadOnly="{Binding IsArchiveLinked}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="3" Grid.Column="1" Spacing="2" Margin="0,6,0,0">
-                            <Label Text="家庭主要困难" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="家庭主要困难" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding FamilyDifficulty}" Placeholder="家庭主要困难" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto">
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="家庭经济情况调查情况" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="家庭经济情况调查情况" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding EconomyInvestigate}" Placeholder="调查情况" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="乡镇（街道）意见" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="乡镇（街道）意见" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding TownOpinion}" Placeholder="乡镇意见" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Row="1" Spacing="2" Margin="0,6,0,0" Grid.ColumnSpan="2">
-                            <Label Text="动态管理记录" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="15" HeightRequest="56" AutoSize="TextChanges"/>
+                            <Label Text="动态管理记录" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}" TextColor="{StaticResource TextSecondary}"/>
+                            <Editor Text="{Binding DynamicRecord}" Placeholder="动态管理记录" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="56" AutoSize="TextChanges"/>
                         </VerticalStackLayout>
                     </Grid>
                 </VerticalStackLayout>
@@ -280,14 +280,14 @@
                     BackgroundColor="{StaticResource Secondary}"
                     TextColor="{StaticResource White}"
                     Padding="14,8"
-                    FontSize="15"/>
+                    FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
             <Button Grid.Column="2"
                     Text="删除本条"
                     Command="{Binding DeleteCommand}"
                     BackgroundColor="#E81123"
                     TextColor="{StaticResource White}"
                     Padding="14,8"
-                    FontSize="15"/>
+                    FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"/>
         </Grid>
 
         <!-- 表单主体 -->
@@ -295,36 +295,36 @@
             <VerticalStackLayout Padding="16" Spacing="12">
 
                 <!-- 状态提示 -->
-                <Label Text="{Binding StatusText}" FontSize="15" TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+                <Label Text="{Binding StatusText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
 
                 <!-- 工作人员信息 -->
                 <Border StrokeThickness="1" Stroke="#E0E0E0" StrokeShape="RoundRectangle 8" Padding="14">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="社会救助经办（工作）人员基本情况" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="社会救助经办（工作）人员基本情况" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="姓名" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding StaffName}" Placeholder="工作人员姓名" FontSize="16"/>
+                                <Entry Text="{Binding StaffName}" Placeholder="工作人员姓名" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="身份证号" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding StaffIdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnStaffIdCardChanged" FontSize="16"/>
+                                <Entry Text="{Binding StaffIdCard}" Placeholder="身份证号（满18位自动带出）" TextChanged="OnStaffIdCardChanged" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Spacing="4" Margin="0,8,0,0">
                                 <Label Text="联系方式" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding StaffPhone}" Placeholder="联系电话" FontSize="16"/>
+                                <Entry Text="{Binding StaffPhone}" Placeholder="联系电话" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="4" Margin="0,8,0,0">
                                 <Label Text="工作单位" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding WorkUnit}" Placeholder="工作单位" FontSize="16"/>
+                                <Entry Text="{Binding WorkUnit}" Placeholder="工作单位" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="2" Spacing="4" Margin="0,8,0,0">
                                 <Label Text="职务（职级）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding Position}" Placeholder="职务（职级）" FontSize="16"/>
+                                <Entry Text="{Binding Position}" Placeholder="职务（职级）" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="2" Grid.Column="1" Spacing="4" Margin="0,8,0,0">
                                 <Label Text="乡镇（街道）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Entry Text="{Binding Town}" Placeholder="所在乡镇/街道" FontSize="16"/>
+                                <Entry Text="{Binding Town}" Placeholder="所在乡镇/街道" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                             </VerticalStackLayout>
                         </Grid>
                     </VerticalStackLayout>
@@ -333,7 +333,7 @@
                 <!-- 备案对象列表 -->
                 <Grid ColumnDefinitions="*,Auto">
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="近亲属享受社会救助情况" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="近亲属享受社会救助情况" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="一名工作人员可对应多名救助对象，行数不限" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                     <Button Grid.Column="1"
@@ -342,7 +342,7 @@
                             BackgroundColor="{StaticResource Secondary}"
                             TextColor="{StaticResource White}"
                             Padding="14,8"
-                            FontSize="15"
+                            FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                             VerticalOptions="Center"/>
                 </Grid>
 
@@ -362,7 +362,7 @@
                     Command="{Binding SaveCommand}"
                     BackgroundColor="{StaticResource Primary}"
                     TextColor="{StaticResource White}"
-                    FontSize="17"
+                    FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                     FontAttributes="Bold"
                     HeightRequest="44"/>
         </Border>

@@ -36,17 +36,17 @@
                   ColumnDefinitions="60, 2*, 1.5*, 2*, 2*, 1*, Auto"
                   ColumnSpacing="8"
                   BackgroundColor="White">
-                <Label Text="{Binding Id}" FontSize="16"
+                <Label Text="{Binding Id}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding Username}" FontSize="17"
+                <Label Grid.Column="1" Text="{Binding Username}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                        FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                        VerticalOptions="Center" LineBreakMode="TailTruncation"/>
-                <Label Grid.Column="2" Text="{Binding FullName}" FontSize="16"
+                <Label Grid.Column="2" Text="{Binding FullName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
                        LineBreakMode="TailTruncation"/>
-                <Label Grid.Column="3" Text="{Binding Phone}" FontSize="16"
+                <Label Grid.Column="3" Text="{Binding Phone}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding OrganizationName}" FontSize="16"
+                <Label Grid.Column="4" Text="{Binding OrganizationName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
                        LineBreakMode="TailTruncation"/>
                 <Border Grid.Column="5" Padding="10,4" StrokeShape="RoundRectangle 10"
@@ -57,7 +57,7 @@
                 </Border>
                 <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
                     <Button Text="{OnPlatform WinUI='&#xE70F;', Android='&#x270F;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Info}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditUserCommand}"
@@ -65,7 +65,7 @@
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanEditUser}"/>
                     <Button Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Error}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=DeleteUserCommand}"
@@ -73,14 +73,14 @@
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanDeleteUser}"/>
                     <Button Text="{OnPlatform WinUI='&#xE17F;', Android='&#x1F511;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Warning}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ResetPasswordCommand}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanResetPassword}"/>
                     <Button Text="{OnPlatform WinUI='&#xE8D7;', Android='&#x1F504;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Secondary}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ToggleUserStatusCommand}"
@@ -95,17 +95,17 @@
                   ColumnDefinitions="60, 2*, 1.5*, 2*, 2*, 1*, Auto"
                   ColumnSpacing="8"
                   BackgroundColor="#F8F9FA">
-                <Label Text="{Binding Id}" FontSize="16"
+                <Label Text="{Binding Id}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding Username}" FontSize="17"
+                <Label Grid.Column="1" Text="{Binding Username}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                        FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                        VerticalOptions="Center" LineBreakMode="TailTruncation"/>
-                <Label Grid.Column="2" Text="{Binding FullName}" FontSize="16"
+                <Label Grid.Column="2" Text="{Binding FullName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
                        LineBreakMode="TailTruncation"/>
-                <Label Grid.Column="3" Text="{Binding Phone}" FontSize="16"
+                <Label Grid.Column="3" Text="{Binding Phone}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding OrganizationName}" FontSize="16"
+                <Label Grid.Column="4" Text="{Binding OrganizationName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"
                        LineBreakMode="TailTruncation"/>
                 <Border Grid.Column="5" Padding="10,4" StrokeShape="RoundRectangle 10"
@@ -116,7 +116,7 @@
                 </Border>
                 <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center">
                     <Button Text="{OnPlatform WinUI='&#xE70F;', Android='&#x270F;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Info}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=EditUserCommand}"
@@ -124,7 +124,7 @@
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanEditUser}"/>
                     <Button Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Error}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=DeleteUserCommand}"
@@ -132,14 +132,14 @@
                             IsVisible="{Binding CanBeManaged}"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanDeleteUser}"/>
                     <Button Text="{OnPlatform WinUI='&#xE17F;', Android='&#x1F511;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Warning}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ResetPasswordCommand}"
                             CommandParameter="{Binding}"
                             IsVisible="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=CanResetPassword}"/>
                     <Button Text="{OnPlatform WinUI='&#xE8D7;', Android='&#x1F504;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="16"
+                            WidthRequest="32" HeightRequest="32" Padding="0" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                             BackgroundColor="{StaticResource Secondary}" TextColor="White"
                             CornerRadius="6"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=ToggleUserStatusCommand}"
@@ -165,16 +165,16 @@
                     <Border Grid.Column="0" WidthRequest="48" HeightRequest="48"
                             BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
                         <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                               FontSize="26" TextColor="{StaticResource Primary}"
+                               FontSize="{OnPlatform WinUI=26, Android=22, Default=26}" TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Margin="16,0" VerticalOptions="Center" Spacing="4">
-                        <Label Text="{Binding Name}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding Code}" FontSize="16" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding Description}" FontSize="16" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                        <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding Code}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Description}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
                     </VerticalStackLayout>
                     <Label Grid.Column="2" Text="{Binding Level, StringFormat='等级: {0}'}"
-                           FontSize="16" TextColor="{StaticResource TextSecondary}"
+                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center" Margin="8,0"/>
                     <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
                         <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
@@ -203,16 +203,16 @@
                     <Border Grid.Column="0" WidthRequest="48" HeightRequest="48"
                             BackgroundColor="#EBF5FF" StrokeShape="RoundRectangle 12">
                         <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                               FontSize="26" TextColor="{StaticResource Primary}"
+                               FontSize="{OnPlatform WinUI=26, Android=22, Default=26}" TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Margin="16,0" VerticalOptions="Center" Spacing="4">
-                        <Label Text="{Binding Name}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding Code}" FontSize="16" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding Description}" FontSize="16" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                        <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding Code}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Description}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
                     </VerticalStackLayout>
                     <Label Grid.Column="2" Text="{Binding Level, StringFormat='等级: {0}'}"
-                           FontSize="16" TextColor="{StaticResource TextSecondary}"
+                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"
                            VerticalOptions="Center" Margin="8,0"/>
                     <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
                         <Button Text="{OnPlatform WinUI='&#xE70F; 编辑', Android='&#x270F;&#xFE0F; 编辑'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
@@ -240,7 +240,7 @@
                     StrokeShape="RoundRectangle 12" StrokeThickness="1"
                     Stroke="{StaticResource Gray200}">
                 <VerticalStackLayout Spacing="12">
-                    <Label Text="{Binding GroupName}" FontSize="20" FontAttributes="Bold"
+                    <Label Text="{Binding GroupName}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold"
                            TextColor="{StaticResource TextPrimary}"/>
                     <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                     <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignContent="Start">
@@ -251,7 +251,7 @@
                                               VerticalOptions="Center"
                                               Scale="0.85"
                                               Margin="0"/>
-                                    <Label Text="{Binding Name}" FontSize="16" TextColor="{StaticResource TextSecondary}"
+                                    <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"
                                            VerticalOptions="Center"
                                            HorizontalTextAlignment="Start"
                                            HorizontalOptions="Start"/>
@@ -271,7 +271,7 @@
                     StrokeShape="RoundRectangle 12" StrokeThickness="1"
                     Stroke="{StaticResource Gray200}">
                 <VerticalStackLayout Spacing="12">
-                    <Label Text="{Binding GroupName}" FontSize="20" FontAttributes="Bold"
+                    <Label Text="{Binding GroupName}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold"
                            TextColor="{StaticResource TextPrimary}"/>
                     <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                     <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start" AlignContent="Start">
@@ -282,7 +282,7 @@
                                               VerticalOptions="Center"
                                               Scale="0.85"
                                               Margin="0"/>
-                                    <Label Text="{Binding Name}" FontSize="16" TextColor="{StaticResource TextSecondary}"
+                                    <Label Text="{Binding Name}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"
                                            VerticalOptions="Center"
                                            HorizontalTextAlignment="Start"
                                            HorizontalOptions="Start"/>
@@ -318,7 +318,7 @@
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="{StaticResource Ink}"
-                                FontSize="16"
+                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                 Command="{Binding OpenOnlineSessionsCommand}"
                                 VerticalOptions="Center"
                                 Padding="16,10"
@@ -328,7 +328,7 @@
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="{StaticResource Ink}"
-                                FontSize="16"
+                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                 Command="{Binding CreateUserCommand}"
                                 VerticalOptions="Center"
                                 Padding="16,10"
@@ -339,7 +339,7 @@
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                 BackgroundColor="White" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="{StaticResource Primary}"
-                                FontSize="16"
+                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                 FontAttributes="Bold"
                                 Command="{Binding CreateRoleCommand}"
                                 VerticalOptions="Center"
@@ -366,17 +366,17 @@
                         Command="{Binding SwitchTabCommand}" CommandParameter="Users"
                         BackgroundColor="{Binding IsUsersTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsUsersTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
-                        CornerRadius="0" Padding="16,8" FontSize="18"/>
+                        CornerRadius="0" Padding="16,8" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                 <Button Text="{OnPlatform WinUI='&#xE8C7; 角色管理', Android='&#x1F3E0; 角色管理'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                         Command="{Binding SwitchTabCommand}" CommandParameter="Roles"
                         BackgroundColor="{Binding IsRolesTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsRolesTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
-                        CornerRadius="0" Padding="16,8" FontSize="18"/>
+                        CornerRadius="0" Padding="16,8" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                 <Button Text="{OnPlatform WinUI='&#xE9D9; 权限配置', Android='&#x1F4CA; 权限配置'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                         Command="{Binding SwitchTabCommand}" CommandParameter="Permissions"
                         BackgroundColor="{Binding IsPermissionsTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#3B82F6|#F1F5F9'}"
                         TextColor="{Binding IsPermissionsTabSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White|#475569'}"
-                        CornerRadius="0" Padding="16,8" FontSize="18"/>
+                        CornerRadius="0" Padding="16,8" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
             </HorizontalStackLayout>
         </Border>
 
@@ -397,21 +397,21 @@
                                     Padding="12,6">
                                 <Grid ColumnDefinitions="Auto,*">
                                     <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                                           FontSize="16" TextColor="{StaticResource Gray500}"
+                                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource Gray500}"
                                            VerticalOptions="Center"/>
                                     <Entry Grid.Column="1" Placeholder="搜索用户名/姓名/手机号"
-                                           Text="{Binding SearchText}" FontSize="16"
+                                           Text="{Binding SearchText}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                            Margin="8,0,0,0" BackgroundColor="Transparent"/>
                                 </Grid>
                             </Border>
                             <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
-                                <Label Text="状态" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Text="状态" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker ItemsSource="{Binding StatusOptions}"
                                         SelectedItem="{Binding SelectedStatus}"
                                         WidthRequest="80"/>
                             </HorizontalStackLayout>
                             <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center">
-                                <Label Text="角色" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Text="角色" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker ItemsSource="{Binding RoleFilterOptions}"
                                         SelectedItem="{Binding SelectedRoleFilter}"
                                         ItemDisplayBinding="{Binding Name}"
@@ -436,8 +436,8 @@
                             Padding="16" Margin="0,8" IsVisible="{Binding HasError}">
                         <HorizontalStackLayout Spacing="8">
                             <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                                   FontSize="18" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
-                            <Label Text="{Binding ErrorMessage}" FontSize="16"
+                                   FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource Error}" VerticalOptions="Center"/>
+                            <Label Text="{Binding ErrorMessage}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                    TextColor="{StaticResource Error}" VerticalOptions="Center"
                                    LineBreakMode="WordWrap"/>
                         </HorizontalStackLayout>
@@ -447,12 +447,12 @@
                     <VerticalStackLayout Grid.Row="3" IsVisible="{Binding HasResults, Converter={StaticResource BoolToInverseConverter}}"
                                          HorizontalOptions="Center" Padding="40" Spacing="12">
                         <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                               FontSize="50" TextColor="{StaticResource Gray400}"
+                               FontSize="{OnPlatform WinUI=50, Android=36, Default=50}" TextColor="{StaticResource Gray400}"
                                HorizontalOptions="Center"/>
-                        <Label Text="暂无用户数据" FontSize="18"
+                        <Label Text="暂无用户数据" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
                                TextColor="{StaticResource TextTertiary}"
                                HorizontalOptions="Center"/>
-                        <Label Text="点击「创建用户」按钮添加第一个用户" FontSize="16"
+                        <Label Text="点击「创建用户」按钮添加第一个用户" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                TextColor="{StaticResource Gray400}"
                                HorizontalOptions="Center"/>
                     </VerticalStackLayout>
@@ -469,19 +469,19 @@
                             <Grid Grid.Row="0" Style="{StaticResource TableHeader}" Padding="16,14"
                                   ColumnDefinitions="60, 2*, 1.5*, 2*, 2*, 1*, Auto"
                                   ColumnSpacing="8">
-                                <Label Text="序号" FontAttributes="Bold" FontSize="16"
+                                <Label Text="序号" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="用户名" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="1" Text="用户名" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center"/>
-                                <Label Grid.Column="2" Text="姓名" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="2" Text="姓名" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center"/>
-                                <Label Grid.Column="3" Text="手机号" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="3" Text="手机号" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center"/>
-                                <Label Grid.Column="4" Text="所属组织" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="4" Text="所属组织" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center"/>
-                                <Label Grid.Column="5" Text="状态" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="5" Text="状态" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" VerticalOptions="Center" HorizontalOptions="Center"/>
-                                <Label Grid.Column="6" Text="操作" FontAttributes="Bold" FontSize="16"
+                                <Label Grid.Column="6" Text="操作" FontAttributes="Bold" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                                        TextColor="{StaticResource Gray700}" HorizontalOptions="Center"/>
                             </Grid>
                             
@@ -505,7 +505,7 @@
                     <CollectionView x:Name="RoleList" ItemsSource="{Binding Roles}"
                          ItemTemplate="{StaticResource RoleRowSelector}">
                         <CollectionView.EmptyView>
-                            <Label Text="暂无角色数据" FontSize="18" 
+                            <Label Text="暂无角色数据" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" 
                                    TextColor="{StaticResource TextTertiary}"
                                    HorizontalOptions="Center" VerticalOptions="Center" Margin="0,40"/>
                         </CollectionView.EmptyView>
@@ -521,7 +521,7 @@
                     <!-- 选择角色 -->
                     <Border BackgroundColor="White" Padding="16" StrokeShape="RoundRectangle 12">
                         <HorizontalStackLayout Spacing="12">
-                            <Label Text="选择角色:" FontSize="18" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Label Text="选择角色:" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Picker WidthRequest="200"
                                     ItemsSource="{Binding Roles}"
                                     SelectedItem="{Binding SelectedRoleForPermission}"
@@ -569,9 +569,9 @@
                     <!-- 抽屉标题 -->
                     <Border Grid.Row="0" BackgroundColor="{StaticResource Primary}" Padding="20,16">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="White" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="White" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="{Binding UserEditorViewModel.IsEditMode, Converter={StaticResource BoolToTextConverter}, ConverterParameter='编辑用户|新建用户'}"
-                                   FontSize="16" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
+                                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
                             <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     BackgroundColor="Transparent" TextColor="White"
                                     Command="{Binding UserEditorViewModel.CancelCommand}"/>
@@ -582,13 +582,13 @@
                     <ScrollView Grid.Row="1" Padding="20">
                         <VerticalStackLayout Spacing="16">
                             
-                            <Label Text="用户名" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="用户名" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding UserEditorViewModel.Username}" 
                                    Placeholder="请输入用户名"
                                    IsReadOnly="{Binding UserEditorViewModel.IsEditMode}"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="密码" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                            <Label Text="密码" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                                    IsVisible="{Binding UserEditorViewModel.IsEditMode, Converter={StaticResource BoolToInverseConverter}}"/>
                             <Entry Text="{Binding UserEditorViewModel.Password}" 
                                    Placeholder="请输入密码"
@@ -596,46 +596,46 @@
                                    IsVisible="{Binding UserEditorViewModel.IsEditMode, Converter={StaticResource BoolToInverseConverter}}"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="姓名" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="姓名" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding UserEditorViewModel.DisplayName}" 
                                    Placeholder="请输入姓名"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="手机号" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="手机号" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding UserEditorViewModel.Phone}" 
                                    Placeholder="请输入手机号"
                                    Keyboard="Telephone"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="身份证号" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="身份证号" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding UserEditorViewModel.IdentityCard}" 
                                    Placeholder="请输入身份证号"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="职位" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="职位" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Picker Title="请选择职位"
                                     ItemsSource="{Binding UserEditorViewModel.PositionOptions}"
                                     SelectedItem="{Binding UserEditorViewModel.SelectedPosition}"/>
                             
-                            <Label Text="所属组织" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="所属组织" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Picker Title="请选择组织"
                                     ItemsSource="{Binding UserEditorViewModel.AvailableOrganizations}"
                                     ItemDisplayBinding="{Binding Name}"
                                     SelectedItem="{Binding UserEditorViewModel.SelectedOrganization}"/>
                             
-                            <Label Text="状态" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="状态" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Switch IsToggled="{Binding UserEditorViewModel.IsActive}" HorizontalOptions="Start"/>
                             
-<Label Text="分配角色" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+<Label Text="分配角色" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                              <CollectionView ItemsSource="{Binding UserEditorViewModel.UserRoles}" HeightRequest="120">
                                  <CollectionView.EmptyView>
-                                     <Label Text="暂未分配角色" FontSize="16" TextColor="{StaticResource TextTertiary}" Margin="0,8"/>
+                                     <Label Text="暂未分配角色" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}" Margin="0,8"/>
                                  </CollectionView.EmptyView>
                                  <CollectionView.ItemTemplate>
                                      <DataTemplate x:DataType="UserRoleItem">
                                          <Border BackgroundColor="#F1F5F9" Padding="12,8" Margin="0,4" StrokeShape="RoundRectangle 8">
                                              <Grid ColumnDefinitions="*,Auto">
-                                                 <Label Text="{Binding RoleName}" FontSize="18" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                                 <Label Text="{Binding RoleName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
 <Button Grid.Column="1" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                                           Style="{StaticResource WarningButton}" WidthRequest="32" HeightRequest="32" Padding="0"
                                                           Command="{Binding Source={RelativeSource AncestorType={x:Type UserManagementViewModel}}, Path=UserEditorViewModel.RemoveRoleCommand}"
@@ -698,9 +698,9 @@
                     <!-- 抽屉标题 -->
                     <Border Grid.Row="0" BackgroundColor="{StaticResource Primary}" Padding="20,16">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="White" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="White" VerticalOptions="Center"/>
                             <Label Grid.Column="1" Text="{Binding RoleEditorViewModel.IsEditMode, Converter={StaticResource BoolToTextConverter}, ConverterParameter='编辑角色|新建角色'}"
-                                   FontSize="16" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
+                                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold" TextColor="White" Margin="12,0,0,0" VerticalOptions="Center"/>
                             <Button Grid.Column="2" Text="{OnPlatform WinUI='&#xE711;', Android='&#x2715;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
                                     BackgroundColor="Transparent" TextColor="White"
                                     Command="{Binding RoleEditorViewModel.CancelCommand}"/>
@@ -711,31 +711,31 @@
                     <ScrollView Grid.Row="1" Padding="20">
                         <VerticalStackLayout Spacing="16">
                             
-                            <Label Text="角色名称" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="角色名称" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding RoleEditorViewModel.RoleName}" 
                                    Placeholder="请输入角色名称"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="角色代码" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                            <Label Text="角色代码" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                                    IsVisible="{Binding RoleEditorViewModel.IsEditMode, Converter={StaticResource BoolToInverseConverter}}"/>
                             <Entry Text="{Binding RoleEditorViewModel.RoleCode}" 
                                    Placeholder="请输入角色代码（英文大写）"
                                    IsVisible="{Binding RoleEditorViewModel.IsEditMode, Converter={StaticResource BoolToInverseConverter}}"
                                    Style="{StaticResource EntryStyle}"/>
                             
-                            <Label Text="角色描述" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="角色描述" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Editor Text="{Binding RoleEditorViewModel.RoleDescription}" 
                                     Placeholder="请输入角色描述"
                                     HeightRequest="100"
                                     Style="{StaticResource EditorStyle}"/>
                             
-                            <Label Text="角色等级" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="角色等级" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Entry Text="{Binding RoleEditorViewModel.RoleLevel}"
                                    Placeholder="请输入角色等级"
                                    Keyboard="Numeric"
                                    Style="{StaticResource EntryStyle}"/>
 
-                            <Label Text="数据范围" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="数据范围" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Picker ItemsSource="{Binding RoleEditorViewModel.DataScopeOptions}"
                                     SelectedItem="{Binding RoleEditorViewModel.RoleDataScope}"
                                     ItemDisplayBinding="{Binding ., Converter={StaticResource DataScopeToDisplayConverter}}"/>

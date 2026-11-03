@@ -27,10 +27,10 @@
                     <VerticalStackLayout Spacing="12">
                         <Label Text="成员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="34" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=34, Android=26, Default=34}" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                <Label Text="{Binding MemberName}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="{Binding MemberIdCard}" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberName}" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding MemberIdCard}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextSecondary}"/>
                             </VerticalStackLayout>
                             <Border Grid.Column="2" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
                                 <Label Text="{Binding MemberRelationship}" Style="{StaticResource ChipNeutralText}"/>
@@ -39,15 +39,15 @@
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
                             <VerticalStackLayout Spacing="2">
                                 <Label Text="年龄" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberAge, StringFormat='{0}岁'}" FontSize="16" FontAttributes="Bold"/>
+                                <Label Text="{Binding MemberAge, StringFormat='{0}岁'}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="2">
                                 <Label Text="性别" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberGender}" FontSize="16" FontAttributes="Bold"/>
+                                <Label Text="{Binding MemberGender}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="2" Spacing="2">
                                 <Label Text="健康状况" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberHealthStatus}" FontSize="16" FontAttributes="Bold"/>
+                                <Label Text="{Binding MemberHealthStatus}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                         </Grid>
                     </VerticalStackLayout>
@@ -65,8 +65,8 @@
                                             BackgroundColor="{StaticResource Gray50}"
                                             Padding="12" Margin="0,4">
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                            <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
-                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -101,7 +101,7 @@
                 <!-- 提示 -->
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}" Stroke="Transparent">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=22, Android=18, Default=22}" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                         <Label Grid.Column="1" Text="{Binding HintText}" FontSize="14" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                     </Grid>
                 </Border>

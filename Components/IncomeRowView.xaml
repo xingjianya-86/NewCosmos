@@ -29,7 +29,7 @@
                     ItemsSource="{Binding MemberItems, Source={x:Reference Root}}"
                     SelectedItem="{Binding SelectedMember, Source={x:Reference Root}, Mode=TwoWay}"
                     ItemDisplayBinding="{Binding Name}"
-                    FontSize="17" HeightRequest="38"
+                    FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"
                     IsVisible="{Binding ShowMember, Source={x:Reference Root}}"
                     IsEnabled="{Binding IsEditable, Source={x:Reference Root}}"/>
 
@@ -37,7 +37,7 @@
             <Picker x:Name="SubTypePicker" Grid.Row="1"
                     ItemsSource="{Binding SubTypeItems, Source={x:Reference Root}}"
                     SelectedItem="{Binding SubType, Source={x:Reference Root}, Mode=TwoWay}"
-                    FontSize="17" HeightRequest="36"
+                    FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="36"
                     VerticalOptions="Center"
                     IsVisible="{Binding ShowSubType, Source={x:Reference Root}}"
                     IsEnabled="{Binding IsEditable, Source={x:Reference Root}}"/>
@@ -45,7 +45,7 @@
             <!-- 行2：描述 Entry（ShowDescription） -->
             <Entry x:Name="DescriptionEntry" Grid.Row="2"
                    Text="{Binding Description, Source={x:Reference Root}, Mode=TwoWay}"
-                   FontSize="17"
+                   FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"
                    Placeholder="{Binding DescriptionPlaceholder, Source={x:Reference Root}}"
                    VerticalOptions="Center"
                    IsVisible="{Binding ShowDescription, Source={x:Reference Root}}"
@@ -53,12 +53,12 @@
 
             <!-- 行3：月收入（恒显） -->
             <Grid Grid.Row="3" Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                <Label Text="月收入" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                <Label Text="月收入" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                 <Entry Grid.Column="1" Text="{Binding Amount, Source={x:Reference Root}, Mode=TwoWay}"
-                       FontSize="17" Keyboard="Numeric"
+                       FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" Keyboard="Numeric"
                        VerticalOptions="Center"
                        IsEnabled="{Binding IsEditable, Source={x:Reference Root}}"/>
-                <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="16"
+                <Label Grid.Column="2" Text="{x:Static constants:UIConstants.YUAN_PER_MONTH}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
                        VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
             </Grid>
 
@@ -66,7 +66,7 @@
             <Button Grid.RowSpan="4" Grid.Column="1"
                     Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}"
                     FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                    FontSize="18" BackgroundColor="{StaticResource ErrorLight}"
+                    FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" BackgroundColor="{StaticResource ErrorLight}"
                     TextColor="{StaticResource Error}" WidthRequest="28" HeightRequest="28"
                     Padding="0" CornerRadius="14" VerticalOptions="Center"
                     Command="{Binding RemoveCommand, Source={x:Reference Root}}"

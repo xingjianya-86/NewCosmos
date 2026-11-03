@@ -61,7 +61,7 @@
                             <DataTemplate x:DataType="ent:ArchivePhoto">
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Padding="6,5">
                                     <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding PhotoCategoryName}" FontSize="16" FontAttributes="Bold"
+                                        <Label Text="{Binding PhotoCategoryName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
                                                TextColor="{StaticResource TextPrimary}"/>
                                         <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                         <Label Text="{Binding PhotoName}" FontSize="14" TextColor="{StaticResource TextTertiary}"
@@ -95,10 +95,10 @@
         <!-- 分页 -->
         <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="16,8,16,12">
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
-                <Button Text="上一页" Style="{StaticResource ButtonOutline}" FontSize="15" HeightRequest="36"
+                <Button Text="上一页" Style="{StaticResource ButtonOutline}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="36"
                         Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                <Label Text="{Binding PageStatusText}" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Button Text="下一页" Style="{StaticResource ButtonOutline}" FontSize="15" HeightRequest="36"
+                <Label Text="{Binding PageStatusText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" Style="{StaticResource ButtonOutline}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="36"
                         Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
             </HorizontalStackLayout>
         </Border>
@@ -125,7 +125,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="16" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

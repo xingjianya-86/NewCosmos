@@ -20,8 +20,8 @@
                 <Border Style="{StaticResource CardBorderElevated}">
                     <VerticalStackLayout Spacing="12">
                         <Label Text="判定结果" Style="{StaticResource SectionTitleLabel}" Margin="0" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding ClassificationName}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
-                        <Label FontSize="20" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center">
+                        <Label Text="{Binding ClassificationName}" FontSize="{OnPlatform WinUI=30, Android=24, Default=30}" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                        <Label FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center">
                             <Label.FormattedText>
                                 <FormattedString><Span Text="保障金额: "/><Span Text="{Binding GuaranteeAmount,StringFormat='{0:F2}'}" FontAttributes="Bold"/><Span Text=" 元/月"/></FormattedString>
                             </Label.FormattedText>
@@ -31,7 +31,7 @@
                 <!-- 一事一议按钮 -->
                 <Border Style="{StaticResource CardBorder}" IsVisible="{Binding ShowSpecialApproval}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Text="⚠ 当前判定为：不符合条件" FontSize="20" TextColor="{StaticResource Error}"/>
+                        <Label Text="⚠ 当前判定为：不符合条件" FontSize="{OnPlatform WinUI=20, Android=18, Default=20}" TextColor="{StaticResource Error}"/>
                         <Button Text="一事一议" Command="{Binding SpecialApprovalCommand}" Style="{StaticResource WarningButton}"/>
                     </VerticalStackLayout>
                 </Border>

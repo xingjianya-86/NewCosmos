@@ -31,7 +31,7 @@
                                 <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
                                     <Label Text="单位模板列表" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                                     <Label Text="{Binding UnitTemplates.Count, StringFormat='({0})'}"
-                                           FontSize="16" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                           FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                 </HorizontalStackLayout>
                                 <Button Grid.Column="1" Text="新增单位模板" Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding StartCreateCommand}"/>
@@ -51,7 +51,7 @@
                                                 Padding="14,10" Margin="0,3">
                                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
                                                 <VerticalStackLayout Spacing="2">
-                                                    <Label Text="{Binding UnitName}" FontSize="17" FontAttributes="Bold"
+                                                    <Label Text="{Binding UnitName}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" FontAttributes="Bold"
                                                            TextColor="{StaticResource TextPrimary}"/>
                                                     <Label Text="{Binding TemplateName, StringFormat='模板: {0}'}" FontSize="14"
                                                            TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
@@ -60,9 +60,9 @@
                                                     <Label Text="{Binding FileType}" Style="{StaticResource ChipInfoText}"/>
                                                 </Border>
                                                 <VerticalStackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
-                                                    <Label Text="{Binding CreatedAtDisplay}" FontSize="13"
+                                                    <Label Text="{Binding CreatedAtDisplay}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
                                                            TextColor="{StaticResource TextTertiary}"/>
-                                                    <Label Text="{Binding UpdatedAtDisplay}" FontSize="13"
+                                                    <Label Text="{Binding UpdatedAtDisplay}" FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
                                                            TextColor="{StaticResource TextTertiary}"/>
                                                 </VerticalStackLayout>
                                             </Grid>
@@ -71,7 +71,7 @@
                                 </CollectionView.ItemTemplate>
                                 <CollectionView.EmptyView>
                                     <VerticalStackLayout Spacing="8" Padding="0,40" HorizontalOptions="Center">
-                                        <Label Text="{OnPlatform WinUI='&#xE7C3;', Android='&#x1F4ED;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="42"
+                                        <Label Text="{OnPlatform WinUI='&#xE7C3;', Android='&#x1F4ED;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="{OnPlatform WinUI=42, Android=30, Default=42}"
                                                TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                         <Label Text="尚未配置单位模板" Style="{StaticResource EmptyStateLabel}" Margin="0"/>
                                         <Label Text="点击右上角「新增单位模板」，为接收单位上传专属证明模板文件" FontSize="14"
@@ -100,20 +100,20 @@
                         <BoxView Style="{StaticResource Divider}"/>
 
                         <VerticalStackLayout Spacing="6">
-                            <Label Text="接收单位名称" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Entry Text="{Binding UnitName}" Placeholder="如：XX市民政局 / XX街道办" FontSize="16"/>
+                            <Label Text="接收单位名称" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Entry Text="{Binding UnitName}" Placeholder="如：XX市民政局 / XX街道办" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
                         </VerticalStackLayout>
 
                         <VerticalStackLayout Spacing="6">
                             <Label Text="证明模板文件（.docx / .xlsx，含 {字段} 占位符）"
-                                   FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
                                         StrokeShape="RoundRectangle 6" Padding="12,8">
-                                    <Label Text="{Binding FileName}" FontSize="15" VerticalOptions="Center"
+                                    <Label Text="{Binding FileName}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" VerticalOptions="Center"
                                            TextColor="{StaticResource TextSecondary}"
                                            IsVisible="{Binding FileName, Converter={StaticResource StringNotEmptyConverter}}"/>
-                                    <Label Text="未选择文件（编辑时留空表示保留原模板）" FontSize="15"
+                                    <Label Text="未选择文件（编辑时留空表示保留原模板）" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
                                            TextColor="{StaticResource TextTertiary}"
                                            IsVisible="{Binding FileName, Converter={StaticResource NullToInverseBoolConverter}}"/>
                                 </Border>
@@ -127,7 +127,7 @@
 
                         <VerticalStackLayout Spacing="6">
                             <Label Text="字段映射配置 JSON（可选，留空则按 {占位符} 直接替换）"
-                                   FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             <Editor Text="{Binding ConfigJson}" Placeholder="字段映射 JSON 配置，可留空（例: { &quot;fields&quot;: [...] }）" HeightRequest="80"
                                     FontSize="14" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"/>
                         </VerticalStackLayout>
