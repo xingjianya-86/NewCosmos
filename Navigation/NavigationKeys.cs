@@ -12,6 +12,6 @@ public static class NavigationKeys
     /// <summary>登录页（登出/会话失效后设置导航根）</summary>
     public const string Login = "login";
 
-    /// <summary>档案输出页（文书直出）</summary>
-    public const string ArchiveOutput = "archive-output";
+    // 已删除（2026-11 死通道）：ArchiveOutput 导航键——INavigationService.PushAsync 全仓零调用方，
+    // 档案输出页实际导航走 ViewModelBase.NavigateToPageAsync<ArchiveOutputPage>（泛型通道）。
 }

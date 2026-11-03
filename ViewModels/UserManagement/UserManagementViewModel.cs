@@ -398,7 +398,9 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
 
         var confirm = await _dialogService.DisplayAlertAsync(
             "确认删除",
-            $"确定要删除用户「{user.Username}」吗？此操作不可撤销。",
+            $"确定要删除用户「{user.Username}」吗？\n\n" +
+            "删除后该用户将立即停用并被强制下线（其全部会话被踢出）。\n" +
+            "用户资料保留为停用状态，可由管理员重新启用恢复。",
             "确定",
             "取消");
 

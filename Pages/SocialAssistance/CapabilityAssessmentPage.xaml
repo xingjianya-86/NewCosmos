@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.CapabilityAssessmentPage"
@@ -14,32 +14,13 @@
 
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8EF;', Android='&#x1F4CA;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="自理能力（评估指标）" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="根据身体状况与照护情况确定等级" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+              Glyph="{OnPlatform WinUI='&#xE8EF;', Android='&#x1F4CA;'}"
+                                  Title="自理能力（评估指标）"
+                                  Subtitle="根据身体状况与照护情况确定等级"
+                                  BackCommand="{Binding GoBackCommand}"
+                                  BackText="返回工作台"/>
 
         <!-- 内容区域 -->
         <ScrollView Grid.Row="1" Padding="16">
@@ -48,9 +29,9 @@
                 <!-- 评估日期和评估人 -->
                 <Border Style="{StaticResource CardBorder}">
                     <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="12">
-                        <Label Text="评估日期" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="评估日期" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                         <DatePicker Grid.Column="1" Date="{Binding AssessmentDate}" Format="yyyy-MM-dd" VerticalOptions="Center"/>
-                        <Label Grid.Column="2" Text="评估人" FontSize="14" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Grid.Column="2" Text="评估人" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                         <Entry Grid.Column="3" Text="{Binding AssessorName}" Placeholder="姓名" VerticalOptions="Center"/>
                     </Grid>
                 </Border>
@@ -59,28 +40,28 @@
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="16">
                         <Label Text="考核指标" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                        <Label Text="请勾选被评估人能够自主完成的项目" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="请勾选被评估人能够自主完成的项目" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
 
                         <!-- 第一行：进食、穿衣、上下床 -->
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
                             <Border StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="进食" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主进食" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="进食" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主进食" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding Eating}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="穿衣" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主穿脱衣服" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="穿衣" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主穿脱衣服" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding Dressing}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="2" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="上下床" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主上下床" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="上下床" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主上下床" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding GettingInOutOfBed}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
@@ -90,22 +71,22 @@
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
                             <Border StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="如厕" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主如厕" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="如厕" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主如厕" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding UsingToilet}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="室内行走" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主室内行走" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="室内行走" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主室内行走" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding IndoorWalking}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="2" StrokeShape="RoundRectangle 8" Padding="12" BackgroundColor="{StaticResource Gray50}" VerticalOptions="Fill">
                                 <VerticalStackLayout Spacing="8">
-                                    <Label Text="洗澡" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
-                                    <Label Text="能否自主洗澡" FontSize="11" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                                    <Label Text="洗澡" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" LineBreakMode="NoWrap"/>
+                                    <Label Text="能否自主洗澡" FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                                     <Switch IsToggled="{Binding Bathing}" HorizontalOptions="Start"/>
                                 </VerticalStackLayout>
                             </Border>
@@ -123,21 +104,21 @@
 
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8">
                             <VerticalStackLayout Spacing="4">
-                                <Label Text="能完成项目数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding CompletedItems, StringFormat='{0}/6 项'}" FontSize="24" FontAttributes="Bold"
+                                <Label Text="能完成项目数" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding CompletedItems, StringFormat='{0}/6 项'}" FontSize="26" FontAttributes="Bold"
                                        TextColor="{Binding LevelColor, Converter={StaticResource StringToColorConverter}}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                <Label Text="自理能力等级" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="自理能力等级" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 <Border StrokeShape="RoundRectangle 16" Padding="12,4"
                                         BackgroundColor="{Binding LevelColor, Converter={StaticResource StringToColorConverter}}"
                                         HorizontalOptions="Start">
-                                    <Label Text="{Binding SelfCareLevel}" FontSize="14" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="{Binding SelfCareLevel}" FontSize="16" FontAttributes="Bold" TextColor="White"/>
                                 </Border>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
-                                <Label Text="照料等级" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding CareLevelDisplay}" FontSize="16" FontAttributes="Bold"
+                                <Label Text="照料等级" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding CareLevelDisplay}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                         </Grid>

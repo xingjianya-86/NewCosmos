@@ -10,87 +10,62 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
+        <!-- 统一页头（纸墨档案风报头：朱砂竖条 + 英文 kicker + 宋体标题 + 副标题 + 内置返回 + 底部双线）
+             统一替代旧手写渐变英雄头，全库页头收敛到 PageHeaderView 单一组件 -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="近亲属备案"
+                                   Kicker="Near-Relative Filing"
+                                   Subtitle="工作人员近亲属享受社会救助的备案名册，防优亲厚友"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.HeaderActions>
+                <Button Text="＋ 新增备案"
+                        Command="{Binding NewEntryCommand}"
+                        Style="{StaticResource ButtonOutline}"
+                        FontSize="16"
+                        Padding="18,8"
+                        VerticalOptions="Center"/>
+            </components:PageHeaderView.HeaderActions>
+        </components:PageHeaderView>
 
-                <!-- 返回行 + 新增备案 -->
-                <Grid ColumnDefinitions="*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <Button Grid.Column="1"
-                            Text="新增备案"
-                            Command="{Binding NewEntryCommand}"
-                            BackgroundColor="#33FFFFFF"
-                            TextColor="White"
-                            FontSize="14"
-                            Padding="16,10"
-                            CornerRadius="20"
-                            VerticalOptions="Center"/>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE787;', Android='&#x1F4CB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="近亲属备案" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="工作人员近亲属享受社会救助的备案名册，防优亲厚友" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
-
-        <!-- 顶部搜索栏 + 计数 -->
+        <!-- 顶部检索工具条（code.html .toolbar：DM Mono 小标 + 发丝下划线输入 + 方角墨线按钮） -->
         <Border Grid.Row="1"
-                BackgroundColor="{StaticResource White}"
+                BackgroundColor="{StaticResource Paper}"
                 StrokeThickness="0"
-                Padding="24,16">
-            <Border.Shadow>
-                <Shadow Brush="{StaticResource Black}" Offset="0,2" Radius="4" Opacity="0.06"/>
-            </Border.Shadow>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <Border BackgroundColor="{StaticResource Gray100}"
-                        StrokeThickness="0"
-                        StrokeShape="RoundRectangle 24"
-                        Padding="16,8"
-                        HorizontalOptions="Fill">
-                    <Grid ColumnDefinitions="Auto, *, Auto">
+                Padding="24,14">
+            <Grid ColumnDefinitions="*" ColumnSpacing="16">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="检 索 · SEARCH" FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                           FontSize="12" CharacterSpacing="2.4" TextColor="{StaticResource Muted}"/>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                         <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                               FontSize="14"
-                               TextColor="{StaticResource Gray500}"
-                               VerticalOptions="Center"
-                               Margin="0,0,8,0"/>
-                        <Entry Grid.Column="1"
-                               Placeholder="搜索工作人员姓名、工作单位"
-                               Text="{Binding SearchText}"
                                FontSize="16"
-                               BackgroundColor="Transparent"
-                               ReturnCommand="{Binding SearchCommand}"/>
+                               TextColor="{StaticResource Gray500}"
+                               VerticalOptions="Center"/>
+                        <Border Grid.Column="1" BackgroundColor="Transparent" StrokeThickness="0" Padding="0,4">
+                            <Grid>
+                                <Entry Text="{Binding SearchText}"
+                                       Placeholder="搜索工作人员姓名、工作单位"
+                                       FontSize="18"
+                                       BackgroundColor="Transparent"
+                                       Margin="0,-6"
+                                       ReturnCommand="{Binding SearchCommand}"/>
+                                <!-- 发丝底线（code.html .field input 下划线） -->
+                                <BoxView HeightRequest="1" Color="{StaticResource LineStrong}" VerticalOptions="End" InputTransparent="True"/>
+                            </Grid>
+                        </Border>
                         <Button Grid.Column="2"
-                                Text="搜索"
+                                Text="检 索"
                                 Style="{StaticResource ButtonSmall}"
-                                BackgroundColor="{StaticResource Primary}"
+                                BackgroundColor="{StaticResource Ink}"
+                                TextColor="{StaticResource Paper}"
+                                BorderColor="{StaticResource Ink}"
+                                BorderWidth="1"
                                 Command="{Binding SearchCommand}"
-                                VerticalOptions="Center"
-                                Margin="8,0,0,0"/>
+                                VerticalOptions="Center"/>
                     </Grid>
-                </Border>
-
-                <Label Grid.Column="1"
-                       Text="{Binding StatusText}"
-                       FontSize="13"
-                       TextColor="{StaticResource TextSecondary}"
-                       VerticalOptions="Center"/>
+                </VerticalStackLayout>
             </Grid>
         </Border>
 
@@ -101,7 +76,7 @@
                 StrokeThickness="0"
                 Padding="24,10">
             <Label Text="{Binding ErrorMessage}"
-                   FontSize="13"
+                   FontSize="15"
                    TextColor="{StaticResource Error}"/>
         </Border>
 
@@ -112,24 +87,54 @@
                 Margin="24,16"
                 MinimumWidthRequest="720">
 
-            <Grid RowDefinitions="Auto, *">
+            <Grid RowDefinitions="Auto, Auto, *">
 
-                <!-- 表头 -->
-                <Grid Grid.Row="0"
+                <!-- 表格标题行（code.html .table-head：宋体标题 + 计数 + 底部 2px 墨线） -->
+                <Grid Grid.Row="0" Padding="16,14,16,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                        <Label Text="备案名册" FontSize="21" FontAttributes="Bold"
+                               FontFamily="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding StatusText}"
+                               FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                               FontSize="14" TextColor="{StaticResource Muted}"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                    <Label Grid.Column="1" Text="名册明细 · LEDGER"
+                           FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                           FontSize="12" CharacterSpacing="2.4" TextColor="{StaticResource Muted}"
+                           VerticalOptions="Center"/>
+                </Grid>
+                <BoxView Grid.Row="0" VerticalOptions="End" HeightRequest="2" Color="{StaticResource Ink}"/>
+
+                <!-- 表头（墨黑反白）
+                     第 4 列为 Auto：表头若只放"操作"二字，该列宽会远小于数据行（放三个按钮），
+                     而表头与每行数据是各自独立的 Grid、星号列按剩余宽度各自计算 → 表头与数据列整体错位。
+                     故在表头内放一组透明镜像按钮（同文本同样式同边框，仅 Opacity=0）撑出与数据行完全一致的列宽。 -->
+                <Grid Grid.Row="1"
                       Style="{StaticResource TableHeader}"
                       Padding="16"
                       ColumnDefinitions="1.2*, 1.6*, 0.8*, Auto">
                     <Label Text="工作人员姓名" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="1" Text="工作单位" Style="{StaticResource TableHeaderLabel}"/>
                     <Label Grid.Column="2" Text="关联对象" Style="{StaticResource TableHeaderLabel}"/>
-                    <Label Grid.Column="3" Text="操作" Style="{StaticResource TableHeaderLabel}" HorizontalOptions="Center"/>
+                    <Grid Grid.Column="3">
+                        <!-- 透明镜像：与数据行操作按钮逐属性同构，仅用于定列宽 -->
+                        <HorizontalStackLayout Spacing="8" Opacity="0" InputTransparent="True">
+                            <Button Text="输出档案" Style="{StaticResource ButtonSmall}"
+                                    BackgroundColor="Transparent" BorderColor="{StaticResource Pine}" BorderWidth="1"/>
+                            <Button Text="编辑" Style="{StaticResource ButtonSmall}"
+                                    BackgroundColor="Transparent" BorderColor="{StaticResource Ink}" BorderWidth="1"/>
+                            <Button Text="删除" Style="{StaticResource ButtonSmall}"
+                                    BackgroundColor="Transparent" BorderColor="{StaticResource Error}" BorderWidth="1"/>
+                        </HorizontalStackLayout>
+                        <Label Text="操作" Style="{StaticResource TableHeaderLabel}"
+                               HorizontalOptions="Start" VerticalOptions="Center"/>
+                    </Grid>
                 </Grid>
 
-                <BoxView Grid.Row="0" Grid.ColumnSpan="4" HeightRequest="1"
-                         BackgroundColor="{StaticResource Gray300}" VerticalOptions="End"/>
-
                 <!-- 数据列表 -->
-                <CollectionView Grid.Row="1"
+                <CollectionView Grid.Row="2"
                                ItemsSource="{Binding Items}"
                                SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                                SelectionMode="Single">
@@ -142,26 +147,38 @@
                                   Style="{StaticResource TableRowInteractive}"
                                   ColumnDefinitions="1.2*, 1.6*, 0.8*, Auto">
 
-                                <Label Text="{Binding StaffName}" FontSize="15" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding WorkUnit}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="{Binding StaffName}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding WorkUnit}" FontSize="17" VerticalOptions="Center"/>
                                 <Label Grid.Column="2"
                                        Text="{Binding LinkCount, StringFormat='{0} 名'}"
-                                       FontSize="15" VerticalOptions="Center"/>
+                                       FontSize="17" VerticalOptions="Center"/>
 
+                                <!-- 操作列（code.html .link-btn/.btn.ghost：透明底 + 语义色描边，方角）
+                                     三色分明：松绿=归档、墨黑=编辑、深朱砂(Error)=删除，
+                                     避免 Primary 与 Error 同为朱砂系导致"编辑/删除"难以区分 -->
                                 <HorizontalStackLayout Grid.Column="3" Spacing="8" VerticalOptions="Center">
                                     <Button Text="输出档案"
                                             Style="{StaticResource ButtonSmall}"
-                                            BackgroundColor="{StaticResource Secondary}"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Pine}"
+                                            BorderColor="{StaticResource Pine}"
+                                            BorderWidth="1"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type NearRelativeListViewModel}}, Path=OutputArchiveCommand}"
                                             CommandParameter="{Binding .}"/>
                                     <Button Text="编辑"
                                             Style="{StaticResource ButtonSmall}"
-                                            BackgroundColor="{StaticResource Primary}"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Ink}"
+                                            BorderColor="{StaticResource Ink}"
+                                            BorderWidth="1"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type NearRelativeListViewModel}}, Path=EditCommand}"
                                             CommandParameter="{Binding .}"/>
                                     <Button Text="删除"
                                             Style="{StaticResource ButtonSmall}"
-                                            BackgroundColor="{StaticResource Error}"
+                                            BackgroundColor="Transparent"
+                                            TextColor="{StaticResource Error}"
+                                            BorderColor="{StaticResource Error}"
+                                            BorderWidth="1"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type NearRelativeListViewModel}}, Path=DeleteCommand}"
                                             CommandParameter="{Binding .}"/>
                                 </HorizontalStackLayout>

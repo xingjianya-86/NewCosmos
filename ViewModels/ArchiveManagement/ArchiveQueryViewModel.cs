@@ -46,7 +46,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
     protected override ILoggerService Logger => _logger;
 
     /// <summary>业务类型（打印留痕与权限 PRINT_LOWINCOMEPROOF 共用）</summary>
-    private const string ProofBusinessType = "LowIncomeProof";
+    private const string ProofBusinessType = PrintBusinessTypes.LowIncomeProof;
 
     /// <summary>当前库档案实体（选中当前库档案后加载）</summary>
     private ApplicationEntity? _currentApplication;
@@ -356,8 +356,15 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             SearchResults.Clear();
             HasSearchResults = false;
 
+            // 双源并行（2026-11：原两条串行 await——两查询互不依赖，串行 = 用户多等一个 RTT；
+            // 结果仍按"当前库在前、导入库在后"顺序落列表，语义不变）
+            var currentTask = _applicationService.GetPagedAsync(1, 20, null, keyword, ct);
+            var importedTask = _importedArchiveService.SearchAsync(keyword, ct);
+            await Task.WhenAll(currentTask, importedTask);
+            var current = currentTask.Result;
+            var imported = importedTask.Result;
+
             // ① 当前库
-            var current = await _applicationService.GetPagedAsync(1, 20, null, keyword, ct);
             if (current.IsSuccess && current.Value != null)
             {
                 foreach (var app in current.Value.Items)
@@ -371,7 +378,6 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             }
 
             // ② 6 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困供养、刚性支出困难家庭、其他困难人员）
-            var imported = await _importedArchiveService.SearchAsync(keyword, ct);
             if (imported.IsSuccess && imported.Value != null)
             {
                 foreach (var item in imported.Value)
@@ -509,8 +515,9 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         // 操作员单位名称/电话（打印证明落款用）
         var (unitName, unitPhone) = await GetProofUnitInfoAsync();
 
-        // 完整家庭住址（省+市+区县+镇+村+门牌）
-        var fullAddress = BuildFullAddress(app.Province, app.City, app.District, app.Town, app.Community, app.Address);
+        // 家庭住址：统一走文本级地址入口（县+镇+村+门牌，已含则跳过）。
+        // 原 BuildFullAddress 省+市+县+镇+村+地址六级裸拼，address 已是全地址时重复（口径与档案制作页不一致）
+        var fullAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
 
         _proofFields = new Dictionary<string, string>
         {
@@ -599,8 +606,8 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         var enjoyDateText = ParseFirstReceiveMonthDate(detail.FirstReceiveMonth);
         var enjoyDateIso = ParseFirstReceiveMonthDateIso(detail.FirstReceiveMonth);
 
-        // 完整家庭住址（省+市+区县+镇+村+门牌）
-        var fullAddress = BuildFullAddress(detail.Province, detail.City, detail.District, detail.Town, detail.Community, detail.Address);
+        // 完整家庭住址：与当前库同口径（统一文本级入口）
+        var fullAddress = AddressResolver.BuildAddressFromText(detail.District, detail.Town, detail.Community, detail.Address);
 
         _proofFields = new Dictionary<string, string>
         {
@@ -1129,23 +1136,6 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             return "-";
         var dictCache = _serviceProvider.GetRequiredService<IDictCacheService>();
         return dictCache.GetValue(DictionaryTypeCodes.FamilyRelationships, relationship);
-    }
-
-    /// <summary>完整家庭住址（省+市+区县+镇+村+门牌，空段自动跳过）</summary>
-    private static string BuildFullAddress(string? province, string? city, string? district, string? town, string? community, string? address)
-    {
-        var parts = new List<string>();
-        AddIfNotEmpty(parts, province, city, district, town, community, address);
-        return string.Concat(parts);
-    }
-
-    private static void AddIfNotEmpty(List<string> parts, params string?[] values)
-    {
-        foreach (var v in values)
-        {
-            if (!string.IsNullOrWhiteSpace(v))
-                parts.Add(v.Trim());
-        }
     }
 
     /// <summary>

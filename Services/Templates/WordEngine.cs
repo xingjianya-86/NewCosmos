@@ -96,6 +96,13 @@ public class WordEngine : ITemplateEngine
     /// </summary>
     private static void SafeRelease(params object?[] comObjects)
     {
+        // 动态调用陷阱（2026-10-30 修复 c06f7ed 引入的全量替换 NRE）：
+        // SafeRelease 的参数是 params 数组，但调用点常传单个 dynamic 值（如 GetStoryRange 里的 frame/stories）。
+        // 当该 dynamic 值为 null 时，运行时绑定器会把 null 整个当作数组传入（null 可隐式转换为 object?[]），
+        // foreach 遍历 null 数组即抛 NRE——且发生在 catch/finally 中会直接吞掉正常流程。
+        // 此处判空后，所有 dynamic 单参调用点均安全；静态调用点本就不会传 null 数组。
+        if (comObjects == null) return;
+
         foreach (var obj in comObjects)
         {
             if (obj == null) continue;
@@ -184,7 +191,8 @@ public class WordEngine : ITemplateEngine
         }
         catch (Exception ex)
         {
-            _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex.Message}");
+            // 全栈入日志：定位 10-16 起全量替换 NRE 的精确抛点（2026-10-30 排查）
+            _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex}");
         }
     }
 
@@ -266,7 +274,8 @@ public class WordEngine : ITemplateEngine
             }
             catch (Exception ex)
             {
-                _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex.Message}");
+                // 全栈入日志：10-16 起全量替换 NRE 只有 Message 无法定位行号（2026-10-30 排查）
+                _logger.Warn($"WordEngine: 替换 {placeholder} 失败: {ex}");
                 break;
             }
             finally

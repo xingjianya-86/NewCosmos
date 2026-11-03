@@ -15,6 +15,7 @@ public partial class App : MauiWinUIApplication
             }
             catch
             {
+                // 崩溃记录器自身失败时静默：UnhandledException 处理器内不能再抛（日志系统可能就是坏的）
             }
         };
     }

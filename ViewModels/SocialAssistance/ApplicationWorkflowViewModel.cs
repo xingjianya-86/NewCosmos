@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -58,7 +58,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         OnPropertyChanged(nameof(IsTab4Selected));
 
         PageIndex = 1;
-        SearchText = string.Empty;
+        // 2026-11：保留搜索词跨 Tab（原实现清空 SearchText——换 Tab 后必须重输关键字，
+        // 而"按身份证搜同一个人在不同 Tab 的状态"正是高频操作）。页码重置，关键字沿用。
 
         var version = ++_loadVersion;
         _tabLoadCts?.Cancel();
@@ -137,8 +138,10 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
             await LoadAllCountsAsync();
             await LoadDataAsync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // 失败必须留痕（§10）：原实现空 catch 只报通用文案，线上无法排查
+            _logger.Error($"工作流页加载失败: {ex.Message}");
             ErrorMessage = "页面加载失败，请重试";
         }
     }
@@ -190,7 +193,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 case 0:
                     // 已提交资产核查 - 状态 0（只显示户主）
                     var result0 = await _verificationService.SearchByDateRangePagedAsync(
-                        new DateTime(2000, 1, 1), new DateTime(2100, 12, 31),
+                        UIConstants.FullRangeStart, UIConstants.FullRangeEnd,
                         SearchText, "0", PageIndex, PageSize, ct, onlyHead: true);
                     if (result0.IsSuccess && result0.Value != null)
                         assetPage = result0.Value;
@@ -203,7 +206,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 case 1:
                     // 有报告未建档 - 状态 1（只显示户主）
                     var result1 = await _verificationService.SearchByDateRangePagedAsync(
-                        new DateTime(2000, 1, 1), new DateTime(2100, 12, 31),
+                        UIConstants.FullRangeStart, UIConstants.FullRangeEnd,
                         SearchText, "1", PageIndex, PageSize, ct, onlyHead: true);
                     if (result1.IsSuccess && result1.Value != null)
                         assetPage = result1.Value;
@@ -302,7 +305,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     if (appPage != null) FillPagedPage(DraftItems, MapApplicationPage(appPage, "草稿", "Danger", WorkflowCardAction.EditDelete, graceMap));
                     break;
                 case 3:
-                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete, graceMap));
+                    // 已建档未提交（此 Tab 支持批量勾选归档）
+                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete, graceMap, batchSelectable: true));
                     break;
                 case 4:
                     if (appPage != null) FillPagedPage(ArchiveCompletedItems, MapApplicationPage(appPage, "已完结", "Success", WorkflowCardAction.ViewArchive));
@@ -315,38 +319,41 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     {
         try
         {
+            // 5 个计数并行（原实现 5 条串行 await；互不依赖，WhenAll 后逐个取值容错保留旧值）
+            var submittedTask = _verificationService.CountByDateRangeAsync(
+                UIConstants.FullRangeStart, UIConstants.FullRangeEnd, "0", onlyHead: true);
+            var hasReportTask = _verificationService.CountByDateRangeAsync(
+                UIConstants.FullRangeStart, UIConstants.FullRangeEnd, "1", onlyHead: true);
+            var draftTask = _applicationService.GetDraftCountAsync();
+            var archiveBuiltTask = _applicationService.GetArchiveBuiltNotSubmittedCountAsync();
+            var archiveCompletedTask = _applicationService.GetArchivedCountAsync();
+
+            await Task.WhenAll(submittedTask, hasReportTask, draftTask, archiveBuiltTask, archiveCompletedTask);
+
             // 已提交资产核查 - 状态 0（只统计户主）
-            var submittedResult = await _verificationService.SearchByDateRangePagedAsync(
-                new DateTime(2000, 1, 1), new DateTime(2100, 12, 31),
-                null, "0", 1, 1, onlyHead: true);
-            if (submittedResult.IsSuccess && submittedResult.Value != null)
-                SubmittedCount = submittedResult.Value.TotalCount;
+            if (submittedTask.Result.IsSuccess)
+                SubmittedCount = (int)submittedTask.Result.Value;
 
             // 有报告未建档 - 状态 1（只统计户主）
-            var hasReportResult = await _verificationService.SearchByDateRangePagedAsync(
-                new DateTime(2000, 1, 1), new DateTime(2100, 12, 31),
-                null, "1", 1, 1, onlyHead: true);
-            if (hasReportResult.IsSuccess && hasReportResult.Value != null)
-                HasReportCount = hasReportResult.Value.TotalCount;
+            if (hasReportTask.Result.IsSuccess)
+                HasReportCount = (int)hasReportTask.Result.Value;
 
             // 草稿
-            var draftResult = await _applicationService.GetDraftCountAsync();
-            if (draftResult.IsSuccess)
-                DraftCount = draftResult.Value;
+            if (draftTask.Result.IsSuccess)
+                DraftCount = draftTask.Result.Value;
 
             // 已建档未提交
-            var archiveBuiltResult = await _applicationService.GetArchiveBuiltNotSubmittedCountAsync();
-            if (archiveBuiltResult.IsSuccess)
-                ArchiveBuiltCount = archiveBuiltResult.Value;
+            if (archiveBuiltTask.Result.IsSuccess)
+                ArchiveBuiltCount = archiveBuiltTask.Result.Value;
 
             // 已完结档案
-            var archiveCompletedResult = await _applicationService.GetArchivedCountAsync();
-            if (archiveCompletedResult.IsSuccess)
-                ArchiveCompletedCount = archiveCompletedResult.Value;
+            if (archiveCompletedTask.Result.IsSuccess)
+                ArchiveCompletedCount = archiveCompletedTask.Result.Value;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 静默处理
+            // 计数失败保留旧值并留痕（原实现空 catch 吞异常，违反 §7；徽章显示旧值优于静默无痕）
+            _logger.Warn($"工作流计数加载失败: {ex.Message}");
         }
     }
 
@@ -395,6 +402,26 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         }
     }
 
+    /// <summary>
+    /// 已建档 Tab：直达"出文书/归档"（档案制作页 → 档案输出 → 完成归档）。
+    /// 原路径必须绕道五步表单点提交才能到档案制作页（6 次点击/3 层），此按钮 1 次直达（§14 归档管线入口同参数）。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenArchiveOutputAsync(WorkflowCardItem? item)
+    {
+        if (item?.Source is not ApplicationEntity app) return;
+
+        try
+        {
+            await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationArchiveParameter>(
+                new ApplicationArchiveParameter(app.Id));
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.DisplayAlertAsync("错误", "打开档案制作失败: " + ex.Message, "确定");
+        }
+    }
+
     [RelayCommand]
     private async Task EditDraftAsync(WorkflowCardItem? item)
     {
@@ -431,10 +458,12 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     ("ApplicationNo", draft.ApplicationNo));
 
                 DraftItems.Remove(item);
-                DraftCount = DraftItems.Count;
-                TotalCount = DraftItems.Count;
+                // 徽章=服务端总数-1（原实现 DraftItems.Count 是【当前页】条目数，多页场景删除后徽章骤减）
+                if (DraftCount > 0) DraftCount--;
+                TotalCount = Math.Max(0, TotalCount - 1);
 
-                await _dialogService.DisplayAlertAsync("成功", "草稿已删除", "确定");
+                // 轻提示替代第二个阻断弹窗（删除已有一次确认框，成功后再弹框=每条两次多余点击）
+                await ShowSnackBarAsync("草稿已删除");
             }
             else
             {
@@ -463,9 +492,10 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         string statusText,
         string statusKind,
         WorkflowCardAction action,
-        IReadOnlyDictionary<long, DateTime>? graceMap = null)
+        IReadOnlyDictionary<long, DateTime>? graceMap = null,
+        bool batchSelectable = false)
         => PagedResult<WorkflowCardItem>.FromList(
-            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action, graceMap)).ToList(),
+            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action, graceMap, batchSelectable)).ToList(),
             page.PageIndex, page.PageSize, page.TotalCount);
 
     /// <summary>渐退期注释文案：进行中"渐退期至 yyyy-MM-dd"；已过到期日标"已到期"。</summary>
@@ -507,7 +537,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
 
     private static WorkflowCardItem MapApplicationItem(
         ApplicationEntity a, string statusText, string statusKind, WorkflowCardAction action,
-        IReadOnlyDictionary<long, DateTime>? graceMap = null) => new()
+        IReadOnlyDictionary<long, DateTime>? graceMap = null,
+        bool batchSelectable = false) => new()
     {
         Source = a,
         Name = a.ApplicantName,
@@ -520,7 +551,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         MetaValue = a.ApplicationNo,
         Address = null,
         Time = a.CreatedAt,
-        Action = action
+        Action = action,
+        IsBatchSelectable = batchSelectable
     };
 
     #endregion

@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities.UserManagement;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -50,21 +51,9 @@ ORDER BY r.level, r.id";
         return result.IsSuccess && result.Value is not null ? result.Value : new List<Role>();
     }
 
-    public async Task<bool> AssignRoleToUserAsync(int userId, int roleId, CancellationToken ct = default)
-    {
-        const string sql = @"
-INSERT INTO nc_sys_user_roles (user_id, role_id) 
-VALUES ($1, $2)";
-        var result = await _dbService.ExecuteNonQueryAsync(sql, ct, userId, roleId);
-        return result.IsSuccess && result.Value > 0;
-    }
-
-    public async Task<bool> RemoveRoleFromUserAsync(int userId, int roleId, CancellationToken ct = default)
-    {
-        const string sql = "DELETE FROM nc_sys_user_roles WHERE user_id = $1 AND role_id = $2";
-        var result = await _dbService.ExecuteNonQueryAsync(sql, ct, userId, roleId);
-        return result.IsSuccess && result.Value > 0;
-    }
+    // 角色分配/移除用户入口已收敛至 UserService.AssignRoleAsync/RemoveRoleAsync（唯一入口：
+    // 带审计留痕 + 权限变更踢会话）。RoleService 原 AssignRoleToUserAsync/RemoveRoleFromUserAsync
+    // 不踢会话且零调用方，2026-11 删除（副作用不一致的双入口已治理）。
 
     public async Task<bool> CheckUserHasRoleAsync(int userId, string roleCode, CancellationToken ct = default)
     {
@@ -96,11 +85,15 @@ WHERE ur.user_id = $1 AND r.code = $2";
 INSERT INTO nc_sys_roles (name, code, description, level, data_scope)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING id";
-        var result = await _dbService.ExecuteScalarAsync(sql, ct, request.Name, request.Code, request.Description, request.Level, request.DataScope);
+        // 泛型版取 RETURNING id（AGENTS §8：旧版无泛型 API 无行时返回 Success(0)，勿用于 RETURNING id）
+        var result = await _dbService.ExecuteScalarAsync<int?>(sql, ct, request.Name, request.Code, request.Description, request.Level, request.DataScope);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
 
-        var roleId = Convert.ToInt32(result.Value);
+        if (result.Value is null or <= 0)
+            return Result.Failure<int>(ErrorCodes.OPERATION_FAILED, "创建角色失败：未返回新角色ID");
+
+        var roleId = result.Value.Value;
         LogInfo("执行操作");
         Logger.LogSecurity("创建角色", ("RoleId", roleId), ("Name", request.Name), ("CreatedBy", request.CreatedBy));
 

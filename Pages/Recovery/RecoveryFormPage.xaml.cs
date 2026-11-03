@@ -1,10 +1,10 @@
-using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Recovery;
 
 namespace NewCosmos.Pages.Recovery;
 
-public partial class RecoveryFormPage : ContentPage, IParameterizedPage<StoppedPersonDto>, IParameterizedPage<RecoveryRecord>
+public partial class RecoveryFormPage : ContentPage, IParameterizedPage<RecoveryFormParameter>
 {
     private readonly RecoveryFormViewModel _viewModel;
 
@@ -15,28 +15,20 @@ public partial class RecoveryFormPage : ContentPage, IParameterizedPage<StoppedP
         BindingContext = _viewModel;
     }
 
-    Task IParameterizedPage<StoppedPersonDto>.SetParameterAsync(StoppedPersonDto parameter)
-    {
-        if (parameter != null)
-        {
-            _viewModel.LoadPersonInfo(parameter);
-        }
-        return Task.CompletedTask;
-    }
-
-    /// <summary>编辑草稿：参数化入口（仅经 NavigateToPageAsync 单一通道调用）</summary>
-    Task IParameterizedPage<RecoveryRecord>.SetParameterAsync(RecoveryRecord record)
-    {
-        _viewModel.LoadRecord(record);
-        return Task.CompletedTask;
-    }
-
     /// <summary>
-    /// 编辑草稿：回填记录数据
+    /// 导航参数注入：Record（编辑草稿）优先，否则 Person（搜索页选人新建）。
+    /// 原 StoppedPersonDto / RecoveryRecord 双契约合一于此。
     /// </summary>
-    public void SetEditRecord(RecoveryRecord record)
+    Task IParameterizedPage<RecoveryFormParameter>.SetParameterAsync(RecoveryFormParameter parameter)
     {
-        _viewModel.LoadRecord(record);
+        if (parameter == null) return Task.CompletedTask;
+
+        if (parameter.Record != null)
+            _viewModel.LoadRecord(parameter.Record);
+        else if (parameter.Person != null)
+            _viewModel.LoadPersonInfo(parameter.Person);
+
+        return Task.CompletedTask;
     }
 
     protected override async void OnAppearing()

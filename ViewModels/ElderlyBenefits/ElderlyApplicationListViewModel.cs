@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
@@ -348,7 +348,7 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
                     return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "加载登记信息失败，无法推送打印");
 
                 PrintNavigationData.ClearDocumentMode();
-                PrintNavigationData.BusinessType = "ElderlyBenefits";
+                PrintNavigationData.BusinessType = PrintBusinessTypes.ElderlyBenefits;
                 PrintNavigationData.BusinessId = app.Id;
                 PrintNavigationData.Classification = classification == "Stop" ? "Stop" : "New";
                 PrintNavigationData.FieldData = ElderlyPrintDataBuilder.BuildSingleFields(appResult.Value);

@@ -90,10 +90,50 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 加载字典数据
+    /// 加载字典数据。
+    /// 2026-11 性能收口：13 个分类改一次 GetAllItemsAsync 取全（同 nc_view_dict_items 视图、
+    /// 同 is_active 过滤、同 sort_order 排序，内存按 Category 分组），原 13 次串行
+    /// GetItemsByCategoryAsync → 1 次往返；失败回退逐分类加载（保持原部分成功语义）。
     /// </summary>
     private async Task LoadDictionariesAsync()
     {
+        List<Models.Results.DictItemView>? allItems = null;
+        try
+        {
+            var allResult = await _dictionaryService.GetAllItemsAsync();
+            if (allResult.IsSuccess)
+                allItems = allResult.Value;
+            else
+                _logger.Warn($"一次加载全部字典失败，回退逐分类: {allResult.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"一次加载全部字典异常，回退逐分类: {ex.Message}");
+        }
+
+        if (allItems != null)
+        {
+            var byCategory = allItems
+                .GroupBy(i => i.Category, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+            FillDictionaryOptions(byCategory, "Gender", GenderOptions);
+            FillDictionaryOptions(byCategory, "Ethnicities", EthnicityOptions);
+            FillDictionaryOptions(byCategory, "MaritalStatuses", MaritalStatusOptions);
+            FillDictionaryOptions(byCategory, "EducationLevels", EducationLevelOptions);
+            FillDictionaryOptions(byCategory, "PoliticalStatuses", PoliticalStatusOptions);
+            FillDictionaryOptions(byCategory, "SupportModes", SupportModeOptions);
+            FillDictionaryOptions(byCategory, "ApplicationReasons", ApplicationReasonOptions);
+            FillDictionaryOptions(byCategory, "DiseaseCategories", DiseaseCategoryOptions);
+            FillDictionaryOptions(byCategory, "DisabilityTypes", DisabilityTypeOptions);
+            FillDictionaryOptions(byCategory, "DisabilityLevels", DisabilityLevelOptions);
+            FillDictionaryOptions(byCategory, "HealthStatuses", HealthStatusOptions);
+            FillDictionaryOptions(byCategory, "EmploymentStatuses", EmploymentStatusOptions);
+            FillDictionaryOptions(byCategory, "IncomeSources", IncomeSourceOptions);
+            return;
+        }
+
+        // 回退：逐分类加载（原路径）
         await LoadDictionaryAsync("Gender", GenderOptions);
         await LoadDictionaryAsync("Ethnicities", EthnicityOptions);
         await LoadDictionaryAsync("MaritalStatuses", MaritalStatusOptions);
@@ -107,6 +147,18 @@ public partial class ApplicationFormViewModel
         await LoadDictionaryAsync("HealthStatuses", HealthStatusOptions);
         await LoadDictionaryAsync("EmploymentStatuses", EmploymentStatusOptions);
         await LoadDictionaryAsync("IncomeSources", IncomeSourceOptions);
+    }
+
+    /// <summary>按分类从全量字典快照填充目标选项集合（保持 sort_order 顺序；分类缺失=清空，与原查询零行语义一致）。</summary>
+    private static void FillDictionaryOptions(
+        IReadOnlyDictionary<string, List<Models.Results.DictItemView>> byCategory,
+        string category,
+        ObservableCollection<DictItemOption> target)
+    {
+        target.Clear();
+        if (!byCategory.TryGetValue(category, out var items)) return;
+        foreach (var item in items)
+            target.Add(new DictItemOption { Key = item.ItemKey, Display = item.ItemValue });
     }
 
     /// <summary>
@@ -137,37 +189,36 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 加载残疾类型/等级映射（从字典数据，不硬编码）
+    /// 加载残疾类型/等级映射（从字典数据，不硬编码）。
+    /// 2026-11 收口：复用 LoadDictionariesAsync 刚填充的 DisabilityTypeOptions/DisabilityLevelOptions
+    /// （同 nc_view_dict_items 视图、同 sort_order,id 排序，顺序一致），去掉重复 2 次分类查询。
     /// </summary>
     private async Task LoadDisabilityMappingsAsync()
     {
         try
         {
-            var typesResult = await _dictionaryService.GetItemsByCategoryAsync(DisabilityConstants.DISABILITY_TYPES_CATEGORY);
-            if (typesResult.IsSuccess)
+            // 兜底：选项集合为空（如一次加载失败走了逐分类回退且该分类也失败）时单独补查
+            if (DisabilityTypeOptions.Count == 0)
+                await LoadDictionaryAsync(DisabilityConstants.DISABILITY_TYPES_CATEGORY, DisabilityTypeOptions);
+            if (DisabilityLevelOptions.Count == 0)
+                await LoadDictionaryAsync(DisabilityConstants.DISABILITY_LEVELS_CATEGORY, DisabilityLevelOptions);
+
+            _disabilityTypeKeyMap.Clear();
+            _disabilityTypeDisplayMap.Clear();
+            char code = '1';
+            foreach (var opt in DisabilityTypeOptions)
             {
-                _disabilityTypeKeyMap.Clear();
-                _disabilityTypeDisplayMap.Clear();
-                char code = '1';
-                foreach (var item in typesResult.Value.OrderBy(x => x.SortOrder))
-                {
-                    _disabilityTypeKeyMap[code++] = item.ItemKey;
-                    _disabilityTypeDisplayMap[item.ItemKey] = item.ItemValue;
-                }
+                _disabilityTypeKeyMap[code++] = opt.Key;
+                _disabilityTypeDisplayMap[opt.Key] = opt.Display;
             }
 
-            var levelsResult = await _dictionaryService.GetItemsByCategoryAsync(DisabilityConstants.DISABILITY_LEVELS_CATEGORY);
-            if (levelsResult.IsSuccess)
+            _disabilityLevelKeyMap.Clear();
+            _disabilityLevelDisplayMap.Clear();
+            code = '1';
+            foreach (var opt in DisabilityLevelOptions)
             {
-                _disabilityLevelKeyMap.Clear();
-                _disabilityLevelDisplayMap.Clear();
-                char code = '1';
-                foreach (var item in levelsResult.Value.OrderBy(x => x.SortOrder))
-                {
-                    var key = item.ItemKey;
-                    _disabilityLevelKeyMap[code++] = key;
-                    _disabilityLevelDisplayMap[key] = item.ItemValue;
-                }
+                _disabilityLevelKeyMap[code++] = opt.Key;
+                _disabilityLevelDisplayMap[opt.Key] = opt.Display;
             }
 
             _logger.Info("残疾映射加载完成");

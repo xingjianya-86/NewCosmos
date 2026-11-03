@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 
@@ -23,6 +23,13 @@ public interface IFamilyMemberService
     /// 添加家庭成员
     /// </summary>
     Task<Result<long>> AddAsync(FamilyMemberCreateRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// 多行 VALUES 批量插入家庭成员（一次批写替代逐人 AddAsync N+1）。
+    /// 库内已存在同身份证则整体 Failure；返回 id_card → 新 id 映射。
+    /// </summary>
+    Task<Result<IReadOnlyDictionary<string, long>>> AddRangeAsync(
+        IReadOnlyList<FamilyMemberCreateRequest> requests, CancellationToken ct = default);
 
     /// <summary>
     /// 更新家庭成员
@@ -50,7 +57,8 @@ public interface IFamilyMemberService
     Task<Result> SetHouseholdHeadAsync(long applicationId, long memberId, CancellationToken ct = default);
 
     /// <summary>
-    /// 检查是否可以删除成    /// </summary>
+    /// 检查是否可以删除成
+/// </summary>
     Task<Result<bool>> CanDeleteMemberAsync(long applicationId, long memberId, CancellationToken ct = default);
 
     /// <summary>

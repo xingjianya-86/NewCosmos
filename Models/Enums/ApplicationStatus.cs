@@ -1,7 +1,8 @@
-﻿namespace NewCosmos.Models.Enums;
+namespace NewCosmos.Models.Enums;
 
 /// <summary>
-/// 申请状态枚举（类型安全    /// </summary>
+/// 申请状态枚举（类型安全
+/// </summary>
 public enum ApplicationStatus
 {
     /// <summary>草稿</summary>
@@ -24,7 +25,8 @@ public enum ApplicationStatus
 }
 
 /// <summary>
-/// 申请状态扩展方    /// </summary>
+/// 申请状态扩展方
+/// </summary>
 public static class ApplicationStatusExtensions
 {
     private static readonly Dictionary<ApplicationStatus, string> Descriptions = new()
@@ -48,17 +50,20 @@ public static class ApplicationStatusExtensions
     };
 
     /// <summary>
-    /// 获取状态描    /// </summary>
+    /// 获取状态描
+/// </summary>
     public static string GetDescription(this ApplicationStatus status) =>
         Descriptions.TryGetValue(status, out var desc) ? desc : status.ToString();
 
     /// <summary>
-    /// 获取状态代    /// </summary>
+    /// 获取状态代
+/// </summary>
     public static string GetCode(this ApplicationStatus status) =>
         Codes.TryGetValue(status, out var code) ? code : status.ToString();
 
     /// <summary>
-    /// 从代码解析状    /// </summary>
+    /// 从代码解析状
+/// </summary>
     public static ApplicationStatus FromCode(string code) => code.Trim() switch
     {
         "Draft" => ApplicationStatus.Draft,
@@ -71,17 +76,20 @@ public static class ApplicationStatusExtensions
     };
 
     /// <summary>
-    /// 是否为可编辑状    /// </summary>
+    /// 是否为可编辑状
+/// </summary>
     public static bool IsEditable(this ApplicationStatus status) =>
         status == ApplicationStatus.Draft;
 
     /// <summary>
-    /// 是否为终    /// </summary>
+    /// 是否为终
+/// </summary>
     public static bool IsFinal(this ApplicationStatus status) =>
         status is ApplicationStatus.Completed or ApplicationStatus.Refused or ApplicationStatus.Stopped;
 
     /// <summary>
-    /// 是否为活动状    /// </summary>
+    /// 是否为活动状
+/// </summary>
     public static bool IsActive(this ApplicationStatus status) =>
         status is ApplicationStatus.Approved or ApplicationStatus.Completed;
 }

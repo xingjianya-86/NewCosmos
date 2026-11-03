@@ -1,7 +1,8 @@
-﻿namespace NewCosmos.Models.Enums;
+namespace NewCosmos.Models.Enums;
 
 /// <summary>
-/// 业务时间线类    /// </summary>
+/// 业务时间线类
+/// </summary>
 public enum TimelineType
 {
     /// <summary>A线：经济核查（每月10号结算，上月11日~本月10日）</summary>

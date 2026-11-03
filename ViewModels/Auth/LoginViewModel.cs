@@ -17,7 +17,6 @@ public partial class LoginViewModel : ViewModelBase
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IUserService _userService;
-    private readonly IBackgroundLoaderService _backgroundLoader;
     private readonly IConfigService _configService;
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
@@ -35,22 +34,15 @@ public partial class LoginViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _password = string.Empty;
-
-    [ObservableProperty]
-    private string _currentBackgroundImage = string.Empty;
-
     [ObservableProperty]
     private bool _rememberMe = true;
 
     [ObservableProperty]
     private bool _rememberPassword;
 
-    public ObservableCollection<string> BackgroundImages { get; } = new();
-
     public LoginViewModel(
         IServiceProvider serviceProvider,
         IUserService userService, 
-        IBackgroundLoaderService backgroundLoader,
         IConfigService configService,
         ILoggerService logger,
         IDialogService dialogService,
@@ -64,7 +56,6 @@ public partial class LoginViewModel : ViewModelBase
     {
         _serviceProvider = serviceProvider;
         _userService = userService;
-        _backgroundLoader = backgroundLoader;
         _configService = configService;
         _logger = logger;
         _dialogService = dialogService;
@@ -77,9 +68,6 @@ public partial class LoginViewModel : ViewModelBase
         _deviceIdentity = deviceIdentity;
         _preferencesOptions = _configService.GetPreferencesOptions();
 
-        LoadBackgroundImages();
-        SelectRandomBackground();
-        // 移除构造函数中的异步调用，改为页面加载时调用
     }
 
     #region 抽象属性实现
@@ -193,89 +181,6 @@ public partial class LoginViewModel : ViewModelBase
             IsBusy = false;
         }
     }
-
-    private void LoadBackgroundImages()
-    {
-        var backgrounds = _backgroundLoader.GetBackgroundImages();
-        
-        BackgroundImages.Clear();
-        foreach (var bg in backgrounds)
-        {
-            BackgroundImages.Add(bg);
-        }
-        
-        _logger.Info("已加载背景图片列表");
-    }
-
-    private void SelectRandomBackground()
-    {
-        try
-        {
-            var uiOptions = _configService.GetUIOptions();
-            
-            var lastUserBg = _backgroundLoader.GetLastUserBackground();
-            if (!string.IsNullOrEmpty(lastUserBg))
-            {
-                CurrentBackgroundImage = lastUserBg;
-                _logger.Info("已应用用户上次选择的背景");
-                return;
-            }
-            
-            var backgrounds = _backgroundLoader.GetBackgroundImages();
-            
-            if (backgrounds.Count == 0)
-            {
-                CurrentBackgroundImage = _backgroundLoader.GetDefaultBackgroundImage();
-                _logger.Warn("背景图片列表为空，使用默认背景");
-                return;
-            }
-            
-            if (uiOptions.UseRandomBackground)
-            {
-                var random = new Random();
-                CurrentBackgroundImage = backgrounds[random.Next(backgrounds.Count)];
-                _logger.Info("已随机选择背景图片");
-            }
-            else
-            {
-                CurrentBackgroundImage = _backgroundLoader.GetDefaultBackgroundImage();
-                _logger.Info("已使用默认背景图片");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "选择背景图片失败");
-        }
-    }
-
-    [RelayCommand]
-    private void ChangeBackground()
-    {
-        try
-        {
-            var backgrounds = _backgroundLoader.GetBackgroundImages();
-            
-            if (backgrounds.Count == 0)
-                return;
-            
-            var currentIndex = backgrounds.IndexOf(CurrentBackgroundImage);
-            
-            if (currentIndex == -1)
-                currentIndex = 0;
-            
-            var nextIndex = (currentIndex + 1) % backgrounds.Count;
-            CurrentBackgroundImage = backgrounds[nextIndex];
-            
-            _backgroundLoader.SaveUserBackground(CurrentBackgroundImage);
-            
-            _logger.Info("已切换背景图片");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "切换背景图片失败");
-        }
-    }
-
     [RelayCommand]
     private async Task LoginAsync()
     {
@@ -603,9 +508,4 @@ public partial class LoginViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    private void SwitchBackground()
-    {
-        ChangeBackground();
-    }
 }

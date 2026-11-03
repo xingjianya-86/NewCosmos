@@ -154,8 +154,8 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
             // 13 张独立明细表并行加载（每次查询各自从连接池取连接，互不阻塞），
             // 替代原先 12 次串行 await；任一失败仍会经 Task.WhenAll 抛出并走统一错误处理。
             var subsidiesTask = SafeLoadAsync<Subsidy>("SELECT * FROM nc_biz_subsidies WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_subsidies");
-            var laborIncomesTask = SafeLoadAsync<LaborIncome>("SELECT * FROM nc_biz_labor_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_labor_incomes");
-            var businessIncomesTask = SafeLoadAsync<BusinessIncome>("SELECT * FROM nc_biz_business_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_business_incomes");
+            var laborIncomesTask = SafeLoadAsync<LaborIncome>("SELECT " + WideTableColumns.LaborIncomesColumns + " FROM nc_biz_labor_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_labor_incomes");
+            var businessIncomesTask = SafeLoadAsync<BusinessIncome>("SELECT " + WideTableColumns.BusinessIncomesColumns + " FROM nc_biz_business_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_business_incomes");
             var propertyIncomesTask = SafeLoadAsync<PropertyIncome>("SELECT * FROM nc_biz_property_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_property_incomes");
             var transferIncomesTask = SafeLoadAsync<TransferIncome>("SELECT * FROM nc_biz_transfer_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_transfer_incomes");
             var otherIncomesTask = SafeLoadAsync<OtherIncome>("SELECT * FROM nc_biz_other_incomes WHERE application_id = $1 AND deleted_at IS NULL", "nc_biz_other_incomes");

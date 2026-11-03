@@ -1,7 +1,8 @@
-﻿namespace NewCosmos.Models.Results;
+namespace NewCosmos.Models.Results;
 
 /// <summary>
-/// 字典项视图结果（查询专用    /// 合并种子数据和用户更新数    /// </summary>
+/// 字典项视图结果（查询专用    /// 合并种子数据和用户更新数
+/// </summary>
 public class DictItemView
 {
     public int Id { get; set; }
@@ -13,7 +14,8 @@ public class DictItemView
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
-    /// 数据状态：seed（种子数据）?updated（已更新    /// </summary>
+    /// 数据状态：seed（种子数据）?updated（已更新
+/// </summary>
     public string Status { get; set; } = "seed";
 
     /// <summary>

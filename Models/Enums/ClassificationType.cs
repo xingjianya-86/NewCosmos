@@ -1,4 +1,4 @@
-﻿namespace NewCosmos.Models.Enums;
+namespace NewCosmos.Models.Enums;
 
 /// <summary>
 /// 分类类型枚举
@@ -149,7 +149,8 @@ public static class ClassificationTypeExtensions
         Descriptions.TryGetValue(type, out var desc) ? desc : type.ToString();
 
     /// <summary>
-    /// 是否为低保类    /// </summary>
+    /// 是否为低保类
+/// </summary>
     public static bool IsSubsistence(this ClassificationType type) =>
         SubsistenceTypes.Contains(type);
 
@@ -160,32 +161,38 @@ public static class ClassificationTypeExtensions
         LowIncomeTypes.Contains(type);
 
     /// <summary>
-    /// 是否为特困类    /// </summary>
+    /// 是否为特困类
+/// </summary>
     public static bool IsDestitute(this ClassificationType type) =>
         DestituteTypes.Contains(type);
 
     /// <summary>
-    /// 是否为停保类    /// </summary>
+    /// 是否为停保类
+/// </summary>
     public static bool IsStop(this ClassificationType type) =>
         StopTypes.Contains(type);
 
     /// <summary>
-    /// 是否为农村类    /// </summary>
+    /// 是否为农村类
+/// </summary>
     public static bool IsRural(this ClassificationType type) =>
         RuralTypes.Contains(type);
 
     /// <summary>
-    /// 是否为城市类    /// </summary>
+    /// 是否为城市类
+/// </summary>
     public static bool IsUrban(this ClassificationType type) =>
         !RuralTypes.Contains(type) && !StopTypes.Contains(type);
 
     /// <summary>
-    /// 是否发放保障    /// </summary>
+    /// 是否发放保障
+/// </summary>
     public static bool HasSubsidy(this ClassificationType type) =>
         type.IsSubsistence() || type.IsDestitute();
 
     /// <summary>
-    /// 从代码解    /// </summary>
+    /// 从代码解
+/// </summary>
     public static ClassificationType FromCode(string code) => code.Trim() switch
     {
         "RuralSubsistence" => ClassificationType.RuralSubsistence,

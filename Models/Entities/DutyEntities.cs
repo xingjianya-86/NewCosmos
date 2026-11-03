@@ -473,6 +473,15 @@ public class HolidayDownloadSummary
     public int Year { get; set; }
     public int HolidayCount { get; set; }
     public int MakeupCount { get; set; }
+
+    /// <summary>实际命中的数据源显示名（如"接口下载"或"备用源下载"），供下载完成提示用</summary>
+    public string SourceDisplayName { get; set; } = string.Empty;
+
+    /// <summary>是否走了备用数据源（主接口无数据/不可达时回退）</summary>
+    public bool IsFromFallback { get; set; }
+
+    /// <summary>备用源返回的国务院公文链接（主源为 null；仅记入日志，供审计追溯）</summary>
+    public string? PaperUrl { get; set; }
 }
 
 /// <summary>

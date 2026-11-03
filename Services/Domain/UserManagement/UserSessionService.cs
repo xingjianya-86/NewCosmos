@@ -1,4 +1,3 @@
-using System.Text.Json;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
@@ -16,7 +15,6 @@ public sealed class UserSessionService : BaseService, IUserSessionService
 {
     protected override string ServiceName => "UserSessionService";
 
-    private const string NotifyChannel = "nc_session_events";
     private static readonly TimeSpan PolicyCacheTtl = TimeSpan.FromSeconds(60);
 
     private readonly IDatabaseService _db;
@@ -219,9 +217,8 @@ public sealed class UserSessionService : BaseService, IUserSessionService
 
                 if (updateResult.IsFailure)
                     return Result.Failure<SessionCreationResult>(updateResult.ErrorCode!, updateResult.Message!);
-
-                foreach (var id in ids)
-                    await NotifyAsync(id, SessionConstants.EndReasonOtherDeviceLogin, ct);
+                // 踢出发现机制 = 心跳轮询（TouchAsync 影响 0 行 → 判定被替换）。
+                // 曾经的 pg_notify('nc_session_events') 已移除：全仓无 LISTEN 消费端，属死基础设施。
             }
 
             var newSessionId = Guid.NewGuid();
@@ -469,7 +466,6 @@ public sealed class UserSessionService : BaseService, IUserSessionService
 
             if (result.Value > 0)
             {
-                await NotifyAsync(sessionId, reason, ct);
                 Logger.LogSecurity("登录会话结束", ("SessionId", sessionId), ("Reason", reason), ("ByUserId", byUserId ?? 0));
             }
 
@@ -510,8 +506,6 @@ public sealed class UserSessionService : BaseService, IUserSessionService
                 return Result.Failure<int>(result.ErrorCode!, result.Message!);
 
             var ids = result.Value ?? new List<SessionIdRow>();
-            foreach (var row in ids)
-                await NotifyAsync(row.SessionId, reason, ct);
 
             if (ids.Count > 0)
                 Logger.LogSecurity("结束用户全部会话", ("UserId", userId), ("Reason", reason), ("Count", ids.Count), ("ByUserId", byUserId ?? 0));
@@ -563,8 +557,6 @@ public sealed class UserSessionService : BaseService, IUserSessionService
                 return Result.Failure<int>(result.ErrorCode!, result.Message!);
 
             var ids = result.Value ?? new List<SessionIdRow>();
-            foreach (var row in ids)
-                await NotifyAsync(row.SessionId, reason, ct);
 
             if (ids.Count > 0)
                 Logger.LogSecurity("全部会话强制下线", ("Reason", reason), ("Count", ids.Count), ("ByUserId", byUserId ?? 0));
@@ -662,11 +654,8 @@ public sealed class UserSessionService : BaseService, IUserSessionService
         }
     }
 
-    private Task<Result<int>> NotifyAsync(Guid sessionId, string reason, CancellationToken ct)
-    {
-        var payload = JsonSerializer.Serialize(new { sessionId, reason });
-        return _db.ExecuteNonQueryAsync("SELECT pg_notify($1, $2)", ct, NotifyChannel, payload);
-    }
+    // pg_notify('nc_session_events') 通知通道已移除（2026-11）：全仓无 LISTEN 消费端，属死基础设施；
+    // 会话踢出发现机制 = 心跳轮询（TouchAsync 影响 0 行 → 查终态 → SessionEnded 事件 → 宽限退出）。
 
     private static SessionValidationStatus MapStatus(string? status) => status?.ToLowerInvariant() switch
     {

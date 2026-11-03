@@ -54,6 +54,9 @@ public partial class HeadChangeViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<FamilyMember> _eligibleMembers = new();
 
+    /// <summary>原户主成员 ID（LoadDataAsync 时取家庭成员表 IsHouseholdHead=true 行；变更记录溯源用）</summary>
+    private long _oldHeadMemberId;
+
     [ObservableProperty]
     private FamilyMember _selectedNewHead = null!;
 
@@ -113,12 +116,17 @@ public partial class HeadChangeViewModel : ViewModelBase
                 FamilySize = app.FamilySize;
             }
 
-            // 加载可选新户主（排除原户主）
+            // 加载可选新户主（排除原户主）；同时记住原户主成员 ID（变更记录溯源用，原为硬编码 0 的 TODO）
             var membersResult = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
-            if (membersResult.IsSuccess)
+            if (membersResult.IsSuccess && membersResult.Value != null)
             {
+                var members = membersResult.Value;
+                _oldHeadMemberId = members.FirstOrDefault(m => m.IsHouseholdHead)?.Id ?? 0;
+                if (_oldHeadMemberId == 0)
+                    _logger.Warn($"户主变更：未找到原户主成员行（ApplicationId={applicationId}），变更记录旧成员ID将为空");
+
                 EligibleMembers.Clear();
-                foreach (var member in membersResult.Value.Where(m => !m.IsHouseholdHead))
+                foreach (var member in members.Where(m => !m.IsHouseholdHead))
                 {
                     EligibleMembers.Add(member);
                 }
@@ -174,7 +182,9 @@ public partial class HeadChangeViewModel : ViewModelBase
             var changeResult = await _changeService.ExecuteHeadChangeAsync(new HeadChangeContext
             {
                 ApplicationId = ApplicationId,
-                OldHeadMemberId = 0, // TODO: 获取原户主成员ID
+                // 原户主成员 ID（LoadDataAsync 时从家庭成员表取 IsHouseholdHead=true 行；
+                // 旧实现硬编码 0 导致变更明细旧成员溯源丢失，服务侧 MapMember 对 0 直接跳过）
+                OldHeadMemberId = _oldHeadMemberId,
                 NewHeadMemberId = SelectedNewHead.Id,
                 OldHeadName = CurrentHeadName,
                 NewHeadName = SelectedNewHead.Name,

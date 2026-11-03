@@ -105,7 +105,8 @@ public static class OutputPathHelper
     }
 
     /// <summary>
-    /// 获取主体目录路径（不含文件名）    /// </summary>
+    /// 获取主体目录路径（不含文件名）
+/// </summary>
     public static string GetSubjectDirectory(
         string category,
         string subjectName,

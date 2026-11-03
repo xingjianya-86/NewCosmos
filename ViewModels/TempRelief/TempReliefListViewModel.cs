@@ -88,18 +88,46 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
         ILoggerService logger,
         IServiceProvider serviceProvider,
         Services.Domain.Reporting.IStatisticsService statisticsService,
-        Services.Domain.Printing.IPrintJobFactory printJobFactory)
+        Services.Domain.Printing.IPrintJobFactory printJobFactory,
+        Services.UserManagement.INewPermissionService permissionService)
     {
         _applicationService = applicationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _statisticsService = statisticsService;
         _printJobFactory = printJobFactory;
+        _permissionService = permissionService;
         Title = "临时救助";
     }
 
     private readonly Services.Domain.Reporting.IStatisticsService _statisticsService = null!;
     private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
+    private readonly Services.UserManagement.INewPermissionService _permissionService = null!;
+
+    /// <summary>
+    /// 动作前权限门控（对齐 ElderlyStopViewModel 2026-10-31 堵洞模式）：
+    /// 本页确认/终止/删除此前零权限校验，仅靠入口卡片 TEMP_CREATE 可见性——入口可见即全部可点。
+    /// </summary>
+    private async Task<bool> HasTempPermissionAsync(string permissionCode, string actionLabel)
+    {
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId > 0 && await _permissionService.HasPermissionAsync(userId, permissionCode, CancellationToken))
+                return true;
+
+            _logger.LogSecurity("临时救助操作被拦截",
+                ("UserId", userId), ("Permission", permissionCode), ("Action", actionLabel));
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "提示", $"无权限执行{actionLabel}，请联系管理员分配相应权限。", "确定");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "临时救助权限校验失败");
+            return false;
+        }
+    }
 
     #region 页头统计栏
 
@@ -269,6 +297,7 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     private async Task ConfirmAsync(TempReliefApplication? app)
     {
         if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「确认生效」")) return;
 
         var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
         var confirm = await dialogService.DisplayAlertAsync("确认生效",
@@ -293,6 +322,7 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     private async Task StopAsync(TempReliefApplication? app)
     {
         if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「终止申请」")) return;
 
         var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
         var confirm = await dialogService.DisplayAlertAsync("终止申请",
@@ -320,6 +350,7 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     private async Task DeleteAsync(TempReliefApplication? app)
     {
         if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_DELETE, "「删除申请」")) return;
 
         var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
         var confirm = await dialogService.DisplayAlertAsync("确认删除",

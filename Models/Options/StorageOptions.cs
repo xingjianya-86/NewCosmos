@@ -28,7 +28,8 @@ public class StorageOptions
     public bool UseAppDataDirectory { get; set; }
 
     /// <summary>
-    /// 应用名称（从AppOptions注入）    /// </summary>
+    /// 应用名称（从AppOptions注入）
+/// </summary>
     public string ApplicationName { get; set; } = string.Empty;
 
     /// <summary>

@@ -37,17 +37,8 @@ public interface IApplicationService
     Task<Result<PagedResult<ApplicationEntity>>> GetByMonthPagedAsync(int year, int month, int pageIndex, int pageSize, CancellationToken ct = default);
 
     /// <summary>
-    /// 搜索申请（分页）
-    /// </summary>
-    Task<Result<PagedResult<ApplicationEntity>>> SearchPagedAsync(string? keyword, string? status, string? role, int pageIndex, int pageSize, CancellationToken ct = default);
-
-    /// <summary>
-    /// 创建申请
-    /// </summary>
-    Task<Result<long>> CreateAsync(ApplicationCreateRequest request, CancellationToken ct = default);
-
-    /// <summary>
-    /// 创建申请（简化版    /// </summary>
+    /// 创建申请（简化版
+/// </summary>
     Task<Result<long>> CreateAsync(ApplicationEntity application, CancellationToken ct = default);
 
     /// <summary>
@@ -102,7 +93,8 @@ public interface IApplicationService
     Task<Result<string>> GetNextApplicationNoAsync(DateTime date, CancellationToken ct = default);
 
 /// <summary>
-    /// 检查身份证号是否存    /// </summary>
+    /// 检查身份证号是否存
+/// </summary>
     Task<Result<bool>> CheckIdCardExistsAsync(string idCard, long? excludeId = null, CancellationToken ct = default);
 
     /// <summary>
@@ -137,17 +129,6 @@ public interface IApplicationService
     /// 获取已完结档案总数
     /// </summary>
     Task<Result<int>> GetArchivedCountAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// 获取已停保档案（分页，支持关键词搜索）
-    /// status = ApplicationStatusCodes.STOPPED
-    /// </summary>
-    Task<Result<PagedResult<ApplicationEntity>>> GetStoppedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default);
-
-    /// <summary>
-    /// 获取已停保档案总数
-    /// </summary>
-    Task<Result<int>> GetStoppedCountAsync(CancellationToken ct = default);
 
     /// <summary>
     /// 完成归档：current_step 推进到 6 并将 status 置为 Approved（已审批/在保）。

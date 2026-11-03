@@ -147,14 +147,16 @@ public partial class ElderlyReportViewModel : ViewModelBase
             var newResult = await _applicationService.GetByMonthAsync(SelectedYear, SelectedMonth, false, null, excludeImported: true, ct);
             var stopResult = await _applicationService.GetByMonthAsync(SelectedYear, SelectedMonth, true, null, excludeImported: false, ct);
 
-            if (newResult.IsFailure)
+            // 加载失败必须显式失败（§7）：弹错误框 + 状态栏标注失败，不再"只记日志然后留 0/留旧值"，
+            // 否则界面上的"新增 0 人、停止 0 人"会被误读成当月真实数据（2026-11 月报恒 0 即此因）。
+            if (newResult.IsFailure || stopResult.IsFailure)
             {
-                _logger.Error($"加载普惠高龄新增记录失败: {newResult.Message}");
-                return;
-            }
-            if (stopResult.IsFailure)
-            {
-                _logger.Error($"加载普惠高龄停止记录失败: {stopResult.Message}");
+                var failed = newResult.IsFailure ? newResult : stopResult;
+                var failedPart = newResult.IsFailure ? "新增" : "停止";
+                var detail = UserFriendlyMessages.Get(failed.ErrorCode!, failed.Message);
+                _logger.Error($"加载普惠高龄{failedPart}记录失败: {failed.ErrorCode} {failed.Message}");
+                StatusText = $"加载失败（{failedPart}）：{detail}";
+                await _dialogService.DisplayAlertAsync("错误", detail, "确定");
                 return;
             }
 

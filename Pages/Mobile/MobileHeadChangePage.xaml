@@ -11,31 +11,25 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="0">
 
         <!-- 绿色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="户主变更" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="仅变更户主，其他信息不变" FontSize="13" TextColor="#E6FFFFFF"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="户主变更"
+                                   Subtitle="仅变更户主，其他信息不变"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <!-- 当前户主 -->
         <Border Grid.Row="1" Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}" Margin="12,12,12,0">
             <VerticalStackLayout Spacing="6">
-                <Label Text="当前户主" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                <Label Text="当前户主" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                 <Grid ColumnDefinitions="*,Auto">
                     <VerticalStackLayout Grid.Column="0" Spacing="2">
                         <Label Text="{Binding CurrentHeadName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding CurrentHeadIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding CurrentHeadIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                     <Border Grid.Column="1" BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4" VerticalOptions="Center">
-                        <Label Text="{Binding CurrentClassificationName}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                        <Label Text="{Binding CurrentClassificationName}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
                     </Border>
                 </Grid>
             </VerticalStackLayout>
@@ -53,8 +47,8 @@
                         <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" StrokeThickness="0" Padding="12" Margin="0,4">
                             <Grid ColumnDefinitions="*,Auto">
                                 <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                    <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                    <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                    <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                                         <Label.FormattedText>
                                             <FormattedString>
                                                 <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
@@ -66,7 +60,7 @@
                                         </Label.FormattedText>
                                     </Label>
                                 </VerticalStackLayout>
-                                <Label Grid.Column="1" Text="{Binding HealthStatusDisplay}" FontSize="12"
+                                <Label Grid.Column="1" Text="{Binding HealthStatusDisplay}" FontSize="14"
                                        TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                             </Grid>
                         </Border>
@@ -84,11 +78,11 @@
         <!-- 底部按钮 -->
         <Border Grid.Row="4" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="返回" HeightRequest="46" CornerRadius="10" FontSize="15"
+                <Button Grid.Column="0" Text="返回" HeightRequest="46" CornerRadius="10" FontSize="16"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding GoBackCommand}"/>
-                <Button Grid.Column="1" Text="确认变更" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                <Button Grid.Column="1" Text="确认变更" HeightRequest="46" CornerRadius="10" FontSize="16" FontAttributes="Bold"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding ConfirmChangeCommand}"/>
             </Grid>
@@ -99,7 +93,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

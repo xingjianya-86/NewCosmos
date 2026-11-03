@@ -65,11 +65,12 @@ public static class ArchiveCategoryResolver
 
     /// <summary>
     /// 低收入人口·变动类模板分类集（输出文书/补打共用；与 TemplateCategoryProvider 变更组叶子 Path 对齐）。
+    /// 原「档案_保障金减少」已移除（2026-11）：模板不在库，减发由《档案_变更告知书》"待遇调整"方向承载。
     /// </summary>
     public static readonly string[] DocumentOperationCategories =
     [
         "经济复核", "资金变更", "人员变更", "户主变更",
-        "档案_保障金减少", "档案_增员减员调整表", "档案_渐退期审批表", "档案_变更告知书", "档案_定期复核审批表"
+        "档案_增员减员调整表", "档案_渐退期审批表", "档案_变更告知书", "档案_定期复核审批表"
     ];
 
     /// <summary>

@@ -193,3 +193,80 @@ tables:
         references:
           table: nc_regions_villages
           columns: [id]
+
+  # 死亡联动待办（2026-10-31 方案2）：申报提交后按身份命中生成各域待办行，有权限者在自己域承接。
+  # 派活表非办结回写表：办没办成以目标域实时状态判定（GetLinkageTasksAsync live 条件），
+  # status=Completed 仅为读取时自愈标记；申报作废/归档靠 JOIN 台账状态自动退出列表。
+  - name: nc_biz_death_linkage_tasks
+    comment: "[流程] 死亡联动待办 - 死亡申报触发的跨域办理任务（高龄停发/户主死亡变更/成员减员/大学生退出/追缴结案）"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 任务ID
+      - name: declaration_id
+        type: BIGINT
+        nullable: false
+        comment: 来源申报ID（nc_biz_death_declarations.id；申报作废/归档时任务随 JOIN 失效，不物理删除）
+      - name: deceased_id_card
+        type: character varying(18)
+        nullable: false
+        comment: 死者身份证（去重键之一 + 目标域实时判定的查询键）
+      - name: deceased_name
+        type: character varying(100)
+        nullable: false
+        comment: 死者姓名（列表展示冗余）
+      - name: task_domain
+        type: character varying(30)
+        nullable: false
+        comment: 任务域（ElderlyStop=高龄停发 / ArchiveHead=户主死亡变更 / ArchiveMember=成员减员 / College=大学生退出 / Recovery=追缴结案）
+      - name: ref_application_id
+        type: BIGINT
+        nullable: true
+        comment: 关联低收入档案ID（ArchiveHead/ArchiveMember 跳转预填）
+      - name: ref_elderly_id
+        type: BIGINT
+        nullable: true
+        comment: 关联高龄档案ID（ElderlyStop 跳转预填）
+      - name: permission_code
+        type: character varying(50)
+        nullable: false
+        comment: 承接所需权限码（生成时按域写入；承接面查询按此过滤=有权限者可见可办）
+      - name: status
+        type: character varying(20)
+        nullable: false
+        defaultValue: 'Pending'
+        comment: 任务状态（Pending=待办 / Completed=已办结——读取时按目标域实时状态自愈推进）
+      - name: village_id
+        type: integer
+        nullable: true
+        comment: 所属村ID（申报时复制，供范围过滤）
+      - name: town_id
+        type: integer
+        nullable: true
+        comment: 所属乡镇ID（申报时复制，供范围过滤）
+      - name: created_at
+        type: timestamp without time zone
+        nullable: true
+        defaultValue: 'CURRENT_TIMESTAMP'
+        comment: 生成时间
+      - name: completed_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 办结标记时间（读取自愈时写入，非人工操作）
+
+    indexes:
+      - name: idx_biz_death_task_pending
+        columns: [status, task_domain]
+      - name: idx_biz_death_task_id_card
+        columns: [deceased_id_card]
+      - name: idx_biz_death_task_declaration
+        columns: [declaration_id]
+
+    foreignKeys:
+      - name: fk_biz_death_task_declaration
+        columns: [declaration_id]
+        references:
+          table: nc_biz_death_declarations
+          columns: [id]

@@ -1,485 +1,465 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:controls="clr-namespace:NewCosmos.Controls"
              x:Class="NewCosmos.Pages.Auth.LoginPage"
              x:DataType="LoginViewModel"
              Title="登录"
              NavigationPage.HasNavigationBar="False"
-             SafeAreaEdges="None">
+             SafeAreaEdges="None"
+             BackgroundColor="{StaticResource Background}">
 
-    <!-- SafeAreaEdges=None：页面与根 Grid 全幅延伸（背景图覆盖状态栏区域）；
-         内层内容 Grid 保持布局默认 Container，自动避开状态栏/导航条 -->
-    <Grid SafeAreaEdges="None">
-        <!-- 背景层 -->
-        <Grid SafeAreaEdges="None">
-            <!-- 背景图片 - 直接绑定当前背景图 -->
-            <Image Source="{Binding CurrentBackgroundImage}"
-                   Aspect="AspectFill"
-                   Opacity="1.0">
-                <Image.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding ChangeBackgroundCommand}"
-                                          NumberOfTapsRequired="1"/>
-                </Image.GestureRecognizers>
-            </Image>
+    <!-- ============================================================================
+         登录页 · 纸墨档案版（code.html 同源色板）
+         视觉语言与启动动画（Resources\Splash）同源：暖纸底板 + 竖向档案条 +
+         四角定位标记 + 等宽小字读数 + 双语状态字 + 环形准星。
+         底板色值须与全局 Background 令牌（#f2ece1）一致，避免启动链路闪色。
+         ============================================================================ -->
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Color x:Key="Ink">#171310</Color>
+            <Color x:Key="InkSoft">#4c4237</Color>
+            <Color x:Key="Muted">#8b7f6c</Color>
+            <Color x:Key="Hair">#29171310</Color>
+            <Color x:Key="HairSoft">#14171310</Color>
+            <Color x:Key="PanelFill">#f8f3e9</Color>
+            <Color x:Key="PanelFillSoft">#f2ece1</Color>
+            <Color x:Key="ArchiveBar">#dfd5c2</Color>
+            <Color x:Key="FieldFill">#ffffff</Color>
 
-            <!-- 黑客帝国 0/1 数据流（全屏覆盖，背景图上、内容层下；点击穿透保留背景切换）——仅 Windows，Android 屏蔽 -->
-            <controls:MatrixRainView HorizontalOptions="Fill"
-                                     VerticalOptions="Fill"
-                                     InputTransparent="True"
-                                     IsVisible="{OnPlatform WinUI=true, Android=false}"/>
+            <LinearGradientBrush x:Key="Plate" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#f2ece1" Offset="0" />
+                <GradientStop Color="#e9e1d1" Offset="1" />
+            </LinearGradientBrush>
 
-            <!-- 渐变覆盖层 -->
-            <BoxView BackgroundColor="White"
-                     Opacity="0.1" />
+            <!-- 等宽小字（技术读数 / 字段标签）· DM Mono -->
+            <Style x:Key="MonoSmall" TargetType="Label">
+                <Setter Property="FontFamily" Value="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="{StaticResource Muted}" />
+                <Setter Property="CharacterSpacing" Value="2" />
+            </Style>
 
+            <!-- 标题字（思源宋体，纸墨档案风的灵魂） -->
+            <Style x:Key="DinTitle" TargetType="Label">
+                <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}" />
+                <Setter Property="TextColor" Value="{StaticResource Ink}" />
+                <Setter Property="FontAttributes" Value="Bold" />
+            </Style>
+
+            <Style x:Key="FieldLabel" TargetType="Label" BasedOn="{StaticResource MonoSmall}">
+                <Setter Property="CharacterSpacing" Value="1.4" />
+                <Setter Property="WidthRequest" Value="86" />
+                <Setter Property="VerticalOptions" Value="Center" />
+            </Style>
+
+            <Style x:Key="ArchiveEntry" TargetType="Entry">
+                <Setter Property="BackgroundColor" Value="Transparent" />
+                <Setter Property="TextColor" Value="{StaticResource Ink}" />
+                <Setter Property="PlaceholderColor" Value="{StaticResource Muted}" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="HeightRequest" Value="46" />
+                <Setter Property="Margin" Value="10,0,6,0" />
+            </Style>
+
+            <!-- 四角定位标记 -->
+            <Style x:Key="Corner" TargetType="Grid">
+                <Setter Property="WidthRequest" Value="16" />
+                <Setter Property="HeightRequest" Value="16" />
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid>
+
+        <!-- ── 底板：暖白渐变 + 竖向档案条水印 ───────────────────────────── -->
+        <Grid Background="{StaticResource Plate}" InputTransparent="True">
+            <Grid ColumnDefinitions="0.39*,0.06*,0.03*,0.06*,0.03*,0.06*,0.37*">
+                <BoxView Grid.Column="1" Color="{StaticResource ArchiveBar}" Opacity="0.45" />
+                <BoxView Grid.Column="3" Color="{StaticResource ArchiveBar}" Opacity="0.32" />
+                <BoxView Grid.Column="5" Color="{StaticResource ArchiveBar}" Opacity="0.20" />
+            </Grid>
         </Grid>
 
-        <!-- 内容层 -->
-        <ScrollView VerticalOptions="Fill"
-                    HorizontalOptions="Fill">
-            <Grid RowDefinitions="Auto, *, Auto"
-                  Padding="16"
-                  RowSpacing="0">
+        <!-- ── 机框：四角细线定位标记 ──────────────────────────────────────── -->
+        <Grid InputTransparent="True" Margin="26">
+            <Grid Style="{StaticResource Corner}" HorizontalOptions="Start" VerticalOptions="Start">
+                <BoxView Color="{StaticResource Hair}" HeightRequest="1" VerticalOptions="Start" />
+                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HorizontalOptions="Start" />
+            </Grid>
+            <Grid Style="{StaticResource Corner}" HorizontalOptions="End" VerticalOptions="Start">
+                <BoxView Color="{StaticResource Hair}" HeightRequest="1" VerticalOptions="Start" />
+                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HorizontalOptions="End" />
+            </Grid>
+            <Grid Style="{StaticResource Corner}" HorizontalOptions="Start" VerticalOptions="End">
+                <BoxView Color="{StaticResource Hair}" HeightRequest="1" VerticalOptions="End" />
+                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HorizontalOptions="Start" />
+            </Grid>
+            <Grid Style="{StaticResource Corner}" HorizontalOptions="End" VerticalOptions="End">
+                <BoxView Color="{StaticResource Hair}" HeightRequest="1" VerticalOptions="End" />
+                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HorizontalOptions="End" />
+            </Grid>
+        </Grid>
 
-                <!-- 顶部 Logo 区域 - Phone Layout -->
-                <VerticalStackLayout Grid.Row="0"
-                                    HorizontalOptions="Center"
-                                    Margin="0,40,0,0">
-                    <VerticalStackLayout.IsVisible>
-                        <OnIdiom x:TypeArguments="x:Boolean">
-                            <OnIdiom.Phone>True</OnIdiom.Phone>
-                            <OnIdiom.Tablet>False</OnIdiom.Tablet>
-                            <OnIdiom.Desktop>False</OnIdiom.Desktop>
-                        </OnIdiom>
-                    </VerticalStackLayout.IsVisible>
+        <!-- 左侧档案书脊（竖排读数，仅桌面/平板） -->
+        <Label Text="ME-13 · SOCIAL ASSISTANCE SYSTEM · 2026"
+               Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="3"
+               Rotation="-90" HorizontalOptions="Start" VerticalOptions="Center"
+               Margin="8,0,0,0" InputTransparent="True"
+               IsVisible="{OnIdiom Desktop=True, Tablet=True, Phone=False}" />
 
-                    <!-- Logo：吉祥物图标（与系统图标同源，四角透明，圆角与图标自带圆角一致） -->
-                    <Border WidthRequest="80"
-                            HeightRequest="80"
-                            StrokeShape="RoundRectangle 10"
-                            StrokeThickness="0"
-                            BackgroundColor="Transparent"
-                            Padding="0"
-                            HorizontalOptions="Center">
-                        <Border.Shadow>
-                            <Shadow Brush="Black"
-                                    Offset="0,4"
-                                    Radius="8"
-                                    Opacity="0.3" />
-                        </Border.Shadow>
-                        <Image Source="mascot_icon.png"
-                               Aspect="AspectFill"
-                               HorizontalOptions="Center"
-                               VerticalOptions="Center" />
-                    </Border>
+        <!-- ════════════════════ 桌面 / 平板版式 ════════════════════ -->
+        <Grid IsVisible="{OnIdiom Desktop=True, Tablet=True, Phone=False}"
+              RowDefinitions="Auto,*,Auto">
 
-                    <Label Text="帝皇权杖δ-me13 社会救助管理系统"
-                           FontSize="26"
-                           FontAttributes="Bold"
-                           TextColor="White"
-                           HorizontalOptions="Center"
-                           Margin="0,16,0,8" />
-
-                    <Label Text="专业的社会救助信息化解决方案"
-                           FontSize="16"
-                           TextColor="White"
-                           Opacity="0.9"
-                           HorizontalOptions="Center" />
+            <!-- 顶部读数（右上角） -->
+            <Grid Grid.Row="0" Padding="46,28,46,0">
+                <VerticalStackLayout HorizontalOptions="End" Spacing="6" InputTransparent="True">
+                    <Label x:Name="ClockLabel" Text="REV · DESKTOP" Style="{StaticResource MonoSmall}" HorizontalOptions="End" />
+                    <HorizontalStackLayout Spacing="6" HorizontalOptions="End">
+                        <BoxView Color="{StaticResource Hair}" HeightRequest="1" WidthRequest="46" VerticalOptions="Center" />
+                        <Label Text="ACCESS TERMINAL" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="3" />
+                    </HorizontalStackLayout>
                 </VerticalStackLayout>
+            </Grid>
 
-                <!-- 登录卡片 - Desktop/Tablet Layout -->
-                <Border Grid.Row="1"
-                        Style="{StaticResource CardBorderElevated}"
-                        Padding="0"
-                        HorizontalOptions="Start"
-                        VerticalOptions="Center"
-                        WidthRequest="420"
-                        Margin="80,0,0,0">
-                    <Border.IsVisible>
-                        <OnIdiom x:TypeArguments="x:Boolean">
-                            <OnIdiom.Phone>False</OnIdiom.Phone>
-                            <OnIdiom.Tablet>True</OnIdiom.Tablet>
-                            <OnIdiom.Desktop>True</OnIdiom.Desktop>
-                        </OnIdiom>
-                    </Border.IsVisible>
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="16" />
-                    </Border.StrokeShape>
-                    <Border.Shadow>
-                        <Shadow Brush="Black"
-                                Offset="0,8"
-                                Radius="16"
-                                Opacity="0.25" />
-                    </Border.Shadow>
+            <!-- 主体：左品牌区 + 右授权面板 -->
+            <Grid Grid.Row="1" ColumnDefinitions="1.1*,0.9*" Padding="46,0">
 
-                    <ScrollView>
-                        <VerticalStackLayout Spacing="24"
-                                           Padding="40,48">
+                <!-- 左：档案终端面板（整组内容在面板内居中） -->
+                <Border x:Name="StatusPanel"
+                        WidthRequest="560"
+                        BackgroundColor="{StaticResource PanelFillSoft}"
+                        Stroke="{StaticResource Hair}" StrokeThickness="1"
+                        Padding="36,30"
+                        HorizontalOptions="Center" VerticalOptions="Center">
+                    <Grid IsClippedToBounds="True">
 
-                            <!-- Logo 区域 -->
-                            <VerticalStackLayout Spacing="16"
-                                                HorizontalOptions="Center">
+                        <!-- 扫描光带：柔和的朱砂渐变竖条自左向右缓慢掠过（code.html 强调色 = 朱砂） -->
+                        <BoxView x:Name="LeftScanline"
+                                 WidthRequest="86"
+                                 HorizontalOptions="Start" VerticalOptions="Fill"
+                                 TranslationX="-90" InputTransparent="True">
+                            <BoxView.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#00AB3227" Offset="0" />
+                                    <GradientStop Color="#33AB3227" Offset="0.5" />
+                                    <GradientStop Color="#00AB3227" Offset="1" />
+                                </LinearGradientBrush>
+                            </BoxView.Background>
+                        </BoxView>
 
-                                <!-- Logo：吉祥物图标（与系统图标同源，四角透明，圆角与图标自带圆角一致） -->
-                                <Border WidthRequest="100"
-                                        HeightRequest="100"
-                                        StrokeShape="RoundRectangle 12"
-                                        StrokeThickness="0"
-                                        BackgroundColor="Transparent"
-                                        Padding="0"
-                                        HorizontalOptions="Center">
-                                    <Border.Shadow>
-                                        <Shadow Brush="Black"
-                                                Offset="0,6"
-                                                Radius="12"
-                                                Opacity="0.3" />
-                                    </Border.Shadow>
-                                    <Image Source="mascot_icon.png"
-                                           Aspect="AspectFill"
-                                           HorizontalOptions="Center"
-                                           VerticalOptions="Center" />
+                        <VerticalStackLayout x:Name="StatusBlock" Spacing="0" HorizontalOptions="Center">
+
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="ACCESS TERMINAL" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="3" />
+                                <Label Grid.Column="1" Text="ME-13" Style="{StaticResource MonoSmall}" FontSize="11" />
+                            </Grid>
+                            <BoxView Color="{StaticResource Hair}" HeightRequest="1" Margin="0,10,0,0" />
+
+                            <VerticalStackLayout x:Name="BrandBlock" Spacing="1" Margin="0,22,0,0" HorizontalOptions="Center" InputTransparent="True">
+                                <Label Text="NEWCOSMOS" Style="{StaticResource DinTitle}" FontSize="28" FontAttributes="Bold" CharacterSpacing="1.5" HorizontalTextAlignment="Center" />
+                                <Label Text="SOCIAL ASSISTANCE MANAGEMENT" Style="{StaticResource MonoSmall}" FontSize="13" CharacterSpacing="4.2" Margin="0,2,0,0" HorizontalTextAlignment="Center" />
+                                <Label Text="帝皇权杖 δ-me13" Style="{StaticResource DinTitle}" FontSize="29" FontAttributes="Bold" Margin="0,4,0,0" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+
+                            <!-- 环形准星：外环顺时针、内环逆时针，慢速对转 -->
+                            <Grid WidthRequest="220" HeightRequest="220" HorizontalOptions="Center" Margin="0,26,0,0">
+                                <Ellipse x:Name="ReticleRing"
+                                         WidthRequest="212" HeightRequest="212"
+                                         Stroke="{StaticResource Hair}" StrokeThickness="1"
+                                         StrokeDashArray="2,7"
+                                         HorizontalOptions="Center" VerticalOptions="Center" />
+                                <Ellipse x:Name="ReticleRingInner"
+                                         WidthRequest="160" HeightRequest="160"
+                                         Stroke="{StaticResource Hair}" StrokeThickness="1"
+                                         StrokeDashArray="1,6"
+                                         HorizontalOptions="Center" VerticalOptions="Center" />
+                                <Ellipse WidthRequest="176" HeightRequest="176"
+                                         Stroke="{StaticResource HairSoft}" StrokeThickness="1"
+                                         HorizontalOptions="Center" VerticalOptions="Center" />
+                                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HeightRequest="10" HorizontalOptions="Center" VerticalOptions="Start" Margin="0,2,0,0" />
+                                <BoxView Color="{StaticResource Hair}" WidthRequest="1" HeightRequest="10" HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,2" />
+                                <BoxView Color="{StaticResource Hair}" WidthRequest="10" HeightRequest="1" HorizontalOptions="Start" VerticalOptions="Center" Margin="2,0,0,0" />
+                                <BoxView Color="{StaticResource Hair}" WidthRequest="10" HeightRequest="1" HorizontalOptions="End" VerticalOptions="Center" Margin="0,0,2,0" />
+                                <Border WidthRequest="96" HeightRequest="96"
+                                        BackgroundColor="Transparent" StrokeThickness="0" Padding="0"
+                                        HorizontalOptions="Center" VerticalOptions="Center">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="12" />
+                                    </Border.StrokeShape>
+                                    <Image Source="mascot_icon.png" Aspect="AspectFill" />
                                 </Border>
+                            </Grid>
 
-                                <!-- 标题 -->
-                                <Label Text="帝皇权杖δ-me13"
-                                       FontSize="28"
-                                       FontAttributes="Bold"
-                                       TextColor="{StaticResource Primary}"
-                                       HorizontalOptions="Center" />
+                            <Label Text="操作员登录"
+                                   Style="{StaticResource DinTitle}"
+                                   FontSize="33" FontAttributes="Bold"
+                                   CharacterSpacing="2" HorizontalTextAlignment="Center" Margin="0,22,0,0" />
+                            <Label Text="OPERATOR SIGN-IN"
+                                   Style="{StaticResource MonoSmall}"
+                                   FontSize="13" CharacterSpacing="4.6" HorizontalTextAlignment="Center" Margin="0,8,0,0" />
+                            <BoxView Color="{StaticResource Hair}" HeightRequest="1" WidthRequest="300" HorizontalOptions="Center" Margin="0,18,0,0" />
 
-                                <!-- 副标题 -->
-                                <Label Text="专业的社会救助信息化解决方案"
-                                       FontSize="16"
-                                       TextColor="{StaticResource TextSecondary}"
-                                       HorizontalOptions="Center" />
-                            </VerticalStackLayout>
+                            <!-- 阶段柱：第一格点亮（与启动动画一致的视觉记号） -->
+                            <HorizontalStackLayout Spacing="5" HorizontalOptions="Center" Margin="0,16,0,0">
+                                <BoxView Color="{StaticResource Primary}" WidthRequest="24" HeightRequest="2" />
+                                <BoxView Color="{StaticResource HairSoft}" WidthRequest="24" HeightRequest="2" />
+                                <BoxView Color="{StaticResource HairSoft}" WidthRequest="24" HeightRequest="2" />
+                                <BoxView Color="{StaticResource HairSoft}" WidthRequest="24" HeightRequest="2" />
+                                <BoxView Color="{StaticResource HairSoft}" WidthRequest="24" HeightRequest="2" />
+                                <BoxView Color="{StaticResource HairSoft}" WidthRequest="24" HeightRequest="2" />
+                            </HorizontalStackLayout>
 
-                            <!-- 分隔线 -->
-                            <BoxView HeightRequest="1"
-                                     BackgroundColor="{StaticResource Gray300}"
-                                     Opacity="0.5" />
-
-                            <!-- 登录表单 -->
-                            <VerticalStackLayout Spacing="20">
-
-                                <!-- 用户名输入框 -->
-                                <VerticalStackLayout Spacing="8">
-                                    <Label Text="用户名"
-                                           FontSize="15"
-                                           FontAttributes="Bold"
-                                           TextColor="{StaticResource TextSecondary}" />
-                                    <Grid ColumnDefinitions="Auto, *"
-                                          HeightRequest="48">
-                                        <Border Grid.Column="0"
-                                               WidthRequest="48"
-                                               BackgroundColor="{StaticResource Gray100}"
-                                               StrokeThickness="0"
-                                               Padding="0">
-                                            <Border.StrokeShape>
-                                                <RoundRectangle CornerRadius="8,0,0,8" />
-                                            </Border.StrokeShape>
-                                            <Label Text="{OnPlatform WinUI=&#xE77B;, Android=👤}"
-                                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                                   FontSize="14"
-                                                   TextColor="{StaticResource Primary}"
-                                                   HorizontalOptions="Center"
-                                                   VerticalOptions="Center" />
-                                        </Border>
-                                        <Border Grid.Column="1"
-                                               BackgroundColor="{StaticResource Gray100}"
-                                               StrokeThickness="0">
-                                            <Border.StrokeShape>
-                                                <RoundRectangle CornerRadius="0,8,8,0" />
-                                            </Border.StrokeShape>
-                                            <Entry Text="{Binding Username}"
-                                                   Placeholder="请输入用户名"
-                                                   FontSize="18"
-                                                   BackgroundColor="Transparent" />
-                                        </Border>
-                                    </Grid>
-                                </VerticalStackLayout>
-
-                                <!-- 密码输入框 -->
-                                <VerticalStackLayout Spacing="8">
-                                    <Label Text="密码"
-                                           FontSize="15"
-                                           FontAttributes="Bold"
-                                           TextColor="{StaticResource TextSecondary}" />
-                                    <Grid ColumnDefinitions="Auto, *"
-                                          HeightRequest="48">
-                                        <Border Grid.Column="0"
-                                               WidthRequest="48"
-                                               BackgroundColor="{StaticResource Gray100}"
-                                               StrokeThickness="0"
-                                               Padding="0">
-                                            <Border.StrokeShape>
-                                                <RoundRectangle CornerRadius="8,0,0,8" />
-                                            </Border.StrokeShape>
-                                            <Label Text="{OnPlatform WinUI=&#xE72E;, Android=🔒}"
-                                                   FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                                   FontSize="14"
-                                                   TextColor="{StaticResource Primary}"
-                                                   HorizontalOptions="Center"
-                                                   VerticalOptions="Center" />
-                                        </Border>
-                                        <Border Grid.Column="1"
-                                               BackgroundColor="{StaticResource Gray100}"
-                                               StrokeThickness="0">
-                                            <Border.StrokeShape>
-                                                <RoundRectangle CornerRadius="0,8,8,0" />
-                                            </Border.StrokeShape>
-                                            <Entry Text="{Binding Password}"
-                                                   Placeholder="请输入密码"
-                                                   IsPassword="True"
-                                                   FontSize="18"
-                                                   BackgroundColor="Transparent"
-                                                   ReturnCommand="{Binding LoginCommand}"
-                                                   ReturnType="Go" />
-                                        </Border>
-                                    </Grid>
-                                </VerticalStackLayout>
-
-<!-- 记住账号和密码 - 改进版（垂直布局） -->
-                                 <VerticalStackLayout Spacing="12">
-                                     <!-- 记住账号选项 -->
-                                     <Border Padding="12,10"
-                                             BackgroundColor="{StaticResource CardOptionBackground}"
-                                             StrokeThickness="0"
-                                             StrokeShape="RoundRectangle 8">
-                                         <Grid ColumnDefinitions="Auto,*"
-                                               RowDefinitions="Auto,Auto"
-                                               ColumnSpacing="10">
-                                             <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                                       IsChecked="{Binding RememberMe}"
-                                                       Color="{StaticResource Primary}"
-                                                       VerticalOptions="Center" />
-                                             <Label Grid.Row="0" Grid.Column="1"
-                                                    Text="记住账号"
-                                                    FontSize="17"
-                                                    FontAttributes="Bold"
-                                                    TextColor="{StaticResource TextPrimary}"
-                                                    VerticalOptions="Center" />
-                                             <Label Grid.Row="1" Grid.Column="1"
-                                                    Text="下次自动填充用户名"
-                                                    FontSize="14"
-                                                    TextColor="{StaticResource TextTertiary}"
-                                                    VerticalOptions="Center" />
-                                         </Grid>
-                                     </Border>
-
-                                     <!-- 记住密码选项 -->
-                                     <Border Padding="12,10"
-                                             BackgroundColor="{StaticResource CardOptionBackground}"
-                                             StrokeThickness="0"
-                                             StrokeShape="RoundRectangle 8"
-                                             IsVisible="{Binding RememberMe}">
-                                         <Grid ColumnDefinitions="Auto,*"
-                                               RowDefinitions="Auto,Auto"
-                                               ColumnSpacing="10">
-                                             <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                                       IsChecked="{Binding RememberPassword}"
-                                                       Color="{StaticResource Primary}"
-                                                       VerticalOptions="Center" />
-                                             <Label Grid.Row="0" Grid.Column="1"
-                                                    Text="记住密码"
-                                                    FontSize="17"
-                                                    FontAttributes="Bold"
-                                                    TextColor="{StaticResource TextPrimary}"
-                                                    VerticalOptions="Center" />
-                                             <Label Grid.Row="1" Grid.Column="1"
-                                                    Text="下次自动填充密码"
-                                                    FontSize="14"
-                                                    TextColor="{StaticResource TextTertiary}"
-                                                    VerticalOptions="Center" />
-                                         </Grid>
-                                     </Border>
-                                 </VerticalStackLayout>
-
-                                <!-- 错误提示 -->
-                                <Label Text="{Binding ErrorMessage}"
-                                       TextColor="{StaticResource Error}"
-                                       FontSize="16"
-                                       IsVisible="{Binding HasError}"
-                                       HorizontalOptions="Center"
-                                       Margin="0,8" />
-
-                                <!-- 登录按钮 -->
-                                <Button Text="登录"
-                                        Command="{Binding LoginCommand}"
-                                        IsEnabled="{Binding IsNotBusy}"
-                                        Style="{StaticResource ButtonPrimary}"
-                                        FontSize="20"
-                                        HeightRequest="52"
-                                        Margin="0,8,0,0" />
-
-                            </VerticalStackLayout>
+                            <Label Text="· CHANNEL : LOCAL SECURE" Style="{StaticResource MonoSmall}" FontSize="11"
+                                   HorizontalTextAlignment="Center" Margin="0,18,0,0" />
                         </VerticalStackLayout>
-                    </ScrollView>
+                    </Grid>
                 </Border>
 
-                <!-- 登录卡片 - Phone Layout -->
-                <Border Grid.Row="1"
-                        Style="{StaticResource CardBorderElevated}"
-                        Padding="0"
-                        HorizontalOptions="Center"
-                        VerticalOptions="Center"
-                        WidthRequest="340">
-                    <Border.IsVisible>
-                        <OnIdiom x:TypeArguments="x:Boolean">
-                            <OnIdiom.Phone>True</OnIdiom.Phone>
-                            <OnIdiom.Tablet>False</OnIdiom.Tablet>
-                            <OnIdiom.Desktop>False</OnIdiom.Desktop>
-                        </OnIdiom>
-                    </Border.IsVisible>
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="16" />
-                    </Border.StrokeShape>
-                    <Border.Shadow>
-                        <Shadow Brush="Black"
-                                Offset="0,6"
-                                Radius="12"
-                                Opacity="0.25" />
-                    </Border.Shadow>
+                <!-- 右：档案授权面板 -->
+                <Border x:Name="FormPanel"
+                        Grid.Column="1"
+                        BackgroundColor="{StaticResource PanelFill}"
+                        Stroke="{StaticResource Hair}" StrokeThickness="1"
+                        Padding="40,34"
+                        WidthRequest="460"
+                        HorizontalOptions="Center" VerticalOptions="Center">
+                    <VerticalStackLayout Spacing="18">
 
-                    <VerticalStackLayout Spacing="20"
-                                        Padding="32,40">
+                        <!-- 面板标题行 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="访问授权" Style="{StaticResource DinTitle}" FontSize="22" FontAttributes="Bold" CharacterSpacing="1" />
+                            <Label Grid.Column="1" Text="01 / 01" Style="{StaticResource MonoSmall}" VerticalOptions="Center" />
+                        </Grid>
+                        <BoxView Color="{StaticResource Hair}" HeightRequest="1" />
 
-                        <!-- 标题 -->
-                        <Label Text="用户登录"
-                               FontSize="26"
-                               FontAttributes="Bold"
-                               TextColor="{StaticResource Primary}"
-                               HorizontalOptions="Center" />
+                        <!-- 用户名 -->
+                        <Grid x:Name="UserRow" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                            <Label Text="OPERATOR" Style="{StaticResource FieldLabel}" />
+                            <Border x:Name="UserFieldBorder" Grid.Column="1" BackgroundColor="{StaticResource FieldFill}"
+                                    Stroke="{StaticResource Hair}" StrokeThickness="1" Padding="0">
+                                <Grid ColumnDefinitions="3,*">
+                                    <BoxView x:Name="UserAccent" Color="Transparent" WidthRequest="3" />
+                                    <Entry x:Name="UsernameEntry" Grid.Column="1"
+                                           Text="{Binding Username}"
+                                           Placeholder="请输入用户名"
+                                           Style="{StaticResource ArchiveEntry}" />
+                                </Grid>
+                            </Border>
+                        </Grid>
 
-                        <!-- 副标题 -->
-                        <Label Text="欢迎使用 帝皇权杖δ-me13 用户中心"
-                               FontSize="16"
-                               HorizontalOptions="Center"
-                               TextColor="{StaticResource TextSecondary}"
-                               Margin="0,0,0,12" />
+                        <!-- 密码 -->
+                        <Grid x:Name="PassRow" ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                            <Label Text="PASSKEY" Style="{StaticResource FieldLabel}" />
+                            <Border x:Name="PassFieldBorder" Grid.Column="1" BackgroundColor="{StaticResource FieldFill}"
+                                    Stroke="{StaticResource Hair}" StrokeThickness="1" Padding="0">
+                                <Grid ColumnDefinitions="3,*">
+                                    <BoxView x:Name="PassAccent" Color="Transparent" WidthRequest="3" />
+                                    <Entry x:Name="PasswordEntry" Grid.Column="1"
+                                           Text="{Binding Password}"
+                                           Placeholder="请输入密码"
+                                           IsPassword="True"
+                                           ReturnCommand="{Binding LoginCommand}"
+                                           ReturnType="Go"
+                                           Style="{StaticResource ArchiveEntry}" />
+                                </Grid>
+                            </Border>
+                        </Grid>
 
-                        <!-- 用户名输入框 -->
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="用户名"
-                                   FontSize="15"
-                                   TextColor="{StaticResource TextSecondary}" />
-                            <Entry Text="{Binding Username}"
-                                   Placeholder="请输入用户名"
-                                   FontSize="18"
-                                   HeightRequest="48" />
+                        <!-- 记住账号 / 记住密码 -->
+                        <VerticalStackLayout x:Name="RememberRow" Spacing="10" Margin="0,2,0,0">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <CheckBox IsChecked="{Binding RememberMe}" Color="{StaticResource Primary}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                    <Label Text="记住账号" FontSize="16" TextColor="{StaticResource InkSoft}" />
+                                    <Label Text="REMEMBER OPERATOR" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="2.4" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding RememberMe}">
+                                <CheckBox IsChecked="{Binding RememberPassword}" Color="{StaticResource Primary}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                    <Label Text="记住密码" FontSize="16" TextColor="{StaticResource InkSoft}" />
+                                    <Label Text="REMEMBER PASSKEY" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="2.4" />
+                                </VerticalStackLayout>
+                            </Grid>
                         </VerticalStackLayout>
-
-                        <!-- 密码输入框 -->
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="密码"
-                                   FontSize="15"
-                                   TextColor="{StaticResource TextSecondary}" />
-                            <Entry Text="{Binding Password}"
-                                   Placeholder="请输入密码"
-                                   IsPassword="True"
-                                   FontSize="18"
-                                   HeightRequest="48"
-                                   ReturnCommand="{Binding LoginCommand}"
-                                   ReturnType="Go" />
-                        </VerticalStackLayout>
-
-<!-- 记住账号和密码 - 手机版（垂直布局） -->
-                         <VerticalStackLayout Spacing="10">
-                             <!-- 记住账号选项 -->
-                             <Border Padding="10,8"
-                                     BackgroundColor="{StaticResource CardOptionBackground}"
-                                     StrokeThickness="0"
-                                     StrokeShape="RoundRectangle 6">
-                                 <Grid ColumnDefinitions="Auto,*"
-                                       RowDefinitions="Auto,Auto"
-                                       ColumnSpacing="8">
-                                     <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                               IsChecked="{Binding RememberMe}"
-                                               Color="{StaticResource Primary}"
-                                               VerticalOptions="Center" />
-                                     <Label Grid.Row="0" Grid.Column="1"
-                                            Text="记住账号"
-                                            FontSize="16"
-                                            FontAttributes="Bold"
-                                            TextColor="{StaticResource TextPrimary}"
-                                            VerticalOptions="Center" />
-                                     <Label Grid.Row="1" Grid.Column="1"
-                                            Text="下次自动填充用户名"
-                                            FontSize="14"
-                                            TextColor="{StaticResource TextTertiary}"
-                                            VerticalOptions="Center" />
-                                 </Grid>
-                             </Border>
-
-                             <!-- 记住密码选项 -->
-                             <Border Padding="10,8"
-                                     BackgroundColor="{StaticResource CardOptionBackground}"
-                                     StrokeThickness="0"
-                                     StrokeShape="RoundRectangle 6"
-                                     IsVisible="{Binding RememberMe}">
-                                 <Grid ColumnDefinitions="Auto,*"
-                                       RowDefinitions="Auto,Auto"
-                                       ColumnSpacing="8">
-                                     <CheckBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                               IsChecked="{Binding RememberPassword}"
-                                               Color="{StaticResource Primary}"
-                                               VerticalOptions="Center" />
-                                     <Label Grid.Row="0" Grid.Column="1"
-                                            Text="记住密码"
-                                            FontSize="16"
-                                            FontAttributes="Bold"
-                                            TextColor="{StaticResource TextPrimary}"
-                                            VerticalOptions="Center" />
-                                     <Label Grid.Row="1" Grid.Column="1"
-                                            Text="下次自动填充密码"
-                                            FontSize="14"
-                                            TextColor="{StaticResource TextTertiary}"
-                                            VerticalOptions="Center" />
-                                 </Grid>
-                             </Border>
-                         </VerticalStackLayout>
 
                         <!-- 错误提示 -->
                         <Label Text="{Binding ErrorMessage}"
-                               TextColor="{StaticResource Error}"
-                               FontSize="16"
                                IsVisible="{Binding HasError}"
-                               HorizontalOptions="Center"
-                               Margin="0,6" />
+                               FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                               FontSize="14" TextColor="{StaticResource Error}"
+                               LineBreakMode="WordWrap" />
 
-                        <!-- 登录按钮 -->
-                        <Button Text="登录"
-                                Command="{Binding LoginCommand}"
+                        <!-- 授权按钮（双语 + 脉冲动画） -->
+                        <Border x:Name="LoginButton"
+                                BackgroundColor="{StaticResource Primary}"
+                                StrokeThickness="0"
+                                HeightRequest="58"
                                 IsEnabled="{Binding IsNotBusy}"
-                                Style="{StaticResource ButtonPrimary}"
-                                FontSize="18"
-                                HeightRequest="48"
-                                Margin="0,6,0,0" />
+                                Margin="0,6,0,0">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding LoginCommand}" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="1" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="授权访问" FontSize="20" FontAttributes="Bold"
+                                       TextColor="White" CharacterSpacing="3" HorizontalOptions="Center" />
+                                <Label Text="GRANT ACCESS" FontSize="11" TextColor="#BFFFFFFF"
+                                       FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                                       CharacterSpacing="3.4" HorizontalOptions="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <!-- 页脚（底部留出任务栏高度，避免被系统任务栏压住） -->
+            <VerticalStackLayout Grid.Row="2" Padding="46,0,46,58" Spacing="10" InputTransparent="True">
+                <Grid ColumnDefinitions="0.24*,0.76*" HeightRequest="1">
+                    <BoxView Color="{StaticResource Primary}" />
+                    <BoxView Grid.Column="1" Color="{StaticResource HairSoft}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="© 2026 帝皇权杖δ-me13 社会救助管理系统" Style="{StaticResource MonoSmall}" FontSize="12" CharacterSpacing="0.6" />
+                    <Label Grid.Column="1" Text="· SESSION : STANDBY" Style="{StaticResource MonoSmall}" FontSize="12" />
+                </Grid>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- ════════════════════ 手机版式 ════════════════════ -->
+        <ScrollView IsVisible="{OnIdiom Phone=True, Desktop=False, Tablet=False}"
+                    VerticalOptions="Fill" HorizontalOptions="Fill">
+            <VerticalStackLayout Padding="24,34,24,24" Spacing="16">
+
+                <VerticalStackLayout x:Name="BrandBlockPhone" Spacing="1" InputTransparent="True">
+                    <Label Text="NEWCOSMOS" Style="{StaticResource DinTitle}" FontSize="18" FontAttributes="Bold" CharacterSpacing="1.2" />
+                    <Label Text="SOCIAL ASSISTANCE MANAGEMENT" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="3.2" Margin="0,1,0,0" />
+                    <Label Text="帝皇权杖 δ-me13" Style="{StaticResource DinTitle}" FontSize="20" FontAttributes="Bold" Margin="0,3,0,0" />
+                    <Label x:Name="ClockLabelPhone" Text="REV · MOBILE" Style="{StaticResource MonoSmall}" FontSize="11" Margin="0,6,0,0" />
+                </VerticalStackLayout>
+
+                <!-- 吉祥物 + 准星 -->
+                <Grid WidthRequest="150" HeightRequest="150" HorizontalOptions="Center" Margin="0,6,0,0">
+                    <Ellipse x:Name="ReticleRingPhone"
+                             WidthRequest="146" HeightRequest="146"
+                             Stroke="{StaticResource Hair}" StrokeThickness="1"
+                             StrokeDashArray="2,6"
+                             HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Ellipse WidthRequest="118" HeightRequest="118"
+                             Stroke="{StaticResource HairSoft}" StrokeThickness="1"
+                             HorizontalOptions="Center" VerticalOptions="Center" />
+                    <Border WidthRequest="70" HeightRequest="70" BackgroundColor="Transparent"
+                            StrokeThickness="0" Padding="0"
+                            HorizontalOptions="Center" VerticalOptions="Center">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="9" />
+                        </Border.StrokeShape>
+                        <Image Source="mascot_icon.png" Aspect="AspectFill" />
+                    </Border>
+                </Grid>
+
+                <Label Text="操作员登录" Style="{StaticResource DinTitle}" FontSize="21" FontAttributes="Bold"
+                       CharacterSpacing="1.4" HorizontalOptions="Center" />
+                <Label Text="OPERATOR SIGN-IN" Style="{StaticResource MonoSmall}"
+                       FontSize="11" CharacterSpacing="3.4" HorizontalOptions="Center" />
+                <BoxView Color="{StaticResource Hair}" HeightRequest="1" Margin="0,2" />
+
+                <!-- 表单面板 -->
+                <Border x:Name="FormPanelPhone"
+                        BackgroundColor="{StaticResource PanelFill}"
+                        Stroke="{StaticResource Hair}" StrokeThickness="1"
+                        Padding="18,18">
+                    <VerticalStackLayout Spacing="14">
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="访问授权" Style="{StaticResource DinTitle}" FontSize="17" FontAttributes="Bold" />
+                            <Label Grid.Column="1" Text="01 / 01" Style="{StaticResource MonoSmall}" VerticalOptions="Center" />
+                        </Grid>
+                        <BoxView Color="{StaticResource Hair}" HeightRequest="1" />
+
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="OPERATOR" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="2.2" />
+                            <Border x:Name="UserFieldBorderPhone" BackgroundColor="{StaticResource FieldFill}" Stroke="{StaticResource Hair}" StrokeThickness="1" Padding="0">
+                                <Grid ColumnDefinitions="3,*">
+                                    <BoxView x:Name="UserAccentPhone" Color="Transparent" WidthRequest="3" />
+                                    <Entry x:Name="UsernameEntryPhone" Grid.Column="1"
+                                           Text="{Binding Username}"
+                                           Placeholder="请输入用户名"
+                                           Style="{StaticResource ArchiveEntry}" />
+                                </Grid>
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="PASSKEY" Style="{StaticResource MonoSmall}" FontSize="11" CharacterSpacing="2.2" />
+                            <Border x:Name="PassFieldBorderPhone" BackgroundColor="{StaticResource FieldFill}" Stroke="{StaticResource Hair}" StrokeThickness="1" Padding="0">
+                                <Grid ColumnDefinitions="3,*">
+                                    <BoxView x:Name="PassAccentPhone" Color="Transparent" WidthRequest="3" />
+                                    <Entry x:Name="PasswordEntryPhone" Grid.Column="1"
+                                           Text="{Binding Password}"
+                                           Placeholder="请输入密码"
+                                           IsPassword="True"
+                                           ReturnCommand="{Binding LoginCommand}"
+                                           ReturnType="Go"
+                                           Style="{StaticResource ArchiveEntry}" />
+                                </Grid>
+                            </Border>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                <CheckBox IsChecked="{Binding RememberMe}" Color="{StaticResource Primary}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
+                                    <Label Text="记住账号" FontSize="14" TextColor="{StaticResource InkSoft}" />
+                                    <Label Text="REMEMBER OPERATOR" Style="{StaticResource MonoSmall}" FontSize="10" />
+                                </VerticalStackLayout>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" IsVisible="{Binding RememberMe}">
+                                <CheckBox IsChecked="{Binding RememberPassword}" Color="{StaticResource Primary}" VerticalOptions="Center" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
+                                    <Label Text="记住密码" FontSize="14" TextColor="{StaticResource InkSoft}" />
+                                    <Label Text="REMEMBER PASSKEY" Style="{StaticResource MonoSmall}" FontSize="10" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </VerticalStackLayout>
+
+                        <Label Text="{Binding ErrorMessage}"
+                               IsVisible="{Binding HasError}"
+                               FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                               FontSize="12" TextColor="{StaticResource Error}"
+                               LineBreakMode="WordWrap" />
+
+                        <Border x:Name="LoginButtonPhone"
+                                BackgroundColor="{StaticResource Primary}"
+                                StrokeThickness="0"
+                                HeightRequest="52"
+                                IsEnabled="{Binding IsNotBusy}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding LoginCommand}" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="0" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="授权访问" FontSize="16" FontAttributes="Bold"
+                                       TextColor="White" CharacterSpacing="2.4" HorizontalOptions="Center" />
+                                <Label Text="GRANT ACCESS" FontSize="10" TextColor="#BFFFFFFF"
+                                       FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                                       CharacterSpacing="2.8" HorizontalOptions="Center" />
+                            </VerticalStackLayout>
+                        </Border>
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- 底部版权 -->
-                <Label Grid.Row="2"
-                       Text="© 2026 帝皇权杖δ-me13 社会救助管理系统 | 技术支持"
-                       FontSize="14"
-                       TextColor="White"
-                       Opacity="0.8"
-                       HorizontalOptions="Center"
-                       VerticalOptions="End"
-                       Margin="0,0,0,24" />
-            </Grid>
+                <Grid ColumnDefinitions="0.24*,0.76*" HeightRequest="1" Margin="0,4,0,0">
+                    <BoxView Color="{StaticResource Primary}" />
+                    <BoxView Grid.Column="1" Color="{StaticResource HairSoft}" />
+                </Grid>
+                <Label Text="© 2026 帝皇权杖δ-me13 社会救助管理系统" Style="{StaticResource MonoSmall}"
+                       FontSize="11" CharacterSpacing="0.4" HorizontalOptions="Center" />
+            </VerticalStackLayout>
         </ScrollView>
 
-        <!-- 翁法罗斯 · 永劫回归 · 数据删除特效（全屏半透明背景层，点击穿透保留背景图切换）——仅 Windows，Android 屏蔽 -->
-        <controls:EternalRegressionView x:Name="EternalRegressionEffect"
-                                        HorizontalOptions="Fill"
-                                        VerticalOptions="Fill"
-                                        InputTransparent="True"
-                                        IsVisible="{OnPlatform WinUI=true, Android=false}"/>
-
-        <!-- 加载指示器 - 放在最顶层 -->
-<components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3" IsLoading="{Binding IsBusy}"
-    LoadingText="正在登录..."/>
+        <!-- 加载遮罩（最顶层） -->
+        <components:LoadingOverlay IsLoading="{Binding IsBusy}"
+                                   LoadingText="正在授权访问…" />
     </Grid>
 </ContentPage>

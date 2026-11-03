@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace NewCosmos.Models.DeathStatement;
 
 /// <summary>
@@ -94,11 +96,20 @@ public sealed class DeathSearchItem
     public string DeathReason { get; set; } = string.Empty;
     public string DeathCertNo { get; set; } = string.Empty;
 
-    /// <summary>行内角标（已申报/未申报/已作废）</summary>
+    /// <summary>行内角标（已申报/未申报/已作废/未登记死亡）</summary>
     public string Badge { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 导入库档案候选行（来源③：5 个历史导入库人员表命中；无申报/死亡登记/关联档案）。
+    /// 角标与副标题走候选口径（未登记死亡），不复用"未申报"通用逻辑。
+    /// </summary>
+    public bool IsImportCandidate { get; set; }
+
+    /// <summary>命中的导入库显示名（农村低保档案/城市低保档案/低保边缘档案/特困供养档案/刚性支出档案；非候选行为空）</summary>
+    public string ImportSourceLabel { get; set; } = string.Empty;
 }
 
-/// <summary>死者在库身份（七源聚合，仅本村命中）</summary>
+/// <summary>死者在库身份（八源聚合，仅本村命中）</summary>
 public sealed class DeathIdentityItem
 {
     /// <summary>身份类别（低保对象/普惠高龄/残疾人…）</summary>
@@ -116,7 +127,8 @@ public sealed class DeathIdentityItem
     /// <summary>备注（金额/等级/学校等）</summary>
     public string Note { get; set; } = string.Empty;
 
-    /// <summary>源标识（Linkage 判定用：Archive/Elderly/Disability/College/TempRelief/NearRelative/Recovery）</summary>
+    /// <summary>源标识（Linkage 判定用：Archive/Elderly/Disability/College/TempRelief/NearRelative/Recovery/ImportArchive；
+    /// ImportArchive=历史导入台账，无 applicationId → 只识别身份，不建联动卡、不派任务）</summary>
     public string SourceKey { get; set; } = string.Empty;
 
     /// <summary>是否本村命中（跨村记录不进表，只计数进提醒）</summary>
@@ -124,7 +136,7 @@ public sealed class DeathIdentityItem
 
     public long? ApplicationId { get; set; }
 
-    /// <summary>源记录ID（高龄=elderly_applications.id / 临救=temp_relief.id / 追缴=recovery.id / 大学生=college_students.id / 近亲属=links.id）</summary>
+    /// <summary>源记录ID（高龄=elderly_applications.id / 临救=temp_relief.id / 追缴=recovery.id / 大学生=college_students.id / 近亲属=links.id / 导入台账=persons.id）</summary>
     public long? SourceRecordId { get; set; }
 }
 
@@ -175,6 +187,57 @@ public sealed class DeathLinkAction
 
     public string DeathReason { get; set; } = string.Empty;
     public string DeathCertNo { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 当前用户能否办理本卡（按 NavKey 对应权限于 VM 加载上下文时批量判定后写入，写入先于绑定无需 INPC）。
+    /// false 且未办 → 按钮禁用且文案「需镇级办理」（申报与办理分离：村级只申报不办理）。
+    /// </summary>
+    public bool CanHandle { get; set; } = true;
+}
+
+/// <summary>
+/// 死亡联动待办项（nc_biz_death_linkage_tasks，2026-10-31 方案2）。
+/// 派活表行 + 目标域实时办结判定（IsDone 读取时计算，Completed 为自愈标记非事实源）。
+/// DeathDate/Time/Reason 来自来源申报行，供承接面跳转预填（同联动卡预填契约）。
+/// </summary>
+public sealed class DeathLinkageTaskItem
+{
+    public long Id { get; set; }
+
+    public long DeclarationId { get; set; }
+
+    public string DeceasedIdCard { get; set; } = string.Empty;
+
+    public string DeceasedName { get; set; } = string.Empty;
+
+    /// <summary>任务域（DeathLinkageConstants.Domain*）</summary>
+    public string TaskDomain { get; set; } = string.Empty;
+
+    /// <summary>任务域中文名（展示）</summary>
+    public string TaskDomainName => Constants.DeathLinkageConstants.GetDomainName(TaskDomain);
+
+    /// <summary>承接所需权限码（承接面按当前用户权限过滤后才展示）</summary>
+    public string PermissionCode { get; set; } = string.Empty;
+
+    /// <summary>关联低收入档案ID（ArchiveHead/ArchiveMember 跳转预填）</summary>
+    public long? RefApplicationId { get; set; }
+
+    /// <summary>关联高龄档案ID（ElderlyStop 跳转预填）</summary>
+    public long? RefElderlyId { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
+    public string DeathDateText { get; set; } = string.Empty;
+
+    public string DeathTimeText { get; set; } = string.Empty;
+
+    public string DeathReason { get; set; } = string.Empty;
+
+    /// <summary>死亡证明编号（户主死亡变更预填，同联动卡契约）</summary>
+    public string DeathCertNo { get; set; } = string.Empty;
+
+    /// <summary>目标域实时办结判定（读取时按各域状态计算；true = 已办，行将被自愈置 Completed 后从待办列表退出）</summary>
+    public bool IsDone { get; set; }
 }
 
 /// <summary>死亡情况说明上下文（文书字段装配 + 页面展示的唯一数据源）</summary>
@@ -208,6 +271,13 @@ public sealed class DeathStatementContext
     public long? ApplicationId { get; set; }
     public long? DeclarationId { get; set; }
     public long? DeathRecordId { get; set; }
+
+    /// <summary>
+    /// 命中的历史导入库显示名（如"特困供养档案"）：搜索来源③带出的候选行透传至此。
+    /// 用途：R10"系统内无在册身份"提醒与身份摘要文案——人已在库（历史导入台账），
+    /// 不应再提示"系统无记录"自相矛盾。
+    /// </summary>
+    public string ImportSourceLabel { get; set; } = string.Empty;
 
     #endregion
 
@@ -319,4 +389,40 @@ public sealed class DeathDeclareResult
 
     /// <summary>同身份证窗口期内既存有效申报数（&gt;0 时页面提示"本窗口内第 N 次申报"）</summary>
     public int RecentValidCount { get; set; }
+}
+
+/// <summary>
+/// 相关业务事项多选项（勾选项集合勾选拼回 BusinessMatter 串，分隔符见
+/// DeathDeclarationConstants.BusinessMatterSeparator；2026-10-30 由单选 Picker 改多选）。
+/// </summary>
+public sealed class BusinessMatterOption : INotifyPropertyChanged
+{
+    private bool _isChecked;
+
+    public BusinessMatterOption(string name, bool isChecked)
+    {
+        Name = name;
+        _isChecked = isChecked;
+    }
+
+    /// <summary>选项显示文本（与落库值一致）</summary>
+    public string Name { get; }
+
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value) return;
+            _isChecked = value;
+            IsCheckedChanged?.Invoke(this, EventArgs.Empty);
+            OnPropertyChanged(nameof(IsChecked));
+        }
+    }
+
+    /// <summary>勾选变化回调（VM 订阅后重拼 BusinessMatter 串）</summary>
+    public event EventHandler? IsCheckedChanged;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

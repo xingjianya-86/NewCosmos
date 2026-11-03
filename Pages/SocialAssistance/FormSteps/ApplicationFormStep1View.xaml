@@ -12,7 +12,7 @@
         <Border BackgroundColor="#FEE2E2" StrokeThickness="0" Padding="12,8"
                 IsVisible="{Binding IsAddressScopeAvailable, Converter={StaticResource BoolToInverseConverter}}">
             <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「用户与权限管理 → 经办机构管理」为本单位补齐省/市/县/镇/村后再录入。"
-                   FontSize="12" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
+                   FontSize="14" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
         </Border>
 
         <!-- ──────────────────────────────────────────────────────── -->
@@ -23,7 +23,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                TextColor="{StaticResource Success}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -31,17 +31,17 @@
                     <Label Grid.Column="2" Text="(限本单位管辖范围)" Style="{StaticResource LabelSmall}" VerticalOptions="Center" HorizontalOptions="End"/>
                 </Grid>
                 <!-- 管辖范围说明（账号绑定级别及以上锁定置灰，只留本单位一项） -->
-                <Label Text="{Binding AddressScopeDescription}" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
+                <Label Text="{Binding AddressScopeDescription}" FontSize="14" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
                 <BoxView Style="{StaticResource Divider}" Margin="0"/>
                 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding HukouProvince}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding HukouCityOptions}"
                                 SelectedItem="{Binding HukouCity}"
                                 Style="{StaticResource FormFieldPickerStyle}"
@@ -49,7 +49,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding HukouDistrictOptions}"
                                 SelectedItem="{Binding HukouDistrict}"
                                 Style="{StaticResource FormFieldPickerStyle}"
@@ -57,7 +57,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="3" Spacing="8">
-                        <Label Text="乡镇" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="乡镇" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding HukouTownOptions}"
                                 SelectedItem="{Binding HukouTown}"
                                 Style="{StaticResource FormFieldPickerStyle}"
@@ -70,7 +70,7 @@
                      打印/归档/存量数据级联解析继续用 HukouAddress，仅界面不给手输入口。 -->
                 <Grid ColumnDefinitions="1*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding HukouVillageOptions}"
                                 SelectedItem="{Binding HukouVillage}"
                                 Style="{StaticResource FormFieldPickerStyle}"
@@ -90,17 +90,17 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="{OnPlatform WinUI='&#xE707;', Android='&#x1F4CD;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE707;', Android='&#x1F4CD;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                TextColor="{StaticResource Primary}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <Label Grid.Column="1" Text="申请人所在地址（家庭住址）" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                 </Grid>
-                <Label Text="居住地全国可选（默认取本单位区划），不受户籍管辖范围限制" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
+                <Label Text="居住地全国可选（默认取本单位区划），不受户籍管辖范围限制" FontSize="14" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
                 <BoxView Style="{StaticResource Divider}" Margin="0"/>
                 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12" RowDefinitions="Auto" RowSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <!-- 2026-10-27：省由「写死单选+禁用」改为**全国 34 省可选** -->
                         <Picker ItemsSource="{Binding ProvinceOptions}"
                                 SelectedItem="{Binding SelectedProvince}"
@@ -108,21 +108,21 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding CityOptions}"
                                 SelectedItem="{Binding SelectedCity}"
                                 Style="{StaticResource FormFieldPickerStyle}"
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="区县" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding DistrictOptions}"
                                 SelectedItem="{Binding SelectedDistrict}"
                                 Style="{StaticResource FormFieldPickerStyle}"
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="3" Spacing="8">
-                        <Label Text="乡镇社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="乡镇社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding TownOptions}"
                                 SelectedItem="{Binding SelectedTown}"
                                 Style="{StaticResource FormFieldPickerStyle}"
@@ -131,14 +131,14 @@
                 </Grid>
                 <Grid ColumnDefinitions="1*,3*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="村社区" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding VillageOptions}"
                                 SelectedItem="{Binding SelectedVillage}"
                                 Style="{StaticResource FormFieldPickerStyle}"
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="详细地址" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="详细地址" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding Address}" Placeholder="请输入详细地址（如：XX路XX号）"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
@@ -154,7 +154,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                TextColor="{StaticResource StatCardOrangeStart}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -165,39 +165,44 @@
                 <!-- 第1行：姓名、身份证号（含搜索按钮）、残疾证号、性别、年龄 -->
                 <Grid ColumnDefinitions="2*,3*,2*,1*,2*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding ApplicantName}"
                                Placeholder="{Binding ApplicantNameField.Placeholder}"
                                IsReadOnly="{Binding IsApplicantIdentityLocked}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                      <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                             <Entry Text="{Binding ApplicantIdCard}"
                                    Placeholder="{Binding ApplicantIdCardField.Placeholder}"
                                    IsReadOnly="{Binding IsApplicantIdentityLocked}"
                                    Style="{StaticResource FormFieldEntryStyle}"
                                    MaxLength="18"/>
-                            <Button Grid.Column="1" Text="照片" Style="{StaticResource ButtonSmall}"
+                            <!-- 查库填充：身份证输满 18 位后按此钮，从人员库带出姓名/电话/地址/家庭成员（编辑模式锁定时禁用，防覆盖已录数据） -->
+                            <Button Grid.Column="1" Text="查库" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding SearchByIdCardCommand}"
+                                    IsEnabled="{Binding IsApplicantIdentityLocked, Converter={StaticResource BoolToInverseConverter}}"
+                                    VerticalOptions="Center"/>
+                            <Button Grid.Column="2" Text="照片" Style="{StaticResource ButtonSmall}"
                                     Command="{Binding OpenPhotosCommand}" VerticalOptions="Center"/>
                         </Grid>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="残疾证号（后两位）" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="残疾证号（后两位）" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding DisabilityCardNo}"
                                Placeholder="后两位用于计算"
                                MaxLength="2"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="3" Spacing="8">
-                        <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="性别" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding DetectedGender}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="4" Spacing="8">
-                        <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="年龄" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding DetectedAgeDisplay}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
@@ -207,14 +212,14 @@
                 <!-- 第2行：联系方式、民族、婚姻状况、户口性质、文化程度、政治面貌 -->
                 <Grid ColumnDefinitions="2*,1*,1*,1*,1*,1*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="联系方式" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="联系方式" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding ApplicantPhone}"
                                Placeholder="{Binding PhoneField.Placeholder}"
                                Style="{StaticResource FormFieldEntryStyle}"
                                Keyboard="Telephone" MaxLength="11"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="民族" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="民族" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding EthnicityOptions}"
                                 SelectedItem="{Binding SelectedEthnicity}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -222,7 +227,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="婚姻状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="婚姻状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding MaritalStatusOptions}"
                                 SelectedItem="{Binding SelectedMaritalStatus}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -230,7 +235,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="3" Spacing="8">
-                        <Label Text="户口性质" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="户口性质" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding HukouTypeOptions}"
                                 SelectedItem="{Binding HukouType}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -238,7 +243,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="4" Spacing="8">
-                        <Label Text="文化程度" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="文化程度" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding EducationLevelOptions}"
                                 SelectedItem="{Binding SelectedEducationLevel}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -246,7 +251,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="5" Spacing="8">
-                        <Label Text="政治面貌" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="政治面貌" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding PoliticalStatusOptions}"
                                 SelectedItem="{Binding SelectedPoliticalStatus}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -258,13 +263,13 @@
                 <!-- 第3行：开户行、银行卡号 -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="开户行" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding BankName}"
                                Placeholder="银行卡开户行（导入建档自动带出，可修改）"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="银行卡号" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding BankAccount}"
                                Placeholder="银行卡号（导入建档自动带出，可修改）"
                                Style="{StaticResource FormFieldEntryStyle}"
@@ -282,7 +287,7 @@
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                     <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                             BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" Padding="0">
-                        <Label Text="{OnPlatform WinUI='&#xE90D;', Android='&#x1F3E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                        <Label Text="{OnPlatform WinUI='&#xE90D;', Android='&#x1F3E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                TextColor="{StaticResource Error}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
@@ -293,19 +298,19 @@
                 <!-- 第1行：身体状况、残疾类型、残疾等级 -->
                 <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="身体状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="身体状况" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding SelectedHealthStatusObj.Display}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="残疾类型" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="残疾类型" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding SelectedDisabilityTypeObj.Display}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="残疾等级" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="残疾等级" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding SelectedDisabilityLevelObj.Display}" IsReadOnly="True"
                                BackgroundColor="{StaticResource Gray100}"
                                Style="{StaticResource FormFieldEntryStyle}"/>
@@ -315,17 +320,17 @@
                 <!-- 第3行：疾病信息（是否重病 + 编码回填 + 一级分类 + 二级名称） -->
                 <Grid ColumnDefinitions="Auto,*,*,*" ColumnSpacing="12" Margin="0,8,0,0">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="是否重病" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="是否重病" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <CheckBox IsChecked="{Binding IsSevereDisease}" HorizontalOptions="Start" VerticalOptions="Center"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="8">
-                        <Label Text="疾病编码（ICD-10）" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="疾病编码（ICD-10）" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding DiseaseCode}" TextChanged="OnApplicantDiseaseCodeChanged"
                                Placeholder="如 A00.900，输入后自动带出疾病"
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="2" Spacing="8">
-                        <Label Text="一级疾病" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="一级疾病" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Picker ItemsSource="{Binding DiseaseCategoryOptions}"
                                 SelectedItem="{Binding SelectedDiseaseCategoryObj}"
                                 ItemDisplayBinding="{Binding Display}"
@@ -333,7 +338,7 @@
                                 Title=""/>
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="3" Spacing="8">
-                        <Label Text="二级疾病" Style="{StaticResource FormFieldLabelStyle}" FontSize="15"/>
+                        <Label Text="二级疾病" Style="{StaticResource FormFieldLabelStyle}" FontSize="17"/>
                         <Entry Text="{Binding DiseaseNameText}"
                                Placeholder="输入疾病编码自动带出，可手工修改"
                                Style="{StaticResource FormFieldEntryStyle}"/>

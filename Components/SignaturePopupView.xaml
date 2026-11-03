@@ -15,13 +15,13 @@
             <!-- 标题 -->
             <Label x:Name="PromptLabel"
                    Text="请本人签名"
-                   FontSize="15"
+                   FontSize="17"
                    FontAttributes="Bold"
                    TextColor="{StaticResource TextPrimary}"
                    Margin="20,16,20,4"/>
 
             <Label Text="请在下方签字框内书写签名"
-                   FontSize="12"
+                   FontSize="14"
                    TextColor="{StaticResource TextTertiary}"
                    Margin="20,0,20,12"/>
 

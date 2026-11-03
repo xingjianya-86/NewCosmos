@@ -71,12 +71,22 @@ public class PersonSearchService : BaseService, IPersonSearchService
 
             var results = completedTasks.SelectMany(r => r.Value ?? new List<PersonSearchResult>()).ToList();
 
-            // 逐人补查家庭成员：无共享连接/事务，可并行执行（连接池上限内安全）。
-            // 原先串行 2-3 次往返 × 命中条数；并行后整体等待时间 ≈ 单条最慢耗时。
+            // 逐人补查家庭成员：无共享连接/事务，可并行执行。
+            // 有界并发（SemaphoreSlim 8）：入参是身份证精确匹配、命中行数天然小，但脏数据
+            //（同身份证海量重复行）下无界 WhenAll 会瞬时抢空连接池（MaxPoolSize=30）造成池等待抖动。
             // §6：补查失败显式失败（空集会被当"无成员"保存回去，静默清空真实成员）。
+            using var enrichGate = new SemaphoreSlim(8);
             var enrichTasks = results.Select(person => Task.Run(async () =>
             {
-                return await EnrichFamilyMembersAsync(person, ct);
+                await enrichGate.WaitAsync(ct);
+                try
+                {
+                    return await EnrichFamilyMembersAsync(person, ct);
+                }
+                finally
+                {
+                    enrichGate.Release();
+                }
             }, ct)).ToArray();
             await Task.WhenAll(enrichTasks);
 
@@ -181,7 +191,7 @@ public class PersonSearchService : BaseService, IPersonSearchService
     private async Task<Result<List<FamilyMember>>> GetFamilyMembersAsync(
         long applicationId, CancellationToken ct)
     {
-        var sql = @"SELECT * FROM nc_biz_family_members 
+        var sql = @"SELECT " + WideTableColumns.FamilyMembersColumns + @" FROM nc_biz_family_members 
                     WHERE application_id = $1 AND deleted_at IS NULL
                     ORDER BY is_applicant DESC, id ASC";
 
@@ -356,7 +366,8 @@ public class PersonSearchService : BaseService, IPersonSearchService
     {
         ValidateTableName(table);
         var joinClause = string.IsNullOrWhiteSpace(join) ? "" : $" {join}";
-        var sql = $"SELECT '{table}' as source_table, '{display}' as source_display, {columns} FROM {table} p {joinClause} WHERE {where}";
+        // LIMIT 防御（§8）：入参为身份证精确匹配，命中行数天然小；上限兜底脏数据全表级返回
+        var sql = $"SELECT '{table}' as source_table, '{display}' as source_display, {columns} FROM {table} p {joinClause} WHERE {where} LIMIT 100";
 
         Debug.WriteLine($"执行SQL: {table}");
         var result = await _db.QueryAsync<PersonSearchResult>(sql, ct, idCard);

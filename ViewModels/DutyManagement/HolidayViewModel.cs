@@ -154,7 +154,7 @@ public partial class HolidayViewModel : ViewModelBase
 
         var confirm = await _dialogService.DisplayAlertAsync(
             "下载节假日数据",
-            $"确定要从节假日接口下载 {SelectedYear} 年数据吗？\n该年份的接口来源数据将被覆盖（手工维护的记录保留）。",
+            $"确定要从节假日接口下载 {SelectedYear} 年数据吗？\n该年份的接口来源数据将被覆盖（手工维护的记录保留）。\n主接口无数据时会自动尝试备用数据源。",
             "下载", "取消");
         if (!confirm) return;
 
@@ -165,18 +165,54 @@ public partial class HolidayViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 downloaded = true;
-                await ShowSnackBarAsync(
-                    $"下载完成：法定节假日 {result.Value.HolidayCount} 天，调休补班 {result.Value.MakeupCount} 天");
+                var summary = result.Value;
+                var message = $"下载完成：法定节假日 {summary.HolidayCount} 天，调休补班 {summary.MakeupCount} 天";
+                if (summary.IsFromFallback)
+                {
+                    message += "\n（主接口无该年度数据，已从备用数据源获取）";
+                    _logger.Warn($"{SelectedYear} 年节假日数据来自备用数据源，建议主接口恢复后重新下载核对");
+                }
+                await ShowSnackBarAsync(message);
             }
             else
             {
-                await ShowFailureAsync(result, "下载节假日数据");
+                await ShowDownloadFailureAsync(result);
             }
         }, $"正在下载 {SelectedYear} 年节假日数据...");
 
         if (downloaded)
         {
             await LoadHolidaysAsync();
+        }
+    }
+
+    /// <summary>
+    /// 下载失败分流提示：把"该年尚未发布"和"网络不可达"从笼统的"数据异常"里拆出来，
+    /// 给出可执行的下一步（等待发布 / 检查网络 / 转手工维护），而非只报错了事。
+    /// </summary>
+    private async Task ShowDownloadFailureAsync(Models.Results.Result result)
+    {
+        var errorCode = result.ErrorCode ?? ErrorCodes.UNKNOWN_ERROR;
+        switch (errorCode)
+        {
+            case ErrorCodes.HOLIDAY_YEAR_NOT_PUBLISHED:
+                // 尚未发布属正常时序，不是故障，用"提示"而非"错误"标题
+                await _dialogService.DisplayAlertAsync(
+                    $"{SelectedYear} 年安排尚未发布",
+                    UserFriendlyMessages.Get(errorCode),
+                    "确定");
+                break;
+
+            case ErrorCodes.HOLIDAY_API_UNREACHABLE:
+                await _dialogService.DisplayAlertAsync(
+                    "网络连接失败",
+                    UserFriendlyMessages.Get(errorCode),
+                    "确定");
+                break;
+
+            default:
+                await ShowFailureAsync(result, "下载节假日数据");
+                break;
         }
     }
 

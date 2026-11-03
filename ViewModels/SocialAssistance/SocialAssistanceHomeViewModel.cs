@@ -31,6 +31,10 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
     [ObservableProperty]
     private bool _canAccessChange;
 
+    /// <summary>大学生管理办理权限（COLLEGE_MANAGE，2026-10-31 立码：入口与死亡待退出承接均按此门控）</summary>
+    [ObservableProperty]
+    private bool _canAccessCollege;
+
     /// <summary>各子功能卡置灰透明度（无权限 0.5）</summary>
     public double SocialAssistanceOpacity => CanAccessSocialAssistance ? 1.0 : 0.5;
     public double ReportOpacity => CanAccessSocialAssistanceReport ? 1.0 : 0.5;
@@ -107,7 +111,8 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
                 PermissionCodes.INCOME_VIEW,
                 PermissionCodes.REPORT_VIEW,
                 PermissionCodes.TEMP_CREATE,
-                PermissionCodes.CHANGE_VIEW
+                PermissionCodes.CHANGE_VIEW,
+                PermissionCodes.COLLEGE_MANAGE
             };
             var permissions = await _permissionService.CheckPermissionsAsync(userId, codes);
 
@@ -117,6 +122,7 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
             CanAccessSocialAssistanceReport = Has(PermissionCodes.REPORT_VIEW);
             CanAccessTemporaryAssistance = Has(PermissionCodes.TEMP_CREATE);
             CanAccessChange = Has(PermissionCodes.CHANGE_VIEW);
+            CanAccessCollege = Has(PermissionCodes.COLLEGE_MANAGE);
             MarkPermissionsLoaded();
         }
         catch (Exception ex)
@@ -176,15 +182,12 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
         NavigateToFeatureAsync<Pages.SocialAssistance.GracePeriodExpiringListPage>(
             true, "渐退期管理", "渐退期管理");
 
-    [RelayCommand]
-    private Task OpenRecoveryAsync() =>
-        NavigateToFeatureAsync<Pages.Recovery.RecoverySearchPage>(
-            true, "后补追缴", "后补追缴");
+    // 后补追缴已升为独立模块（主页业务模块直达区 + 侧栏 + 手机工作台），本页子卡与命令一并移除
 
     [RelayCommand]
     private Task OpenCollegeStudentAsync() =>
         NavigateToFeatureAsync<Pages.SocialAssistance.CollegeStudentManagementPage>(
-            CanAccessSocialAssistance, "大学生管理", "大学生管理");
+            CanAccessCollege, "大学生管理", "大学生管理");
 
     [RelayCommand]
     private Task OpenNearRelativeAsync() =>

@@ -117,6 +117,7 @@ public partial class SnackBarView : ContentView
         }
         catch (OperationCanceledException)
         {
+            // 展示时长到点/新提示抢占触发的取消，正常收尾路径，非错误
         }
     }
 

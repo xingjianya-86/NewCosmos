@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 
@@ -6,7 +6,8 @@ namespace NewCosmos.Services.System;
 
 /// <summary>
 /// 地区服务接口
-/// 提供黑龙江省行政区划数据查询（地级市、县区、乡镇、村/社区四级    /// </summary>
+/// 提供黑龙江省行政区划数据查询（地级市、县区、乡镇、村/社区四级
+/// </summary>
 public interface IRegionService
 {
     #region Schema管理

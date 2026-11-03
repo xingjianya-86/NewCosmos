@@ -90,7 +90,8 @@ public class OrganizationService : BaseService, IOrganizationService
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
             RETURNING id";
 
-        var insertResult = await _db.ExecuteScalarAsync(sql, ct,
+        // 泛型版取 RETURNING id（AGENTS §8：旧版无泛型 API 无行时返回 Success(0)，勿用于 RETURNING id）
+        var insertResult = await _db.ExecuteScalarAsync<int?>(sql, ct,
             request.Name, request.Abbreviation, request.Principal, request.PrincipalIdentityCard, request.Phone,
             request.Address, request.PostalCode, request.ParentId,
             request.InstitutionNature, request.InstitutionType, request.InstitutionCategory,
@@ -107,7 +108,10 @@ public class OrganizationService : BaseService, IOrganizationService
             return Result.Failure<int>(insertResult.ErrorCode!, insertResult.Message!);
         }
 
-        var orgId = Convert.ToInt32(insertResult.Value);
+        if (insertResult.Value is null or <= 0)
+            return Result.Failure<int>(ErrorCodes.OPERATION_FAILED, "创建组织失败：未返回新组织ID");
+
+        var orgId = insertResult.Value.Value;
         LogInfo($"组织创建成功: Id={orgId}");
         Logger.LogBusiness("创建组织", ("OrganizationId", orgId), ("Name", request.Name));
         return Result.Success(orgId);

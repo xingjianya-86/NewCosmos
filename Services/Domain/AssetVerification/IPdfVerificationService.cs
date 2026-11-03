@@ -4,19 +4,14 @@ namespace NewCosmos.Services.Domain.AssetVerification;
 
 public interface IPdfVerificationService
 {
-    Task<Result<List<PdfVerificationResult>>> BatchVerifyAsync(
-        IEnumerable<string> pdfFilePaths,
-        IEnumerable<string> expectedNames,
-        CancellationToken ct = default);
-
-    Task<Result<AssetCheckItemResult?>> FindCheckByNameAsync(
-        string name, CancellationToken ct = default);
+    // 已删除（2026-11 死代码清理，全仓 grep 零调用方）：
+    // BatchVerifyAsync（纯文件名分段匹配）/ FindCheckByNameAsync / GetVerificationHistoryAsync /
+    // AssetCheckItemResult 类（仅被上述死方法引用）。
 
     Task<Result<bool>> HasLowIncomeIdentityAsync(
         string name, string idCard, CancellationToken ct = default);
 
-    Task<Result> UpdateCheckStatusAsync(
-        long checkId, string status, CancellationToken ct = default);
+    // UpdateCheckStatusAsync 已移至 IAssetVerificationService（唯一实现带终态守卫）；本接口副本 2026-11 删除
 
     /// <summary>
     /// 按身份证整户升级核查状态为"已纳入低收入人口"(2)：该身份证作为户主
@@ -46,9 +41,6 @@ public interface IPdfVerificationService
     Task<Result<bool>> ReportExistsByCheckIdAsync(
         long checkId, CancellationToken ct = default);
 
-    Task<Result<List<PdfVerificationRecord>>> GetVerificationHistoryAsync(
-        int limit = 50, CancellationToken ct = default);
-
     /// <summary>按户（head_id_card）取全部报告版本，version 倒序，当前版本 is_current=true。</summary>
     Task<Result<List<PdfVerificationRecord>>> GetReportHistoryByCheckIdAsync(
         long checkId, CancellationToken ct = default);
@@ -61,13 +53,4 @@ public interface IPdfVerificationService
         long checkId, CancellationToken ct = default);
 }
 
-public class AssetCheckItemResult
-{
-    public long Id { get; set; }
-    public string ApplicantName { get; set; } = string.Empty;
-    public string ApplicantIdCard { get; set; } = string.Empty;
-    public string Relationship { get; set; } = string.Empty;
-    public string Status { get; set; } = "0";
-    public string BatchId { get; set; } = string.Empty;
-    public string HeadIdCard { get; set; } = string.Empty;
-}
+// 已删除（2026-11）：AssetCheckItemResult 类——仅被死方法 FindCheckByNameAsync 引用。

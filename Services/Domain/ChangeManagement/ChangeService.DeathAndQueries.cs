@@ -93,7 +93,7 @@ public partial class ChangeService
             var newFamilySize = (int)countResult.Value;
 
             // 5. 获取剩余成员（同经济复核：查询失败不能按空成员继续做分类判定）
-            var membersSql = "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
+            var membersSql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
@@ -356,7 +356,7 @@ public partial class ChangeService
         {
             // 1. 获取新户主信息（必须限定归属本申请且未删除——否则传入别户的成员 ID
             //    会把别户成员的姓名/身份证写进本申请的户主字段，数据归属错乱）
-            var memberSql = "SELECT * FROM nc_biz_family_members WHERE id = $1 AND application_id = $2 AND deleted_at IS NULL";
+            var memberSql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE id = $1 AND application_id = $2 AND deleted_at IS NULL";
             var memberResult = await _db.QuerySingleAsync<FamilyMember>(memberSql, ct, context.NewHeadMemberId, context.ApplicationId);
             if (!memberResult.IsSuccess || memberResult.Value == null)
             {
@@ -546,7 +546,7 @@ public partial class ChangeService
             //    未显式传入时按 优先级：is_applicant=true / member_category='HouseholdHead' /
             //    身份证号或姓名与旧档案申请人一致（存量数据常存在 is_applicant 未置位的申请人成员）
             var membersResult = await _db.QueryAsync<FamilyMember>(
-                "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
+                "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
@@ -867,7 +867,7 @@ public partial class ChangeService
 
             // 构建 旧成员ID → 新成员ID 映射（按身份证号匹配，用于照料人被照料成员与经济明细 member_id 的指向迁移）
             var newMembersResult = await _db.QueryAsync<FamilyMember>(
-                "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
+                "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
             if (newMembersResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
@@ -930,7 +930,7 @@ public partial class ChangeService
 
             // 12. 复制照料人（cared_member_id 迁移到新成员ID，无法映射置 0）
             var caregiversResult = await _db.QueryAsync<Caregiver>(
-                "SELECT * FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
+                "SELECT " + WideTableColumns.CaregiversColumns + " FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (caregiversResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
@@ -1130,6 +1130,260 @@ public partial class ChangeService
         return result.IsSuccess
             ? Result.Success(result.Value ?? new List<ChangeRecord>())
             : Result.Failure<List<ChangeRecord>>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <summary>
+    /// 单人户户主死亡：只整户停止、不建新档案。
+    /// 与 ExecuteHouseholdDeathAsync（停旧建新）的区别：唯一成员即户主，无人可接任新户主，
+    /// 因此不复制子表、不建新档、不算幸存家庭收入——只登记死亡 + 停止旧档 + 结清渐退期 + 写变更记录。
+    /// </summary>
+    public async Task<Result<ChangeResult>> ExecuteHouseholdHeadDeathStopOnlyAsync(HouseholdDeathContext context, CancellationToken ct = default)
+    {
+        LogInfo($"执行单人户户主死亡整户停止: ApplicationId={context.ApplicationId}");
+
+        // 死亡确切时间必填（与停旧建新同一服务侧门）
+        if (context.DeathTime is null)
+            return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择死亡确切时刻");
+
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
+        try
+        {
+            // 1. 获取旧档案（已软删的申请不允许再变更）
+            var appResult = await _db.QuerySingleAsync<ApplicationEntity>(
+                $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
+            if (!appResult.IsSuccess || appResult.Value == null)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+            }
+            var application = appResult.Value;
+            var oldClassification = application.ClassificationResult ?? string.Empty;
+            var oldGuaranteeAmount = application.TotalGuaranteeAmount;
+            var oldFamilySize = application.FamilySize;
+            var oldHeadName = application.ApplicantName;
+            var oldHeadIdCard = application.ApplicantIdCard;
+
+            // 2. 状态校验（与停旧建新一致）：已停保幂等拒绝；Refused 不允许；Draft/Submitted 按业务规则放行
+            var currentStatus = ApplicationStatusExtensions.FromCode(application.Status ?? string.Empty);
+            if (currentStatus == ApplicationStatus.Stopped)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION, "该档案已停保，不能重复执行户主死亡变更");
+            }
+            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
+            if (transition.IsFailure && currentStatus is ApplicationStatus.Refused)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(
+                    ErrorCodes.INVALID_TRANSITION,
+                    transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
+            }
+            if (transition.IsFailure)
+            {
+                LogWarn($"单人户户主死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（户主死亡）放行");
+            }
+
+            // 3. 加载全部家庭成员，定位死亡原户主成员（四重兜底，同停旧建新）
+            var membersResult = await _db.QueryAsync<FamilyMember>(
+                "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
+            if (membersResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    membersResult.Message ?? "家庭成员查询失败");
+            }
+            var allMembers = membersResult.Value ?? new List<FamilyMember>();
+            var deceasedHead = context.DeceasedHeadMemberId > 0
+                ? allMembers.FirstOrDefault(m => m.Id == context.DeceasedHeadMemberId)
+                : allMembers.FirstOrDefault(m => m.IsApplicant
+                    || string.Equals(m.MemberCategory, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrEmpty(oldHeadIdCard)
+                        && string.Equals(m.IdCard, oldHeadIdCard, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(oldHeadName)
+                        && string.Equals(m.Name, oldHeadName, StringComparison.Ordinal)));
+            if (deceasedHead == null)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "未找到死亡原户主成员记录");
+            }
+
+            // 4. 单人户护栏：必须"除死亡户主外无其他共同生活成员（非赡养人）"才允许走只停止分支；
+            //    若仍有幸存成员，应走停旧建新（ExecuteHouseholdDeathAsync）——此处防御性拒绝，避免误停丢失在保成员。
+            var survivingCoResident = allMembers.Count(m => m.Id != deceasedHead.Id
+                && !string.Equals(m.MemberCategory, MemberCategoryConstants.SUPPORT, StringComparison.OrdinalIgnoreCase));
+            if (survivingCoResident > 0)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED,
+                    "该档案仍有其他共同生活成员，不适用单人户整户停止，请办理完整的户主死亡变更（停旧建新）");
+            }
+
+            // 5. 写死亡记录（is_household_head=true，无新户主/新档案）
+            var deathSql = @"INSERT INTO nc_biz_death_records
+                (application_id, member_id, member_name, member_id_card, relationship_to_head,
+                 death_date, death_time, death_reason, death_certificate_no,
+                 is_household_head, new_head_id_card, new_head_name, new_application_id,
+                 operator_name, created_by, created_at)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,NULL,NULL,NULL,$10,$10,NOW());";
+            var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
+                context.ApplicationId, deceasedHead.Id, deceasedHead.Name, deceasedHead.IdCard,
+                string.IsNullOrEmpty(deceasedHead.RelationshipToHead) ? "本人/户主" : deceasedHead.RelationshipToHead,
+                context.DeathDate, context.DeathTime, context.DeathReason, context.DeathCertificateNo,
+                context.OperatorName);
+            if (deathInsertResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(deathInsertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    deathInsertResult.Message ?? "创建死亡记录失败");
+            }
+
+            // 6. 停止旧档案（状态写入统一走 ApplicationStatusService：状态机校验 + stop_* 落库 + 审计留痕）
+            var stopResult = await _statusService.StopAsync(
+                context.ApplicationId, ChangeReasonTypeConstants.HeadDeceased, context.DeathDate,
+                context.OperatorName, allowSubmittedOverride: true, ct: ct);
+            if (stopResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(stopResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    stopResult.Message ?? "停止旧档案失败");
+            }
+
+            // 7. 旧档案停保，结清其渐退期（渐退期仅对在保的低收入降档户有意义）
+            var graceClearResult = await _gracePeriodService.ClearAsync(context.ApplicationId, ct);
+            if (graceClearResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(graceClearResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    graceClearResult.Message ?? "结清旧档案渐退期失败");
+            }
+
+            // 8. 写变更记录（change_type=HouseholdDeath，供历史/本月已办/月报统一识别）
+            var changeContext = new ChangeContext
+            {
+                ApplicationId = context.ApplicationId,
+                ChangeType = DictionaryConstants.ChangeType.HOUSEHOLD_DEATH,
+                ChangeCategory = DictionaryConstants.ChangeCategory.MEMBER_CHANGE,
+                ChangeReason = $"户主死亡: {deceasedHead.Name}({oldHeadIdCard}) → 单人户整户停止",
+                ChangeReasonType = ChangeReasonTypeConstants.HeadDeceased,
+                ChangeDate = context.DeathDate,
+                OperatorName = context.OperatorName
+            };
+            var beforeJson = JsonSerializer.Serialize(new
+            {
+                HeadName = oldHeadName,
+                HeadIdCard = oldHeadIdCard,
+                FamilySize = oldFamilySize,
+                Classification = oldClassification,
+                GuaranteeAmount = oldGuaranteeAmount
+            });
+            var afterJson = JsonSerializer.Serialize(new
+            {
+                FamilySize = 0,
+                DeathDate = context.DeathDate,
+                DeathReason = context.DeathReason,
+                DeceasedHeadName = deceasedHead.Name,
+                StoppedOnly = true
+            });
+            var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
+            if (changeIdResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    changeIdResult.Message ?? "创建变更记录失败");
+            }
+            var changeId = changeIdResult.Value;
+
+            // 9. 回填变更记录结构化字段（无新档：new_classification/new_guarantee/new_application_id 一律 NULL）
+            var updateChangeSql = @"UPDATE nc_biz_change_records SET
+                change_reason_type = $1,
+                old_classification = $2,
+                old_per_capita_income = $3,
+                old_guarantee_amount = $4,
+                triggered_stop = $5,
+                original_application_id = $6,
+                changed_at = NOW()
+                WHERE id = $7;";
+            var updateChangeResult = await _db.ExecuteNonQueryAsync(updateChangeSql, ct,
+                ChangeReasonTypeConstants.HeadDeceased,
+                oldClassification,
+                application.PerCapitaIncome,
+                oldGuaranteeAmount,
+                true,
+                context.ApplicationId,
+                changeId);
+            if (updateChangeResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(updateChangeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    updateChangeResult.Message ?? "更新变更记录对比字段失败");
+            }
+
+            await tx.CommitAsync(ct);
+
+            LogInfo($"单人户户主死亡整户停止完成: 档案={context.ApplicationId} 已停保");
+
+            return Result.Success(new ChangeResult
+            {
+                ChangeId = changeId,
+                IsSuccess = true,
+                OldClassification = oldClassification,
+                OldGuaranteeAmount = oldGuaranteeAmount,
+                TriggeredStop = true,
+                NewApplicationId = 0
+            });
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(ct);
+            LogException(ex, "单人户户主死亡整户停止");
+            return Result.FromException<ChangeResult>(ex);
+        }
+    }
+
+    /// <summary>
+    /// 查询本月（当前自然月）内本档案链上发生过的变更类型项（按 change_type + change_reason_type 去重）。
+    /// 用 changed_at（实际办理时间戳）而非 change_date（业务日期可能回填）；链双列关联 + 软删过滤。
+    /// </summary>
+    public async Task<Result<List<MonthlyChangeEntry>>> GetThisMonthChangeEntriesAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT DISTINCT change_type, change_reason_type
+                    FROM nc_biz_change_records
+                    WHERE (application_id = $1 OR new_application_id = $1)
+                      AND deleted_at IS NULL
+                      AND changed_at >= date_trunc('month', NOW())
+                      AND changed_at <  date_trunc('month', NOW()) + interval '1 month';";
+        var result = await _db.QueryAsync<MonthlyChangeEntry>(sql, ct, applicationId);
+        return result.IsSuccess
+            ? Result.Success(result.Value ?? new List<MonthlyChangeEntry>())
+            : Result.Failure<List<MonthlyChangeEntry>>(result.ErrorCode!, result.Message!);
+    }
+
+    /// <summary>
+    /// 查询最近一条"户主死亡整户停止"记录（单人户户主死亡只停不建新档；无则 Value 为 null）。
+    /// 门槛由变更记录把关：change_type='HouseholdDeath' AND triggered_stop=true AND new_application_id IS NULL
+    /// 唯一标识"整户停止、无下游新档"（停旧建新的户主死亡 new_application_id 指向新档，不会误命中）。
+    /// 死亡日期取独立权威值 nc_biz_death_records.death_date（JOIN 且 is_household_head=true 锁定户主本人），
+    /// 而非变更记录的 change_date——后者是变更生效日期，只是写入时恰好等于死亡日期，并非死亡时间来源。
+    /// 注：nc_biz_death_records 无 deleted_at 列，故不加软删过滤。
+    /// </summary>
+    public async Task<Result<HouseholdDeathStopRecord?>> GetLatestHouseholdDeathStopRecordAsync(long applicationId, CancellationToken ct = default)
+    {
+        var sql = @"SELECT d.death_date FROM nc_biz_change_records c
+                    JOIN nc_biz_death_records d
+                      ON d.application_id = c.application_id
+                     AND d.is_household_head = true
+                    WHERE (c.application_id = $1 OR c.new_application_id = $1)
+                      AND c.change_type = 'HouseholdDeath'
+                      AND c.triggered_stop = true
+                      AND c.new_application_id IS NULL
+                      AND c.deleted_at IS NULL
+                    ORDER BY c.changed_at DESC, d.created_at DESC
+                    LIMIT 1";
+        var result = await _db.QuerySingleAsync<HouseholdDeathStopRecord>(sql, ct, applicationId);
+        if (result.IsFailure)
+            return Result.Failure<HouseholdDeathStopRecord?>(result.ErrorCode!, result.Message!);
+        return Result.Success<HouseholdDeathStopRecord?>(result.Value);
     }
 
     public async Task<Result<TriggeredStopChangeRecord?>> GetLatestTriggeredStopRecordAsync(long applicationId, IReadOnlyCollection<string> newClassifications, CancellationToken ct = default)

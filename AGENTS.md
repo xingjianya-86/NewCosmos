@@ -16,7 +16,8 @@ dotnet build NewCosmos.csproj -f net10.0-windows10.0.19041.0     # Windows
 # Android：-f net10.0-android36.0（发布由 deploy\publish_all 走 -SkipAndroid 控制）
 ```
 
-- **没有测试项目**。验证 = 编译零错误 + 启动冒烟（登录→列表→表单保存→导入→打印预览）。
+- **测试项目**：`NewCosmos.Tests\NewCosmos.Tests.csproj`（xUnit，2026-11 引入，只测纯逻辑：金额/分段/校验器/状态机/常量）。验证 = `dotnet test NewCosmos.Tests\NewCosmos.Tests.csproj` 全过 + 编译零错误 + 启动冒烟（登录→列表→表单保存→导入→打印预览）。
+- **规范/迁移检查**（报告式，防回潮）：`powershell -File deploy\check_standards.ps1`（AGENTS §5/§7/§8/§10/§12 违规清单）、`powershell -File deploy\check_migrations.ps1`（docs/migrations 与 nc_sys_migrations 对账，需先 `psql -f deploy\migrations_registry_init.sql`）。
 - 发版入口：`deploy\publish_all.bat`（先用 `-DryRun` 体检），见 §2。
 - 本地可再生占用（`bin\ obj\ publish\`，≈9 GB）可整删重建，维护见 §2。
 - 改数据库 / 改金额 / 改日志，动手前分别看 §8、§9、§10。
@@ -112,10 +113,11 @@ NewCosmos/
 │                   MonthlyReport、DutyManagement、Lottery、Mobile、Reporting、Reprint、
 │                   DatabaseManagement、UserManagement、Config、Shared…）；基类见 §6
 ├── Platforms/      平台实现（Windows 文件夹选择、打印机等）
-├── Resources/      Schema/（YAML 表定义权威）、Seed/、Styles/、PdfJs/、Backgrounds/
+├── Resources/      Schema/（YAML 表定义权威）、Seed/、Styles/、PdfJs/、Backgrounds/、
+│                   Splash/（启动动画 Web 资产，dsh-startup-screen 二次开发版，许可见其 THIRD-PARTY-NOTICES.md）
 ├── Services/
 │   ├── Core/       BaseService、LoggerService、ConfigService、DialogService、DictCacheService、
-│   │               DataMasker（日志脱敏）、InitializationService、SchemaSyncService、
+│   │               DataMasker（日志脱敏）、SchemaSyncService、
 │   │               UpdateService / AppUpdateCoordinator、DatabaseBackupService、FileService、SessionStore…
 │   ├── Database/   IDatabaseService、PostgreSqlDatabaseService、ITransactionScope、SchemaService
 │   ├── Domain/     业务域（与 Pages 同名分目录）：SocialAssistance、AssetVerification、
@@ -127,7 +129,7 @@ NewCosmos/
 │   ├── StateMachine/ ApplicationStateMachine（申请状态机唯一权威，见 §14）
 │   ├── System/     RegionService、DictionaryService、StandardConfigService、DatabaseManagementService
 │   ├── Templates/  ExcelEngine、WordEngine、TemplateEngineFactory
-│   ├── UserManagement/  NewPermissionService、RoleService、DataPermissionManager
+│   ├── UserManagement/  NewPermissionService、RoleService、DataScopeService（数据范围，原名 DataPermissionManager）
 │   ├── Platform/  平台相关服务
 │   └── Utilities/  OfficeProviderDetector、HolidayService、BusinessTimelineService
 ├── ViewModels/     与 Pages 同构；Base\ViewModelBase.cs 是三层基类（见 §6）
@@ -283,5 +285,6 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
 | 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`Services\Core\ConfigService.cs`（用户级覆盖读写）、`Pages\Config\SettingsPage`（改根入口）、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照与输出根优先级见该文档 |
 | 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |
+| 启动画面（启动动画 / 双就绪门 / 素材融合） | `Pages\Splash\SplashPage.xaml(.cs)`、`Services\Core\SplashGate.cs`、`Services\Core\SplashAssetsService.cs`、`Resources\Splash\*`、`config\app.ini` 的 `[Splash]` | 二次开发自 dsh-startup-screen（MIT © 沈宏宏，音频素材第三方、`SplashSound=0` 可静音）；说明见 `docs\20261027_启动画面移植与素材融合.md` |
 | 追缴应追缴总额（自动分段 / 月标准×月数 / 人工核实） | `Services\Domain\Recovery\RecoveryAmountCalculator.cs`（分段唯一实现）、`RecoveryHistoryProvider.cs`（历史时间轴取数）、`Constants\RecoveryConstants.cs`、`docs\migrations\20261019_recovery_amount_source.sql`（加列 `amount_source/amount_note/auto_amount` + 分段表 `nc_biz_recovery_segments`） | `recovery_amount` 为唯一事实来源（表单/列表/打印/落库同源）；算不出必须人工填写且必填原因；口径与数据缺口见 `docs\20261019_追缴金额来源与分段计算.md` |
 | 登录会话 / 多端互踢 / 强制下线 | `Services\Domain\UserManagement\UserSessionService.cs`、`Services\Core\SessionHeartbeatService.cs`、`Services\Core\SessionLifecycleService.cs`、`Constants\SessionConstants.cs`、`Resources\Schema\system_sessions\database.yaml` | `nc_sys_user_sessions` 是会话唯一事实来源（本机 SecureStorage 仅缓存）；策略/心跳/宽限配置见 `nc_config_system_standards`（category='session'）；部署先执行 `docs\migrations\20261023_user_sessions.sql`；说明见 `docs\20261023_登录会话与多端互踢.md` |

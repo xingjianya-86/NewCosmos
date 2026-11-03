@@ -2,7 +2,8 @@ namespace NewCosmos.Services.Core;
 
 /// <summary>
 /// 对话服务实现
-/// 封装 Application.Current.MainPage.DisplayAlert 等操    /// </summary>
+/// 封装 Application.Current.MainPage.DisplayAlert 等操
+/// </summary>
 public class DialogService : BaseService, IDialogService
 {
     protected override string ServiceName => "DialogService";

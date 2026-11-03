@@ -16,7 +16,7 @@ public partial class OrganizationPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        var userId = App.CurrentUserId ?? 1;
+        var userId = App.CurrentUserId ?? 0; // 未登录兜底 0（无权限），禁止兜底 1（管理员）
         await _viewModel.LoadPermissionsAsync(userId);
         await _viewModel.LoadTreeAsync();
     }

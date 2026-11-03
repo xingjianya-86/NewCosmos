@@ -70,6 +70,9 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     {
         LogInfo($"生成月报表: {year}年{month}月 乡镇={town ?? "全部"}");
 
+        // 同事务包住「先删后算再插」：统计失败时旧记录随之回滚，不再出现"已删未插"的数据丢失窗口
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
         // 支持重新生成覆盖：先删同 (year, month) 记录（uk_monthly_reports_year_month 唯一）
         var delResult = await _db.ExecuteNonQueryAsync(
             "DELETE FROM nc_biz_monthly_reports WHERE year = $1 AND month = $2", ct, year, month);
@@ -89,7 +92,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             VALUES ($1, $2, $3, 'Monthly', 'Generated', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
             RETURNING id";
 
-        var insertResult = await _db.ExecuteScalarAsync(sql, ct,
+        // 泛型版取 RETURNING id（AGENTS §8：旧版无泛型 API 无行时返回 Success(0)，勿用于 RETURNING id）
+        var insertResult = await _db.ExecuteScalarAsync<long?>(sql, ct,
             year, month, string.IsNullOrEmpty(town) ? "全部" : town,
             stats.TotalArchives, stats.NewArchives, stats.StoppedArchives, stats.TotalAmount, 0,
             stats.ClassificationCounts.GetValueOrDefault(ClassificationConstants.RuralSubsistence, 0),
@@ -103,9 +107,14 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         if (insertResult.IsFailure)
             return Result.Failure<MonthlyReport>(insertResult.ErrorCode!, insertResult.Message!);
 
+        if (insertResult.Value is null or <= 0)
+            return Result.Failure<MonthlyReport>(ErrorCodes.OPERATION_FAILED, "生成月报表失败：未返回新记录ID");
+
+        await tx.CommitAsync(ct);
+
         var report = new MonthlyReport
         {
-            Id = insertResult.Value,
+            Id = insertResult.Value.Value,
             Year = year,
             Month = month,
             Town = string.IsNullOrEmpty(town) ? "全部" : town,
@@ -121,7 +130,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
 
     public async Task<Result<MonthlyReport>> GetAsync(int year, int month, CancellationToken ct = default)
     {
-        var sql = "SELECT * FROM nc_biz_monthly_reports WHERE year = $1 AND month = $2 ORDER BY id DESC LIMIT 1";
+        var sql = "SELECT " + WideTableColumns.MonthlyReportsColumns + " FROM nc_biz_monthly_reports WHERE year = $1 AND month = $2 ORDER BY id DESC LIMIT 1";
         return await _db.QuerySingleAsync<MonthlyReport>(sql, ct, year, month);
     }
 
@@ -131,12 +140,12 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         object[] parameters;
         if (year.HasValue)
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC LIMIT 1000";
+            sql = "SELECT " + WideTableColumns.MonthlyReportsColumns + " FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC LIMIT 1000";
             parameters = new object[] { year.Value };
         }
         else
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC LIMIT 1000";
+            sql = "SELECT " + WideTableColumns.MonthlyReportsColumns + " FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC LIMIT 1000";
             parameters = Array.Empty<object>();
         }
         return await _db.QueryAsync<MonthlyReport>(sql, ct, parameters);
@@ -158,12 +167,12 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         object[] parameters;
         if (year.HasValue)
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC LIMIT 1000";
+            sql = "SELECT " + WideTableColumns.MonthlyReportsColumns + " FROM nc_biz_monthly_reports WHERE year = $1 ORDER BY month DESC LIMIT 1000";
             parameters = new object[] { year.Value };
         }
         else
         {
-            sql = "SELECT * FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC LIMIT 1000";
+            sql = "SELECT " + WideTableColumns.MonthlyReportsColumns + " FROM nc_biz_monthly_reports ORDER BY year DESC, month DESC LIMIT 1000";
             parameters = Array.Empty<object>();
         }
         return await _db.QueryAsync<MonthlyReportSummary>(sql, ct, parameters);
@@ -177,7 +186,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             .AddIf(!string.IsNullOrEmpty(town), "town = {0}", town)
             .AddIf(!string.IsNullOrEmpty(status), "status = {0}", status);
 
-        var sql = $"SELECT * FROM nc_biz_monthly_reports{conditions.ToWhereClause()} ORDER BY year DESC, month DESC LIMIT 1000";
+        var sql = $"SELECT {WideTableColumns.MonthlyReportsColumns} FROM nc_biz_monthly_reports{conditions.ToWhereClause()} ORDER BY year DESC, month DESC LIMIT 1000";
         return await _db.QueryAsync<MonthlyReportSummary>(sql, ct, conditions.GetParameters());
     }
 
@@ -189,7 +198,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
 
         var where = conditions.ToWhereClause();
         var countSql = $"SELECT COUNT(*) FROM nc_biz_monthly_reports{where}";
-        var querySql = $"SELECT * FROM nc_biz_monthly_reports{where}";
+        var querySql = $"SELECT {WideTableColumns.MonthlyReportsColumns} FROM nc_biz_monthly_reports{where}";
 
         var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
         if (countResult.IsFailure)

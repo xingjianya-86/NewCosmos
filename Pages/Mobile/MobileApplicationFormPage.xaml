@@ -18,36 +18,36 @@
                         <HorizontalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding AbandonCommand}"/>
                         </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
+                        <Label Text="‹" FontSize="20" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
+                        <Label Text="返回" FontSize="15" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                     <!-- 录入环节照片采集 + 身份证扫描：均按申请人身份证归档 -->
                     <HorizontalStackLayout Grid.Column="2" Spacing="8">
-                        <Button Text="📋 来源" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                        <Button Text="📋 来源" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="16"
                                 BackgroundColor="#33FFFFFF" TextColor="White"
                                 IsVisible="{Binding HasAssetCheckData}"
                                 Command="{Binding ToggleFieldPanelCommand}"/>
-                        <Button Text="🔍 扫描" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                        <Button Text="🔍 扫描" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="16"
                                 BackgroundColor="#33FFFFFF" TextColor="White"
                                 Command="{Binding ScanIdCardCommand}"/>
-                        <Button Text="📷 照片" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="16"
+                        <Button Text="📷 照片" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="16"
                                 BackgroundColor="#33FFFFFF" TextColor="White"
                                 Command="{Binding OpenPhotosCommand}"/>
                     </HorizontalStackLayout>
                 </Grid>
 
-                <Label Text="低收入人口认定申请" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="{Binding ModeDescription}" FontSize="13" TextColor="#E6FFFFFF"/>
+                <Label Text="低收入人口认定申请" FontSize="18" FontAttributes="Bold" TextColor="White"/>
+                <Label Text="{Binding ModeDescription}" FontSize="14" TextColor="#E6FFFFFF"/>
 
                 <HorizontalStackLayout Spacing="18">
-                    <Label FontSize="13" TextColor="#E6FFFFFF">
+                    <Label FontSize="14" TextColor="#E6FFFFFF">
                         <Label.FormattedText>
                             <FormattedString>
                                 <Span Text="人口 "/><Span Text="{Binding FamilySize}"/><Span Text=" 人"/>
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
-                    <Label FontSize="13" TextColor="#E6FFFFFF">
+                    <Label FontSize="14" TextColor="#E6FFFFFF">
                         <Label.FormattedText>
                             <FormattedString>
                                 <Span Text="人均年收入 "/>
@@ -77,17 +77,17 @@
         <!-- 底部操作栏 -->
         <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,10,12,16">
             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="存草稿" HeightRequest="46" CornerRadius="10" FontSize="13"
+                <Button Grid.Column="0" Text="存草稿" HeightRequest="46" CornerRadius="10" FontSize="14"
                         BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
                         Command="{Binding SaveDraftCommand}" IsVisible="{Binding IsSaveDraftVisible}"/>
-                <Button Grid.Column="1" Text="上一步" HeightRequest="46" CornerRadius="10" FontSize="13"
+                <Button Grid.Column="1" Text="上一步" HeightRequest="46" CornerRadius="10" FontSize="14"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding PreviousStepCommand}" IsVisible="{Binding IsNotFirstStep}"/>
-                <Button Grid.Column="2" Text="下一步" HeightRequest="46" CornerRadius="10" FontSize="13"
+                <Button Grid.Column="2" Text="下一步" HeightRequest="46" CornerRadius="10" FontSize="14"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding NextStepCommand}" IsVisible="{Binding IsNotLastStep}"/>
-                <Button Grid.Column="3" Text="提交" HeightRequest="46" CornerRadius="10" FontSize="14" FontAttributes="Bold"
+                <Button Grid.Column="3" Text="提交" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
                         BackgroundColor="{StaticResource Success}" TextColor="White"
                         Command="{Binding SaveCommand}" IsVisible="{Binding IsSubmitVisible}"
                         IsEnabled="{Binding IsClassificationDone}"/>
@@ -110,7 +110,7 @@
                     <Grid Grid.Row="0" Padding="16,14" ColumnDefinitions="*,Auto" BackgroundColor="{StaticResource Gray50}">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="来源数据" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Label Text="{Binding FieldPanelSummary}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding FieldPanelSummary}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <Button Grid.Column="1" Text="✕" FontSize="16" FontAttributes="Bold"
                                 WidthRequest="36" HeightRequest="36" Padding="0" CornerRadius="18"
@@ -127,22 +127,22 @@
                                               IsVisible="{Binding HasValue}"/>
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
                                         <HorizontalStackLayout Spacing="6">
-                                            <Label Text="{Binding DisplayName}" FontSize="13" FontAttributes="Bold"
+                                            <Label Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold"
                                                    TextColor="{StaticResource TextPrimary}"/>
-                                            <Label Text="{Binding Source}" FontSize="10" TextColor="{StaticResource Primary}"
+                                            <Label Text="{Binding Source}" FontSize="12" TextColor="{StaticResource Primary}"
                                                    VerticalOptions="Center"/>
                                         </HorizontalStackLayout>
-                                        <Label Text="{Binding Value}" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                        <Label Text="{Binding Value}" FontSize="14" TextColor="{StaticResource TextPrimary}"
                                                LineBreakMode="TailTruncation"/>
-                                        <Label Text="{Binding MissingText}" FontSize="11" TextColor="{StaticResource WarningDark}"
+                                        <Label Text="{Binding MissingText}" FontSize="12" TextColor="{StaticResource WarningDark}"
                                                IsVisible="{Binding IsMissing}"/>
                                     </VerticalStackLayout>
-                                    <Button Grid.Column="2" Text="填充" FontSize="12" Padding="10,4" HeightRequest="30"
+                                    <Button Grid.Column="2" Text="填充" FontSize="14" Padding="10,4" HeightRequest="30"
                                             BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
                                             IsVisible="{Binding HasValue}"
                                             Command="{Binding Source={x:Reference FormPageRoot}, Path=BindingContext.FillFieldCommand}"
                                             CommandParameter="{Binding .}"/>
-                                    <Button Grid.Column="2" Text="去填写" FontSize="12" Padding="10,4" HeightRequest="30"
+                                    <Button Grid.Column="2" Text="去填写" FontSize="14" Padding="10,4" HeightRequest="30"
                                             BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
                                             CornerRadius="6" IsVisible="{Binding IsMissing}"
                                             Command="{Binding Source={x:Reference FormPageRoot}, Path=BindingContext.GoToFieldStepCommand}"
@@ -151,7 +151,7 @@
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
                         <CollectionView.EmptyView>
-                            <Label Text="暂无来源数据" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                            <Label Text="暂无来源数据" FontSize="15" TextColor="{StaticResource TextSecondary}"
                                    HorizontalOptions="Center" Margin="0,30"/>
                         </CollectionView.EmptyView>
                     </CollectionView>
@@ -160,12 +160,12 @@
                     <VerticalStackLayout Grid.Row="2" Padding="16,10,16,18" Spacing="8">
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                             <Button Text="全选" Command="{Binding SelectAllFieldsCommand}"
-                                    Style="{StaticResource ButtonOutline}" HeightRequest="38" FontSize="13"/>
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="38" FontSize="14"/>
                             <Button Grid.Column="1" Text="填充选中" Command="{Binding FillSelectedFieldsCommand}"
-                                    Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="13"/>
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="14"/>
                         </Grid>
                         <Button Text="导入全部家庭成员" Command="{Binding ImportAllAssetCheckMembersCommand}"
-                                Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="13"/>
+                                Style="{StaticResource ButtonPrimary}" HeightRequest="38" FontSize="14"/>
                     </VerticalStackLayout>
                 </Grid>
             </Border>
@@ -176,7 +176,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

@@ -1,4 +1,4 @@
-﻿namespace NewCosmos.Models.Entities;
+namespace NewCosmos.Models.Entities;
 
 /// <summary>
 /// 乡镇/街道实体（种子数据）
@@ -32,7 +32,8 @@ public class RegionTown
     public string TownType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 排序    /// </summary>
+    /// 排序
+/// </summary>
     public int SortOrder { get; set; }
 
     /// <summary>

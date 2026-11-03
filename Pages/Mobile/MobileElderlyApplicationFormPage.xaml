@@ -11,43 +11,39 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 深色紫色头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding CancelCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="高龄津贴申请登记" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="输入身份证自动评估享受类别与补发金额" FontSize="13" TextColor="#E6FFFFFF"/>
-                <Border BackgroundColor="White" Opacity="0.95" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="高龄津贴申请登记"
+                                   Subtitle="输入身份证自动评估享受类别与补发金额"
+                                   BackCommand="{Binding CancelCommand}"
+                                   BackText="返回">
+            <components:PageHeaderView.Stats>
+<Border BackgroundColor="White" Opacity="0.95" StrokeThickness="0" StrokeShape="RoundRectangle 6"
                         Padding="10,6" IsVisible="{Binding IsModeBannerVisible}">
-                    <Label Text="{Binding ModeBannerText}" FontSize="12" FontAttributes="Bold"
+                    <Label Text="{Binding ModeBannerText}" FontSize="14" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" LineBreakMode="WordWrap"/>
                 </Border>
-            </VerticalStackLayout>
-        </Border>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
 
         <!-- 分区 Tab：基本信息 / 代办代领 / 判定认证 -->
         <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
             <Border Grid.Column="0" StrokeShape="RoundRectangle 16" Padding="8,8"
                     BackgroundColor="{Binding IsSection0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
                 <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="0"/></Border.GestureRecognizers>
-                <Label Text="基本信息" FontSize="13" HorizontalOptions="Center"
+                <Label Text="基本信息" FontSize="14" HorizontalOptions="Center"
                        TextColor="{Binding IsSection0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
             </Border>
             <Border Grid.Column="1" StrokeShape="RoundRectangle 16" Padding="8,8"
                     BackgroundColor="{Binding IsSection1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
                 <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="1"/></Border.GestureRecognizers>
-                <Label Text="代办代领" FontSize="13" HorizontalOptions="Center"
+                <Label Text="代办代领" FontSize="14" HorizontalOptions="Center"
                        TextColor="{Binding IsSection1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
             </Border>
             <Border Grid.Column="2" StrokeShape="RoundRectangle 16" Padding="8,8"
                     BackgroundColor="{Binding IsSection2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
                 <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchSectionCommand}" CommandParameter="2"/></Border.GestureRecognizers>
-                <Label Text="判定认证" FontSize="13" HorizontalOptions="Center"
+                <Label Text="判定认证" FontSize="14" HorizontalOptions="Center"
                        TextColor="{Binding IsSection2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
             </Border>
         </Grid>
@@ -71,11 +67,11 @@
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                     <Entry Grid.Column="0" Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
                                     <Button Grid.Column="1" Text="📷 扫描"
-                                            FontSize="12" HeightRequest="42" Padding="10,0" CornerRadius="8"
+                                            FontSize="14" HeightRequest="42" Padding="10,0" CornerRadius="8"
                                             BackgroundColor="{StaticResource Primary}" TextColor="White"
                                             Command="{Binding ScanIdCardCommand}"/>
                                     <Button Grid.Column="2" Text="🖼 照片"
-                                            FontSize="12" HeightRequest="42" Padding="10,0" CornerRadius="8"
+                                            FontSize="14" HeightRequest="42" Padding="10,0" CornerRadius="8"
                                             BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
                                             Command="{Binding OpenPhotosCommand}"/>
                                 </Grid>
@@ -107,8 +103,8 @@
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="12">
                             <Label Text="🏠 户籍与住址" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                            <Label Text="{Binding AddressScopeDescription}" FontSize="11" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
-                            <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「经办机构管理」补齐区划。" FontSize="11" TextColor="#7F1D1D"
+                            <Label Text="{Binding AddressScopeDescription}" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
+                            <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「经办机构管理」补齐区划。" FontSize="12" TextColor="#7F1D1D"
                                    IsVisible="{Binding IsAddressScopeAvailable, Converter={StaticResource BoolToInverseConverter}}"/>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
@@ -258,7 +254,7 @@
 
                             <Border IsVisible="{Binding HasEvaluateResult}" BackgroundColor="{StaticResource InfoSoft}"
                                     StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
-                                <Label Text="{Binding EvaluateMessage}" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
+                                <Label Text="{Binding EvaluateMessage}" FontSize="15" TextColor="{StaticResource PrimaryDark}"/>
                             </Border>
 
                             <Label Text="享受类别判定" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
@@ -271,7 +267,7 @@
                                                 <Label Text="{Binding Mark}" FontSize="16"
                                                        TextColor="{Binding Matched, Converter={StaticResource BoolToColorConverter}}"
                                                        VerticalOptions="Center"/>
-                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="14"
+                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="15"
                                                        TextColor="{StaticResource TextPrimary}"
                                                        FontAttributes="{Binding Matched, Converter={StaticResource BoolToFontAttributeConverter}}"
                                                        VerticalOptions="Center"/>
@@ -346,17 +342,17 @@
                                             <Border Padding="8" Margin="0,2" StrokeShape="RoundRectangle 6"
                                                     BackgroundColor="White" Stroke="{StaticResource Gray200}" StrokeThickness="1">
                                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="2">
-                                                    <Label Grid.Row="0" Grid.Column="0" Text="{Binding CategoryName}" FontSize="13" FontAttributes="Bold"/>
-                                                    <Label Grid.Row="0" Grid.Column="1" Text="{Binding SegmentAmount, StringFormat='{0:F2}元'}" FontSize="13"
+                                                    <Label Grid.Row="0" Grid.Column="0" Text="{Binding CategoryName}" FontSize="14" FontAttributes="Bold"/>
+                                                    <Label Grid.Row="0" Grid.Column="1" Text="{Binding SegmentAmount, StringFormat='{0:F2}元'}" FontSize="14"
                                                            FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="End"/>
-                                                    <Label Grid.Row="1" Grid.Column="0" FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                                    <Label Grid.Row="1" Grid.Column="0" FontSize="14" TextColor="{StaticResource TextSecondary}">
                                                         <Label.FormattedText>
                                                             <FormattedString>
                                                                 <Span Text="{Binding SegmentStartMonth}"/><Span Text=" ~ "/><Span Text="{Binding SegmentEndMonth}"/>
                                                             </FormattedString>
                                                         </Label.FormattedText>
                                                     </Label>
-                                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Months, StringFormat='{0}个月'}" FontSize="12"
+                                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding Months, StringFormat='{0}个月'}" FontSize="14"
                                                            TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
                                                 </Grid>
                                             </Border>
@@ -368,18 +364,18 @@
                             <Label Text="补发原因（可选）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
                             <VerticalStackLayout Spacing="2">
                                 <RadioButton Content="未及时登记" GroupName="PaybackReasonGroup"
-                                             IsChecked="{Binding IsPaybackReasonMissed}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             IsChecked="{Binding IsPaybackReasonMissed}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="查找不到本人" GroupName="PaybackReasonGroup"
-                                             IsChecked="{Binding IsPaybackReasonNotLocated}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             IsChecked="{Binding IsPaybackReasonNotLocated}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="短暂失联" GroupName="PaybackReasonGroup"
-                                             IsChecked="{Binding IsPaybackReasonLostContact}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             IsChecked="{Binding IsPaybackReasonLostContact}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="其他" GroupName="PaybackReasonGroup"
-                                             IsChecked="{Binding IsPaybackReasonOther}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             IsChecked="{Binding IsPaybackReasonOther}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
 
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                 <CheckBox Grid.Column="0" IsChecked="{Binding IsSpecialCase}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="特殊情况处理（手动调整补发起止月份）" FontSize="13"
+                                <Label Grid.Column="1" Text="特殊情况处理（手动调整补发起止月份）" FontSize="14"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </Grid>
                             <VerticalStackLayout IsVisible="{Binding IsSpecialCase}" Spacing="4">
@@ -397,18 +393,18 @@
         <!-- 底部操作栏 -->
         <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,10,12,16">
             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="上一页" FontSize="13" HeightRequest="46" CornerRadius="10"
+                <Button Grid.Column="0" Text="上一页" FontSize="14" HeightRequest="46" CornerRadius="10"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding PreviousSectionCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                <Button Grid.Column="1" Text="下一页" FontSize="13" HeightRequest="46" CornerRadius="10"
+                <Button Grid.Column="1" Text="下一页" FontSize="14" HeightRequest="46" CornerRadius="10"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding NextSectionCommand}" IsEnabled="{Binding CanGoNext}"/>
-                <Button Grid.Column="2" Text="保存草稿" FontSize="13" HeightRequest="46" CornerRadius="10"
+                <Button Grid.Column="2" Text="保存草稿" FontSize="14" HeightRequest="46" CornerRadius="10"
                         BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
                         Command="{Binding SaveCommand}" IsVisible="{Binding IsSavable}"/>
-                <Button Grid.Column="3" Text="保存并确认" FontSize="13" HeightRequest="46" CornerRadius="10"
+                <Button Grid.Column="3" Text="保存并确认" FontSize="14" HeightRequest="46" CornerRadius="10"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding SaveAndConfirmCommand}" IsVisible="{Binding IsSaveAndConfirmVisible}"/>
             </Grid>
@@ -419,7 +415,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

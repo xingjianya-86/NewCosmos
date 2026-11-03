@@ -11,7 +11,7 @@
         <Border Style="{StaticResource CardBorder}">
             <VerticalStackLayout Spacing="12">
                 <Label Text="🏠 户籍所在地" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                <Label Text="默认来自组织机构，可修改" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                <Label Text="默认来自组织机构，可修改" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                 <BoxView Style="{StaticResource Divider}" Margin="0"/>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}"/>

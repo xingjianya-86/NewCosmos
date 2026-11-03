@@ -29,12 +29,15 @@ public interface IElderlyApplicationService
     /// 分页查询（关键字：姓名/身份证；状态：空=全部）。
     /// distinctIdCard=true 时同身份证只返回最新一条（复核页在享检索用，避免重复档案显示成两行）。
     /// </summary>
-    Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default, bool distinctIdCard = false);
+    Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string? keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default, bool distinctIdCard = false);
 
     /// <summary>
     /// 按月份查询记录（月报表用）。
-    /// 新增明细：受理月份 = 指定月且状态已确认；停止明细：实际停发月份 = 指定月。
-    /// excludeImported: 排除从导入库补全建档的记录（source_type IS NULL）。
+    /// 新增明细：受理月份 = 指定月，且符合「当月真正新增」统一口径
+    /// （<see cref="Helpers.ElderlyNewArchiveFilter"/>：状态 + 排除补录档 + 建档时已死亡兜底，三处统计同源）。
+    /// 停止明细：实际停发月份 = 指定月。
+    /// excludeImported: 排除从导入库补全建档的记录（source_type IS NULL）——**仅对停发方向有效**，
+    /// 新增方向的补录排除已固定在单点口径内。
     /// categoryCode: 享受类别代码（CAT1-CAT4），null/空 = 不按分类筛选。
     /// </summary>
     Task<Result<List<ElderlyApplication>>> GetByMonthAsync(int year, int month, bool isStop, string? categoryCode = null, bool excludeImported = false, CancellationToken ct = default);

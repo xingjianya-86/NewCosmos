@@ -155,123 +155,6 @@ public partial class ApplicationFormViewModel
     #region 分类判定
 
     [RelayCommand]
-    private async Task ClassifyAsync()
-    {
-        await ExecuteAsync(async ct =>
-        {
-            _logger.LogBusiness("开始分类判定");
-
-            // 构建申请对象（必须包含身份证号和健康状况，用于推导年龄和判断劳动能力）
-            var application = new Application
-            {
-                Id = _applicationId,
-                ApplicantIdCard = ApplicantIdCard,
-                HealthStatus = SelectedHealthStatusObj?.Key ?? "",
-                HukouType = HukouType?.Key ?? "",
-                FamilySize = FamilySize,
-                TotalFamilyIncome = TotalFamilyIncome,
-                PerCapitaIncome = PerCapitaIncome,
-                TotalAnnualIncome = TotalAnnualIncome,
-                PerCapitaAnnualIncome = PerCapitaAnnualIncome,
-                RigidExpenditure = RigidExpenditure,
-                ClassificationResult = ClassificationResult,
-                OriginalClassificationResult = _originalClassificationContext ?? ClassificationResult,
-                CaregiverType = CaregiverType,
-                DestituteSupportType = DestituteSupportType
-            };
-
-            // 执行分类判定
-            var result = await _classificationService.DetermineClassificationAsync(
-                application,
-                FamilyMembers.ToList(),
-                Supporters.ToList(),
-                Caregivers.ToList(),
-                ct);
-
-            if (result.IsSuccess && result.Value != null)
-            {
-                var classification = result.Value;
-
-                ClassificationResult = classification.Classification;
-                ClassificationDescription = classification.Description;
-                IsEligible = classification.IsEligible;
-                IneligibleReason = classification.IneligibleReason;
-                var priorGuaranteeForGrace = GuaranteeAmount;
-                GuaranteeAmount = classification.GuaranteeAmount;
-
-                // 分类施保
-                if (classification.ClassifiedSubsidy != null)
-                {
-                    ClassifiedSubsidyType = classification.ClassifiedSubsidy.Types;
-                    ClassifiedSubsidyAmount = classification.ClassifiedSubsidy.TotalAmount;
-                }
-
-                // 渐退期（1B：判定命中先弹确认页，确认后才应用；取消则本次不进渐退、可改数据再判定）
-                if (classification.GracePeriod != null && classification.GracePeriod.IsEligible)
-                {
-                    // 链档案渐退期内按原分类待遇重算分类施保（低收入判定不算分类施保，死亡/变更链新档需保住幸存成员份额）
-                    var graceClassified = await TryCalcChainGraceClassifiedAsync(application, ct);
-                    var selectedMonths = await ShowGracePeriodConfirmAsync(classification, graceClassified, ct);
-                    if (selectedMonths is int months && GracePeriodConstants.IsValidMonths(months))
-                    {
-                        IsInGracePeriod = true;
-                        GracePeriodMonths = months;
-                        GracePeriodStartDate = classification.GracePeriod.StartDate;
-                        GracePeriodEndDate = classification.GracePeriod.StartDate.AddMonths(months).AddDays(-1);
-                        OriginalClassificationResult = classification.GracePeriod.OriginalClassification;
-                        if (graceClassified != null)
-                            ApplyGraceClassifiedSubsidy(graceClassified);
-                        await ApplyGraceCapAsync(priorGuaranteeForGrace, ct);
-                    }
-                    else
-                    {
-                        IsInGracePeriod = false;
-                        GraceGrantAmount = null;
-                    }
-                }
-                else
-                {
-                    IsInGracePeriod = false;
-                    GraceGrantAmount = null;
-                }
-                _gracePeriodEvaluated = true;
-
-                // 特困：自动计算照料护理费（集中供养不发钱，护理费为 0；仅分散供养按能力鉴定计算）
-                // 非特困：清零旧照料费（H2——分类离开特困后禁止沿用旧值进总额）
-                if (ClassificationConstants.IsCodeDestitute(ClassificationResult))
-                {
-                    CaregiverSubsidyAmount = IsCentralizedSupport
-                        ? 0
-                        : await _classificationService.CalculateCareAllowanceAsync(
-                            _applicationId, ct);
-                }
-                else
-                {
-                    CaregiverSubsidyAmount = 0;
-                }
-
-                // 计算保障金总额
-                TotalGuaranteeAmount = _guaranteeAmountService.CalculateTotalGuaranteeAmount(
-                    GuaranteeAmount,
-                    ClassifiedSubsidyAmount,
-                    CaregiverSubsidyAmount);
-
-                // 立即保存分类结果到数据库
-                await SaveClassificationResultAsync();
-
-                _logger.LogBusiness("分类判定完成",
-                    ("分类", classification.Classification),
-                    ("描述", classification.Description),
-                    ("保障金额", TotalGuaranteeAmount));
-            }
-            else
-            {
-                _logger.Error($"Classification 失败: {result.Message}");
-            }
-        }, "分类判定中...");
-    }
-
-    [RelayCommand]
     private async Task DetermineClassificationAsync()
     {
         if (IsDetermining) return;
@@ -661,11 +544,12 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 保存分类结果到数据库
+    /// 保存分类结果到数据库。返回是否成功。
+    /// 失败时弹窗明示（原实现仅记日志，UI 仍显示"判定成功"，用户会误以为已保存）。
     /// </summary>
-    private async Task SaveClassificationResultAsync()
+    private async Task<bool> SaveClassificationResultAsync()
     {
-        if (_applicationId <= 0) return;
+        if (_applicationId <= 0) return true;
 
         try
         {
@@ -706,15 +590,20 @@ public partial class ApplicationFormViewModel
                 // 户主死亡进渐退期（低保→低收入）时：第 1 步被渐退期跳过（待遇走封顶减发），
                 // 第 2 步照写分类施保减发记录（月保障金 313→313 无增减发，该减发由月报施保金减发表承载）。
                 await EnsureChainFundChangeSettlementAsync(CancellationToken);
+                return true;
             }
-            else
-            {
-                _logger.Error($"保存分类结果失败: {updateResult.Message}");
-            }
+
+            _logger.Error($"保存分类结果失败: {updateResult.Message}");
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "保存失败", $"分类结果未能保存到数据库：{updateResult.Message}\n\n请重试分类判定或检查数据库连接后重新保存。", "确定");
+            return false;
         }
         catch (Exception ex)
         {
             _logger.Error($"保存分类结果异常: {ex.Message}");
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "保存失败", $"分类结果保存异常：{ex.Message}\n\n请重试分类判定或检查数据库连接后重新保存。", "确定");
+            return false;
         }
     }
 
@@ -945,8 +834,8 @@ public partial class ApplicationFormViewModel
                 ? (string.IsNullOrEmpty(_originalStatus) ? ApplicationStatusCodes.APPROVED : _originalStatus)
                 : ApplicationStatusCodes.DRAFT;
             await SaveApplicationInternalAsync(saveStatus, ct);
-            await _serviceProvider.GetRequiredService<IDialogService>()
-                .DisplayAlertAsync("成功", "草稿保存成功", "确定");
+            // 轻提示替代阻断弹窗（原 DisplayAlert 每次保存都要多点一次"确定"）
+            await ShowSnackBarAsync("草稿保存成功");
         }, "保存草稿中...");
     }
 
@@ -969,6 +858,28 @@ public partial class ApplicationFormViewModel
         var application = BuildApplication(status);
 
         var wasCreateMode = _applicationId <= 0;
+
+        // 新建模式：事务内会静默删除同身份证的旧草稿（原实现无声丢失他人的编辑）。
+        // 进事务前先查并明确提示，用户确认后才覆盖（确认框必须在事务外——对话框会挂起异步流）。
+        if (wasCreateMode && !string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            var oldDrafts = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
+            var draftList = oldDrafts.IsSuccess && oldDrafts.Value != null
+                ? oldDrafts.Value.Where(a => a.Status == ApplicationStatusCodes.DRAFT).ToList()
+                : new List<Application>();
+            if (draftList.Count > 0)
+            {
+                var names = string.Join("、", draftList.Select(d => $"{d.ApplicationNo}（{d.CreatedAt:yyyy-MM-dd HH:mm}）"));
+                var cover = await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                    "发现同身份证旧草稿",
+                    $"身份证 {ApplicantIdCard} 已有 {draftList.Count} 条未提交草稿：\n{names}\n\n" +
+                    "继续保存将删除这些旧草稿并以本次录入替代。\n是否继续？",
+                    "覆盖保存", "返回修改");
+                if (!cover)
+                    throw new BusinessException(ErrorCodes.VALIDATION_FAILED, "用户取消保存：存在同身份证旧草稿，未做覆盖");
+            }
+        }
+
         try
         {
             await _applicationService.ExecuteInTransactionAsync(
@@ -1318,14 +1229,15 @@ public partial class ApplicationFormViewModel
         if (deleteResult.Value > 0)
             _logger.LogBusiness("已软删旧家庭成员", ("DeletedCount", deleteResult.Value.ToString()));
 
-        // ── 第2步：插入所有新家庭成员（旧记录已删，AddAsync 防重复校验自然通过）──
+        // ── 第2步：插入所有新家庭成员（旧记录已删，批插防重复校验自然通过）──
         // 防重复：同批表单内可能携带重复身份证（历史导入脏数据、用户重复录入），
-        // 保留首个出现、跳过后续重复并记日志——否则 AddAsync 的批内防重会命中刚插入的
-        // 兄弟行，把整单保存卡死在"该身份证号已在此申请中存在"。
+        // 保留首个出现、跳过后续重复并记日志（2026-11 前移：Step2 校验已拦新录入的重复，
+        // 此处仅兜底存量脏数据）。
+        // 2026-11 性能收口：逐人 AddAsync（每人 COUNT+INSERT，6 口之家 ≈18 条串行 SQL）
+        // → AddRangeAsync 多行 VALUES 一次批写（2 条 SQL），id_card→id 映射取自 RETURNING。
         var seenIdCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skippedDuplicates = new List<string>();
-        var savedCount = 0;
-        var failures = new List<string>();
+        var requests = new List<FamilyMemberCreateRequest>(FamilyMembers.Count);
         foreach (var member in FamilyMembers)
         {
             if (string.IsNullOrWhiteSpace(member.Name) || string.IsNullOrWhiteSpace(member.IdCard))
@@ -1351,7 +1263,7 @@ public partial class ApplicationFormViewModel
                 member.HukouAddress = HukouAddress;
             }
 
-            var request = new FamilyMemberCreateRequest
+            requests.Add(new FamilyMemberCreateRequest
             {
                 ApplicationId = _applicationId,
                 Name = member.Name,
@@ -1403,33 +1315,26 @@ public partial class ApplicationFormViewModel
                 MonthlySupportFee = member.MonthlySupportFee,
                 SupportMonths = member.SupportMonths,
                 IsSupportAbility = member.IsSupportAbility,
-            };
-
-            var result = await _familyMemberService.AddAsync(request, ct);
-            if (result.IsSuccess)
-            {
-                savedCount++;
-                // 收集 IdCard → 新 ID 映射，供 SaveSupportersAsync 使用（避免额外 DB 查询）
-                if (result.Value > 0)
-                    idCardToNewId[idCard] = result.Value;
-            }
-            else
-            {
-                _logger.Error($"保存家庭成员失败: {DataMasker.MaskName(member.Name)}, 错误: {result.Message}");
-                failures.Add($"{member.Name}：{result.Message}");
-            }
+            });
         }
 
         if (skippedDuplicates.Count > 0)
             _logger.LogBusiness("已跳过重复身份证成员", ("Skipped", string.Join("；", skippedDuplicates)));
 
-        if (failures.Count > 0)
+        var insertResult = await _familyMemberService.AddRangeAsync(requests, ct);
+        if (insertResult.IsFailure)
         {
-            throw new BusinessException(ErrorCodes.DB_QUERY_ERROR,
-                $"家庭成员保存失败（{failures.Count}/{FamilyMembers.Count}）：{string.Join("；", failures)}");
+            // 显式失败（§7）：批插整体回滚，绝不静默丢成员
+            _logger.Error($"批量保存家庭成员失败: {insertResult.ErrorCode} {insertResult.Message}");
+            throw new BusinessException(
+                string.IsNullOrEmpty(insertResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : insertResult.ErrorCode!,
+                $"家庭成员保存失败：{insertResult.Message}");
         }
 
-        _logger.LogBusiness("家庭成员保存完成", ("Total", FamilyMembers.Count.ToString()), ("Saved", savedCount.ToString()));
+        foreach (var (idCard, newId) in insertResult.Value)
+            idCardToNewId[idCard] = newId;
+
+        _logger.LogBusiness("家庭成员保存完成", ("Total", FamilyMembers.Count.ToString()), ("Saved", requests.Count.ToString()));
         return idCardToNewId;
     }
 

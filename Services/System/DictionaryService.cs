@@ -267,7 +267,8 @@ public class DictionaryService : BaseService, IDictionaryService
         if (ensureData.IsFailure)
             return Result.Failure<List<DictItemView>>(ensureData.ErrorCode!, ensureData.Message!);
 
-        LogInfo($"获取分类 {category} 的字典项");
+        // Debug 级：每次表单加载 × 每分类都落盘一条 Info 属高频噪音（最低级别 Information 时自动过滤）
+        LogDebug($"获取分类 {category} 的字典项");
 
         var sql = "SELECT * FROM nc_view_dict_items WHERE category = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<DictItemView>(sql, ct, category);

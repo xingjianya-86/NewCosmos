@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Results;
+using NewCosmos.Models.Results;
 
 namespace NewCosmos.Services.System;
 
@@ -8,20 +8,30 @@ namespace NewCosmos.Services.System;
 public interface IDatabaseManagementService
 {
     /// <summary>
-    /// 获取数据库连接状    /// </summary>
+    /// 获取数据库连接状
+/// </summary>
     Task<Result<DatabaseStatus>> GetDatabaseStatusAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 获取数据库统计信    /// </summary>
+    /// 获取数据库统计信
+/// </summary>
     Task<Result<DatabaseStatistics>> GetDatabaseStatisticsAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 获取所有表的大小信    /// </summary>
+    /// 获取所有表的大小信
+/// </summary>
     Task<Result<List<TableSizeInfo>>> GetTableSizesAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 执行数据库备    /// </summary>
+    /// 执行数据库备份（pg_dump 快照）
+/// </summary>
     Task<Result<string>> BackupDatabaseAsync(string backupPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// 从 pg_dump 备份文件还原数据库（危险操作）。
+    /// 服务层三重防护之二：psql 单事务回放，失败整体回滚；调用方必须先二次确认并自动再备份。
+    /// </summary>
+    Task<Result<string>> RestoreDatabaseAsync(string backupFilePath, CancellationToken ct = default);
 
     /// <summary>
     /// 获取备份文件列表
@@ -90,7 +100,8 @@ public class SoftDeleteCleanupResult
 }
 
 /// <summary>
-/// 数据库状    /// </summary>
+/// 数据库状态
+/// </summary>
 public class DatabaseStatus
 {
     public bool IsConnected { get; set; }
@@ -103,7 +114,8 @@ public class DatabaseStatus
 }
 
 /// <summary>
-/// 数据库统计信    /// </summary>
+/// 数据库统计信息
+/// </summary>
 public class DatabaseStatistics
 {
     public int TotalTables { get; set; }
@@ -115,7 +127,8 @@ public class DatabaseStatistics
 }
 
 /// <summary>
-/// 表大小信    /// </summary>
+/// 表大小信息
+/// </summary>
 public class TableSizeInfo
 {
     public string TableName { get; set; } = string.Empty;

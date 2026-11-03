@@ -11,7 +11,8 @@ using NewCosmos.Services.System;
 namespace NewCosmos.Models.Entities;
 
 /// <summary>
-/// 家庭成员实体，对对应 nc_biz_family_members     /// </summary>
+/// 家庭成员实体，对对应 nc_biz_family_members
+/// </summary>
 public class FamilyMember : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -88,7 +89,8 @@ public class FamilyMember : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 是否申请    /// </summary>
+    /// 是否申请
+/// </summary>
     public bool IsApplicant { get; set; }
 
     /// <summary>
@@ -97,7 +99,8 @@ public class FamilyMember : INotifyPropertyChanged
     public bool IsHouseholdHead { get; set; }
 
     /// <summary>
-    /// 是否有重    /// </summary>
+    /// 是否有重
+/// </summary>
     public bool HasSevereIllness { get; set; }
 
     /// <summary>
@@ -570,7 +573,8 @@ public class FamilyMember : INotifyPropertyChanged
     public string SecondaryDisease { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属分类（共同生活成员/赡养抚养扶养    /// </summary>
+    /// 所属分类（共同生活成员/赡养抚养扶养
+/// </summary>
     public string MemberCategory { get; set; } = string.Empty;
 
     /// <summary>
@@ -740,7 +744,8 @@ public class FamilyMember : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 年收    /// </summary>
+    /// 年收
+/// </summary>
     public decimal AnnualIncome { get; set; }
 
     // ── 赡养人特有字段（member_category = "赡养抚养扶养" 时使用）──
@@ -840,7 +845,8 @@ public class FamilyMember : INotifyPropertyChanged
     public bool PhoneIsValid => !string.IsNullOrWhiteSpace(Phone) && Phone.Length == 11;
 
     /// <summary>
-    /// 从身份证号更新性别和年    /// </summary>
+    /// 从身份证号更新性别和年
+/// </summary>
     public void UpdateGenderAndAgeFromIdCard()
     {
         if (!string.IsNullOrEmpty(IdCard) && IdCard.Length >= 17)

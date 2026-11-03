@@ -80,6 +80,20 @@ public partial class ApplicationFormViewModel
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED, $"家庭成员 {member.Name} 的与户主关系不能为空");
         }
 
+        // 身份证查重前移（原静默跳过 = 用户以为保存成功、人数/收入口径对不上）：
+        // 同批成员身份证重复时在本步即报错定位，不再留到保存时丢数据。
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var member in FamilyMembers)
+            {
+                var mid = member.IdCard?.Trim();
+                if (string.IsNullOrEmpty(mid)) continue;
+                if (!seen.Add(mid))
+                    return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                        $"家庭成员 {member.Name} 的身份证号 {DataMasker.MaskIdCard(mid)} 与其他成员重复，请删除重复行或更正身份证号");
+            }
+        }
+
         // 免于劳动力判定联动校验：任一成员勾选时，本户须存在重病或重残者（含户主本人）可供其照顾
         if (FamilyMembers.Any(m => m.IsLaborExempt))
         {
@@ -220,6 +234,18 @@ public partial class ApplicationFormViewModel
         if (string.IsNullOrEmpty(ClassificationResult))
             return Result.Failure(ErrorCodes.VALIDATION_FAILED, "请先进行分类判定");
 
+        // 特困供养前置校验前移（原仅 SaveDraftAsync 拦截——用户填完 5 步点提交/保存才被拦，返工重填）：
+        // 分类为特困时，照料人与供养方式在本步（判定后）即校验，与保存草稿同一口径。
+        if (IsDestituteClassification)
+        {
+            if (Caregivers.Count == 0)
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                    "特困供养需要填写照料人信息，请先在成员信息中添加照料人");
+            if (SelectedSupportModeObj == null)
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED,
+                    "特困供养需要选择供养方式（集中供养或分散供养）");
+        }
+
         // 变更流程模式（复核/家庭修正/编辑家庭信息/成员变更）：必须在本次会话点过 Step5「分类判定」。
         // 分类/保障金只有判定按钮才落库（SaveClassificationResultAsync → UpdateAsync），
         // 跳过判定直接保存会让复核/变更结果丢失（只留变更记录、分类与保障金不落库），
@@ -231,16 +257,43 @@ public partial class ApplicationFormViewModel
         return Result.Success();
     }
 
+    /// <summary>
+    /// 保存前全量校验（五步）。
+    /// 旧实现只验 Step1+2，而 NavigateToStepCommand 允许自由跳步——Step3（收入/支出非负）、
+    /// Step4（入户调查日期时序）可被"跳步后直接保存"绕过。跳步【浏览】不拦，保存必须全量通过。
+    /// Step4/Step5 的模式豁免与 ExecuteSaveAsync 同口径（补全模式自有提醒流程、成员变更不重判分类）。
+    /// </summary>
     protected override Task<Result> ValidateAllStepsAsync()
     {
-        var step1 = ValidateStep1();
-        if (!step1.IsSuccess) return Task.FromResult(step1);
+        var result = ValidateStep1();
+        if (!result.IsSuccess) return Task.FromResult(WithStep(1, result));
 
-        var step2 = ValidateStep2();
-        if (!step2.IsSuccess) return Task.FromResult(step2);
+        result = ValidateStep2();
+        if (!result.IsSuccess) return Task.FromResult(WithStep(2, result));
+
+        result = ValidateStep3();
+        if (!result.IsSuccess) return Task.FromResult(WithStep(3, result));
+
+        // 补全模式豁免 Step4（锁定档/历史补录的调查日不在本次补全范围，其自有提醒流程）
+        if (!IsCompletionMode)
+        {
+            result = ValidateStep4();
+            if (!result.IsSuccess) return Task.FromResult(WithStep(4, result));
+        }
+
+        // 与 ExecuteSaveAsync 同口径：补全/成员变更模式不重判分类
+        if (!IsCompletionMode && !IsMemberChangeMode)
+        {
+            result = ValidateStep5();
+            if (!result.IsSuccess) return Task.FromResult(WithStep(5, result));
+        }
 
         return Task.FromResult(Result.Success());
     }
+
+    /// <summary>给校验失败结果补步骤号前缀，让用户知道是哪一步没过（保存是全量校验，失败必须可定位）。</summary>
+    private static Result WithStep(int step, Result inner) =>
+        Result.Failure(inner.ErrorCode, $"第{step}步未通过：{inner.Message}");
 
     /// <summary>
     /// 构建 Application 实体对象
@@ -381,7 +434,7 @@ public partial class ApplicationFormViewModel
             {
                 SignatureData = png,
                 ApplicantIdCard = ApplicantIdCard.Trim(),
-                BusinessType = "FamilyApplication",
+                BusinessType = PrintBusinessTypes.FamilyApplication,
                 BusinessId = _applicationId,
                 SignerName = ApplicantName,
                 SignerRole = "本人",
@@ -599,7 +652,9 @@ public partial class ApplicationFormViewModel
     /// <summary>
     /// 预置输出文书上下文（OutputCategories/Prefilter/OperationOverride）并进档案制作页。
     /// 用户在制作页点「档案输出」→ Output 按变动分类加载并预勾选。
-    /// 预勾选：告知书必选；有人员变动→增减员表；渐退→渐退审批表；有减发→保障金减少。
+    /// 预勾选：告知书必选；有人员变动→增减员表；渐退→渐退审批表。
+    /// （原「有减发→保障金减少」已删：模板档案_保障金减少 2026-10-16 起不在库，
+    ///   减发场景由《档案_变更告知书》"待遇调整"方向承载）
     /// </summary>
     [RelayCommand]
     private async Task ShowGraceDocumentSheetAsync()
@@ -619,26 +674,25 @@ public partial class ApplicationFormViewModel
             if (IsInGracePeriod && GracePeriodMonths > 0)
                 await SyncGracePeriodRecordAsync(CancellationToken);
 
+            // 预勾选名单与档案输出的清单过滤同源（ChangeDocumentApplicabilityService 单点口径，
+            // 补打中心同用）：告知书必选；渐退→渐退审批表；有人员变动→增减员表。
+            // （原「减发→档案_保障金减少」已删：模板不在库，减发由告知书"待遇调整"方向承载）
             var preselect = new List<string> { DocumentTemplateNames.ChangeNotice }; // 告知书必选
-
-            // 渐退核定 → 渐退审批表
-            if (IsInGracePeriod)
-                preselect.Add(DocumentTemplateNames.GraceApproval);
-
-            // 有减发 → 保障金减少
-            if (OriginalGuaranteeAmount is decimal og && GraceGrantAmount is decimal gg && og > gg && gg > 0)
-                preselect.Add(DocumentTemplateNames.GrantReduce);
-
-            // 有人员变动 → 增减员表（死亡链/成员增减记录存在）
-            try
+            var factsResult = await _serviceProvider
+                .GetRequiredService<IChangeDocumentApplicabilityService>()
+                .GetFactsAsync(_applicationId, ClassificationResult, CancellationToken);
+            if (factsResult.IsSuccess)
             {
-                var changes = await _changeService.GetMemberChangeRecordsAsync(_applicationId, 5, CancellationToken);
-                if (changes.IsSuccess && changes.Value is { Count: > 0 })
+                var facts = factsResult.Value;
+                if (facts.HasActiveGracePeriod)
+                    preselect.Add(DocumentTemplateNames.GraceApproval);
+                if (facts.HasMemberChange)
                     preselect.Add(DocumentTemplateNames.MemberChangeTable);
             }
-            catch
+            else
             {
-                // 取数失败不阻断：仅少预勾一张
+                // 取数失败不阻断：仅保留告知书必选项（与原「取数失败仅少预勾一张」同降级口径）
+                _logger.Warn($"变动文书预勾选事实查询失败: ApplicationId={_applicationId}, {factsResult.ErrorCode} {factsResult.Message}");
             }
 
             ApplyDocumentOutputContext(preselect);
@@ -930,11 +984,11 @@ public partial class ApplicationFormViewModel
                 || (OriginalGuaranteeAmount is decimal ro && GraceGrantAmount is decimal rg && ro > rg);
             if (hasGraceReduce)
             {
+                // 预勾选：告知书必选 + 渐退审批表（原「保障金减少」项已删：模板不在库，
+                // 减发场景由《档案_变更告知书》"待遇调整"方向承载）
                 var docs = new List<string> { DocumentTemplateNames.ChangeNotice };
                 if (IsInGracePeriod)
                     docs.Add(DocumentTemplateNames.GraceApproval);
-                if (OriginalGuaranteeAmount is decimal o2 && GraceGrantAmount is decimal g2 && o2 > g2)
-                    docs.Add(DocumentTemplateNames.GrantReduce);
                 try
                 {
                     ApplyDocumentOutputContext(docs);

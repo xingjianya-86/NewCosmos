@@ -1,3 +1,4 @@
+using NewCosmos.Models.DeathStatement;
 using System.Text.RegularExpressions;
 
 namespace NewCosmos.Helpers;
@@ -63,4 +64,39 @@ public static class VillageScopeResolver
         var pattern = "(村民委员会|居民委员会|村公所|居委会|村委会|委员会|社区|村)+$";
         return $"regexp_replace(COALESCE({column}, ''), '{pattern}', '') = ${paramIndex}";
     }
+
+    /// <summary>
+    /// 归属判定（C# 侧，SQL 片段之外的行级判定）：**村级**按 village_id / community 文本；
+    /// **镇级降级**按 town_id / town 文本。无任何归属字段 → 不可判定 → 计入当前范围（规范 §3.1）。
+    /// 2026-11 从 DeathStatementService 纯移入（申报服务与身份聚合器共用，避免聚合器反向依赖服务）。
+    /// </summary>
+    public static bool InScope(VillageScope scope, int? villageId, int? hukouVillageId,
+        int? townId, int? hukouTownId, string? community, string? townText)
+    {
+        if (scope.IsTownScope)
+        {
+            if (townId is > 0) return townId.Value == scope.TownId;
+            if (hukouTownId is > 0) return hukouTownId.Value == scope.TownId;
+
+            var town = Normalize(townText);
+            return town.Length == 0
+                || string.Equals(town, Normalize(scope.TownName), StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (villageId is > 0) return villageId.Value == scope.VillageId;
+        if (hukouVillageId is > 0) return hukouVillageId.Value == scope.VillageId;
+
+        var core = Normalize(community);
+        return core.Length == 0
+            || string.Equals(core, scope.VillageCoreName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>档案类表归属（现住址 village → 户籍 village → community 文本；镇级同理用 town 三档）</summary>
+    public static bool ArchiveInScope(VillageScope scope, int? villageId, int? hukouVillageId,
+        int? townId, int? hukouTownId, string? community, string? townText)
+        => InScope(scope, villageId, hukouVillageId, townId, hukouTownId, community, townText);
+
+    /// <summary>纯文本归属表（临时救助：village/town 都是文本）</summary>
+    public static bool TextInScope(VillageScope scope, string? villageText, string? townText)
+        => InScope(scope, null, null, null, null, villageText, townText);
 }

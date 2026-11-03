@@ -123,7 +123,9 @@ public class StatisticsService : BaseService, IStatisticsService
             //   用不可变的首次审批时间，避免任何一次编辑/变更把老档案重算成"本月新增"）
             // - 本月总退出 = status=ApplicationStatusCodes.STOPPED 且 stop_date∈B线周期（月报"停保汇总"口径）
             // - 新申请资产核查 = nc_biz_asset_checks 中 status='0'（已申请未出授权报告）且 application_date∈B线周期
-            // - 本月新增高龄老人 = nc_biz_elderly_applications 中 status∈(Confirmed,Stopped) 且 apply_date∈当月自然月
+            // - 本月新增高龄老人 = nc_biz_elderly_applications 满足「当月真正新增」单点口径
+            //   （ElderlyNewArchiveFilter：status∈(Confirmed,Stopped) 且 source_type IS NULL 且 建档时未死亡）
+            //   且 apply_date∈当月自然月；与月报新增明细、模块统计同源
             // B 线周期统一走 BusinessTimelineService（唯一事实来源，与 GetCycleRangeAsync、档案公示/卷号同源）。
             var now = DateTime.Now;
             var (bStart, bEnd) = await GetBCycleWindowAsync(now, ct);   // B 线周期 [起, 止)
@@ -150,12 +152,11 @@ public class StatisticsService : BaseService, IStatisticsService
                 CROSS JOIN
                     (SELECT COUNT(*) AS monthly_new_elderly
                       FROM nc_biz_elderly_applications
-                      WHERE status IN ($8, $9) AND apply_date >= $3::date AND apply_date < $4::date AND deleted_at IS NULL
-                        AND source_type IS NULL) e";
+                      WHERE {ElderlyNewArchiveFilter.IsNewArchiveExpr("nc_biz_elderly_applications")}
+                        AND apply_date >= $3::date AND apply_date < $4::date AND deleted_at IS NULL) e";
 
             var result = await _dbService.QuerySingleAsync<DashboardCounts>(sql, ct, bStart, bEnd, mStart, mEnd,
-                ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.STOPPED, AssetCheckStatusConstants.SUBMITTED,
-                ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusStopped);
+                ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.STOPPED, AssetCheckStatusConstants.SUBMITTED);
 
             // 查询失败必须失败返回，不再伪造"全 0"的假数据——
             // 假数据会让仪表盘在数据库异常时看起来"一切正常但没业务"。
@@ -246,13 +247,14 @@ public class StatisticsService : BaseService, IStatisticsService
             // - 在享领取人数 = 当前库 status=ApplicationStatusCodes.CONFIRMED 且未死亡（death_date IS NULL）
             //   + 导入库 nc_biz_elderly_subsidy_history 中尚未在当前库建档（身份证不在当前库未删记录）
             //   且未登记死亡（不在 nc_biz_death_records.member_id_card）的记录数。
-            // - 本月新增登记 = status∈(Confirmed,Stopped) 且 apply_date∈当月自然月
-            //   （排除导入库补录：source_type 非空者的 apply_date 为补录当天，非真实新增）
+            // - 本月新增登记 = 满足「当月真正新增」单点口径（ElderlyNewArchiveFilter：status∈(Confirmed,Stopped)
+            //   且 source_type IS NULL 排除导入名册补录 且 建档时未死亡兜底）且 apply_date∈当月自然月，
+            //   与仪表盘 MonthlyNewElderly、月报新增明细、补打中心按月名单同源
             var now = DateTime.Now;
             var mStart = new DateTime(now.Year, now.Month, 1); // 当月1日
             var mEnd = mStart.AddMonths(1);                    // 次月1日
 
-            var sql = @"
+            var sql = $@"
                 SELECT
                     ((SELECT COUNT(*) FROM nc_biz_elderly_applications
                        WHERE status = $3
@@ -263,12 +265,12 @@ public class StatisticsService : BaseService, IStatisticsService
                          AND NOT EXISTS (SELECT 1 FROM nc_biz_death_records d
                                          WHERE d.member_id_card = h.id_card))) AS active_count,
                     (SELECT COUNT(*) FROM nc_biz_elderly_applications
-                     WHERE status IN ($3, $4)
+                     WHERE {ElderlyNewArchiveFilter.IsNewArchiveExpr("nc_biz_elderly_applications")}
                        AND apply_date >= $1::date AND apply_date < $2::date
-                       AND source_type IS NULL AND deleted_at IS NULL) AS monthly_new";
+                       AND deleted_at IS NULL) AS monthly_new";
 
             var result = await _dbService.QuerySingleAsync<ElderlyModuleStats>(sql, ct, mStart, mEnd,
-                ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusStopped);
+                ElderlyBenefitConstants.StatusConfirmed);
 
             if (result.IsFailure || result.Value is null)
             {

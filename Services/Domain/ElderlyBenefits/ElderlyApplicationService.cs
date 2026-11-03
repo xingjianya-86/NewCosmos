@@ -15,6 +15,29 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
 {
     protected override string ServiceName => "ElderlyApplicationService";
 
+    /// <summary>
+    /// 46 列全量 INSERT（登记建档/自动草稿两处共用——原实现全文抄两遍，改列只改一处必漏另一处）。
+    /// 参数顺序 = 列顺序（$1..$46），created_at/updated_at 由 SQL 自填。
+    /// </summary>
+    private const string InsertApplicationSql = @"
+                INSERT INTO nc_biz_elderly_applications
+                (application_no, name, id_card, gender, birth_date, phone,
+                 hukou_address, hukou_village,
+                 hukou_city_id, hukou_county_id, hukou_town_id, hukou_village_id, hukou_detail_address,
+                 family_address, family_city_id, family_county_id, family_town_id, family_village_id, detail_address,
+                 bank_name, bank_account, agent_name, agent_relation,
+                 agent_receive_name, agent_receive_relation, agent_receive_bank_name, agent_receive_bank_account, agent_receive_reason,
+                 issue_start_month, issue_amount,
+                 category, identity_flag, identity_source, is_category_manual,
+                 payback_start_month, payback_end_month, auto_start_month, auto_end_month,
+                 payback_months, payback_amount, is_special_case, special_reason, payback_reason,
+                 status, apply_date, created_by, created_at, updated_at)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
+                        $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,
+                        $37,$38,$39,$40,$41,$42,$43,$44,$45,$46,
+                        NOW(), NOW())
+                RETURNING id";
+
     private readonly IDatabaseService _db;
     private readonly IStandardConfigService _standardConfigService;
     private readonly ElderlyCategoryService _categoryService;
@@ -42,6 +65,19 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
 
         return Result.Success(result.Value.StandardValue);
     }
+
+    /// <summary>
+    /// 「未死亡」SQL 条件（低收入流程对已死亡人员豁免高龄核查，2026-10-30）：
+    /// 既无死亡登记（nc_biz_death_records）也无未作废死亡申报（nc_biz_death_declarations）才继续核查。
+    /// 死亡判定口径 = 登记 ∪ 有效申报，按身份证**全库**匹配（人死与哪户无关）；
+    /// 申报一落，「死亡情况说明」联动卡即接管提示，低收入侧不再重复核查高龄状态。
+    /// idCardExpr 为代码内写死的身份证列表达式（列名/参数占位，非用户输入），同 ScopeApplicationSql 拼列先例。
+    /// </summary>
+    private static string NotDeadSql(string idCardExpr) =>
+        $@"NOT EXISTS (SELECT 1 FROM nc_biz_death_records d WHERE d.member_id_card = {idCardExpr})
+           AND NOT EXISTS (SELECT 1 FROM nc_biz_death_declarations dd
+                           WHERE dd.deceased_id_card = {idCardExpr}
+                             AND dd.deleted_at IS NULL AND dd.status <> 'Revoked')";
 
     public async Task<Result<ElderlyEvaluateResult>> EvaluateAsync(string idCard, DateTime applyDate, CancellationToken ct = default)
     {
@@ -126,7 +162,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
     public async Task<Result<ElderlyApplication>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"按ID查询: {id}");
-        var sql = "SELECT * FROM nc_biz_elderly_applications WHERE id = $1 AND deleted_at IS NULL";
+        var sql = "SELECT " + WideTableColumns.ElderlyApplicationsColumns + @" FROM nc_biz_elderly_applications WHERE id = $1 AND deleted_at IS NULL";
         return await _db.QuerySingleAsync<ElderlyApplication>(sql, ct, id);
     }
 
@@ -144,9 +180,10 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         return await _db.QueryAsync<ElderlyPaybackSegment>(sql, ct, applicationId);
     }
 
-    public async Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default, bool distinctIdCard = false)
+    // keyword 允许 null：补打中心等"关键词留空=默认最近名单"路径按设计传 null（曾因 keyword.Length 直接解引用致 NRE、跨域搜索整体失败）
+    public async Task<Result<PagedResult<ElderlyApplication>>> GetPagedAsync(string? keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default, bool distinctIdCard = false)
     {
-        LogInfo($"分页查询: keywordLength={keyword.Length}, status={status}, 第{pageIndex}页, 每页{pageSize}条, 去重={distinctIdCard}");
+        LogInfo($"分页查询: keywordLength={keyword?.Length ?? 0}, status={status}, 第{pageIndex}页, 每页{pageSize}条, 去重={distinctIdCard}");
 
         var conditions = new SqlConditionBuilder()
             .Add("deleted_at IS NULL")
@@ -156,13 +193,14 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         var where = conditions.ToWhereClause();
         // 去重模式：同身份证存在多条在享档案时只取最新一条，计数同步按 distinct id_card，
         // 避免复核页"在享人员检索"把同一人显示成两行（历史重复档案的显示口径）。
+        // 列收口：66 列宽表禁 SELECT *（§5#2），列表页只取显式列清单。
         var fromClause = distinctIdCard
-            ? $"(SELECT DISTINCT ON (id_card) * FROM nc_biz_elderly_applications{where} ORDER BY id_card, created_at DESC) t"
+            ? $"(SELECT DISTINCT ON (id_card) {WideTableColumns.ElderlyApplicationsColumns} FROM nc_biz_elderly_applications{where} ORDER BY id_card, created_at DESC) t"
             : $"nc_biz_elderly_applications{where}";
         var countSql = distinctIdCard
             ? $"SELECT COUNT(DISTINCT id_card) FROM nc_biz_elderly_applications{where}"
             : $"SELECT COUNT(*) FROM nc_biz_elderly_applications{where}";
-        var querySql = $"SELECT * FROM {fromClause}";
+        var querySql = $"SELECT {WideTableColumns.ElderlyApplicationsColumns} FROM {fromClause}";
 
         var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
         if (countResult.IsFailure)
@@ -186,7 +224,9 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         var monthStart = new DateTime(year, month, 1);
         var monthEnd = monthStart.AddMonths(1);
 
-        // 新增明细：受理日期落在该月；停止明细：实际停发时间落在该月
+        // 新增明细：受理日期落在该月 +「当月真正新增」统一口径（ElderlyNewArchiveFilter 单点，
+        // 与主页卡片、模块统计同一判定：状态口径 + 排除导入名册补录 + 建档时已死亡兜底）；
+        // 停止明细：实际停发时间落在该月，口径与新增无关。
         var conditions = new SqlConditionBuilder().Add("deleted_at IS NULL");
         string dateColumn;
         string orderBy;
@@ -199,15 +239,16 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         }
         else
         {
-            conditions.Add("status IN ({0}, {1})", ElderlyBenefitConstants.StatusConfirmed, ElderlyBenefitConstants.StatusStopped);
+            conditions.Add(ElderlyNewArchiveFilter.IsNewArchiveExpr("nc_biz_elderly_applications"));
             dateColumn = "apply_date";
             orderBy = "apply_date, id";
         }
         conditions.Add(dateColumn + " >= {0} AND " + dateColumn + " < {1}", monthStart, monthEnd);
         conditions.AddIf(!string.IsNullOrWhiteSpace(categoryCode), "category = {0}", categoryCode?.Trim());
-        conditions.AddIf(excludeImported, "source_type IS NULL");
+        // source_type 过滤：新增方向已并入单点口径（恒排除补录档），此处只对停发方向按参数生效
+        conditions.AddIf(isStop && excludeImported, "source_type IS NULL");
 
-        var sql = $"SELECT * FROM nc_biz_elderly_applications{conditions.ToWhereClause()} ORDER BY {orderBy}";
+        var sql = $"SELECT {WideTableColumns.ElderlyApplicationsColumns} FROM nc_biz_elderly_applications{conditions.ToWhereClause()} ORDER BY {orderBy}";
         var result = await _db.QueryAsync<ElderlyApplication>(sql, ct, conditions.GetParameters());
         if (result.IsFailure)
             return Result.Failure<List<ElderlyApplication>>(result.ErrorCode!, result.Message!);
@@ -220,7 +261,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         if (ids == null || ids.Count == 0)
             return Result.Success(new List<ElderlyApplication>());
 
-        var sql = @"SELECT * FROM nc_biz_elderly_applications
+        var sql = @"SELECT " + WideTableColumns.ElderlyApplicationsColumns + @" FROM nc_biz_elderly_applications
                     WHERE deleted_at IS NULL AND id = ANY($1)
                     ORDER BY id";
         var result = await _db.QueryAsync<ElderlyApplication>(sql, ct, ids.ToArray());
@@ -249,24 +290,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             if (appNoResult.IsFailure)
                 return Result.Failure<long>(appNoResult.ErrorCode!, appNoResult.Message!);
 
-            const string sql = @"
-                INSERT INTO nc_biz_elderly_applications
-                (application_no, name, id_card, gender, birth_date, phone,
-                 hukou_address, hukou_village,
-                 hukou_city_id, hukou_county_id, hukou_town_id, hukou_village_id, hukou_detail_address,
-                 family_address, family_city_id, family_county_id, family_town_id, family_village_id, detail_address,
-                 bank_name, bank_account, agent_name, agent_relation,
-                 agent_receive_name, agent_receive_relation, agent_receive_bank_name, agent_receive_bank_account, agent_receive_reason,
-                 issue_start_month, issue_amount,
-                 category, identity_flag, identity_source, is_category_manual,
-                 payback_start_month, payback_end_month, auto_start_month, auto_end_month,
-                 payback_months, payback_amount, is_special_case, special_reason, payback_reason,
-                 status, apply_date, created_by, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
-                        $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,
-                        $37,$38,$39,$40,$41,$42,$43,$44,$45,$46,
-                        NOW(), NOW())
-                RETURNING id";
+            var sql = InsertApplicationSql; // 46 列全量 INSERT 单点（登记建档与自动草稿共用）
 
             var insertResult = await _db.ExecuteScalarAsync(sql, ct,
                 appNoResult.Value,
@@ -421,17 +445,18 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             return Result.Failure(ErrorCodes.DB_UNIQUE_VIOLATION,
                 "该身份证已存在在享档案，不能重复确认（请先办理复核或停发）");
 
+        // 状态守卫：仅草稿可确认（同 TempReliefService.ConfirmAsync）。无守卫时已停发记录可被重新确认回在享。
         var sql = @"UPDATE nc_biz_elderly_applications SET
                     status = $1, confirmed_at = NOW(), confirmed_by = $2, updated_at = NOW()
-                    WHERE id = $3 AND deleted_at IS NULL";
-        var result = await _db.ExecuteNonQueryAsync(sql, ct, ElderlyBenefitConstants.StatusConfirmed, operatorName ?? "System", id);
+                    WHERE id = $3 AND deleted_at IS NULL AND status = $4";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct, ElderlyBenefitConstants.StatusConfirmed, operatorName ?? "System", id, ElderlyBenefitConstants.StatusDraft);
         if (result.IsFailure)
             return result.ErrorCode == ErrorCodes.DB_UNIQUE_VIOLATION
                 ? Result.Failure(ErrorCodes.DB_UNIQUE_VIOLATION,
                     "该身份证已存在在享档案，不能重复确认（请先办理复核或停发）")
                 : Result.Failure(result.ErrorCode!, result.Message!);
         if (result.Value == 0)
-            return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "登记记录不存在或已删除");
+            return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "登记记录不存在、已删除或已不是草稿状态（仅草稿可确认）");
 
         Logger.LogBusiness("确认普惠高龄登记", ("ApplicationId", id));
         return Result.Success();
@@ -499,7 +524,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "登记记录不存在或已删除");
 
         // 停发成功后联动标记导入台账（nc_biz_elderly_subsidy_history）：来源记录按 id 标记，另按身份证兜底标记全部 Active 记录
-        await MarkHistoryStoppedAsync(id, ct);
+        var linkageOk = await MarkHistoryStoppedAsync(id, ct);
 
         Logger.LogBusiness("停发普惠高龄登记",
             ("ApplicationId", id),
@@ -507,7 +532,12 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             ("DeathDate", deathDate?.ToString("yyyy-MM-dd") ?? ""),
             ("IsRecover", isRecover),
             ("RecoverAmount", recoverAmount));
-        return Result.Success();
+
+        // 主操作已提交，联动失败不回滚停发——但必须让用户知道（台账侧残留 Active 会把已停发人员再算进"待建档"），
+        // 由 UI 展示警告（原实现仅 LogWarn 静默，用户无从得知）。
+        return linkageOk
+            ? Result.Success()
+            : Result.SuccessWithWarning("停发已保存，但导入台账联动标记失败（已停发人员可能仍出现在待建档名单）。可稍后重试停发或联系管理员处理。");
     }
 
     public async Task<Result> DeleteAsync(long id, CancellationToken ct = default)
@@ -529,41 +559,54 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
     /// 停发联动：将导入台账（nc_biz_elderly_subsidy_history）对应人员标记为已停发。
     /// 1) 来自导入库建档（source_type=ElderlySubsidyHistory）按 source_id 精确标记；
     /// 2) 无论来源，按身份证兜底将该人员全部 Active 记录标记 Stopped（用户口径：全部标记）。
+    /// 返回是否全部联动成功（失败不抛异常——主停发已提交，由调用方转为用户可见警告）。
     /// </summary>
-    private async Task MarkHistoryStoppedAsync(long applicationId, CancellationToken ct)
+    private async Task<bool> MarkHistoryStoppedAsync(long applicationId, CancellationToken ct)
     {
         try
         {
             const string srcSql = @"SELECT COALESCE(source_type,'') AS source_type, source_id, id_card
                                     FROM nc_biz_elderly_applications WHERE id = $1 AND deleted_at IS NULL";
-            var srcResult = await _db.QuerySingleAsync<HistoryMarkRow>(srcSql, ct, applicationId);
-            if (srcResult.IsFailure || srcResult.Value == null) return;
-            var src = srcResult.Value;
+            var src = await _db.QuerySingleAsync<HistoryMarkRow>(srcSql, ct, applicationId);
+            if (src.IsFailure || src.Value == null)
+            {
+                // 取数失败按联动失败处理（不能静默当作成功）；查无此人（已删）不算失败
+                if (src.IsFailure)
+                {
+                    LogWarn($"停发联动：读取档案来源信息失败: {src.Message}");
+                    return false;
+                }
+                return true;
+            }
+            var row = src.Value;
 
             var marked = 0;
-            if (string.Equals(src.SourceType, "ElderlySubsidyHistory", StringComparison.OrdinalIgnoreCase)
-                && src.SourceId.HasValue)
+            var allOk = true;
+            if (string.Equals(row.SourceType, "ElderlySubsidyHistory", StringComparison.OrdinalIgnoreCase)
+                && row.SourceId.HasValue)
             {
                 var byId = await _db.ExecuteNonQueryAsync(
                     "UPDATE nc_biz_elderly_subsidy_history SET status = $2, stopped_at = NOW(), updated_at = NOW() WHERE id = $1",
-                    ct, src.SourceId.Value, ElderlyBenefitConstants.StatusStopped);
-                if (byId.IsSuccess) marked += byId.Value;
+                    ct, row.SourceId.Value, ElderlyBenefitConstants.StatusStopped);
+                if (byId.IsSuccess) marked += byId.Value; else allOk = false;
             }
 
-            if (!string.IsNullOrWhiteSpace(src.IdCard))
+            if (!string.IsNullOrWhiteSpace(row.IdCard))
             {
                 var byCard = await _db.ExecuteNonQueryAsync(
                     "UPDATE nc_biz_elderly_subsidy_history SET status = $2, stopped_at = NOW(), updated_at = NOW() WHERE id_card = $1 AND status = $3",
-                    ct, src.IdCard, ElderlyBenefitConstants.StatusStopped, ElderlyBenefitConstants.StatusActive);
-                if (byCard.IsSuccess) marked += byCard.Value;
+                    ct, row.IdCard, ElderlyBenefitConstants.StatusStopped, ElderlyBenefitConstants.StatusActive);
+                if (byCard.IsSuccess) marked += byCard.Value; else allOk = false;
             }
 
             if (marked > 0)
                 Logger.LogBusiness("停发联动标记导入台账", ("ApplicationId", applicationId), ("MarkedCount", marked));
+            return allOk;
         }
         catch (Exception ex)
         {
             LogWarn($"停发联动标记导入台账失败: {ex.Message}");
+            return false;
         }
     }
 
@@ -731,24 +774,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             if (appNoResult.IsFailure)
                 return Result.Failure<long>(appNoResult.ErrorCode!, appNoResult.Message!);
 
-            const string sql = @"
-                INSERT INTO nc_biz_elderly_applications
-                (application_no, name, id_card, gender, birth_date, phone,
-                 hukou_address, hukou_village,
-                 hukou_city_id, hukou_county_id, hukou_town_id, hukou_village_id, hukou_detail_address,
-                 family_address, family_city_id, family_county_id, family_town_id, family_village_id, detail_address,
-                 bank_name, bank_account, agent_name, agent_relation,
-                 agent_receive_name, agent_receive_relation, agent_receive_bank_name, agent_receive_bank_account, agent_receive_reason,
-                 issue_start_month, issue_amount,
-                 category, identity_flag, identity_source, is_category_manual,
-                 payback_start_month, payback_end_month, auto_start_month, auto_end_month,
-                 payback_months, payback_amount, is_special_case, special_reason, payback_reason,
-                 status, apply_date, created_by, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
-                        $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,
-                        $37,$38,$39,$40,$41,$42,$43,$44,$45,$46,
-                        NOW(), NOW())
-                RETURNING id";
+            var sql = InsertApplicationSql; // 46 列全量 INSERT 单点（登记建档与自动草稿共用）
 
             var insertResult = await _db.ExecuteScalarAsync(sql, ct,
                 appNoResult.Value,
@@ -937,16 +963,15 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                 return Result.Success(0);
             }
 
-            // 候选人员 = 户主/申请人 + 共同生活成员（赡养抚养人不住本户不参与）；排除死亡登记成员
-            const string memberSql = @"
+            // 候选人员 = 户主/申请人 + 共同生活成员（赡养抚养人不住本户不参与）；
+            // 死亡豁免（登记∪有效申报，全库匹配）——已死亡不再建高龄草稿，由死亡情况说明联动卡承接
+            string memberSql = @"
                 SELECT DISTINCT m.name, m.id_card
                 FROM nc_biz_family_members m
                 WHERE m.application_id = $1 AND m.deleted_at IS NULL
                   AND m.id_card IS NOT NULL AND length(m.id_card) = 18
                   AND (m.is_applicant OR m.member_category = 'SharedLiving')
-                  AND NOT EXISTS (
-                      SELECT 1 FROM nc_biz_death_records d
-                      WHERE d.application_id = m.application_id AND d.member_id_card = m.id_card)";
+                  AND " + NotDeadSql("m.id_card");
             var membersResult = await _db.QueryAsync<ArchivedMemberRow>(memberSql, ct, applicationId);
             if (membersResult.IsFailure)
                 return Result.Failure<int>(membersResult.ErrorCode!, membersResult.Message!);
@@ -960,6 +985,18 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             }
 
             var created = 0;
+
+            // 批查已登记身份证（原逐人 CheckIdCardExistsAsync：每批一次 COUNT 往返；= ANY($1) 一次取全）
+            var registeredSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var registeredResult = await _db.QueryAsync<string>(
+                "SELECT id_card FROM nc_biz_elderly_applications WHERE id_card = ANY($1) AND deleted_at IS NULL",
+                ct, candidates.Keys.ToArray());
+            if (registeredResult.IsSuccess && registeredResult.Value != null)
+            {
+                foreach (var c in registeredResult.Value)
+                    if (!string.IsNullOrWhiteSpace(c)) registeredSet.Add(c.Trim());
+            }
+
             foreach (var (idCard, name) in candidates)
             {
                 // 满80周岁精确到月（口径与导入迁移 TryCreateElderlyBenefitsAsync 一致）
@@ -970,8 +1007,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                 if (ageMonths < ElderlyBenefitConstants.Threshold80 * 12) continue;
 
                 // 查重：任意未删除登记记录（含停发历史）均视为已登记，不重复自动建
-                var existsResult = await CheckIdCardExistsAsync(idCard, null, ct);
-                if (existsResult.IsSuccess && existsResult.Value)
+                if (registeredSet.Contains(idCard.Trim()))
                 {
                     LogInfo($"归档联动跳过（已有普惠高龄登记）: {DataMasker.MaskName(name)}");
                     continue;
@@ -1046,7 +1082,8 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             // 满80判定按身份证出生段精确到月；分流：
             //   待新增   = 无 Pending 复核 且正式表无 Confirmed 且名册无 Active
             //   需停旧增新 = 存在 Pending 复核（待办为复核队列的「已完结档案」子集，办结即消账）
-            const string sql = @"
+            // 注意：persons 内拼 NotDeadSql（方法调用），故非常量串
+            string sql = @"
                 WITH target_apps AS (
                     SELECT a.id, a.applicant_id_card
                     FROM nc_biz_applications a
@@ -1058,15 +1095,14 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                     SELECT DISTINCT ta.applicant_id_card AS id_card
                     FROM target_apps ta
                     WHERE ta.applicant_id_card IS NOT NULL AND length(ta.applicant_id_card) = 18
+                      AND " + NotDeadSql("ta.applicant_id_card") + @"
                     UNION
                     SELECT DISTINCT m.id_card
                     FROM nc_biz_family_members m
                     JOIN target_apps ta ON ta.id = m.application_id
                     WHERE m.deleted_at IS NULL AND m.id_card IS NOT NULL AND length(m.id_card) = 18
                       AND (m.is_applicant OR m.member_category = 'SharedLiving')
-                      AND NOT EXISTS (
-                          SELECT 1 FROM nc_biz_death_records d
-                          WHERE d.application_id = m.application_id AND d.member_id_card = m.id_card)
+                      AND " + NotDeadSql("m.id_card") + @"
                 ),
                 qualified AS (
                     SELECT DISTINCT p.id_card
@@ -1113,12 +1149,13 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         try
         {
             // 人员集与 GetPendingElderlyCountsAsync 完全同口径：
-            // 已完结（排除单人保）档案的户主/申请人与共同生活成员（排除死亡登记），身份证去重优先户主；
+            // 已完结（排除单人保）档案的户主/申请人与共同生活成员（死亡豁免：登记∪有效申报全库匹配），身份证去重优先户主；
             // 满80判定按身份证出生段精确到月；分流：
             //   待新增   = 无 Pending 复核 且正式表无 Confirmed 且名册无 Active
             //   需停旧增新 = 存在 Pending 复核（办结后队列置 Completed，该人自动退出列表）
             // 附带正式表在享ID/历史名册ID/复核记录ID，供跳转办理。
-            const string sql = @"
+            // 注意：persons 内拼 NotDeadSql（方法调用），故非常量串
+            string sql = @"
                 WITH target_apps AS (
                     SELECT a.id, a.application_no, a.applicant_id_card, a.applicant_name
                     FROM nc_biz_applications a
@@ -1131,6 +1168,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                            ta.applicant_id_card AS id_card, ta.applicant_name AS name, '户主' AS member_role
                     FROM target_apps ta
                     WHERE ta.applicant_id_card IS NOT NULL AND length(ta.applicant_id_card) = 18
+                      AND " + NotDeadSql("ta.applicant_id_card") + @"
                     UNION
                     SELECT DISTINCT ta.id, ta.application_no,
                            m.id_card, m.name, '共同生活成员' AS member_role
@@ -1138,9 +1176,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                     JOIN target_apps ta ON ta.id = m.application_id
                     WHERE m.deleted_at IS NULL AND m.id_card IS NOT NULL AND length(m.id_card) = 18
                       AND (m.is_applicant OR m.member_category = 'SharedLiving')
-                      AND NOT EXISTS (
-                          SELECT 1 FROM nc_biz_death_records d
-                          WHERE d.application_id = m.application_id AND d.member_id_card = m.id_card)
+                      AND " + NotDeadSql("m.id_card") + @"
                 ),
                 dedup AS (
                     SELECT DISTINCT ON (p.id_card)

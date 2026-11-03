@@ -5,7 +5,8 @@ using NewCosmos.Services.Core;
 namespace NewCosmos.Services.Utilities;
 
 /// <summary>
-/// 业务时间线计算结    /// </summary>
+/// 业务时间线计算结
+/// </summary>
 public class TimelineResult
 {
     public int Year { get; set; }

@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Exceptions;
+using NewCosmos.Models.Exceptions;
 
 namespace NewCosmos.Models.Options;
 
@@ -8,15 +8,18 @@ namespace NewCosmos.Models.Options;
 public class UIOptions
 {
     /// <summary>
-    /// 背景图目录    /// </summary>
+    /// 背景图目录
+/// </summary>
     public string BackgroundImagesDirectory { get; set; } = string.Empty;
 
     /// <summary>
-    /// 背景图格式    /// </summary>
+    /// 背景图格式
+/// </summary>
     public string BackgroundImageFormat { get; set; } = string.Empty;
 
     /// <summary>
-    /// 默认背景图    /// </summary>
+    /// 默认背景图
+/// </summary>
     public string DefaultBackgroundImage { get; set; } = string.Empty;
 
     /// <summary>
@@ -25,7 +28,8 @@ public class UIOptions
     public bool UseRandomBackground { get; set; }
 
     /// <summary>
-    /// 是否记住用户选择的背景    /// </summary>
+    /// 是否记住用户选择的背景
+/// </summary>
     public bool RememberBackgroundChoice { get; set; }
 
     /// <summary>

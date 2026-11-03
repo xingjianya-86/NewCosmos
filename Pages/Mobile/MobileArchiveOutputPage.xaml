@@ -15,31 +15,19 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="0">
 
         <!-- ① 头部：返回 / 标题 / 模板统计 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,14,16,12">
-            <VerticalStackLayout Spacing="6">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Grid.Column="0" Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                        <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                    <Button Grid.Column="2" Text="打印任务" FontSize="12"
-                            BackgroundColor="White" TextColor="{StaticResource Primary}"
-                            Padding="12,0" HeightRequest="34" CornerRadius="17"
-                            Command="{Binding OpenPrintJobsCommand}"/>
-                </Grid>
-                <Label Text="档案输出" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="{Binding StatusText}" FontSize="12" TextColor="#E6FFFFFF" LineBreakMode="WordWrap"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="档案输出"
+                                   Subtitle="{Binding StatusText}"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <!-- ② 说明条：为什么手机上只有「推送打印」 -->
         <Border Grid.Row="1" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="12,8">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <Label Text="ℹ️" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="1" FontSize="12" TextColor="{StaticResource PrimaryDark}"
+                <Label Text="ℹ️" FontSize="15" VerticalOptions="Center"/>
+                <Label Grid.Column="1" FontSize="14" TextColor="{StaticResource PrimaryDark}"
                        LineBreakMode="WordWrap"
                        Text="手机端不生成文书：勾选模板后推送打印任务，电脑端登录后自动打印。"/>
             </Grid>
@@ -51,7 +39,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <Label Text="输出模板（批量）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                     <Button Grid.Column="1" Text="全选 / 取消"
-                            FontSize="12" Padding="10,0" HeightRequest="32" CornerRadius="8"
+                            FontSize="14" Padding="10,0" HeightRequest="32" CornerRadius="8"
                             BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource TextSecondary}"
                             Command="{Binding ToggleSelectAllCommand}"/>
                 </Grid>
@@ -62,16 +50,16 @@
                                 <Switch IsToggled="{Binding IsSelected}" OnColor="{StaticResource Primary}"
                                         IsEnabled="{Binding IsApplicable}" VerticalOptions="Center"/>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                    <Label Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                                    <Label Text="{Binding Name}" FontSize="15" TextColor="{StaticResource TextPrimary}"
                                            LineBreakMode="TailTruncation"/>
-                                    <Label Text="{Binding BaseCopies, StringFormat='{0} 份'}" FontSize="11"
+                                    <Label Text="{Binding BaseCopies, StringFormat='{0} 份'}" FontSize="12"
                                            TextColor="{StaticResource TextTertiary}"
                                            IsVisible="{Binding IsVerificationReport, Converter={StaticResource BoolToInverseConverter}}"/>
-                                    <Label Text="核查报告需在电脑端生成（不支持推送）" FontSize="11"
+                                    <Label Text="核查报告需在电脑端生成（不支持推送）" FontSize="12"
                                            TextColor="{StaticResource WarningDark}"
                                            IsVisible="{Binding IsVerificationReport}"/>
                                 </VerticalStackLayout>
-                                <Label Grid.Column="2" Text="{Binding ReportStatus}" FontSize="11"
+                                <Label Grid.Column="2" Text="{Binding ReportStatus}" FontSize="12"
                                        VerticalOptions="Center"
                                        TextColor="{Binding ReportStatus, Converter={StaticResource ReportStatusColorConverter}}"
                                        IsVisible="{Binding IsVerificationReport}"/>
@@ -91,21 +79,21 @@
             <VerticalStackLayout Spacing="8">
                 <Label Text="打印设置（电脑端执行）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                    <Label Text="份数倍数" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Label Text="份数倍数" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                     <HorizontalStackLayout Grid.Column="1" Spacing="8">
                         <Button Text="−" Command="{Binding DecreaseCopiesCommand}"
                                 WidthRequest="38" HeightRequest="38" FontSize="18" FontAttributes="Bold" Padding="0"
                                 BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
                                 CornerRadius="8"/>
                         <Entry Text="{Binding Copies}" Keyboard="Numeric"
-                               WidthRequest="64" MinimumHeightRequest="48" HorizontalTextAlignment="Center" FontSize="14"/>
+                               WidthRequest="64" MinimumHeightRequest="48" HorizontalTextAlignment="Center" FontSize="15"/>
                         <Button Text="+" Command="{Binding IncreaseCopiesCommand}"
                                 WidthRequest="38" HeightRequest="38" FontSize="18" FontAttributes="Bold" Padding="0"
                                 BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource TextPrimary}"
                                 CornerRadius="8"/>
                     </HorizontalStackLayout>
                     <HorizontalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center">
-                        <Label Text="双面" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        <Label Text="双面" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                         <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
                     </HorizontalStackLayout>
                 </Grid>
@@ -120,7 +108,7 @@
                     <Switch Grid.Column="1" IsToggled="{Binding IsPrintPhotosOn}" OnColor="{StaticResource Primary}"/>
                 </Grid>
                 <Label Text="该申请人暂无照片，可到「档案 → 照片补传」采集后再打印"
-                       FontSize="12" TextColor="{StaticResource TextTertiary}"
+                       FontSize="14" TextColor="{StaticResource TextTertiary}"
                        IsVisible="{Binding HasNoPhotoForPrint}"/>
                 <CollectionView ItemsSource="{Binding PhotoPrintItems}"
                                 IsVisible="{Binding IsPrintPhotosOn}"
@@ -129,10 +117,10 @@
                         <DataTemplate x:DataType="ent:PhotoPrintItem">
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="0,4">
                                 <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding DisplayText}" FontSize="12"
+                                <Label Grid.Column="1" Text="{Binding DisplayText}" FontSize="14"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"
                                        LineBreakMode="TailTruncation"/>
-                                <Picker Grid.Column="2" WidthRequest="112" FontSize="12"
+                                <Picker Grid.Column="2" WidthRequest="112" FontSize="14"
                                         ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ArchiveOutputViewModel}}, Path=PhotoLayoutOptions}"
                                         ItemDisplayBinding="{Binding Name}"
                                         SelectedItem="{Binding SelectedLayout, Mode=TwoWay}"/>
@@ -149,13 +137,13 @@
             <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
                 <Button Grid.Column="0" Text="返回首页"
                         Command="{Binding GoHomeCommand}"
-                        FontSize="14" HeightRequest="48" CornerRadius="10" Padding="0"
+                        FontSize="15" HeightRequest="48" CornerRadius="10" Padding="0"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"/>
                 <Button Grid.Column="1" Text="推送打印"
                         Command="{Binding PushPrintCommand}"
                         IsEnabled="{Binding IsNotBusy}"
-                        FontSize="15" FontAttributes="Bold" HeightRequest="48" CornerRadius="10"
+                        FontSize="16" FontAttributes="Bold" HeightRequest="48" CornerRadius="10"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"/>
             </Grid>
         </Border>
@@ -170,7 +158,7 @@
             <VerticalStackLayout Spacing="8">
                 <Label Text="推送中..." FontSize="16" FontAttributes="Bold" HorizontalOptions="Center"/>
                 <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Primary}"/>
-                <Label Text="{Binding ProgressText}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                <Label Text="{Binding ProgressText}" FontSize="14" TextColor="{StaticResource TextSecondary}"
                        HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
             </VerticalStackLayout>
         </Border>
@@ -180,7 +168,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
@@ -181,38 +181,6 @@ public class ClassificationService : BaseService, IClassificationService
 
         LogInfo($"分类判定完成: {result.Classification} ({result.Description})");
 
-        return Result.Success(result);
-    }
-
-    /// <summary>
-    /// 执行分类判定（简化版，不含赡养人/照料人）
-    /// </summary>
-    public async Task<Result<ClassificationResult>> DetermineClassificationAsync(
-        ApplicationEntity application,
-        List<FamilyMember> members,
-        CancellationToken ct = default)
-    {
-        return await DetermineClassificationAsync(application, members, new List<Supporter>(), new List<Caregiver>(), ct);
-    }
-
-    public async Task<Result<ClassificationResult>> ClassifyAsync(
-        string hukouType, decimal perCapitaIncome, int familySize,
-        List<string> healthConditions, CancellationToken ct = default)
-    {
-        LogInfo($"执行分类: hukouType={hukouType}");
-        var isRural = ClassificationConstants.HukouType.IsHukouRural(hukouType);
-        var classification = isRural ? ClassificationConstants.RuralSubsistence : ClassificationConstants.UrbanSubsistence;
-        var standard = await GetSubsistenceStandardAsync(isRural, ct);
-        var amount = await CalculateGuaranteeAmountAsync(classification, familySize, isRural, 0, ct);
-
-        var result = new ClassificationResult
-        {
-            Classification = classification,
-            ClassificationCode = classification,
-            Description = GetClassificationDescription(classification),
-            IsEligible = true,
-            GuaranteeAmount = amount.IsSuccess ? amount.Value : standard * familySize
-        };
         return Result.Success(result);
     }
 

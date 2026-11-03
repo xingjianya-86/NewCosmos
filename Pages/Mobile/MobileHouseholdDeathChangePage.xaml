@@ -11,19 +11,13 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 绿色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="户主死亡变更" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="原户主整户停止，选择新户主建立新档案" FontSize="13" TextColor="#E6FFFFFF"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="户主死亡变更"
+                                   Subtitle="原户主整户停止，选择新户主建立新档案"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="12" Spacing="12">
@@ -31,24 +25,24 @@
                 <!-- 原户主信息 -->
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}">
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="原户主信息（只读）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="原户主信息（只读）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
                             <VerticalStackLayout Spacing="2">
-                                <Label Text="姓名" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding OriginalHeadName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="姓名" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding OriginalHeadName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                <Label Text="家庭人口" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding OriginalFamilySize, StringFormat='{0}人'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="家庭人口" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding OriginalFamilySize, StringFormat='{0}人'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                         </Grid>
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="身份证号" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding OriginalHeadIdCard}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="身份证号" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding OriginalHeadIdCard}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="2">
-                            <Label Text="当前保障" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding OriginalGuaranteeAmount, StringFormat='{0:F2} 元/月'}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="当前保障" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding OriginalGuaranteeAmount, StringFormat='{0:F2} 元/月'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
@@ -58,14 +52,8 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="死亡信息" Style="{StaticResource SectionTitleLabel}" Margin="0" TextColor="{StaticResource Error}"/>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="死亡日期" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <DatePicker Date="{Binding DeathDate}" Format="yyyy-MM-dd" HeightRequest="46"/>
-                        </VerticalStackLayout>
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="死亡确切时间（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <TimePicker Time="{Binding DeathTime}" Format="HH:mm" HeightRequest="46"/>
-                        </VerticalStackLayout>
+                        <!-- 死亡日期与时刻（组件：未选择为 null，必填校验真实生效；弹窗内限 ≤ 当前时刻） -->
+                        <components:DateTimeEntryView Title="死亡日期与时间" IsRequired="True" Value="{Binding DeathDateTime}"/>
                         <VerticalStackLayout Spacing="4">
                             <Label Text="死亡证明编号" Style="{StaticResource FormFieldLabelStyle}"/>
                             <Entry Text="{Binding DeathCertificateNo}" Placeholder="选填" Style="{StaticResource FormFieldEntryStyle}"/>
@@ -83,14 +71,23 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <Label Text="请选择新户主" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                <!-- 单人户提示：整户停止，无继承人 -->
+                <Border Style="{StaticResource CardBorder}" Padding="14" BackgroundColor="{StaticResource WarningSoft}"
+                        IsVisible="{Binding IsSinglePersonHousehold}">
+                    <Label Text="该户为单人户（户内唯一成员即户主）。户主死亡后无继承人可接任，将整户停止保障，不建立新档案。"
+                           FontSize="14" TextColor="{StaticResource WarningDark}" LineBreakMode="WordWrap"/>
+                </Border>
+
+                <Label Text="请选择新户主" Style="{StaticResource SectionTitleLabel}" Margin="0"
+                       IsVisible="{Binding IsNewHeadSelectionVisible}"/>
 
             </VerticalStackLayout>
         </ScrollView>
 
         <!-- 可选新户主 -->
         <CollectionView Grid.Row="2" ItemsSource="{Binding EligibleMembers}" SelectionMode="Single"
-                        SelectedItem="{Binding SelectedNewHead}" Margin="12,0">
+                        SelectedItem="{Binding SelectedNewHead}" Margin="12,0"
+                        IsVisible="{Binding IsNewHeadSelectionVisible}">
             <CollectionView.EmptyView>
                 <Label Text="暂无可选成员" Style="{StaticResource EmptyStateLabel}" Margin="0,24"/>
             </CollectionView.EmptyView>
@@ -99,8 +96,8 @@
                     <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" StrokeThickness="0" Padding="12" Margin="0,4">
                         <Grid ColumnDefinitions="*,Auto">
                             <VerticalStackLayout Grid.Column="0" Spacing="2">
-                                <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                                     <Label.FormattedText>
                                         <FormattedString>
                                             <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
@@ -112,7 +109,7 @@
                                     </Label.FormattedText>
                                 </Label>
                             </VerticalStackLayout>
-                            <Label Grid.Column="1" Text="{Binding HealthStatusDisplay}" FontSize="12"
+                            <Label Grid.Column="1" Text="{Binding HealthStatusDisplay}" FontSize="14"
                                    TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
@@ -123,11 +120,11 @@
         <!-- 底部按钮 -->
         <Border Grid.Row="3" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="返回" HeightRequest="46" CornerRadius="10" FontSize="15"
+                <Button Grid.Column="0" Text="返回" HeightRequest="46" CornerRadius="10" FontSize="16"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding GoBackCommand}"/>
-                <Button Grid.Column="1" Text="停旧建新" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                <Button Grid.Column="1" Text="{Binding SubmitButtonText}" HeightRequest="46" CornerRadius="10" FontSize="16" FontAttributes="Bold"
                         BackgroundColor="{StaticResource Success}" TextColor="White"
                         Command="{Binding SubmitCommand}"/>
             </Grid>
@@ -138,7 +135,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

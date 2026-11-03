@@ -30,8 +30,8 @@
             <TapGestureRecognizer Command="{Binding Source={x:Reference ThisView}, Path=TapCommand}" CommandParameter="{Binding Source={x:Reference ThisView}, Path=NavigationTarget}"/>
         </Grid.GestureRecognizers>
         <HorizontalStackLayout Spacing="12" VerticalOptions="Center" Margin="16,0">
-            <Label Text="{Binding Source={x:Reference ThisView}, Path=Icon}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="{Binding Source={x:Reference ThisView}, Path=IconColor}"/>
-            <Label Text="{Binding Source={x:Reference ThisView}, Path=Label}" FontSize="16" TextColor="{Binding Source={x:Reference ThisView}, Path=LabelColor}"/>
+            <Label Text="{Binding Source={x:Reference ThisView}, Path=Icon}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{Binding Source={x:Reference ThisView}, Path=IconColor}"/>
+            <Label Text="{Binding Source={x:Reference ThisView}, Path=Label}" FontSize="18" TextColor="{Binding Source={x:Reference ThisView}, Path=LabelColor}"/>
         </HorizontalStackLayout>
     </Grid>
 </ContentView>

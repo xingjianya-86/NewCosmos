@@ -8,18 +8,27 @@
 
     <Grid RowDefinitions="Auto,*,Auto">
 
-        <!-- 顶部栏 -->
-        <Border Grid.Row="0" BackgroundColor="{StaticResource CardBackground}" Padding="16,12">
-            <Border.Shadow>
-                <Shadow Brush="#000000" Offset="0,1" Radius="3" Opacity="0.08"/>
-            </Border.Shadow>
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <Label Grid.Column="0" Text="帝皇权杖" FontSize="18" FontAttributes="Bold"
-                       TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding AppVersion}" FontSize="12"
-                       TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+        <!-- 顶部报头（纸墨档案风：朱砂竖条 + 宋体标题 + DM Mono 读数 + 底部双线） -->
+        <Grid Grid.Row="0" ColumnDefinitions="5,*">
+            <BoxView Grid.Column="0" Color="{StaticResource Seal}"/>
+            <Grid Grid.Column="1" RowDefinitions="*,2,3,1">
+                <Border Grid.Row="0" BackgroundColor="{StaticResource CardBackground}" Padding="16,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Label Grid.Column="0" Text="帝皇权杖" FontSize="18" FontAttributes="Bold"
+                               FontFamily="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"
+                               TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="NEWCOSMOS" FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                               FontSize="12" CharacterSpacing="3" TextColor="{StaticResource Muted}"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Grid.Column="2" Text="{Binding AppVersion}" FontSize="14"
+                               TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+                <!-- 报头底部双线（墨线 + 细线，与桌面报头同构） -->
+                <BoxView Grid.Row="1" Color="{StaticResource Ink}"/>
+                <BoxView Grid.Row="3" Color="{StaticResource LineStrong}"/>
             </Grid>
-        </Border>
+        </Grid>
 
         <!-- 主内容区 -->
         <Grid Grid.Row="1">
@@ -27,11 +36,11 @@
             <!-- 工作台 -->
             <ScrollView IsVisible="{Binding IsWorkspaceSelected}">
                 <VerticalStackLayout Padding="20,16" Spacing="16">
-                    <Label Text="{Binding CurrentUserName, StringFormat='你好，{0}'}" FontSize="22"
+                    <Label Text="{Binding CurrentUserName, StringFormat='你好，{0}'}" FontSize="20"
                            FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
-                    <Label Text="选择一个功能模块开始工作" FontSize="14"
+                    <Label Text="选择一个功能模块开始工作" FontSize="15"
                            TextColor="{StaticResource TextTertiary}" Margin="0,-8,0,0" />
-                    <Label Text="暂无可用功能模块，请联系管理员分配权限" FontSize="14"
+                    <Label Text="暂无可用功能模块，请联系管理员分配权限" FontSize="15"
                            TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"
                            Margin="0,40,0,0" IsVisible="{Binding HasNoWorkspaceCards}" />
                     <VerticalStackLayout Spacing="12"
@@ -52,13 +61,13 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="14" />
                                             </Border.StrokeShape>
-                                            <Label Text="{Binding Icon}" FontSize="28"
+                                            <Label Text="{Binding Icon}" FontSize="24"
                                                    HorizontalOptions="Center" VerticalOptions="Center" />
                                         </Border>
                                         <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
-                                            <Label Text="{Binding Title}" FontSize="15" FontAttributes="Bold"
+                                            <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold"
                                                    TextColor="{StaticResource TextPrimary}" />
-                                            <Label Text="{Binding Subtitle}" FontSize="12"
+                                            <Label Text="{Binding Subtitle}" FontSize="14"
                                                    TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation" />
                                         </VerticalStackLayout>
                                     </Grid>
@@ -80,44 +89,44 @@
                             </LinearGradientBrush>
                         </Border.Background>
                         <VerticalStackLayout Spacing="12">
-                            <Label Text="家庭经济状况核对" FontSize="22" FontAttributes="Bold"
+                            <Label Text="家庭经济状况核对" FontSize="20" FontAttributes="Bold"
                                    TextColor="White" />
-                            <Label Text="居民家庭经济状况核对 · 授权报告上传与月度审核" FontSize="14"
+                            <Label Text="居民家庭经济状况核对 · 授权报告上传与月度审核" FontSize="15"
                                    TextColor="#E6FFFFFF" />
                             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10" Margin="0,8,0,0">
                                 <Border Padding="6,8" StrokeThickness="0" BackgroundColor="#33FFFFFF">
                                     <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
                                     <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding PendingReportCount}" FontSize="20" FontAttributes="Bold"
+                                        <Label Text="{Binding PendingReportCount}" FontSize="18" FontAttributes="Bold"
                                                TextColor="White" HorizontalOptions="Center" />
-                                        <Label Text="待上传" FontSize="11" TextColor="#E6FFFFFF"
+                                        <Label Text="待上传" FontSize="12" TextColor="#E6FFFFFF"
                                                HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" Padding="6,8" StrokeThickness="0" BackgroundColor="#33FFFFFF">
                                     <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
                                     <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding MonthlyCompletedCount}" FontSize="20" FontAttributes="Bold"
+                                        <Label Text="{Binding MonthlyCompletedCount}" FontSize="18" FontAttributes="Bold"
                                                TextColor="White" HorizontalOptions="Center" />
-                                        <Label Text="本月已完成" FontSize="11" TextColor="#E6FFFFFF"
+                                        <Label Text="本月已完成" FontSize="12" TextColor="#E6FFFFFF"
                                                HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="2" Padding="6,8" StrokeThickness="0" BackgroundColor="#33FFFFFF">
                                     <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
                                     <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding MonthlyNewCount}" FontSize="20" FontAttributes="Bold"
+                                        <Label Text="{Binding MonthlyNewCount}" FontSize="18" FontAttributes="Bold"
                                                TextColor="White" HorizontalOptions="Center" />
-                                        <Label Text="本月新增" FontSize="11" TextColor="#E6FFFFFF"
+                                        <Label Text="本月新增" FontSize="12" TextColor="#E6FFFFFF"
                                                HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="3" Padding="6,8" StrokeThickness="0" BackgroundColor="#33FFFFFF">
                                     <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
                                     <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding YearTotalCount}" FontSize="20" FontAttributes="Bold"
+                                        <Label Text="{Binding YearTotalCount}" FontSize="18" FontAttributes="Bold"
                                                TextColor="White" HorizontalOptions="Center" />
-                                        <Label Text="全年累计" FontSize="11" TextColor="#E6FFFFFF"
+                                        <Label Text="全年累计" FontSize="12" TextColor="#E6FFFFFF"
                                                HorizontalOptions="Center" />
                                     </VerticalStackLayout>
                                 </Border>
@@ -145,16 +154,16 @@
                                                 <Border.StrokeShape>
                                                     <RoundRectangle CornerRadius="12" />
                                                 </Border.StrokeShape>
-                                                <Label Text="{Binding Icon}" FontSize="24"
+                                                <Label Text="{Binding Icon}" FontSize="22"
                                                        HorizontalOptions="Center" VerticalOptions="Center" />
                                             </Border>
                                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                                <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold"
+                                                <Label Text="{Binding Title}" FontSize="15" FontAttributes="Bold"
                                                        TextColor="{StaticResource TextPrimary}" />
-                                                <Label Text="{Binding Subtitle}" FontSize="12"
+                                                <Label Text="{Binding Subtitle}" FontSize="14"
                                                        TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap" />
                                             </VerticalStackLayout>
-                                            <Label Grid.Column="2" Text="›" FontSize="22"
+                                            <Label Grid.Column="2" Text="›" FontSize="20"
                                                    TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" />
                                         </Grid>
                                     </Border>
@@ -168,11 +177,11 @@
             <!-- 档案 -->
             <ScrollView IsVisible="{Binding IsArchiveSelected}">
                 <VerticalStackLayout Padding="20,16" Spacing="16">
-                    <Label Text="档案管理" FontSize="22" FontAttributes="Bold"
+                    <Label Text="档案管理" FontSize="20" FontAttributes="Bold"
                            TextColor="{StaticResource TextPrimary}" />
-                    <Label Text="历史档案检索查阅" FontSize="14"
+                    <Label Text="历史档案检索查阅" FontSize="15"
                            TextColor="{StaticResource TextTertiary}" Margin="0,-8,0,0" />
-                    <Label Text="暂无可用档案功能，请联系管理员分配权限" FontSize="14"
+                    <Label Text="暂无可用档案功能，请联系管理员分配权限" FontSize="15"
                            TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"
                            Margin="0,40,0,0" IsVisible="{Binding HasNoArchiveCards}" />
                     <VerticalStackLayout Spacing="12"
@@ -193,13 +202,13 @@
                                             <Border.StrokeShape>
                                                 <RoundRectangle CornerRadius="14" />
                                             </Border.StrokeShape>
-                                            <Label Text="{Binding Icon}" FontSize="28"
+                                            <Label Text="{Binding Icon}" FontSize="24"
                                                    HorizontalOptions="Center" VerticalOptions="Center" />
                                         </Border>
                                         <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
-                                            <Label Text="{Binding Title}" FontSize="15" FontAttributes="Bold"
+                                            <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold"
                                                    TextColor="{StaticResource TextPrimary}" />
-                                            <Label Text="{Binding Subtitle}" FontSize="12"
+                                            <Label Text="{Binding Subtitle}" FontSize="14"
                                                    TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation" />
                                         </VerticalStackLayout>
                                     </Grid>
@@ -223,13 +232,13 @@
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="28" />
                                 </Border.StrokeShape>
-                                <Label Text="👤" FontSize="28"
+                                <Label Text="👤" FontSize="24"
                                        HorizontalOptions="Center" VerticalOptions="Center" />
                             </Border>
                             <VerticalStackLayout VerticalOptions="Center" Spacing="4">
                                 <Label Text="{Binding CurrentUserName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" />
-                                <Label Text="{Binding AppVersion, StringFormat='版本 {0}'}" FontSize="13"
+                                <Label Text="{Binding AppVersion, StringFormat='版本 {0}'}" FontSize="14"
                                        TextColor="{StaticResource TextTertiary}" />
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
@@ -263,9 +272,9 @@
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding SelectWorkspaceCommand}"/>
                     </Grid.GestureRecognizers>
-                    <Label Grid.Row="0" Text="📋" FontSize="22" Margin="0,6,0,0"
+                    <Label Grid.Row="0" Text="📋" FontSize="20" Margin="0,6,0,0"
                            HorizontalOptions="Center" VerticalOptions="Center"/>
-                    <Label Grid.Row="1" Text="工作台" FontSize="11" HorizontalOptions="Center"
+                    <Label Grid.Row="1" Text="工作台" FontSize="12" HorizontalOptions="Center"
                            Margin="0,0,0,4"
                            TextColor="{Binding IsWorkspaceSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#1a73e8|#9e9e9e}"/>
                 </Grid>
@@ -274,9 +283,9 @@
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding SelectVerifyCommand}"/>
                     </Grid.GestureRecognizers>
-                    <Label Grid.Row="0" Text="✅" FontSize="22" Margin="0,6,0,0"
+                    <Label Grid.Row="0" Text="✅" FontSize="20" Margin="0,6,0,0"
                            HorizontalOptions="Center" VerticalOptions="Center"/>
-                    <Label Grid.Row="1" Text="核对" FontSize="11" HorizontalOptions="Center"
+                    <Label Grid.Row="1" Text="核对" FontSize="12" HorizontalOptions="Center"
                            Margin="0,0,0,4"
                            TextColor="{Binding IsVerifySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#1a73e8|#9e9e9e}"/>
                 </Grid>
@@ -285,9 +294,9 @@
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding SelectArchiveCommand}"/>
                     </Grid.GestureRecognizers>
-                    <Label Grid.Row="0" Text="📁" FontSize="22" Margin="0,6,0,0"
+                    <Label Grid.Row="0" Text="📁" FontSize="20" Margin="0,6,0,0"
                            HorizontalOptions="Center" VerticalOptions="Center"/>
-                    <Label Grid.Row="1" Text="档案" FontSize="11" HorizontalOptions="Center"
+                    <Label Grid.Row="1" Text="档案" FontSize="12" HorizontalOptions="Center"
                            Margin="0,0,0,4"
                            TextColor="{Binding IsArchiveSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#1a73e8|#9e9e9e}"/>
                 </Grid>
@@ -296,9 +305,9 @@
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding SelectProfileCommand}"/>
                     </Grid.GestureRecognizers>
-                    <Label Grid.Row="0" Text="👤" FontSize="22" Margin="0,6,0,0"
+                    <Label Grid.Row="0" Text="👤" FontSize="20" Margin="0,6,0,0"
                            HorizontalOptions="Center" VerticalOptions="Center"/>
-                    <Label Grid.Row="1" Text="我的" FontSize="11" HorizontalOptions="Center"
+                    <Label Grid.Row="1" Text="我的" FontSize="12" HorizontalOptions="Center"
                            Margin="0,0,0,4"
                            TextColor="{Binding IsProfileSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#1a73e8|#9e9e9e}"/>
                 </Grid>

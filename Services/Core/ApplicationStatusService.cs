@@ -84,16 +84,30 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             // 此处是存量自愈入口：下次完成归档即补齐。
             if (currentStatus is ApplicationStatus.Approved or ApplicationStatus.Completed)
             {
-                var stepOnly = await _db.ExecuteNonQueryAsync(
-                    @"UPDATE nc_biz_applications SET current_step = $2,
-                        first_approved_at = COALESCE(first_approved_at, NOW()), updated_at = NOW()
-                      WHERE id = $1 AND deleted_at IS NULL", ct, applicationId, WorkflowSteps.ARCHIVED);
-                if (stepOnly.IsFailure)
-                    return Result.Failure(stepOnly.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        stepOnly.Message ?? "归档推进步骤失败");
-                await WriteAuditAsync(applicationId, "完成归档",
-                    "已 Approved/Completed，仅推进 current_step=6（first_approved_at 为空则补空，不覆盖原值）",
-                    current.Status, current.Status, operatorName, ct);
+                // 事务包裹（§8）：状态推进与审计同生共死——原实现无事务，UPDATE 成功而审计失败
+                // 会留下"状态变了没审计"的孤儿行。事务内审计失败=显式失败回滚（§7），
+                // 不再沿用"仅告警"（失败语句会中止 PostgreSQL 事务，静默回滚比报错更糟）。
+                await using (var tx = await _db.BeginTransactionScopeAsync(ct))
+                {
+                    var stepOnly = await _db.ExecuteNonQueryAsync(
+                        @"UPDATE nc_biz_applications SET current_step = $2,
+                            first_approved_at = COALESCE(first_approved_at, NOW()), updated_at = NOW()
+                          WHERE id = $1 AND deleted_at IS NULL", ct, applicationId, WorkflowSteps.ARCHIVED);
+                    if (stepOnly.IsFailure)
+                        return Result.Failure(stepOnly.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            stepOnly.Message ?? "归档推进步骤失败");
+                    var audit1 = await _db.ExecuteNonQueryAsync(
+                        @"INSERT INTO nc_biz_application_logs
+                              (application_id, action, action_detail, old_value, new_value, operator_name, operated_at)
+                          VALUES ($1, '完成归档', $2, $3, $3, $4, NOW())",
+                        ct, applicationId,
+                        "已 Approved/Completed，仅推进 current_step=6（first_approved_at 为空则补空，不覆盖原值）",
+                        current.Status, operatorName);
+                    if (audit1.IsFailure)
+                        return Result.Failure(audit1.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            $"审计留痕写入失败，归档已回滚: {audit1.Message}");
+                    await tx.CommitAsync(ct);
+                }
                 LogInfo($"归档完成（幂等，状态未变）: ApplicationId={applicationId}, Status={current.Status}");
                 return Result.Success();
             }
@@ -102,14 +116,24 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             // 历史遗留的 step<6 停保行（如停旧建新中途停保）五个 Tab 全不可见，推步后归位。
             if (currentStatus == ApplicationStatus.Stopped)
             {
-                var stopStepOnly = await _db.ExecuteNonQueryAsync(
-                    @"UPDATE nc_biz_applications SET current_step = $2, updated_at = NOW()
-                      WHERE id = $1 AND deleted_at IS NULL", ct, applicationId, WorkflowSteps.ARCHIVED);
-                if (stopStepOnly.IsFailure)
-                    return Result.Failure(stopStepOnly.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        stopStepOnly.Message ?? "归档推进步骤失败");
-                await WriteAuditAsync(applicationId, "完成归档", "已 Stopped（终态），仅推进 current_step=6",
-                    current.Status, current.Status, operatorName, ct);
+                await using (var tx = await _db.BeginTransactionScopeAsync(ct))
+                {
+                    var stopStepOnly = await _db.ExecuteNonQueryAsync(
+                        @"UPDATE nc_biz_applications SET current_step = $2, updated_at = NOW()
+                          WHERE id = $1 AND deleted_at IS NULL", ct, applicationId, WorkflowSteps.ARCHIVED);
+                    if (stopStepOnly.IsFailure)
+                        return Result.Failure(stopStepOnly.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            stopStepOnly.Message ?? "归档推进步骤失败");
+                    var audit2 = await _db.ExecuteNonQueryAsync(
+                        @"INSERT INTO nc_biz_application_logs
+                              (application_id, action, action_detail, old_value, new_value, operator_name, operated_at)
+                          VALUES ($1, '完成归档', '已 Stopped（终态），仅推进 current_step=6', $2, $2, $3, NOW())",
+                        ct, applicationId, current.Status, operatorName);
+                    if (audit2.IsFailure)
+                        return Result.Failure(audit2.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            $"审计留痕写入失败，归档已回滚: {audit2.Message}");
+                    await tx.CommitAsync(ct);
+                }
                 LogInfo($"归档完成（已停保，仅推步）: ApplicationId={applicationId}");
                 return Result.Success();
             }
@@ -152,18 +176,31 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             args.Add(applicationId);
             var sql = $@"UPDATE nc_biz_applications SET {string.Join(", ", sets)}
                          WHERE id = ${args.Count} AND deleted_at IS NULL";
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, args.ToArray());
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    result.Message ?? "归档完成失败");
-            if (result.Value == 0)
-                return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+            // 事务包裹（§8）：状态推进 + 配套列 + 审计同生共死（原无事务，UPDATE 成功而审计
+            // 失败会留下"状态变了没审计"孤儿行）。后续台账/告警动作各有自身容错，保持事务外。
+            await using (var tx = await _db.BeginTransactionScopeAsync(ct))
+            {
+                var result = await _db.ExecuteNonQueryAsync(sql, ct, args.ToArray());
+                if (result.IsFailure)
+                    return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        result.Message ?? "归档完成失败");
+                if (result.Value == 0)
+                    return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
 
-            await WriteAuditAsync(applicationId, "完成归档",
-                targetStatus == ApplicationStatus.Stopped
-                    ? "归档终结：判定不合格，status=Stopped、current_step=6、stop_reason/stop_date 落库"
-                    : "归档完结：status=Approved、current_step=6、first_approved_at 落库",
-                current.Status, targetStatus.GetCode(), operatorName, ct);
+                var auditMain = await _db.ExecuteNonQueryAsync(
+                    @"INSERT INTO nc_biz_application_logs
+                          (application_id, action, action_detail, old_value, new_value, operator_name, operated_at)
+                      VALUES ($1, '完成归档', $2, $3, $4, $5, NOW())",
+                    ct, applicationId,
+                    targetStatus == ApplicationStatus.Stopped
+                        ? "归档终结：判定不合格，status=Stopped、current_step=6、stop_reason/stop_date 落库"
+                        : "归档完结：status=Approved、current_step=6、first_approved_at 落库",
+                    current.Status, targetStatus.GetCode(), operatorName);
+                if (auditMain.IsFailure)
+                    return Result.Failure(auditMain.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        $"审计留痕写入失败，归档已回滚: {auditMain.Message}");
+                await tx.CommitAsync(ct);
+            }
 
             // 归档终结判不合格同样属于非死亡性停保 → 按同一规则尝试转入其他困难人员台账
             if (targetStatus == ApplicationStatus.Stopped)

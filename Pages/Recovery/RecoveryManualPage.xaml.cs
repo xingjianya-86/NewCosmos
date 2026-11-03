@@ -1,10 +1,10 @@
-using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Recovery;
 
 namespace NewCosmos.Pages.Recovery;
 
-public partial class RecoveryManualPage : ContentPage, IParameterizedPage<RecoveryRecord>
+public partial class RecoveryManualPage : ContentPage, IParameterizedPage<RecoveryManualParameter>
 {
     private readonly RecoveryManualViewModel _viewModel;
 
@@ -15,12 +15,19 @@ public partial class RecoveryManualPage : ContentPage, IParameterizedPage<Recove
         BindingContext = _viewModel;
     }
 
-    /// <summary>编辑草稿：参数化入口（仅经 NavigateToPageAsync 单一通道调用）</summary>
-    Task IParameterizedPage<RecoveryRecord>.SetParameterAsync(RecoveryRecord record)
+    /// <summary>导航参数注入：Record 非空 = 编辑草稿；null = 新建（原无参跳转由此承接）</summary>
+    Task IParameterizedPage<RecoveryManualParameter>.SetParameterAsync(RecoveryManualParameter parameter)
     {
-        _viewModel.LoadRecord(record);
+        if (parameter?.Record != null)
+        {
+            _viewModel.LoadRecord(parameter.Record);
+        }
         return Task.CompletedTask;
     }
+
+    /// <summary>身份证变化 → 满 18 位自动带出（WinUI 绑定失焦才提交源，VM 内主动写回）</summary>
+    private void OnIdCardChanged(object? sender, TextChangedEventArgs e)
+        => _viewModel.OnIdCardTextChanged(e.NewTextValue ?? string.Empty);
 
     protected override async void OnAppearing()
     {

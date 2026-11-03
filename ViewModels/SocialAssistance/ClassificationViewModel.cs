@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -249,7 +249,8 @@ public partial class ClassificationViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 从分类判定结果加载    /// </summary>
+    /// 从分类判定结果加载
+/// </summary>
     public async Task LoadFromClassificationResult(ClassificationResult result)
     {
         ClassificationCode = result.Classification;
@@ -353,7 +354,8 @@ public partial class ClassificationViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 是否为低保类型    /// </summary>
+    /// 是否为低保类型
+/// </summary>
     public bool IsSubsistence => ClassificationConstants.IsCodeSubsistence(ClassificationCode);
 
     /// <summary>
@@ -362,23 +364,28 @@ public partial class ClassificationViewModel : ViewModelBase
     public bool IsLowIncome => ClassificationConstants.IsCodeLowIncome(ClassificationCode);
 
     /// <summary>
-    /// 是否为特困类型    /// </summary>
+    /// 是否为特困类型
+/// </summary>
     public bool IsDestitute => ClassificationConstants.IsCodeDestitute(ClassificationCode);
 
     /// <summary>
-    /// 是否为刚性支出类型    /// </summary>
+    /// 是否为刚性支出类型
+/// </summary>
     public bool IsRigidExpenditure => ClassificationConstants.IsCodeRigidExpenditure(ClassificationCode);
 
     /// <summary>
-    /// 是否为停保类型    /// </summary>
+    /// 是否为停保类型
+/// </summary>
     public bool IsStop => ClassificationConstants.IsCodeStop(ClassificationCode);
 
     /// <summary>
-    /// 是否有渐退期    /// </summary>
+    /// 是否有渐退期
+/// </summary>
     public bool HasGracePeriod => IsInGracePeriod && GracePeriodEndDate.HasValue;
 
     /// <summary>
-    /// 渐退期状态文本    /// </summary>
+    /// 渐退期状态文本
+/// </summary>
     public string GracePeriodStatusText
     {
         get

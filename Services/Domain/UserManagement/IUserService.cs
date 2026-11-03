@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 
 namespace NewCosmos.Services.Domain.UserManagement;
@@ -14,7 +14,8 @@ public interface IUserService
     Task<Result<User>> GetByIdAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// 根据用户名获取用    /// </summary>
+    /// 根据用户名获取用
+/// </summary>
     Task<Result<User>> GetByUsernameAsync(string username, CancellationToken ct = default);
 
     /// <summary>
@@ -114,7 +115,8 @@ public interface IUserService
 }
 
 /// <summary>
-/// 用户实体 - 对应原数据库 users     /// </summary>
+/// 用户实体 - 对应原数据库 users
+/// </summary>
 public class User
 {
     public int Id { get; set; }

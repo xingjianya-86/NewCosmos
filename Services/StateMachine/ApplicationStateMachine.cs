@@ -5,7 +5,22 @@ using NewCosmos.Models.Results;
 namespace NewCosmos.Services.StateMachine;
 
 /// <summary>
-/// 申请状态机（类型安全）
+/// 申请状态机（类型安全）。
+///
+/// 【真实流转与状态机的关系（2026-11 核实，权威=ApplicationStatusService）】
+/// ① 归档即审核：系统无独立审批工作流——CompleteArchiveAsync 才是"审核"，
+///    归档直接 Draft/Submitted → Approved（或不合格 → Stopped），不经过 Completed；
+/// ② Completed 为历史保留态：全库无写入点（生产库存量 0 行），仅在读侧过滤集/转换器中兼容，
+///    用于读取旧备份恢复的数据——禁止新增写入，勿当活跃状态使用；
+/// ③ Submitted 仅由一事一议（SpecialApprovalFormService.CompleteReviewAsync）与 SubmitAsync 进入，
+///    普通申请 Draft → 归档 → Approved；
+/// ④ 状态机严格校验 Submit/Approve/Refuse；CompleteArchiveAsync 与 StopAsync(allowSubmittedOverride)
+///    的"业务放行"是有意为之（见各方法注释），改动前先读 ApplicationStatusService。
+///
+/// 本类仅保留实际使用的 CanTransition / ValidateTransition / IsEditable；
+/// 原 GetAvailableTransitions / GetAvailableTransitionDescriptions / IsFinalState / IsActiveState /
+/// GetRecommendedNextStatus / GetStateDiagram（字符串已损坏）/ StateTransitionResult 类
+/// 均于 2026-11 经全仓 grep 取证零调用方后删除。
 /// </summary>
 public static class ApplicationStateMachine
 {
@@ -23,6 +38,7 @@ public static class ApplicationStateMachine
         },
         [ApplicationStatus.Approved] = new()
         {
+            // Completed 仅为旧数据读取兼容保留（无写入点）；归档即审核见类注释②
             ApplicationStatus.Completed,
             ApplicationStatus.Stopped
         },
@@ -39,14 +55,16 @@ public static class ApplicationStateMachine
     };
 
     /// <summary>
-    /// 判断是否可以从 from 状态转换到 to 状态    /// </summary>
+    /// 判断是否可以从 from 状态转换到 to 状态
+    /// </summary>
     public static bool CanTransition(ApplicationStatus from, ApplicationStatus to)
     {
         return AllowedTransitions.TryGetValue(from, out var targets) && targets.Contains(to);
     }
 
     /// <summary>
-    /// 验证状态转换（返回 result ??   /// </summary>
+    /// 验证状态转换（返回带错误消息的 Result）
+    /// </summary>
     public static Result ValidateTransition(ApplicationStatus from, ApplicationStatus to)
     {
         if (!CanTransition(from, to))
@@ -59,84 +77,8 @@ public static class ApplicationStateMachine
     }
 
     /// <summary>
-    /// 获取当前状态可用的下一步状态列    /// </summary>
-    public static IReadOnlyList<ApplicationStatus> GetAvailableTransitions(ApplicationStatus current)
-    {
-        return AllowedTransitions.TryGetValue(current, out var targets)
-            ? targets.ToList()
-            : Array.Empty<ApplicationStatus>();
-    }
-
-    /// <summary>
-    /// 获取可用下一步状态的描述列表
+    /// 判断是否可编辑（仅草稿可编辑）
     /// </summary>
-    public static IReadOnlyList<string> GetAvailableTransitionDescriptions(ApplicationStatus current)
-    {
-        return GetAvailableTransitions(current)
-            .Select(s => s.GetDescription())
-            .ToList();
-    }
-
-    /// <summary>
-    /// 判断是否为终态（Refused 为终态；Stopped 可经"恢复保障"回到 Approved，不再是终态）
-    /// </summary>
-    public static bool IsFinalState(ApplicationStatus status) =>
-        status == ApplicationStatus.Refused;
-
-    /// <summary>
-    /// 判断是否为活动状态    /// </summary>
-    public static bool IsActiveState(ApplicationStatus status) =>
-        status is ApplicationStatus.Approved or ApplicationStatus.Completed;
-
-    /// <summary>
-    /// 判断是否可编    /// </summary>
     public static bool IsEditable(ApplicationStatus status) =>
         status == ApplicationStatus.Draft;
-
-    /// <summary>
-    /// 尝试获取下一个推荐状态    /// </summary>
-    public static ApplicationStatus? GetRecommendedNextStatus(ApplicationStatus current)
-    {
-        var available = GetAvailableTransitions(current);
-        return available.Count > 0 ? available[0] : null;
-    }
-
-    /// <summary>
-    /// 获取状态机图示
-    /// </summary>
-    public static string GetStateDiagram()
-    {
-        return @"
-状态流转图:
-
-┌───────── Draft  (草稿)  ?└────┬────          ├─────────────────                                   ┌──────────              ?Refused                ?不予受理)              └──────────          ?┌───────────??Submitted (已提  ?└─────┬─────            ├──────────────────                                       ┌──────────                ?Approved                 (已审                 └────┬─────                                          ├───────────────                                                               ┌───────────                            ?Completed                             ?档案完成)                             └─────┬─────                                                                                               ┌──────────                           ?Stopped        └────────────────┼──────▶│ (已停                              └──────────                                              └──────────────────────                                                                                       ┌──────────                                        ?Refused                                          ?不予受理)                                        └──────────";
-    }
-}
-
-/// <summary>
-/// 状态转换结    /// </summary>
-public class StateTransitionResult
-{
-    public bool IsSuccess { get; init; }
-    public ApplicationStatus FromStatus { get; init; }
-    public ApplicationStatus ToStatus { get; init; }
-    public string ErrorMessage { get; init; } = string.Empty;
-    public DateTime TransitionTime { get; init; }
-
-    public static StateTransitionResult Success(ApplicationStatus from, ApplicationStatus to) => new()
-    {
-        IsSuccess = true,
-        FromStatus = from,
-        ToStatus = to,
-        TransitionTime = DateTime.Now
-    };
-
-    public static StateTransitionResult Failure(ApplicationStatus from, ApplicationStatus to, string error) => new()
-    {
-        IsSuccess = false,
-        FromStatus = from,
-        ToStatus = to,
-        ErrorMessage = error,
-        TransitionTime = DateTime.Now
-    };
 }

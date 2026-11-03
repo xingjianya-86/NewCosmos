@@ -474,40 +474,12 @@ public partial class TempReliefFormViewModel
     [RelayCommand]
     private async Task SaveAsync()
     {
-        var validation = Validate();
-        if (validation != null)
-        {
-            await _dialogService.DisplayAlertAsync("提示", validation, "确定");
-            return;
-        }
-
         await ExecuteAsync(async () =>
         {
-            // 保存兜底：未手动编辑过救助原因时按当前困难类型与明细重新生成
-            if (!_reasonDirty) RegenerateDifficultyReason();
-            var app = BuildApplication();
+            var saved = await SaveCoreAsync();
+            if (saved == null) return Result.Success();       // 校验失败（SaveCoreAsync 已弹提示）
+            if (saved.IsFailure) return saved;                 // 保存失败（已弹提示，交回 ExecuteAsync 记录）
 
-            if (OperationMode == FormOperationMode.Create)
-            {
-                var result = await _applicationService.CreateAsync(app, Members.ToList(), CancellationToken);
-                if (!result.IsSuccess)
-                {
-                    await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
-                    return result;
-                }
-                _id = result.Value;
-            }
-            else
-            {
-                var result = await _applicationService.UpdateAsync(app, Members.ToList(), CancellationToken);
-                if (!result.IsSuccess)
-                {
-                    await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
-                    return result;
-                }
-            }
-
-            _logger.LogBusiness("临时救助申请保存成功", ("ApplicationId", _id));
             await _dialogService.ShowSnackBarAsync("保存成功");
             await CloseAsync();
             return Result.Success();
@@ -519,38 +491,11 @@ public partial class TempReliefFormViewModel
     {
         if (!IsSavable) return;
 
-        var validation = Validate();
-        if (validation != null)
-        {
-            await _dialogService.DisplayAlertAsync("提示", validation, "确定");
-            return;
-        }
-
         await ExecuteAsync(async () =>
         {
-            // 保存兜底：未手动编辑过救助原因时按当前困难类型与明细重新生成
-            if (!_reasonDirty) RegenerateDifficultyReason();
-            var app = BuildApplication();
-
-            if (OperationMode == FormOperationMode.Create)
-            {
-                var result = await _applicationService.CreateAsync(app, Members.ToList(), CancellationToken);
-                if (!result.IsSuccess)
-                {
-                    await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
-                    return result;
-                }
-                _id = result.Value;
-            }
-            else
-            {
-                var result = await _applicationService.UpdateAsync(app, Members.ToList(), CancellationToken);
-                if (!result.IsSuccess)
-                {
-                    await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
-                    return result;
-                }
-            }
+            var saved = await SaveCoreAsync();
+            if (saved == null) return Result.Success();       // 校验失败（SaveCoreAsync 已弹提示）
+            if (saved.IsFailure) return saved;                 // 保存失败（已弹提示，交回 ExecuteAsync 记录）
 
             var confirmResult = await _applicationService.ConfirmAsync(_id, App.CurrentUserName, CancellationToken);
             if (!confirmResult.IsSuccess)
@@ -610,6 +555,49 @@ public partial class TempReliefFormViewModel
     private async Task CancelAsync()
     {
         await CloseAsync();
+    }
+
+    /// <summary>
+    /// 保存核心（SaveAsync 与 SaveAndConfirmAsync 共用，2026-11 消除两命令间的整段重复）：
+    /// 校验 → 救助原因兜底重建 → Create/Update 主表+成员子表。
+    /// 返回 null = 校验失败（已弹提示，调用方直接结束）；返回 Result 失败 = 保存失败（已弹提示）。
+    /// 成功时 _id 已回填。确认生效及后续档案输出由 SaveAndConfirmAsync 自行接力。
+    /// </summary>
+    private async Task<Result?> SaveCoreAsync()
+    {
+        var validation = Validate();
+        if (validation != null)
+        {
+            await _dialogService.DisplayAlertAsync("提示", validation, "确定");
+            return null;
+        }
+
+        // 保存兜底：未手动编辑过救助原因时按当前困难类型与明细重新生成
+        if (!_reasonDirty) RegenerateDifficultyReason();
+        var app = BuildApplication();
+
+        if (OperationMode == FormOperationMode.Create)
+        {
+            var result = await _applicationService.CreateAsync(app, Members.ToList(), CancellationToken);
+            if (!result.IsSuccess)
+            {
+                await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
+                return result;
+            }
+            _id = result.Value;
+        }
+        else
+        {
+            var result = await _applicationService.UpdateAsync(app, Members.ToList(), CancellationToken);
+            if (!result.IsSuccess)
+            {
+                await _dialogService.DisplayAlertAsync("保存失败", result.Message ?? "保存失败，请重试", "确定");
+                return result;
+            }
+        }
+
+        _logger.LogBusiness("临时救助申请保存成功", ("ApplicationId", _id));
+        return Result.Success();
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.AssetVerification.MonthlyAssetAuditPage"
@@ -14,31 +14,13 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="0">
 
         <!-- 渐变英雄头部（橙色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE898;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="月度审核" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="按月核查资产状况与数据审核" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE898;', Android='&#x1F4CE;'}"
+                                   Title="月度审核"
+                                   Subtitle="按月核查资产状况与数据审核"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台"/>
 
         <Grid Grid.Row="1" ColumnDefinitions="420,*" ColumnSpacing="0">
 
@@ -52,11 +34,11 @@
                             <Label Text="报表周期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
                                 <Picker Grid.Column="0" HeightRequest="40" ItemsSource="{Binding YearOptions}" SelectedItem="{Binding SelectedYear}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="年" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="年" FontSize="18" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="2" HeightRequest="40" ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding SelectedMonth}" VerticalOptions="Center"/>
-                                <Label Grid.Column="3" Text="月" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="月" FontSize="18" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </Grid>
-                            <Label Text="{Binding PeriodText}" FontSize="15" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding PeriodText}" FontSize="17" TextColor="{StaticResource Primary}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -67,31 +49,31 @@
                             <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
                                 <Border Grid.Column="0" Grid.Row="0" BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="已提交" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
-                                        <Label Text="{Binding SubmittedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                        <Label Text="已提交" FontSize="16" TextColor="{StaticResource PrimaryDark}"/>
+                                        <Label Text="{Binding SubmittedCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" Grid.Row="0" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="有报告未建档" FontSize="14" TextColor="{StaticResource WarningDark}"/>
-                                        <Label Text="{Binding HasReportCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="有报告未建档" FontSize="16" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="{Binding HasReportCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="0" Grid.Row="1" BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="已建档" FontSize="14" TextColor="{StaticResource SecondaryDark}"/>
-                                        <Label Text="{Binding ArchivedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
+                                        <Label Text="已建档" FontSize="16" TextColor="{StaticResource SecondaryDark}"/>
+                                        <Label Text="{Binding ArchivedCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource SecondaryDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" Grid.Row="1" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="不予认定" FontSize="14" TextColor="{StaticResource Error}"/>
-                                        <Label Text="{Binding RejectedCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                                        <Label Text="不予认定" FontSize="16" TextColor="{StaticResource Error}"/>
+                                        <Label Text="{Binding RejectedCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
-                            <Label HorizontalOptions="End" TextColor="{StaticResource TextSecondary}" FontSize="14" Text="{Binding TotalCount, StringFormat='总计 {0} 户'}"/>
-                            <Label Text="统计按户；名单/报告按人" FontSize="11" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
+                            <Label HorizontalOptions="End" TextColor="{StaticResource TextSecondary}" FontSize="16" Text="{Binding TotalCount, StringFormat='总计 {0} 户'}"/>
+                            <Label Text="统计按户；名单/报告按人" FontSize="13" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -103,12 +85,12 @@
                                 <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                     <Label Text="{Binding MatchTasks.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold" VerticalOptions="Center"/>
                                 </Border>
-                                <Button Grid.Column="2" Text="保存报告" FontSize="13" Padding="10,2" HeightRequest="30"
+                                <Button Grid.Column="2" Text="保存报告" FontSize="15" Padding="10,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource Success}" CornerRadius="6"
                                         VerticalOptions="Center"
                                         Command="{Binding SaveReportCommand}"
                                         IsEnabled="{Binding CanPrintReport}"/>
-                                <Button Grid.Column="3" Text="打印报告" FontSize="13" Padding="10,2" HeightRequest="30"
+                                <Button Grid.Column="3" Text="打印报告" FontSize="15" Padding="10,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}" CornerRadius="6"
                                         VerticalOptions="Center"
                                         Command="{Binding PrintSelectedCommand}"
@@ -117,12 +99,12 @@
                             <!-- 人员名单搜索：姓名/身份证号关键字 -->
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                 <Entry Grid.Column="0" Placeholder="搜索姓名/身份证号" Text="{Binding SearchKeyword}"
-                                       HeightRequest="36" FontSize="14" IsTextPredictionEnabled="False"
+                                       HeightRequest="36" FontSize="16" IsTextPredictionEnabled="False"
                                        Completed="OnSearchEntryCompleted"/>
-                                <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="36"
+                                <Button Grid.Column="1" Text="搜索" FontSize="15" Padding="14,0" HeightRequest="36"
                                         BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="6"
                                         Command="{Binding SearchCommand}"/>
-                                <Button Grid.Column="2" Text="打开输出目录" FontSize="12" Padding="10,0" HeightRequest="36"
+                                <Button Grid.Column="2" Text="打开输出目录" FontSize="14" Padding="10,0" HeightRequest="36"
                                         BackgroundColor="Transparent" TextColor="{StaticResource PrimaryDark}"
                                         Command="{Binding OpenOutputFolderCommand}"/>
                             </Grid>
@@ -131,7 +113,7 @@
                                     <DataTemplate x:DataType="assetsvc:AssetVerificationTask">
                                         <Border Padding="12,8" Margin="0,4" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 8">
                                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                                <Label Grid.Column="0" Text="{Binding ArchiveName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                                <Label Grid.Column="0" Text="{Binding ArchiveName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
 
                                                 <!-- 状态徽章（柔和 Chip：已提交/有报告未建档/已建档/不予认定） -->
                                                 <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
@@ -167,7 +149,7 @@
                                                     </Label>
                                                 </Border>
 
-                                                <Button Grid.Column="2" Text="不予认定" FontSize="12" Padding="10,2" HeightRequest="30"
+                                                <Button Grid.Column="2" Text="不予认定" FontSize="14" Padding="10,2" HeightRequest="30"
                                                         BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}" CornerRadius="6" VerticalOptions="Center"
                                                         IsVisible="{Binding CanReject}"
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type MonthlyAssetAuditViewModel}}, Path=RejectCheckCommand}"
@@ -190,31 +172,31 @@
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Border Grid.Column="0" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="待上传" FontSize="14" TextColor="{StaticResource WarningDark}"/>
-                                        <Label Text="{Binding UploadPendingCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="待上传" FontSize="16" TextColor="{StaticResource WarningDark}"/>
+                                        <Label Text="{Binding UploadPendingCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" BackgroundColor="{StaticResource DangerSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
                                     <VerticalStackLayout Spacing="4">
-                                        <Label Text="失败" FontSize="14" TextColor="{StaticResource Error}"/>
-                                        <Label Text="{Binding UploadErrorCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                                        <Label Text="失败" FontSize="16" TextColor="{StaticResource Error}"/>
+                                        <Label Text="{Binding UploadErrorCount}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
-                            <Button Text="选择文件夹并批量上传" Style="{StaticResource ButtonPrimary}" Command="{Binding BatchUploadCommand}" HeightRequest="44" FontSize="16" IsEnabled="{Binding IsUploading, Converter={x:Static converters:BoolToInverseConverter.Instance}}"/>
+                            <Button Text="选择文件夹并批量上传" Style="{StaticResource ButtonPrimary}" Command="{Binding BatchUploadCommand}" HeightRequest="44" FontSize="18" IsEnabled="{Binding IsUploading, Converter={x:Static converters:BoolToInverseConverter.Instance}}"/>
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <HorizontalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
                                     <CheckBox IsChecked="{Binding IncludeSubfolders}" VerticalOptions="Center"/>
-                                    <Label Text="包含子文件夹" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                    <Label Text="包含子文件夹" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 </HorizontalStackLayout>
-                                <Button Grid.Column="1" Text="取消上传" FontSize="13" Padding="12,0" HeightRequest="34"
+                                <Button Grid.Column="1" Text="取消上传" FontSize="15" Padding="12,0" HeightRequest="34"
                                         BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
                                         CornerRadius="6" IsVisible="{Binding IsUploading}"
                                         Command="{Binding CancelBatchUploadCommand}"/>
                             </Grid>
                             <Grid IsVisible="{Binding IsUploading}" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <ProgressBar Grid.Column="0" Progress="{Binding UploadProgressPercent}" HeightRequest="16"/>
-                                <Label Grid.Column="1" Text="{Binding UploadProgressText}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding UploadProgressText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </Grid>
                         </VerticalStackLayout>
                     </Border>
@@ -222,8 +204,8 @@
                     <!-- 比对信息 -->
                     <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasSelectedMatchTask}">
                         <VerticalStackLayout Spacing="4">
-                            <Label Text="比对信息" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
-                            <Label Text="{Binding MatchInfoText}" FontSize="14" TextColor="{StaticResource Gray800}"/>
+                            <Label Text="比对信息" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                            <Label Text="{Binding MatchInfoText}" FontSize="16" TextColor="{StaticResource Gray800}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -236,7 +218,7 @@
                     <Grid Grid.Row="0">
                         <controls:PdfPreviewView x:Name="PdfPreview" PdfFilePath="{Binding PdfPreviewUrl}" IsVisible="{Binding HasPdfPreview}" VerticalOptions="Fill" HorizontalOptions="Fill"/>
                         <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16" IsVisible="{Binding HasPdfPreview, Converter={StaticResource BoolToInverseConverter}}">
-                            <Label Text="选择左侧人员后显示PDF预览" Style="{StaticResource EmptyStateLabel}" FontSize="20"/>
+                            <Label Text="选择左侧人员后显示PDF预览" Style="{StaticResource EmptyStateLabel}" FontSize="22"/>
                         </VerticalStackLayout>
                     </Grid>
 
@@ -244,9 +226,9 @@
                             StrokeThickness="0" Padding="12,8">
                         <VerticalStackLayout Spacing="6">
                             <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="报告版本（只读）" FontSize="13" FontAttributes="Bold"
+                                <Label Text="报告版本（只读）" FontSize="15" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                <Button Grid.Column="1" Text="打印此版本" FontSize="12" Padding="12,2" HeightRequest="30"
+                                <Button Grid.Column="1" Text="打印此版本" FontSize="14" Padding="12,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
                                         CornerRadius="6" Command="{Binding PrintSelectedVersionCommand}"
                                         IsEnabled="{Binding CanPrintSelectedVersion}"/>
@@ -267,12 +249,12 @@
                                                     <Setter Property="Stroke" Value="{StaticResource Primary}"/>
                                                 </DataTrigger>
                                             </Border.Triggers>
-                                            <Label Text="{Binding DisplayText}" FontSize="12" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding DisplayText}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
                             </CollectionView>
-                            <Label Text="{Binding ReportVersionInfoText}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ReportVersionInfoText}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
                         </VerticalStackLayout>
                     </Border>
                 </Grid>

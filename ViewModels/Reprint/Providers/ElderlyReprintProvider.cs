@@ -56,9 +56,12 @@ public class ElderlyReprintProvider : IReprintDomainProvider
 
     public async Task<Result<List<ReprintArchiveItem>>> SearchByMonthAsync(int year, int month, int limit = 200, CancellationToken ct = default)
     {
-        // 服务端按月查询（新增=apply_date 月、停发=actual_stop_date 月，域内既有口径）；excludeImported=false 与名单口径一致
-        var confirmedResult = await _applicationService.GetByMonthAsync(year, month, false, null, false, ct);
-        var stoppedResult = await _applicationService.GetByMonthAsync(year, month, true, null, false, ct);
+        // 服务端按月查询（新增=apply_date 月、停发=actual_stop_date 月，域内既有口径）。
+        // 新增方向：统一走「当月真正新增」单点口径（ElderlyNewArchiveFilter，含排除补录档），
+        // 与月报新增明细/主页卡片同源——补打中心按月名单不再列出导入名册补录档与已故补录档；
+        // 停发方向：excludeImported=false，与停发明细名单口径一致。
+        var confirmedResult = await _applicationService.GetByMonthAsync(year, month, false, null, excludeImported: true, ct);
+        var stoppedResult = await _applicationService.GetByMonthAsync(year, month, true, null, excludeImported: false, ct);
 
         if (confirmedResult.IsFailure && stoppedResult.IsFailure)
             return Result.Failure<List<ReprintArchiveItem>>(

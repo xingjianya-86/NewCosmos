@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using NewCosmos.Models.Lottery;
 using NewCosmos.Models.Results;
@@ -19,7 +18,6 @@ public class LotteryDataService : ILotteryDataService
 
     private static readonly string ScriptsDir = Path.Combine(AppContext.BaseDirectory, "Scripts", "Lottery");
     private static readonly string DataDir = Path.Combine(AppContext.BaseDirectory, "Data", "Lottery");
-    private static readonly string PythonExe = Path.Combine(AppContext.BaseDirectory, "python-embed", "python.exe");
 
     public LotteryDataService(
         IDatabaseService db,
@@ -253,46 +251,9 @@ public class LotteryDataService : ILotteryDataService
     #region 私有方法
 
     private async Task<(bool Success, string Output, string Error)> RunPythonScriptAsync(string args, CancellationToken ct)
-    {
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = PythonExe,
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = ScriptsDir
-            };
-
-            // 传递代理环境变量（如果系统配置了的话）
-            var httpProxy = Environment.GetEnvironmentVariable("HTTP_PROXY") ?? Environment.GetEnvironmentVariable("http_proxy");
-            var httpsProxy = Environment.GetEnvironmentVariable("HTTPS_PROXY") ?? Environment.GetEnvironmentVariable("https_proxy");
-            if (!string.IsNullOrEmpty(httpProxy))
-                startInfo.EnvironmentVariables["HTTP_PROXY"] = httpProxy;
-            if (!string.IsNullOrEmpty(httpsProxy))
-                startInfo.EnvironmentVariables["HTTPS_PROXY"] = httpsProxy;
-
-            using var process = new Process { StartInfo = startInfo };
-            process.Start();
-
-            var outputTask = process.StandardOutput.ReadToEndAsync(ct);
-            var errorTask = process.StandardError.ReadToEndAsync(ct);
-
-            await process.WaitForExitAsync(ct);
-
-            var output = await outputTask;
-            var error = await errorTask;
-
-            return (process.ExitCode == 0, output, error);
-        }
-        catch (Exception ex)
-        {
-            return (false, "", ex.Message);
-        }
-    }
+        // 单点实现（PythonScriptRunner）：合并后补上本实现缺失的【超时+Kill】
+        //（旧版网络挂起时 fetch_history 子进程会永久滞留），默认 120 秒。
+        => await PythonScriptRunner.RunAsync(args, ScriptsDir, ct, TimeSpan.FromSeconds(120));
 
     private async Task<int> BatchInsertDrawsAsync(LotteryType lotteryType, List<LotteryDrawDto> draws, CancellationToken ct)
     {

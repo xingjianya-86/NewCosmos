@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyStopPage"
@@ -10,31 +10,13 @@
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
         <!-- 渐变英雄头部（紫色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="高龄津贴停发办理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="停发后自动生成《取消备案表》" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}"
+                                   Title="高龄津贴停发办理"
+                                   Subtitle="停发后自动生成《取消备案表》"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台"/>
 
         <!-- 内容区域 -->
         <ScrollView Grid.Row="1">
@@ -49,7 +31,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="20"
                                        TextColor="{StaticResource Info}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -115,7 +97,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="20"
                                        TextColor="{StaticResource Warning}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -166,7 +148,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="20"
                                        TextColor="{StaticResource Primary}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -175,7 +157,7 @@
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                             <CheckBox Grid.Column="0" IsChecked="{Binding IsRecover}" VerticalOptions="Center"/>
-                            <Label Grid.Column="1" Text="需要追缴（多发的高龄津贴需返还）" FontSize="14"
+                            <Label Grid.Column="1" Text="需要追缴（多发的高龄津贴需返还）" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                         </Grid>
                         <VerticalStackLayout IsVisible="{Binding IsRecover}" Spacing="12">
@@ -185,10 +167,10 @@
                                     <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
                                         <Picker Grid.Column="0" ItemsSource="{Binding RecoverStartYearOptions}"
                                                 SelectedItem="{Binding RecoverStartYear}" Style="{StaticResource FormFieldPickerStyle}"/>
-                                        <Label Grid.Column="1" Text="年" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="1" Text="年" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                         <Picker Grid.Column="2" ItemsSource="{Binding RecoverStartMonthOptions}"
                                                 SelectedItem="{Binding RecoverStartMonth}" Style="{StaticResource FormFieldPickerStyle}"/>
-                                        <Label Grid.Column="3" Text="月" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="月" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                     </Grid>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="4">
@@ -196,10 +178,10 @@
                                     <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
                                         <Picker Grid.Column="0" ItemsSource="{Binding RecoverEndYearOptions}"
                                                 SelectedItem="{Binding RecoverEndYear}" Style="{StaticResource FormFieldPickerStyle}"/>
-                                        <Label Grid.Column="1" Text="年" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="1" Text="年" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                         <Picker Grid.Column="2" ItemsSource="{Binding RecoverEndMonthOptions}"
                                                 SelectedItem="{Binding RecoverEndMonth}" Style="{StaticResource FormFieldPickerStyle}"/>
-                                        <Label Grid.Column="3" Text="月" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="月" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                     </Grid>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="4">
@@ -219,8 +201,8 @@
                 <!-- 提示 -->
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Info}" VerticalOptions="Center"/>
-                        <Label Grid.Column="1" Text="停发后实际停发时间取系统当前时间，自动生成《取消备案表》" FontSize="13" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Info}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="停发后实际停发时间取系统当前时间，自动生成《取消备案表》" FontSize="15" TextColor="{StaticResource PrimaryDark}" VerticalOptions="Center"/>
                     </Grid>
                 </Border>
 

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.DateTimeEntryView"
+             x:Name="ThisView">
+
+    <VerticalStackLayout Spacing="8">
+
+        <!-- 标题（必填时红色 *） -->
+        <HorizontalStackLayout Spacing="2">
+            <Label x:Name="TitleLabel"
+                   FontSize="{OnPlatform WinUI=16, Android=14, Default=16}"
+                   TextColor="{StaticResource TextSecondary}"
+                   VerticalOptions="Center"/>
+            <Label x:Name="RequiredMarkLabel"
+                   Text="*"
+                   FontSize="{OnPlatform WinUI=16, Android=14, Default=16}"
+                   TextColor="{StaticResource Error}"
+                   VerticalOptions="Center"
+                   IsVisible="False"/>
+        </HorizontalStackLayout>
+
+        <!-- 值框（点击弹出选择弹窗；未选灰色占位，已选深色值） -->
+        <Border x:Name="FieldBorder"
+                Style="{StaticResource CardBorder}"
+                Padding="12,0"
+                HeightRequest="48"
+                BackgroundColor="White">
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnFieldTapped"/>
+            </Border.GestureRecognizers>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label x:Name="ValueLabel"
+                       FontSize="{OnPlatform WinUI=17, Android=14, Default=17}"
+                       TextColor="{StaticResource TextTertiary}"
+                       VerticalOptions="Center"
+                       LineBreakMode="TailTruncation"/>
+                <Label Grid.Column="1"
+                       Text="{OnPlatform WinUI='&#xE787;', Android='&#x1F4C5;'}"
+                       FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                       FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
+                       TextColor="{StaticResource Gray500}"
+                       VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+    </VerticalStackLayout>
+</ContentView>

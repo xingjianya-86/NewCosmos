@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace NewCosmos.Models.Entities;
 
@@ -44,7 +44,8 @@ public class LandRegistration
     public string MeasurementType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 面积（亩    /// </summary>
+    /// 面积（亩
+/// </summary>
     public double Area { get; set; }
 
     /// <summary>

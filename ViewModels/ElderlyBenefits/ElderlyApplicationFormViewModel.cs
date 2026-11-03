@@ -127,46 +127,34 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 手机端：扫描身份证（Camera2 预览 + 端侧 PaddleOCR），回填姓名/身份证并触发判类联动。
-    /// 桌面端 IIdentityReader.IsSupported=false（无摄像头/OCR），页面只在手机端显示入口。
+    /// 扫描证件（Camera2 取景 + 类别识别）：跳转扫描页选拍证件 → 内网识别 → 分配页定向回填。
+    /// 回填经 <see cref="Services.Platform.IOcrAssignContext"/>（本 VM 实现）：身份证填 Name/IdCard
+    /// 即触发 OnIdCardChanged 自动评估（判类 + 补发计算）。
     /// </summary>
     [RelayCommand]
     private async Task ScanIdCardAsync()
     {
-        var identityReader = _serviceProvider.GetRequiredService<Services.Platform.IIdentityReader>();
-        if (!identityReader.IsSupported)
+        if (DeviceInfo.Platform != DevicePlatform.Android)
         {
-            await _dialogService.DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请手动录入或改用手机端", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "扫描功能请在手机上使用；电脑端可在「照片采集」中选图识别", "确定");
             return;
         }
 
         try
         {
-            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
-            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
-                new IdCardScanParameter(result => completion.TrySetResult(result)));
+            var completion = new TaskCompletionSource<int>();
+            await NavigateToPageAsync<Pages.Mobile.MobileOcrScanPage, OcrScanParameter>(
+                new OcrScanParameter(this, applied => completion.TrySetResult(applied)));
 
-            var scanResult = await completion.Task;
-            if (scanResult is null) return; // 用户取消
+            var applied = await completion.Task;
+            if (applied > 0)
+                await _dialogService.ShowSnackBarAsync($"已回填 {applied} 条识别结果", Components.SnackBarType.Success);
 
-            if (scanResult.IsFailure || scanResult.Value is null)
-            {
-                await _dialogService.DisplayAlertAsync("识别失败", scanResult.Message ?? "未识别到身份证信息", "确定");
-                return;
-            }
-
-            var info = scanResult.Value;
-            if (!string.IsNullOrWhiteSpace(info.Name)) Name = info.Name.Trim();
-            // 赋值即触发 OnIdCardChanged 的自动评估（判类 + 补发计算 + 导入台账带出）
-            if (!string.IsNullOrWhiteSpace(info.IdCard)) IdCard = info.IdCard.Trim();
-
-            _logger.LogBusiness("高龄津贴-身份证扫描",
-                ("HasName", !string.IsNullOrWhiteSpace(info.Name)),
-                ("HasIdCard", !string.IsNullOrWhiteSpace(info.IdCard)));
+            _logger.LogBusiness("高龄津贴-证件扫描", ("Applied", applied.ToString()));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "高龄津贴身份证扫描失败");
+            _logger.LogError(ex, "高龄津贴证件扫描失败");
             await _dialogService.DisplayAlertAsync("提示", "扫描失败，请重试或手动录入", "确定");
         }
     }
@@ -186,7 +174,8 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
 
         _logger.LogBusiness("高龄津贴-照片采集/查看", ("ApplicationId", _id.ToString()));
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(IdCard.Trim(), _id > 0 ? _id : null, Name));
+            new ArchivePhotoParameter(IdCard.Trim(), _id > 0 ? _id : null, Name,
+                AssignContext: this));
     }
 
 }

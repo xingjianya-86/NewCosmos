@@ -43,6 +43,11 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     /// </summary>
     public ObservableCollection<MonthlyFormOption> Forms { get; } = new();
 
+    /// <summary>
+    /// 报表生成历史（子 VM：分页列表 + 年份筛选 + 删除；此前实现了但未注册 DI/未绑定页面，属流程断环）
+    /// </summary>
+    public ReportHistoryViewModel History { get; }
+
     [ObservableProperty]
     private int _selectedYear;
 
@@ -148,7 +153,8 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         IPrinterService printerService,
         IUserService userService,
-        IBusinessTimelineService businessTimelineService)
+        IBusinessTimelineService businessTimelineService,
+        ReportHistoryViewModel history)
     {
         _reportService = reportService;
         _printService = printService;
@@ -158,6 +164,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         _printerService = printerService;
         _userService = userService;
         _businessTimelineService = businessTimelineService;
+        History = history;
 
         var now = DateTime.Now;
         for (var y = now.Year - 5; y <= now.Year + 1; y++)
@@ -238,10 +245,13 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         }
         await RefreshCycleRangeAsync();
         await LoadMeetingAsync();
+        // 报表历史首屏加载（历史 VM 此前从未被任何页面绑定，属死代码复活；失败不阻塞主流程）
+        if (History.TotalCount == 0)
+            History.SearchCommand.Execute(null);
     }
 
     /// <summary>
-    /// 重新加载当前周期数据（统计卡片 + 会议记录）
+    /// 重新加载当前周期数据（统计卡片 + 会议记录 + 报表历史）
     /// </summary>
     [RelayCommand]
     private async Task RefreshAsync()
@@ -252,6 +262,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             await LoadSummaryAsync(ct);
             await LoadMeetingAsync();
         }, "加载月报数据...");
+        History.SearchCommand.Execute(null);
     }
 
     private async Task LoadSummaryAsync(CancellationToken ct)
@@ -335,7 +346,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         var usersResult = await _userService.GetByOrganizationAsync(orgId.Value);
         if (usersResult.IsFailure || usersResult.Value == null)
             return string.Empty;
-        return usersResult.Value.FirstOrDefault(u => u.Position == "民政助理")?.FullName ?? string.Empty;
+        return usersResult.Value.FirstOrDefault(u => u.Position == PositionTitles.CivilAssistant)?.FullName ?? string.Empty;
     }
 
     /// <summary>
@@ -773,11 +784,31 @@ public partial class ReportHistoryViewModel : PagedSearchViewModelBase
             "加载报表历史...");
 
     [RelayCommand]
-    private async Task DeleteReportAsync()
+    private async Task DeleteReportAsync(MonthlyReportSummary? report)
     {
-        if (SelectedReport == null) return;
-        var result = await _reportService.DeleteAsync(SelectedReport.Year, SelectedReport.Month);
+        // 行内按钮传参；无参时退回选中项（兼容旧绑定）
+        var target = report ?? SelectedReport;
+        if (target == null) return;
+
+        // 二次确认 + 明示删除范围：DeleteAsync(year, month) 删的是该年月【所有乡镇】的汇总行
+        var confirm = await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+            "删除报表记录",
+            $"确定删除 {target.Year}年{target.Month}月 的月报汇总记录吗？\n\n" +
+            "⚠ 将删除该年月【全部乡镇】的记录（含：全部 / " + target.Town + "）。\n" +
+            "删除后可重新生成，不影响业务明细数据。",
+            "删除", "取消");
+        if (!confirm) return;
+
+        var result = await _reportService.DeleteAsync(target.Year, target.Month);
         if (result.IsSuccess)
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>().ShowSnackBarAsync("已删除");
             await LoadDataAsync();
+        }
+        else
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "删除失败", result.Message ?? "删除报表记录失败", "确定");
+        }
     }
 }

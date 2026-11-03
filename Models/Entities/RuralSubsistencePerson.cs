@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace NewCosmos.Models.Entities;
 
@@ -13,11 +13,13 @@ public class RuralSubsistencePerson
     public long Id { get; set; }
 
     /// <summary>
-    /// 家庭ID（关联nc_biz_rural_subsistence_families    /// </summary>
+    /// 家庭ID（关联nc_biz_rural_subsistence_families
+/// </summary>
     public long FamilyId { get; set; }
 
     /// <summary>
-    /// 户主身份证号（关联键    /// </summary>
+    /// 户主身份证号（关联键
+/// </summary>
     [Required(ErrorMessage = "户主身份证号不能为空")]
     public string HeadIdCard { get; set; } = string.Empty;
 
@@ -34,7 +36,8 @@ public class RuralSubsistencePerson
     public string IdCard { get; set; } = string.Empty;
 
     /// <summary>
-    /// 与户主关    /// </summary>
+    /// 与户主关
+/// </summary>
     public string Relationship { get; set; } = string.Empty;
 
     /// <summary>
@@ -83,7 +86,8 @@ public class RuralSubsistencePerson
     public decimal AnnualIncome { get; set; }
 
     /// <summary>
-    /// 是否残疾    /// </summary>
+    /// 是否残疾
+/// </summary>
     public bool IsDisabled { get; set; }
 
     /// <summary>
@@ -122,7 +126,8 @@ public class RuralSubsistencePerson
     public string InsuranceType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 最初享受月    /// </summary>
+    /// 最初享受月
+/// </summary>
     public string FirstReceiveMonth { get; set; } = string.Empty;
 
     /// <summary>
@@ -131,7 +136,8 @@ public class RuralSubsistencePerson
     public bool IsPovertyHousehold { get; set; }
 
     /// <summary>
-    /// 开户银    /// </summary>
+    /// 开户银
+/// </summary>
     public string BankName { get; set; } = string.Empty;
 
     /// <summary>
@@ -145,7 +151,8 @@ public class RuralSubsistencePerson
     public string BankAccount { get; set; } = string.Empty;
 
     /// <summary>
-    /// 一卡通账    /// </summary>
+    /// 一卡通账
+/// </summary>
     public string OneCardAccount { get; set; } = string.Empty;
 
     /// <summary>
@@ -154,19 +161,23 @@ public class RuralSubsistencePerson
     public string AssistanceType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 户月保障金额（元    /// </summary>
+    /// 户月保障金额（元
+/// </summary>
     public decimal MonthlyGuaranteeAmount { get; set; }
 
     /// <summary>
-    /// 家庭分类施保金额（元    /// </summary>
+    /// 家庭分类施保金额（元
+/// </summary>
     public decimal FamilyClassifiedAmount { get; set; }
 
     /// <summary>
-    /// 合计分类施保金额（元    /// </summary>
+    /// 合计分类施保金额（元
+/// </summary>
     public decimal TotalClassifiedAmount { get; set; }
 
     /// <summary>
-    /// 救助金计算方    /// </summary>
+    /// 救助金计算方
+/// </summary>
     public string CalculationMethod { get; set; } = string.Empty;
 
     /// <summary>
@@ -175,7 +186,8 @@ public class RuralSubsistencePerson
     public string GradeType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 合计（元    /// </summary>
+    /// 合计（元
+/// </summary>
     public decimal TotalAmount { get; set; }
 
     /// <summary>
@@ -214,23 +226,28 @@ public class RuralSubsistencePerson
     public string Remark { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属省    /// </summary>
+    /// 所属省
+/// </summary>
     public string Province { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属市    /// </summary>
+    /// 所属市
+/// </summary>
     public string City { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属区    /// </summary>
+    /// 所属区
+/// </summary>
     public string District { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属街    /// </summary>
+    /// 所属街
+/// </summary>
     public string Street { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属社    /// </summary>
+    /// 所属社
+/// </summary>
     public string Community { get; set; } = string.Empty;
 
     /// <summary>

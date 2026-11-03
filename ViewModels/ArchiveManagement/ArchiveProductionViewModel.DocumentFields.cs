@@ -352,13 +352,7 @@ public partial class ArchiveProductionViewModel
     /// 未确定时两框皆空，只保留"分散供养/集中供养"两个选项。
     /// </summary>
     private string BuildDestituteSupportTypeDisplay(ApplicationEntity app)
-    {
-        if (app.DestituteSupportType == "Centralized" || app.DestituteSupportType == ClassificationConstants.SupportMode.CENTRALIZED)
-            return "□分散供养 ☑集中供养";
-        if (app.DestituteSupportType == "Scattered" || app.DestituteSupportType == ClassificationConstants.SupportMode.SCATTERED)
-            return "☑分散供养 □集中供养";
-        return "□分散供养 □集中供养";
-    }
+        => Services.Domain.SocialAssistance.DestitutePrintDataBuilder.BuildDestituteSupportTypeDisplay(app);
 
     /// <summary>
     /// 构建自理能力六项明细（逐项勾选式，数据源 = 能力鉴定六项考核指标）。
@@ -397,11 +391,12 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 构建调查走访情况
+    /// 构建调查走访情况（入户调查表/特困入户调查表{调查走访情况}）——
+    /// 分类取文书基准分类（复核前旧分类），否则复核后会打出「符合收入超标条件」
     /// </summary>
     private string BuildSurveyVisitSituation(ApplicationEntity app)
     {
-        return $"经入户调查，该家庭确属困难家庭，符合{(ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""))}条件。";
+        return $"经入户调查，该家庭确属困难家庭，符合{(ClassificationConstants.ConvertFromCode(_docClassification))}条件。";
     }
 
     /// <summary>
@@ -830,9 +825,12 @@ public partial class ArchiveProductionViewModel
         return sb.ToString();
     }
 
-    private static string BuildVerifiedBenefitText(ApplicationEntity app)
+    /// <summary>
+    /// 核实待遇文本：分类取文书基准分类（复核前旧分类），app 仅保留签名占位
+    /// </summary>
+    private string BuildVerifiedBenefitText(ApplicationEntity app)
     {
-        var familyTypeName = ClassificationConstants.ConvertToFamilyTypeName(app.ClassificationResult ?? "");
+        var familyTypeName = ClassificationConstants.ConvertToFamilyTypeName(_docClassification);
         return $"经调查核实，该家庭符合{familyTypeName}条件，补助执行时间：";
     }
 
@@ -1039,25 +1037,47 @@ public partial class ArchiveProductionViewModel
         return $"有：{string.Join("；", items)}";
     }
 
+    /// <summary>
+    /// 务工收入明细（档案_定期复核审批表{务工明细}、档案_邻里访问调查表{劳务收入}）。
+    /// 2026-11 打印口径：{务工收入} 金额 = 务工明细 + 转移性（工资性）收入（见 INCOME_LABOR 供给行），
+    /// 明细同步补一句来源，否则「金额2000元 / 明细"-"」自相矛盾（奚德芳：工资性收入2000元/月无务工录入行）。
+    /// 务工与工资性收入均无时才返回 "-"。
+    /// </summary>
     private string BuildLaborIncomeDesc(EconomicDetailData? economicDetail)
     {
-        if (economicDetail?.LaborIncomes == null || economicDetail.LaborIncomes.Count == 0)
-            return "-";
+        var items = new List<string>();
 
-        var items = economicDetail.LaborIncomes.Select(l =>
+        if (economicDetail?.LaborIncomes is { Count: > 0 } laborIncomes)
         {
-            var workUnit = l.WorkUnit ?? "";
-            var incomeType = l.IncomeSubType ?? "";
-            var desc = (!string.IsNullOrEmpty(workUnit), !string.IsNullOrEmpty(incomeType)) switch
+            items.AddRange(laborIncomes.Select(l =>
             {
-                (true, true) => $"在{workUnit}从事{incomeType}工作",
-                (true, false) => $"在{workUnit}工作",
-                (false, true) => $"从事{incomeType}工作",
-                _ => "务工收入"
-            };
-            return $"{desc}，月收入{FormatDecimal(l.MonthlyIncome ?? 0)}元，工作{l.MonthsWorked ?? 0}个月/年";
-        });
-        return $"有：{string.Join("；", items)}";
+                var workUnit = l.WorkUnit ?? "";
+                var incomeType = l.IncomeSubType ?? "";
+                var desc = (!string.IsNullOrEmpty(workUnit), !string.IsNullOrEmpty(incomeType)) switch
+                {
+                    (true, true) => $"在{workUnit}从事{incomeType}工作",
+                    (true, false) => $"在{workUnit}工作",
+                    (false, true) => $"从事{incomeType}工作",
+                    _ => "务工收入"
+                };
+                return $"{desc}，月收入{FormatDecimal(l.MonthlyIncome ?? 0)}元，工作{l.MonthsWorked ?? 0}个月/年";
+            }));
+        }
+
+        // 并入务工口径的工资性（转移性）收入来源说明：与 {务工收入} 金额同源同范围
+        if (economicDetail?.TransferIncomes is { Count: > 0 } transferIncomes)
+        {
+            items.AddRange(transferIncomes
+                .Where(t => (t.MonthlyAmount ?? t.TotalAmount) > 0)
+                .Select(t =>
+                {
+                    var source = string.IsNullOrWhiteSpace(t.IncomeType) ? "转移性收入" : t.IncomeType;
+                    var owner = string.IsNullOrWhiteSpace(t.MemberName) ? "" : $"{t.MemberName}的";
+                    return $"{owner}{source}{FormatDecimal(t.MonthlyAmount ?? t.TotalAmount)}元/月（工资性收入并入务工收入）";
+                }));
+        }
+
+        return items.Count > 0 ? $"有：{string.Join("；", items)}" : "-";
     }
 
     private string BuildFarmEquipmentDesc(EconomicDetailData? economicDetail)
@@ -1166,6 +1186,68 @@ public partial class ArchiveProductionViewModel
             _logger.LogError(ex, "生成退出渐退期情况失败");
             return "";
         }
+    }
+
+    /// <summary>
+    /// 告知书方向③-次级子场景：**渐退封顶减发**（A2 口径，2026-11 拍板）。
+    /// 无「保障金变更登记」（**登记优先**）且本档处于活跃渐退期、原额 &gt; 封顶现发 &gt; 0 时填 NOTICE_* 并返回 true；
+    /// 不满足或单人保排除时返回 false，由调用方继续走落空护栏。
+    /// 取数与清单门 <c>ChangeDocumentFacts.HasGrantReduce</c> 同源（<c>_gracePeriodService.GetActiveAsync</c>），两侧永不劈叉；
+    /// 金额 = 户月保障金（不含分类施保），权威计算在 <c>ApplyGraceCapAsync</c>。
+    /// 文案 = 方向③句式 + 渐退期上下文（月数/止期缺失时逐段降级，绝不出空括号）。
+    /// </summary>
+    private async Task<bool> TryFillGraceCapReduceNoticeAsync(
+        ApplicationEntity app, OrganizationInfoDto orgInfo, long applicationId)
+    {
+        // 单人保排除（与清单门 NoticeApplicable 同口径；2026-11 拍板：封顶减发单人保也不出告知书）
+        if (ClassificationConstants.IsCodeSingleRescue(app.ClassificationResult ?? string.Empty))
+            return false;
+
+        var graceRes = await _gracePeriodService.GetActiveAsync(applicationId, CancellationToken);
+        var grace = graceRes.IsSuccess ? graceRes.Value : null;
+        if (grace is not { } g
+            || g.OriginalGuaranteeAmount is not decimal orig
+            || g.GraceGrantAmount is not decimal grant
+            || orig <= grant
+            || grant <= 0)
+            return false;
+
+        var reduce = orig - grant;
+
+        // 渐退期上下文逐段降级（月数/止期任一缺失都不产生空括号）
+        var periodParts = new List<string>(2);
+        if (g.GracePeriodMonths is int months && months > 0)
+            periodParts.Add($"{months}个月");
+        if (g.EndDate is DateTime endDate)
+            periodParts.Add($"至{endDate:yyyy年M月d日}");
+        var periodText = periodParts.Count > 0 ? $"（{string.Join("，", periodParts)}）" : "";
+
+        _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "变更";
+        _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
+        _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
+        // 承办分类：渐退不改享受类别，取渐退登记的原分类（缺省回落档案自身分类）
+        _fieldData[FieldKeys.NOTICE_HANDLING_CATEGORY] = ClassificationConstants.ConvertToFullName(
+            string.IsNullOrEmpty(g.OriginalClassification)
+                ? app.ClassificationResult ?? ""
+                : g.OriginalClassification);
+        _fieldData[FieldKeys.NOTICE_BENEFIT_TYPE] = "调整享受";
+        _fieldData[FieldKeys.NOTICE_BENEFIT_RESULT] = "社会救助保障待遇";
+        _fieldData[FieldKeys.NOTICE_DETAILED_REASON] =
+            $"经审核，你户月保障金由{orig:F2}元调整为{grant:F2}元（减发{reduce:F2}元/月）"
+            + $"，已进入渐退期{periodText}，期内按封顶标准发放";
+        _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
+        _fieldData[FieldKeys.NOTICE_DELIVERER] = global::NewCosmos.App.CurrentUserFullName ?? "";
+        _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
+        _fieldData[FieldKeys.NOTICE_DATE] = DateTime.Now.ToString("yyyy年MM月dd日");
+
+        _logger.LogBusiness("渐退封顶减发告知书字段已装配",
+            ("ApplicationId", applicationId.ToString()),
+            ("OriginalAmount", orig.ToString("F2")),
+            ("GrantAmount", grant.ToString("F2")),
+            ("Reduce", reduce.ToString("F2")),
+            ("Months", g.GracePeriodMonths?.ToString() ?? ""),
+            ("EndDate", g.EndDate?.ToString("yyyy-MM-dd") ?? ""));
+        return true;
     }
 
     /// <summary>
@@ -1392,23 +1474,23 @@ public partial class ArchiveProductionViewModel
         var stdResult = await _standardConfigService.GetStandardValueAsync(stdType, stdHukou);
         if (!stdResult.IsSuccess || stdResult.Value <= 0)
         {
-            _logger.Error($"停保告知书：低保标准配置缺失或无效（{stdType}/{stdHukou}），禁止使用硬编码回退值");
-            return $"低保标准配置缺失或无效（{stdType}/{stdHukou}），请在「数据中心-标准配置管理」中维护有效标准后重新生成停保告知书。";
+            _logger.Error($"停保告知书：最低生活保障标准配置缺失或无效（{stdType}/{stdHukou}），禁止使用硬编码回退值");
+            return $"最低生活保障标准配置缺失或无效（{stdType}/{stdHukou}），请在「数据中心-标准配置管理」中维护有效标准后重新生成停保告知书。";
         }
         var standard = stdResult.Value;
         var threshold = standard * ClassificationConstants.LowIncomeMultiplier;
 
-        sb.Append($"{(isRural ? "农村" : "城市")}低保标准为{standard:N0}元/月，");
-        sb.Append($"低收入标准上限为{threshold:N0}元/月（{standard:N0}×1.5）。");
+        sb.Append($"{(isRural ? "农村" : "城市")}最低生活保障标准为{standard:N0}元/月，");
+        sb.Append($"最低生活保障边缘家庭标准上限为{threshold:N0}元/月（{standard:N0}×1.5）。");
 
         // 治本：按实际数值决定措辞，杜绝「未超限却写成已超过」的自相矛盾文书。
         // 历史缺陷：此处原为无条件写死「已超过」，致使人均713.92元/上限948元的档案
         // 被写成「已超过低收入标准上限」。即便上游分支已按分类正确分流，这里仍保留
         // 数值判断作为第二道防线——将来若有分支漏配，文案也不会与自身数字打架。
         if (perCapitaIncome >= threshold)
-            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元已超过低收入标准上限{threshold:N2}元，");
+            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元已超过最低生活保障边缘家庭标准上限{threshold:N2}元，");
         else
-            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元未超过低收入标准上限{threshold:N2}元，");
+            sb.Append($"您家庭人均月收入{perCapitaIncome:N2}元未超过最低生活保障边缘家庭标准上限{threshold:N2}元，");
 
         // 刚性支出分析（>0 才提：0 支出并非拒保理由，硬接一句反而画蛇添足）
         if (rigidExpenditure > 0)
@@ -1422,12 +1504,14 @@ public partial class ArchiveProductionViewModel
             else if (ratio >= 0.6m)
                 sb.Append("但占比已超过60%，不满足刚性支出困难家庭条件。");
             else if (perCapitaIncome >= standard * 2)
-                sb.Append("但人均收入超过低保标准2倍，不满足刚性支出困难家庭条件。");
+                sb.Append("但人均收入超过最低生活保障标准2倍，不满足刚性支出困难家庭条件。");
             else
-                sb.Append("扣除刚性支出后人均收入不足低保标准，不满足刚性支出困难家庭条件。");
+                sb.Append("扣除刚性支出后人均收入不足最低生活保障标准，不满足刚性支出困难家庭条件。");
         }
 
-        sb.Append("根据《牡丹江市低收入人口认定实施细则》（牡民规〔2024〕2号）相关规定，不符合低收入人口认定条件。");
+        // 结尾不带句号：模板 241 正文「具体原因：{具体原因}。」自带收尾句号，
+        // 生成文本再带句号会渲染成「。。」（装配端 TrimEnd('。') 为第二道防线）。
+        sb.Append("根据《牡丹江市低收入人口认定实施细则》（牡民规〔2024〕2号）相关规定，不符合最低生活保障及最低生活保障边缘家庭认定条件");
 
         return sb.ToString();
     }
@@ -1480,16 +1564,16 @@ public partial class ArchiveProductionViewModel
         var stdResult = await _standardConfigService.GetStandardValueAsync(stdType, stdHukou, ct: ct);
         if (!stdResult.IsSuccess || stdResult.Value <= 0)
         {
-            _logger.Error($"有劳动力拒保告知书：低保标准配置缺失或无效（{stdType}/{stdHukou}），禁止使用硬编码回退值");
-            return $"低保标准配置缺失或无效（{stdType}/{stdHukou}），请在「数据中心-标准配置管理」中维护有效标准后重新生成告知书。";
+            _logger.Error($"有劳动力拒保告知书：最低生活保障标准配置缺失或无效（{stdType}/{stdHukou}），禁止使用硬编码回退值");
+            return $"最低生活保障标准配置缺失或无效（{stdType}/{stdHukou}），请在「数据中心-标准配置管理」中维护有效标准后重新生成告知书。";
         }
         var standard = stdResult.Value;
         var threshold = standard * ClassificationConstants.LowIncomeMultiplier;
 
-        sb.Append($"本市{(isRural ? "农村" : "城市")}最低生活保障标准为{standard:N0}元/月，最低生活保障边缘标准上限为{threshold:N0}元/月（{standard:N0}×{ClassificationConstants.LowIncomeMultiplier}）。");
+        sb.Append($"本市{(isRural ? "农村" : "城市")}最低生活保障标准为{standard:N0}元/月，最低生活保障边缘家庭标准上限为{threshold:N0}元/月（{standard:N0}×{ClassificationConstants.LowIncomeMultiplier}）。");
         sb.Append(perCapitaIncome >= threshold
-            ? $"经核对，您家庭人均月收入{perCapitaIncome:N2}元已超过最低生活保障边缘标准上限{threshold:N2}元。"
-            : $"经核对，您家庭人均月收入处于上述标准区间内，并未超过最低生活保障边缘标准上限。");
+            ? $"经核对，您家庭人均月收入{perCapitaIncome:N2}元已超过最低生活保障边缘家庭标准上限{threshold:N2}元。"
+            : $"经核对，您家庭人均月收入处于上述标准区间内，并未超过最低生活保障边缘家庭标准上限。");
 
         // ── 第二段：真实拒保理由归位到成员状况 ──
         sb.Append("本次不予认定的原因不在收入水平，而在家庭成员状况：经核查，您家庭共同生活成员中存在劳动年龄内具有劳动能力的人员，且家庭成员中无重病、重残人员。");

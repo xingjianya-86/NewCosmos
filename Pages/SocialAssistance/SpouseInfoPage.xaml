@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.SpouseInfoPage"
@@ -6,34 +6,13 @@
              Title="配偶信息" BackgroundColor="{StaticResource Background}">
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="12">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="配偶信息" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="填写配偶基本信息与健康状况" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+              Glyph="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}"
+                                  Title="配偶信息"
+                                  Subtitle="填写配偶基本信息与健康状况"
+                                  BackCommand="{Binding GoBackCommand}"
+                                  BackText="返回"/>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="16">

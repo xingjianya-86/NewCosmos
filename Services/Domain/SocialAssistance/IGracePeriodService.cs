@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -10,11 +10,13 @@ namespace NewCosmos.Services.Domain.SocialAssistance;
 using ApplicationEntity = NewCosmos.Models.Entities.Application;
 
 /// <summary>
-/// 渐退期管理服务接    /// </summary>
+/// 渐退期管理服务接
+/// </summary>
 public interface IGracePeriodService
 {
     /// <summary>
-    /// 检查渐退期资    /// </summary>
+    /// 检查渐退期资
+/// </summary>
     GracePeriodCheckResult CheckEligibility(
         string oldClassification, 
         string newClassification,
@@ -22,7 +24,8 @@ public interface IGracePeriodService
         decimal standard);
 
     /// <summary>
-    /// 设置渐退    /// </summary>
+    /// 设置渐退
+/// </summary>
     GracePeriodInfo SetGracePeriod(int months, decimal? originalGuaranteeAmount = null);
 
     /// <summary>
@@ -32,7 +35,8 @@ public interface IGracePeriodService
     GracePeriodInfo CalculatePeriod(int months);
 
     /// <summary>
-    /// 清除渐退    /// </summary>
+    /// 清除渐退
+/// </summary>
     void ClearGracePeriod(ApplicationEntity application);
 
     /// <summary>
@@ -133,23 +137,28 @@ public enum GraceReconcileOutcome
 }
 
 /// <summary>
-/// 渐退期信    /// </summary>
+/// 渐退期信
+/// </summary>
 public class GracePeriodInfo
 {
     /// <summary>
-    /// 是否处于渐退    /// </summary>
+    /// 是否处于渐退
+/// </summary>
     public bool IsInGracePeriod { get; set; }
 
     /// <summary>
-    /// 渐退期月    /// </summary>
+    /// 渐退期月
+/// </summary>
     public int GracePeriodMonths { get; set; }
 
     /// <summary>
-    /// 渐退期开始日    /// </summary>
+    /// 渐退期开始日
+/// </summary>
     public DateTime GracePeriodStartDate { get; set; }
 
     /// <summary>
-    /// 渐退期结束日    /// </summary>
+    /// 渐退期结束日
+/// </summary>
     public DateTime GracePeriodEndDate { get; set; }
 
     /// <summary>

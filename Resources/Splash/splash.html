@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>帝皇权杖δ-me13 社会救助管理系统</title>
+<!-- 启动动画：dsh-startup-screen（MIT © 沈宏宏）二次开发版，改动见 THIRD-PARTY-NOTICES.md -->
+<link rel="stylesheet" href="splash.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<!-- 动画挂载点：结构与上游 preview/index.html 保持一致 -->
+<div id="dsh-startup-root" class="dsu-root dsu-boot"></div>
+
+<!-- 1) 运行时配置（C# 每次启动生成：身份、品牌文案、配色、音效开关） -->
+<script src="config.js"></script>
+<!-- 2) 宿主桥：done / error 事件 → newcosmos-splash:// 自定义协议 -->
+<script src="bridge.js"></script>
+<!-- 3) 动画运行时（已本地化：品牌标识、音频路径） -->
+<script src="splash.js"></script>
+</body>
+</html>

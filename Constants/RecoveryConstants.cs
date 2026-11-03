@@ -163,4 +163,15 @@ public static class RecoveryConstants
             ? displayName
             : (source ?? string.Empty);
     }
+
+    /// <summary>
+    /// 状态 → 中文显示名（2026-11 从 DeathStatementService 纯移入——死亡说明的身份聚合/联动/提醒三处与本域共用）。
+    /// </summary>
+    public static string GetStatusDisplayName(string? status) => status switch
+    {
+        STATUS_DRAFT => "办理中",
+        STATUS_CONFIRMED => "已确认",
+        STATUS_PRINTED => "已出文书",
+        _ => string.Empty
+    };
 }

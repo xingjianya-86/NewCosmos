@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.SocialAssistanceHomePage"
@@ -13,41 +13,22 @@
             <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
 
                 <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
-                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-                    <VerticalStackLayout Spacing="16">
-
-                        <!-- 返回行 -->
-                        <Grid ColumnDefinitions="Auto,*">
-                            <HorizontalStackLayout Spacing="6">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
+                <!-- 统一页头（纸墨档案风报头 · Phase 6，统计胶囊迁入 Stats 插槽并转浅色变体） -->
+                <components:PageHeaderView
+                                           Glyph="{OnPlatform WinUI='&#xE765;', Android='&#x1F3E0;'}"
+                                           Title="低收入人口救助帮扶"
+                                           Subtitle="低收入人口认定审核确认 · 保障对象动态管理 · 临时救助"
+                                           BackCommand="{Binding GoBackCommand}"
+                                           BackText="返回工作台">
+                    <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule IsLight="True"  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="1"  Value="{Binding MonthlyNewAdditionsText}" Caption="本月新增（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="2"  Value="{Binding MonthlyExitsText}" Caption="本月退出（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="3"  Value="{Binding GracePeriodExpiringText}" Caption="渐退期临期（户）"/>
                         </Grid>
-
-                        <!-- 标题与职责 -->
-                        <HorizontalStackLayout Spacing="14">
-                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="{OnPlatform WinUI='&#xE765;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                                <Label Text="低收入人口救助帮扶" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="低收入人口认定审核确认 · 保障对象动态管理 · 临时救助" Style="{StaticResource ModuleHeroSubtitle}"/>
-                            </VerticalStackLayout>
-                        </HorizontalStackLayout>
-
-                        <!-- 模块统计栏 -->
-                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                            <components:StatCapsule  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享保障对象（户）"/>
-                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyNewAdditionsText}" Caption="本月新增（户）"/>
-                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyExitsText}" Caption="本月退出（户）"/>
-                            <components:StatCapsule  Grid.Column="3"  Value="{Binding GracePeriodExpiringText}" Caption="渐退期临期（户）"/>
-                        </Grid>
-
-                    </VerticalStackLayout>
-                </Border>
+                    </components:PageHeaderView.Stats>
+                </components:PageHeaderView>
 
                 <!-- 子功能卡片区 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
@@ -89,21 +70,17 @@
                                                 Title="渐退期管理" Description="进行中与已到期统一管理"
                                                 Command="{Binding OpenGracePeriodExpiringCommand}"/>
 
-                        <!-- 后补追缴 -->
-                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}"
-                                                IconBackgroundColor="#FFF3E0" IconColor="{StaticResource WarningDark}"
-                                                Title="后补追缴" Description="低保、刚性支出、临时救助、高龄的后补追缴"
-                                                Command="{Binding OpenRecoveryCommand}"/>
+                        <!-- 后补追缴已升为独立模块（主页业务模块直达区 + 侧栏 + 手机工作台），本页不再重复 -->
 
                         <!-- 大学生管理 -->
-                        <components:FeatureCard Grid.Row="3" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}"
+                        <components:FeatureCard Grid.Row="2" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}"
                                                 IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
                                                  Title="大学生管理" Description="18-23周岁家庭成员大学生档案关联与毕业管理"
                                                 Command="{Binding OpenCollegeStudentCommand}"
                                                 Opacity="{Binding SocialAssistanceOpacity}"/>
 
                         <!-- 近亲属备案 -->
-                        <components:FeatureCard Grid.Row="3" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE787;', Android='&#x1F4CB;'}"
+                        <components:FeatureCard Grid.Row="3" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE787;', Android='&#x1F4CB;'}"
                                                 IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
                                                 Title="近亲属备案" Description="工作人员近亲属享受救助备案名册维护"
                                                 Command="{Binding OpenNearRelativeCommand}"

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Config.ConfigWizardPage"
@@ -10,9 +10,9 @@
     <ContentPage.Resources>
         <DataTemplate x:Key="MissingConfigRow" x:DataType="x:String">
             <Grid Padding="12,8" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
+                <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                        TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding .}" FontSize="15"
+                <Label Grid.Column="1" Text="{Binding .}" FontSize="17"
                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
             </Grid>
         </DataTemplate>
@@ -21,20 +21,12 @@
     <Grid RowDefinitions="Auto,*">
 
         <!-- 渐变头部 -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White"
-                               HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="系统配置向导" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="完成配置与网络接入后即可启动系统" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE713;', Android='&#x2699;&#xFE0F;'}"
+                                   Title="系统配置向导"
+                                   Subtitle="完成配置与网络接入后即可启动系统">
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="24" Spacing="16" HorizontalOptions="Center" MaximumWidthRequest="760">
@@ -43,7 +35,7 @@
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="10">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
+                            <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                                    TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
                             <Label Text="缺失的配置文件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
@@ -60,30 +52,30 @@
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
-                            <Label Grid.Row="0" Grid.Column="0" Text="主机" FontSize="14"
+                            <Label Grid.Row="0" Grid.Column="0" Text="主机" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
                             <Entry Grid.Row="0" Grid.Column="1" Text="{Binding DbHost}" Placeholder="127.0.0.1"
-                                   FontSize="15"/>
+                                   FontSize="17"/>
 
-                            <Label Grid.Row="1" Grid.Column="0" Text="端口" FontSize="14"
+                            <Label Grid.Row="1" Grid.Column="0" Text="端口" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
                             <Entry Grid.Row="1" Grid.Column="1" Text="{Binding DbPort}" Placeholder="5432"
-                                   Keyboard="Numeric" FontSize="15"/>
+                                   Keyboard="Numeric" FontSize="17"/>
 
-                            <Label Grid.Row="2" Grid.Column="0" Text="数据库" FontSize="14"
+                            <Label Grid.Row="2" Grid.Column="0" Text="数据库" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
                             <Entry Grid.Row="2" Grid.Column="1" Text="{Binding DbName}" Placeholder="cosmos_next"
-                                   FontSize="15"/>
+                                   FontSize="17"/>
 
-                            <Label Grid.Row="3" Grid.Column="0" Text="用户名" FontSize="14"
+                            <Label Grid.Row="3" Grid.Column="0" Text="用户名" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
                             <Entry Grid.Row="3" Grid.Column="1" Text="{Binding DbUsername}" Placeholder="new_cosmos"
-                                   FontSize="15"/>
+                                   FontSize="17"/>
 
-                            <Label Grid.Row="4" Grid.Column="0" Text="密码" FontSize="14"
+                            <Label Grid.Row="4" Grid.Column="0" Text="密码" FontSize="16"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" WidthRequest="70"/>
                             <Entry Grid.Row="4" Grid.Column="1" Text="{Binding DbPassword}" Placeholder="填写数据库密码"
-                                   IsPassword="True" FontSize="15"/>
+                                   IsPassword="True" FontSize="17"/>
                         </Grid>
 
                         <Button Text="保存数据库配置" Style="{StaticResource ButtonPrimary}"
@@ -108,9 +100,9 @@
                                     Command="{Binding RecheckConfigCommand}" Margin="0,0,10,10" MinimumWidthRequest="110"/>
                         </FlexLayout>
                         <Label Text="说明：一键生成默认配置（数据库为默认连接，密码首次连接后自动加密为 DPAPI 密文）；" 
-                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                         <Label Text="异地组网请先点「网络接入」安装/加入 ZeroTier，并在服务器网页端授权本机节点。"
-                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Border>
 

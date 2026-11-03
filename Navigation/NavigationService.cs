@@ -14,7 +14,6 @@ public class NavigationService : INavigationService
     {
         [NavigationKeys.Main] = typeof(Pages.Main.MainPage),
         [NavigationKeys.Login] = typeof(Pages.Auth.LoginPage),
-        [NavigationKeys.ArchiveOutput] = typeof(Pages.ArchiveManagement.ArchiveOutputPage),
     };
 
     private readonly IServiceProvider _serviceProvider;
@@ -34,6 +33,7 @@ public class NavigationService : INavigationService
         try
         {
             var page = ResolvePage(pageType);
+            SuppressSystemTitleBar(page);
             _serviceProvider.GetService<IWindowTitleService>()?.Register(page);
 
             // 主首页是 NavigationPage 的 root（不经 push），必须显式注册标题跟随，
@@ -50,32 +50,15 @@ public class NavigationService : INavigationService
         }
     }
 
-    public async Task PushAsync(string pageKey, string? pageTitle = null, CancellationToken ct = default)
+
+    /// <summary>
+    /// 全局关闭系统导航标题栏（纸墨档案风：页头由 PageHeaderView 自绘，不走 MAUI 标题条）。
+    /// 安卓沉浸式全屏下再留一条标题条会破坏"无标题"观感，故在 push/root 处统一兜底，
+    /// 避免遗漏个别未设 NavigationPage.HasNavigationBar 的页面。
+    /// </summary>
+    private static void SuppressSystemTitleBar(Microsoft.Maui.Controls.Page page)
     {
-        var pageType = ResolveType(pageKey);
-        var pageName = pageType.Name;
-        _logger.LogNavigationStart("NavigationService", pageName);
-        try
-        {
-            var page = ResolvePage(pageType);
-            _serviceProvider.GetService<IWindowTitleService>()?.Register(page);
-
-            if (pageTitle != null)
-                page.Title = pageTitle;
-
-            var navigation = Helpers.WindowNavigator.CurrentPage?.Navigation
-                ?? throw new InvalidOperationException("当前页面为空，无法导航");
-            await navigation.PushAsync(page);
-
-            _logger.LogNavigationSuccess("NavigationService", pageName);
-            _serviceProvider.GetService<IWindowTitleService>()?.RestoreFromNavigation(navigation);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogNavigationFailed("NavigationService", pageName, ex.Message);
-            _logger.LogError(ex, $"导航到 {pageName} 失败");
-            throw;
-        }
+        Microsoft.Maui.Controls.NavigationPage.SetHasNavigationBar(page, false);
     }
 
     private static Type ResolveType(string pageKey)
@@ -85,19 +68,7 @@ public class NavigationService : INavigationService
         return type;
     }
 
-    /// <summary>DI 解析页面；Android 上先解析 Pages.Mobile.Mobile{页面名}，找不到回退桌面页。</summary>
+    /// <summary>DI 解析页面；Android 上先解析 Pages.Mobile.Mobile{页面名}，找不到回退桌面页（单点实现见 PageResolver）。</summary>
     private Microsoft.Maui.Controls.Page ResolvePage(Type pageType)
-    {
-        if (Microsoft.Maui.Devices.DeviceInfo.Platform == Microsoft.Maui.Devices.DevicePlatform.Android)
-        {
-            var mobileTypeName = $"NewCosmos.Pages.Mobile.Mobile{pageType.Name}";
-            var mobileType = pageType.Assembly.GetType(mobileTypeName);
-            if (mobileType != null)
-            {
-                var resolved = _serviceProvider.GetService(mobileType) as Microsoft.Maui.Controls.Page;
-                if (resolved != null) return resolved;
-            }
-        }
-        return (Microsoft.Maui.Controls.Page)_serviceProvider.GetRequiredService(pageType);
-    }
+        => PageResolver.Resolve(_serviceProvider, pageType);
 }

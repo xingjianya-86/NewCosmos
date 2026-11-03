@@ -1,7 +1,8 @@
-﻿namespace NewCosmos.Models.Requests;
+namespace NewCosmos.Models.Requests;
 
 /// <summary>
-/// 模板保存请求（上传/更新）    /// </summary>
+/// 模板保存请求（上传/更新）
+/// </summary>
 public record TemplateSaveRequest
 {
     public required string TemplateId { get; init; }
@@ -42,7 +43,8 @@ public record SurveyRequest
 }
 
 /// <summary>
-/// 一事一议审批请求    /// </summary>
+/// 一事一议审批请求
+/// </summary>
 public record SpecialApprovalRequest
 {
     public required long ApplicationId { get; init; }

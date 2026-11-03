@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
@@ -18,6 +19,7 @@ namespace NewCosmos.ViewModels.Recovery;
 public partial class RecoveryManualViewModel : ViewModelBase
 {
     private readonly IRecoveryService _recoveryService;
+    private readonly IRecoveryHistoryProvider _historyProvider;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
@@ -31,7 +33,22 @@ public partial class RecoveryManualViewModel : ViewModelBase
     /// <summary>库中已落库的分段明细（自动算不出时用于展示历史依据）</summary>
     private List<RecoverySegment> _loadedSegments = new();
 
-    /// <summary>自动计算的建议来源（手工录入页无来源档案，恒为 Flat）</summary>
+    /// <summary>
+    /// 历史月保障标准时间轴（按身份证带出来源档案后加载一次，之后本地重算，属性 setter 里不打 IO）。
+    /// 为空表示无来源档案（纯手工录入），退化为「月保障额 × 月数」定额口径。
+    /// </summary>
+    private List<RecoveryMonthlyStandardPoint> _timeline = new();
+
+    /// <summary>最近一次已触发查档的身份证（同号去重，避免逐键重复查库）</summary>
+    private string _lastLookupIdCard = string.Empty;
+
+    /// <summary>查档序号（递增；仅采纳最新一次结果，防止旧查询晚到覆盖新结果）</summary>
+    private int _lookupSeq;
+
+    /// <summary>程序性赋值身份证期间屏蔽带出（编辑回填等，防覆盖库中已核定内容）</summary>
+    private bool _suppressLookup;
+
+    /// <summary>自动计算的建议来源（手工录入页无来源档案时恒为 Flat；带出档案后可为 Segment）</summary>
     private string _autoSource = RecoveryConstants.AMOUNT_SOURCE_FLAT;
 
     /// <summary>程序性赋值期间屏蔽"用户手改总额→转人工"的侦测</summary>
@@ -134,6 +151,12 @@ public partial class RecoveryManualViewModel : ViewModelBase
     private string _cannotAutoReason = string.Empty;
 
     /// <summary>
+    /// 身份证带出结果提示（命中来源 / 未找到 / 查询失败；空表示未触发过查档）
+    /// </summary>
+    [ObservableProperty]
+    private string _lookupStatusText = string.Empty;
+
+    /// <summary>
     /// 自动计算分段明细（手工录入页通常为空，仅编辑既有自动计算记录时展示）
     /// </summary>
     [ObservableProperty]
@@ -191,11 +214,13 @@ public partial class RecoveryManualViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         ILoggerService logger,
         IRecoveryService recoveryService,
+        IRecoveryHistoryProvider historyProvider,
         Services.Domain.Printing.IPrintJobFactory printJobFactory)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
+        _historyProvider = historyProvider;
         _printJobFactory = printJobFactory;
 
         // 初始化追缴分类列表
@@ -295,15 +320,15 @@ public partial class RecoveryManualViewModel : ViewModelBase
     {
         RecoveryMonths = _recoveryService.CalculateRecoveryMonths(StartMonth, EndMonth);
 
-        // 手工录入无来源档案：无历史时间轴可依据，仅「月保障额 × 月数」定额口径；
-        // 月保障额缺失即转人工填写（RecoveryAmountCalculator 统一口径）。
-        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, null, MonthlyAmount);
+        // 有来源档案（身份证带出）时按历史时间轴分段计算；纯手工录入无时间轴，
+        // 退化为「月保障额 × 月数」定额口径，月保障额缺失即转人工填写（RecoveryAmountCalculator 统一口径）。
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, _timeline, MonthlyAmount);
         ApplyAutoReference(result);
         ApplyAuto(result);
     }
 
     /// <summary>
-    /// 页面出现：加载已落库分段明细（编辑场景）并完成首次计算。
+    /// 页面出现：编辑场景先补历史时间轴与已落库分段明细，再完成首次计算。
     /// </summary>
     public override async Task OnAppearingAsync()
     {
@@ -311,6 +336,9 @@ public partial class RecoveryManualViewModel : ViewModelBase
 
         if (_storedRecord != null)
         {
+            // 编辑既有草稿：按身份证只补时间轴（供"改周期后重算"用），不回填任何字段
+            await LoadTimelineForStoredRecordAsync();
+
             var storedSegments = await _recoveryService.GetRecoverySegmentsAsync(_storedRecord.Id, CancellationToken);
             if (storedSegments.IsSuccess)
                 _loadedSegments = storedSegments.Value;
@@ -318,7 +346,7 @@ public partial class RecoveryManualViewModel : ViewModelBase
                 Logger.Warn($"加载追缴分段明细失败: {storedSegments.Message}");
         }
 
-        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, null, MonthlyAmount);
+        var result = RecoveryAmountCalculator.Calculate(StartMonth, EndMonth, _timeline, MonthlyAmount);
         ApplyAutoReference(result);
 
         if (_storedRecord != null)
@@ -332,6 +360,151 @@ public partial class RecoveryManualViewModel : ViewModelBase
         }
 
         ApplyAuto(result);
+    }
+
+    // ── 身份证自动带出（满 18 位查档：追缴分类 / 每月保障标准 / 追缴原因 / 应追缴总额） ──
+    // 触发模式与近亲属备案一致：页面 TextChanged 代码后置调用（WinUI 绑定失焦才提交源，故主动写回）。
+
+    /// <summary>
+    /// 身份证文本变化：满 18 位且校验码通过时按档案自动带出。
+    /// 编辑模式（已有库记录）不回填字段——库中已核定内容绝不被覆盖。
+    /// </summary>
+    public void OnIdCardTextChanged(string newText)
+    {
+        newText = newText ?? string.Empty;
+        if (IdCard != newText)
+            IdCard = newText;
+
+        if (_suppressLookup || _storedRecord != null) return;
+        if (!IdCardValidator.IsValid(newText)) return;
+        if (string.Equals(_lastLookupIdCard, newText, StringComparison.OrdinalIgnoreCase)) return;
+
+        _lastLookupIdCard = newText;
+        SafeFireAndForget(() => LookupArchiveAsync(newText, ++_lookupSeq));
+    }
+
+    /// <summary>
+    /// 按身份证查档并带出：追缴分类、每月保障标准、追缴原因（档案停发原因）、
+    /// 随后加载历史时间轴自动计算应追缴总额。未命中只提示、不清已有内容。
+    /// <paramref name="seq"/> 为查档序号：每次 await 后核对，过期结果直接丢弃（只采纳最新一次）。
+    /// </summary>
+    private async Task LookupArchiveAsync(string idCard, int seq)
+    {
+        try
+        {
+            var lookup = await _recoveryService.LookupArchiveByIdCardAsync(idCard, CancellationToken);
+            if (seq != _lookupSeq) return; // 期间又触发了新查档，本结果已过期
+
+            if (lookup.IsFailure)
+            {
+                // 取数失败显式提示（§7 不吞），已有内容原样保留
+                Logger.Warn($"手工追缴按身份证查档失败: {lookup.Message}");
+                LookupStatusText = lookup.Message ?? "档案查询失败，可继续手工填写";
+                return;
+            }
+
+            var hit = lookup.Value;
+            if (hit == null)
+            {
+                _timeline = new();
+                LookupStatusText = "未在低保/刚性支出/临时救助/高龄档案中找到该身份证，可手工填写";
+                CalculateRecovery();
+                return;
+            }
+
+            ApplyArchiveHit(hit);
+            await LoadTimelineAsync(hit.SourceType, hit.SourceId);
+            if (seq != _lookupSeq) return; // 时间轴加载期间又触发了新查档，本结果已过期
+
+            CalculateRecovery();
+
+            LookupStatusText = BuildLookupStatusText(hit);
+            Logger.Debug($"手工追缴已按身份证带出档案: sourceType={hit.SourceType}, " +
+                         $"sourceId={hit.SourceId}, monthly={hit.MonthlyAmount:N2}, timeline={_timeline.Count}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "手工追缴按身份证查档异常");
+            LookupStatusText = "查档异常，可继续手工填写";
+        }
+    }
+
+    /// <summary>
+    /// 把档案命中结果写入表单。
+    /// 规则：追缴分类 / 每月保障标准属"档案事实"，带出即写（月标准为 0 时不覆盖已填值）；
+    /// 姓名 / 追缴原因属人工文本，仅在当前为空时补入（不覆盖用户已填内容）。
+    /// </summary>
+    private void ApplyArchiveHit(RecoveryArchiveLookupDto hit)
+    {
+        var matched = SourceTypeList.FirstOrDefault(kv => kv.Key == hit.SourceType);
+        if (!string.IsNullOrEmpty(matched.Key))
+            SelectedSourceType = matched;
+
+        if (hit.MonthlyAmount > 0)
+            MonthlyAmount = hit.MonthlyAmount;
+
+        if (string.IsNullOrWhiteSpace(RecoveryReason) && !string.IsNullOrWhiteSpace(hit.StopReason))
+            RecoveryReason = hit.StopReason;
+
+        if (string.IsNullOrWhiteSpace(PersonName) && !string.IsNullOrWhiteSpace(hit.PersonName))
+            PersonName = hit.PersonName;
+    }
+
+    /// <summary>
+    /// 加载来源档案的历史月保障标准时间轴（失败不静默：记日志，总额退化为定额口径）。
+    /// </summary>
+    private async Task LoadTimelineAsync(string sourceType, long sourceId)
+    {
+        var history = await _historyProvider.GetMonthlyStandardsAsync(sourceType, sourceId, CancellationToken);
+        if (history.IsSuccess)
+        {
+            _timeline = history.Value;
+            return;
+        }
+
+        _timeline = new();
+        Logger.Warn($"手工追缴加载历史月标准失败: sourceType={sourceType}, sourceId={sourceId}, {history.Message}");
+    }
+
+    /// <summary>
+    /// 编辑既有草稿：只按身份证补时间轴，不改任何已回显字段（供"改月保障额/周期后重算"用）。
+    /// 查不到或取数失败一律留空时间轴，总额仍以库中已核定值为准。
+    /// </summary>
+    private async Task LoadTimelineForStoredRecordAsync()
+    {
+        _timeline = new();
+        if (!IdCardValidator.IsValid(IdCard)) return;
+
+        try
+        {
+            var lookup = await _recoveryService.LookupArchiveByIdCardAsync(IdCard, CancellationToken);
+            if (lookup.IsFailure || lookup.Value == null)
+            {
+                if (lookup.IsFailure)
+                    Logger.Warn($"编辑追缴草稿查档失败（时间轴留空）: {lookup.Message}");
+                return;
+            }
+
+            await LoadTimelineAsync(lookup.Value.SourceType, lookup.Value.SourceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "编辑追缴草稿加载时间轴异常");
+        }
+    }
+
+    /// <summary>带出结果提示文案（命中来源 / 停发状态 / 停发原因 / 时间轴可用性）</summary>
+    private string BuildLookupStatusText(RecoveryArchiveLookupDto hit)
+    {
+        var source = RecoveryConstants.GetSourceTypeDisplayName(hit.SourceType);
+        var state = hit.IsStopped ? "已停发" : "在保";
+        var reason = string.IsNullOrWhiteSpace(hit.StopReason)
+            ? string.Empty
+            : $"；停发原因：{hit.StopReason}";
+        var timeline = _timeline.Count > 0
+            ? "已按历史标准自动计算应追缴总额"
+            : "无历史月标准，按月保障额×月数计算";
+        return $"已从档案带出：{source}（{state}）{reason}；{timeline}，均可修改";
     }
 
     private void ApplyAutoReference(RecoveryAmountResult result)
@@ -467,10 +640,17 @@ public partial class RecoveryManualViewModel : ViewModelBase
 
         _storedRecord = record;
         _loadedSegments = new();
+        _timeline = new();
+        _lastLookupIdCard = string.Empty;
+        LookupStatusText = string.Empty;
 
         RecordId = record.Id;
         PersonName = record.PersonName;
+
+        // 程序化回填身份证不触发档案带出（编辑模式字段一律以库中值为准）
+        _suppressLookup = true;
         IdCard = record.IdCard ?? string.Empty;
+        _suppressLookup = false;
 
         if (record.SourceType != null)
         {
@@ -556,10 +736,10 @@ public partial class RecoveryManualViewModel : ViewModelBase
             return;
         }
 
-        var fields = await BuildPrintFieldsAsync();
+        var fields = await BuildPrintFieldsAsync(result.Value);
         var request = new PrintJobRequest
         {
-            BusinessType = "Recovery",
+            BusinessType = PrintBusinessTypes.Recovery,
             BusinessId = result.Value,
             Classification = RecoveryConstants.INPUT_MODE_MANUAL,
             ApplicantName = PersonName,
@@ -605,7 +785,8 @@ public partial class RecoveryManualViewModel : ViewModelBase
                 AmountSource = AmountSource,
                 AmountNote = AmountNote,
                 AutoAmount = AutoAmount,
-                Segments = Segments.ToList()
+                Segments = Segments.ToList(),
+                CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
             };
 
             Result<long> result;
@@ -695,7 +876,8 @@ public partial class RecoveryManualViewModel : ViewModelBase
                 AmountSource = AmountSource,
                 AmountNote = AmountNote,
                 AutoAmount = AutoAmount,
-                Segments = Segments.ToList()
+                Segments = Segments.ToList(),
+                CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
             };
 
             Result<long> result;
@@ -737,10 +919,10 @@ public partial class RecoveryManualViewModel : ViewModelBase
     {
         // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
         PrintNavigationData.ClearDocumentMode();
-        PrintNavigationData.BusinessType = "Recovery";
+        PrintNavigationData.BusinessType = PrintBusinessTypes.Recovery;
         PrintNavigationData.BusinessId = recordId;
         PrintNavigationData.Classification = RecoveryConstants.INPUT_MODE_MANUAL;
-        PrintNavigationData.FieldData = await BuildPrintFieldsAsync();
+        PrintNavigationData.FieldData = await BuildPrintFieldsAsync(recordId);
         PrintNavigationData.TableData = new();
         PrintNavigationData.SupporterTableData = null;
         PrintNavigationData.NearRelativePairs = null;
@@ -749,55 +931,11 @@ public partial class RecoveryManualViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 填报单位默认值：当前登录用户所属组织名称（单位全称，取不到时回退登录用户名）
+    /// 构建《追缴资金办理单》打印字段（单点装配于 RecoveryPrintFieldBuilder，三入口共用）
     /// </summary>
-    private async Task<string> GetReportUnitAsync()
-    {
-        var orgId = App.CurrentUserOrganizationId;
-        if (!orgId.HasValue)
-            return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-
-        try
-        {
-            var orgService = ServiceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IOrganizationService>();
-            var result = await orgService.GetByIdAsync(orgId.Value, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
-            {
-                var org = result.Value;
-                if (!string.IsNullOrWhiteSpace(org.Name)) return org.Name;
-                if (!string.IsNullOrWhiteSpace(org.TownName)) return org.TownName;
-                if (!string.IsNullOrWhiteSpace(org.CountyName)) return org.CountyName;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"获取填报单位默认值失败: {ex.Message}");
-        }
-
-        return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-    }
-
-    /// <summary>
-    /// 构建《追缴资金办理单》打印字段（key 与模板中文占位符对应）
-    /// </summary>
-    private async Task<Dictionary<string, string>> BuildPrintFieldsAsync()
-    {
-        var now = DateTime.Now;
-        var reportUnit = await GetReportUnitAsync();
-        var codeResult = await _recoveryService.GenerateRecoveryCodeAsync(now);
-
-        return new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [FieldKeys.RECOVERY_UNIT] = reportUnit,
-            [FieldKeys.RECOVERY_CODE] = codeResult.IsSuccess ? codeResult.Value : string.Empty,
-            [FieldKeys.RECOVERY_SEQ] = "1",
-            [FieldKeys.RECOVERY_PERSON_NAME] = PersonName,
-            [FieldKeys.RECOVERY_ID_CARD] = IdCard,
-            [FieldKeys.RECOVERY_SOURCE_TYPE] = SourceTypeDisplay,
-            [FieldKeys.RECOVERY_AMOUNT] = RecoveryAmount.ToString("N2"),
-            [FieldKeys.RECOVERED_AMOUNT] = RecoveredAmount.ToString("N2"),
-            [FieldKeys.RECOVERY_REPORT_DATE] = now.ToString("yyyy年MM月dd日"),
-            [FieldKeys.RECOVERY_RANGE] = $"{StartMonth} 至 {EndMonth}"
-        };
-    }
+    private Task<Dictionary<string, string>> BuildPrintFieldsAsync(long recordId)
+        => RecoveryPrintFieldBuilder.BuildFieldsAsync(
+            ServiceProvider, _recoveryService, recordId,
+            PersonName, IdCard, SourceTypeDisplay,
+            RecoveryAmount, RecoveredAmount, StartMonth, EndMonth);
 }

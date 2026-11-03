@@ -12,7 +12,7 @@ namespace NewCosmos.Constants;
 public static class PermissionSeedCatalog
 {
     /// <summary>权限矩阵版本：内容变更时递增；与库内版本不一致触发一次重建。</summary>
-    public const int MatrixVersion = 4;
+    public const int MatrixVersion = 5;
 
     /// <summary>缓存版本表 key：矩阵版本标记（nc_perm_cache_version）</summary>
     public const string MatrixVersionKey = "permission_matrix";
@@ -93,6 +93,9 @@ public static class PermissionSeedCatalog
         // 近亲属备案（84）
         ("NEAR_RELATIVE_MANAGE", "近亲属备案", "近亲属备案", "维护近亲属备案信息", 84),
 
+        // 大学生管理（86，2026-10-31 死亡联动待办承接权限）
+        ("COLLEGE_MANAGE", "大学生管理", "大学生管理", "办理大学生在读/退出/毕业状态维护", 86),
+
         // 普惠高龄（90-93）
         ("ELDERLY_VIEW",   "查看普惠高龄", "普惠高龄", "查看高龄补贴档案", 90),
         ("ELDERLY_CREATE", "创建普惠高龄", "普惠高龄", "创建高龄补贴申请", 91),
@@ -169,6 +172,7 @@ public static class PermissionSeedCatalog
             "CHANGE_VIEW", "CHANGE_MANAGE",
             "SPECIAL_APPROVAL_CREATE", "SPECIAL_APPROVAL_REVIEW", "SPECIAL_APPROVAL_PRINT",
             "NEAR_RELATIVE_MANAGE",
+            "COLLEGE_MANAGE",
             "ELDERLY_VIEW", "ELDERLY_CREATE", "ELDERLY_EDIT", "ELDERLY_DELETE",
             "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_DELETE", "ASSET_MAUDIT", "ASSET_REPORT",
             "ARCHIVE_VIEW", "ARCHIVE_MANAGE",
@@ -195,6 +199,7 @@ public static class PermissionSeedCatalog
             "CHANGE_VIEW", "CHANGE_MANAGE",
             "SPECIAL_APPROVAL_CREATE", "SPECIAL_APPROVAL_REVIEW", "SPECIAL_APPROVAL_PRINT",
             "NEAR_RELATIVE_MANAGE",
+            "COLLEGE_MANAGE",
             "ELDERLY_VIEW", "ELDERLY_CREATE", "ELDERLY_EDIT", "ELDERLY_DELETE",
             "ASSET_VIEW", "ASSET_CREATE", "ASSET_EDIT", "ASSET_DELETE", "ASSET_MAUDIT", "ASSET_REPORT",
             "ARCHIVE_VIEW", "ARCHIVE_MANAGE",
@@ -219,6 +224,7 @@ public static class PermissionSeedCatalog
             "CHANGE_VIEW", "CHANGE_MANAGE",
             "SPECIAL_APPROVAL_CREATE", "SPECIAL_APPROVAL_REVIEW", "SPECIAL_APPROVAL_PRINT",
             "NEAR_RELATIVE_MANAGE",
+            "COLLEGE_MANAGE",
             "ARCHIVE_VIEW",
             "DUTY_VIEW", "DUTY_MANAGE",
             "LOTTERY_ACCESS",

@@ -11,29 +11,25 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 蓝色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="10">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="渐退期管理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="进行中与已到期的渐退户统一管理" FontSize="13" TextColor="#E6FFFFFF"/>
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <components:StatCapsule Grid.Column="0" Value="{Binding ExpiringCountText}" Caption="进行中/已到期（户）"/>
-                    <components:StatCapsule Grid.Column="1" Value="{Binding ActiveCountText}" Caption="在享保障（户）"/>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="渐退期管理"
+                                   Subtitle="进行中与已到期的渐退户统一管理"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+            <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding ExpiringCountText}" Caption="进行中/已到期（户）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding ActiveCountText}" Caption="在享保障（户）"/>
                 </Grid>
-            </VerticalStackLayout>
-        </Border>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
 
         <!-- 搜索栏 -->
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,8" BackgroundColor="White">
             <Entry Grid.Column="0" Placeholder="搜索申请人姓名、身份证号" Text="{Binding SearchText}"
-                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
-            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="40"
+                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding SearchCommand}"/>
+            <Button Grid.Column="1" Text="搜索" FontSize="14" Padding="14,0" HeightRequest="40"
                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                     Command="{Binding SearchCommand}"/>
         </Grid>
@@ -50,21 +46,21 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <Label Grid.Column="0" Text="{Binding ApplicantName}" FontSize="16" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                                <Button Grid.Column="1" Text="重新核算" FontSize="12" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                <Button Grid.Column="1" Text="重新核算" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="8"
                                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type GracePeriodExpiringListViewModel}}, Path=ReReviewCommand}"
                                         CommandParameter="{Binding .}"/>
                             </Grid>
-                            <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                                 <VerticalStackLayout Spacing="2">
-                                    <Label Text="渐退期" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                    <Label Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="渐退期" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                    <Label Text="{Binding StatusText}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                    <Label FontSize="12" FontAttributes="Bold" Text="{Binding DurationText}">
+                                    <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label FontSize="14" FontAttributes="Bold" Text="{Binding DurationText}">
                                         <Label.Triggers>
                                             <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="True">
                                                 <Setter Property="TextColor" Value="#16A34A"/>
@@ -76,7 +72,7 @@
                                     </Label>
                                 </VerticalStackLayout>
                             </Grid>
-                            <Label Text="{Binding OriginalClassification, StringFormat='原分类：{0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding OriginalClassification, StringFormat='原分类：{0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                     </Border>
                 </DataTemplate>
@@ -86,12 +82,12 @@
         <!-- 分页 -->
         <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
-                <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                <Button Text="上一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                <Label Text="{Binding PageStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
@@ -103,7 +99,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

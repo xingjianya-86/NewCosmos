@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -30,9 +30,9 @@
 
             <!-- 标题栏 -->
             <Grid ColumnDefinitions="*,Auto" Padding="20,12,16,8">
-                <Label Text="选择家庭成员" FontSize="17" FontAttributes="Bold"
+                <Label Text="选择家庭成员" FontSize="19" FontAttributes="Bold"
                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                <Button Grid.Column="1" Text="全选" FontSize="14"
+                <Button Grid.Column="1" Text="全选" FontSize="16"
                         Clicked="OnSelectAllClicked" BackgroundColor="Transparent"
                         TextColor="{StaticResource Primary}" Padding="0" HeightRequest="32"/>
             </Grid>
@@ -52,13 +52,13 @@
                                     <CheckBox IsChecked="{Binding IsSelected}"
                                               Color="{StaticResource Primary}" VerticalOptions="Center"/>
                                     <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
-                                        <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
                                                TextColor="{StaticResource TextPrimary}"/>
-                                        <Label Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="12"
+                                        <Label Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="14"
                                                TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                        <Label Text="{Binding Age, StringFormat='{0}岁'}" FontSize="12"
+                                        <Label Text="{Binding Age, StringFormat='{0}岁'}" FontSize="14"
                                                TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                                        <Label Text="{Binding Gender}" FontSize="12"
+                                        <Label Text="{Binding Gender}" FontSize="14"
                                                TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                     </HorizontalStackLayout>
                                 </Grid>

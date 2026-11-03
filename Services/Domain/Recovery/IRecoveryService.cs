@@ -28,6 +28,17 @@ public interface IRecoveryService
         string sourceType, long sourceId, CancellationToken ct = default);
 
     /// <summary>
+    /// 手工录入页按身份证查档（自动带出追缴分类 / 每月保障标准 / 停发原因）。
+    /// 同一身份证命中多条时按「停发优先 → 分类（低保系 &gt; 临时救助 &gt; 高龄）→ 最新」只取一条。
+    /// 未命中返回 Success(null)——不是失败（手工录入允许档案外人员），由界面提示转手工填写。
+    /// </summary>
+    /// <param name="idCard">身份证号（18 位）</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>档案带出信息，未命中为 null</returns>
+    Task<Result<RecoveryArchiveLookupDto?>> LookupArchiveByIdCardAsync(
+        string idCard, CancellationToken ct = default);
+
+    /// <summary>
     /// 保存追缴记录（搜索录入）
     /// </summary>
     /// <param name="dto">追缴记录DTO</param>
@@ -130,12 +141,13 @@ public interface IRecoveryService
         long recoveryId, CancellationToken ct = default);
 
     /// <summary>
-    /// 生成追缴编码（格式 YYYYMM-NNN，按当月已有记录数流水递增）
+    /// 取分配追缴编号（格式 YYYYMM-NNN，按记录创建月）。
+    /// 首次调用在事务内分配并落库（advisory 锁串行化同月并发）；此后返回库内编号——补打/多次打印同号。
     /// </summary>
-    /// <param name="month">所属月份（取年月部分）</param>
+    /// <param name="recoveryId">追缴记录ID</param>
     /// <param name="ct">取消令牌</param>
-    /// <returns>追缴编码，如 202609-001</returns>
-    Task<Result<string>> GenerateRecoveryCodeAsync(DateTime month, CancellationToken ct = default);
+    /// <returns>追缴编号，如 202609-001</returns>
+    Task<Result<string>> GetOrAssignRecoveryCodeAsync(long recoveryId, CancellationToken ct = default);
 
     /// <summary>
     /// 获取停止人员统计信息

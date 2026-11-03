@@ -1,8 +1,9 @@
-﻿#if WINDOWS
+#if WINDOWS
 namespace NewCosmos.Services.Utilities;
 
 /// <summary>
-/// 办公软件提供    /// </summary>
+/// 办公软件提供
+/// </summary>
 public enum OfficeProvider
 {
     None,
@@ -12,7 +13,8 @@ public enum OfficeProvider
 }
 
 /// <summary>
-/// 办公软件提供商信    /// </summary>
+/// 办公软件提供商信
+/// </summary>
 public class OfficeProviderInfo
 {
     public OfficeProvider Provider { get; set; }

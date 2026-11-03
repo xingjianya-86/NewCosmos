@@ -1,0 +1,12 @@
+# 遗体安置情况字典（固定 ID）
+# 分类 ID=98，字典项 ID 范围: 98001-98999；首项为表单默认值（模板 {死亡人遗体安置情况} 引用）
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 98001, category: "DeathRemainsArrangements", item_key: "已由亲属接走火化安葬", item_value: "已由亲属接走火化安葬", sort_order: 1, is_active: true }
+      - { id: 98002, category: "DeathRemainsArrangements", item_key: "已由亲属接走土葬安葬", item_value: "已由亲属接走土葬安葬", sort_order: 2, is_active: true }
+      - { id: 98003, category: "DeathRemainsArrangements", item_key: "遗体已送殡仪馆存放", item_value: "遗体已送殡仪馆存放", sort_order: 3, is_active: true }
+      - { id: 98004, category: "DeathRemainsArrangements", item_key: "其他", item_value: "其他", sort_order: 4, is_active: true }

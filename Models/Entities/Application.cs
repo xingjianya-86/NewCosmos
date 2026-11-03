@@ -9,7 +9,8 @@ namespace NewCosmos.Models.Entities;
 public class Application
 {
     /// <summary>
-    /// 申请ID，主键    /// </summary>
+    /// 申请ID，主键
+/// </summary>
     public long Id { get; set; }
 
     /// <summary>
@@ -18,12 +19,14 @@ public class Application
     public string ApplicationNo { get; set; } = string.Empty;
 
     /// <summary>
-    /// 申请人姓名    /// </summary>
+    /// 申请人姓名
+/// </summary>
     [Required(ErrorMessage = "申请人姓名不能为")]
     public string ApplicantName { get; set; } = string.Empty;
 
     /// <summary>
-    /// 申请人身份证号    /// </summary>
+    /// 申请人身份证号
+/// </summary>
     [Required(ErrorMessage = "申请人身份证号不能为")]
     public string ApplicantIdCard { get; set; } = string.Empty;
 
@@ -68,23 +71,28 @@ public class Application
     public string HukouAddress { get; set; } = string.Empty;
 
     /// <summary>
-    /// 户籍城市 ID（对应 nc_regions_cities.id）    /// </summary>
+    /// 户籍城市 ID（对应 nc_regions_cities.id）
+/// </summary>
     public int? HukouCityId { get; set; }
 
     /// <summary>
-    /// 户籍区县 ID（对应 nc_regions_counties.id）    /// </summary>
+    /// 户籍区县 ID（对应 nc_regions_counties.id）
+/// </summary>
     public int? HukouCountyId { get; set; }
 
     /// <summary>
-    /// 户籍乡镇 ID（对应 nc_regions_towns.id）    /// </summary>
+    /// 户籍乡镇 ID（对应 nc_regions_towns.id）
+/// </summary>
     public int? HukouTownId { get; set; }
 
     /// <summary>
-    /// 户籍社区/?ID（对应 nc_regions_villages.id）    /// </summary>
+    /// 户籍社区/?ID（对应 nc_regions_villages.id）
+/// </summary>
     public int? HukouVillageId { get; set; }
 
     /// <summary>
-    /// 残疾证号（如有）    /// </summary>
+    /// 残疾证号（如有）
+/// </summary>
     public string DisabilityCardNo { get; set; } = string.Empty;
 
     /// <summary>
@@ -93,19 +101,23 @@ public class Application
     public string Province { get; set; } = string.Empty;
 
     /// <summary>
-    /// 城市ID（对应 nc_regions_cities.id）    /// </summary>
+    /// 城市ID（对应 nc_regions_cities.id）
+/// </summary>
     public int? CityId { get; set; }
 
     /// <summary>
-    /// 区县ID（对应 nc_regions_counties.id）    /// </summary>
+    /// 区县ID（对应 nc_regions_counties.id）
+/// </summary>
     public int? CountyId { get; set; }
 
     /// <summary>
-    /// 乡镇ID（对应 nc_regions_towns.id）    /// </summary>
+    /// 乡镇ID（对应 nc_regions_towns.id）
+/// </summary>
     public int? TownId { get; set; }
 
     /// <summary>
-    /// ?社区ID（对应 nc_regions_villages.id）    /// </summary>
+    /// ?社区ID（对应 nc_regions_villages.id）
+/// </summary>
     public int? VillageId { get; set; }
 
     /// <summary>
@@ -124,11 +136,13 @@ public class Application
     public string Town { get; set; } = string.Empty;
 
     /// <summary>
-    /// 社区    /// </summary>
+    /// 社区
+/// </summary>
     public string Community { get; set; } = string.Empty;
 
     /// <summary>
-    ///     /// </summary>
+    ///  
+/// </summary>
     public string Village { get; set; } = string.Empty;
 
     /// <summary>
@@ -233,7 +247,8 @@ public class Application
     public string ApplicationReasonDetail { get; set; } = string.Empty;
 
     /// <summary>
-    /// 照料护理人类    /// </summary>
+    /// 照料护理人类
+/// </summary>
     public string CaregiverType { get; set; } = string.Empty;
 
     /// <summary>
@@ -347,7 +362,8 @@ public class Application
     public decimal HouseholdMonthlyGuaranteeAmount { get; set; }
 
     /// <summary>
-    /// 人员分类保障总金    /// </summary>
+    /// 人员分类保障总金
+/// </summary>
     public decimal PersonCategoryProtectionTotalAmount { get; set; }
 
     /// <summary>
@@ -361,19 +377,23 @@ public class Application
     public decimal TotalGuaranteeAmount { get; set; }
 
     /// <summary>
-    /// 是否处于渐退    /// </summary>
+    /// 是否处于渐退
+/// </summary>
     public bool IsInGracePeriod { get; set; }
 
     /// <summary>
-    /// 渐退期月    /// </summary>
+    /// 渐退期月
+/// </summary>
     public int? GracePeriodMonths { get; set; }
 
     /// <summary>
-    /// 渐退期开始日    /// </summary>
+    /// 渐退期开始日
+/// </summary>
     public DateTime? GracePeriodStartDate { get; set; }
 
     /// <summary>
-    /// 渐退期结束日    /// </summary>
+    /// 渐退期结束日
+/// </summary>
     public DateTime? GracePeriodEndDate { get; set; }
 
     /// <summary>
@@ -412,7 +432,8 @@ public class Application
     public long? SpecialApprovalId { get; set; }
 
     /// <summary>
-    /// 申请状    /// </summary>
+    /// 申请状
+/// </summary>
     public string Status { get; set; } = ApplicationStatusCodes.DRAFT;
 
     /// <summary>
@@ -426,7 +447,8 @@ public class Application
     public DateTime SubmitAt { get; set; }
 
     /// <summary>
-    /// 提交    /// </summary>
+    /// 提交
+/// </summary>
     public string SubmitBy { get; set; } = string.Empty;
 
     /// <summary>
@@ -440,19 +462,23 @@ public class Application
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// 创建    /// </summary>
+    /// 创建
+/// </summary>
     public string? CreatedBy { get; set; } = string.Empty;
 
     /// <summary>
-    /// 更新    /// </summary>
+    /// 更新
+/// </summary>
     public string UpdatedBy { get; set; } = string.Empty;
 
     /// <summary>
-    /// 删除时间（软删除标记    /// </summary>
+    /// 删除时间（软删除标记
+/// </summary>
     public DateTime DeletedAt { get; set; }
 
     /// <summary>
-    /// 乐观并发版本    /// </summary>
+    /// 乐观并发版本
+/// </summary>
     public int Version { get; set; } = 1;
     /// <summary>
     /// 原始申请ID（用于追溯变更链
@@ -489,27 +515,33 @@ public class Application
     // ── 土地相关 ──
 
     /// <summary>
-    /// 家庭土地面积（亩    /// </summary>
+    /// 家庭土地面积（亩
+/// </summary>
     public decimal FamilyLandArea { get; set; }
 
     /// <summary>
-    /// 自种土地面积（亩    /// </summary>
+    /// 自种土地面积（亩
+/// </summary>
     public decimal SelfFarmedLandArea { get; set; }
 
     /// <summary>
-    /// 转租土地面积（亩    /// </summary>
+    /// 转租土地面积（亩
+/// </summary>
     public decimal SubleasedLandArea { get; set; }
 
     /// <summary>
-    /// 承包土地面积（亩    /// </summary>
+    /// 承包土地面积（亩
+/// </summary>
     public decimal ContractedLandArea { get; set; }
 
     /// <summary>
-    /// 土地收入合计（元    /// </summary>
+    /// 土地收入合计（元
+/// </summary>
     public decimal LandIncomeTotal { get; set; }
 
     /// <summary>
-    /// 补贴合计（元    /// </summary>
+    /// 补贴合计（元
+/// </summary>
     public decimal SubsidyTotal { get; set; }
 
     /// <summary>

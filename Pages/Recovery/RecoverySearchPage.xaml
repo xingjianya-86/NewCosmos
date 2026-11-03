@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
@@ -15,13 +15,13 @@
         <DataTemplate x:Key="RecoverySearchEvenRow" x:DataType="entities:StoppedPersonDto">
             <Grid Padding="16" Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 2*, 1.2*, 1.5*, Auto" BackgroundColor="White">
-                <Label Text="{Binding RowIndex}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding RowIndex}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="3" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
-                    <Label Text="{Binding SourceDisplay}" FontSize="12"/>
+                    <Label Text="{Binding SourceDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="4" Text="{Binding MonthlyAmount, StringFormat='{0:N2} 元'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding MonthlyAmount, StringFormat='{0:N2} 元'}" FontSize="17" VerticalOptions="Center"/>
                 <Button Grid.Column="5" Text="选择" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource Primary}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectPersonCommand}"
@@ -32,13 +32,13 @@
         <DataTemplate x:Key="RecoverySearchOddRow" x:DataType="entities:StoppedPersonDto">
             <Grid Padding="16" Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 2*, 1.2*, 1.5*, Auto" BackgroundColor="#F8F9FA">
-                <Label Text="{Binding RowIndex}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding RowIndex}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding PersonName}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="3" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
-                    <Label Text="{Binding SourceDisplay}" FontSize="12"/>
+                    <Label Text="{Binding SourceDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="4" Text="{Binding MonthlyAmount, StringFormat='{0:N2} 元'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding MonthlyAmount, StringFormat='{0:N2} 元'}" FontSize="17" VerticalOptions="Center"/>
                 <Button Grid.Column="5" Text="选择" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource Primary}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectPersonCommand}"
@@ -54,15 +54,15 @@
         <DataTemplate x:Key="RecoveryHistoryEvenRow" x:DataType="entities:RecoveryRecord">
             <Grid Padding="16" Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="1.4*, 1.2*, 1.2*, 0.9*, 1.4*, Auto" BackgroundColor="White">
-                <Label Text="{Binding PersonName}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding PersonName}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
-                    <Label Text="{Binding SourceTypeDisplay}" FontSize="12"/>
+                    <Label Text="{Binding SourceTypeDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="2" Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="3" Style="{StaticResource ChipBase}" Padding="10,3" VerticalOptions="Center">
-                    <Label Text="{Binding StatusDisplay}" FontSize="12"/>
+                    <Label Text="{Binding StatusDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="4" Text="{Binding CreatedAtText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding CreatedAtText}" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="5" Spacing="6" VerticalOptions="Center">
                     <Button Text="编辑" Style="{StaticResource ButtonSmall}" BackgroundColor="{StaticResource Primary}" TextColor="White"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditRecordCommand}"
@@ -76,15 +76,15 @@
         <DataTemplate x:Key="RecoveryHistoryOddRow" x:DataType="entities:RecoveryRecord">
             <Grid Padding="16" Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="1.4*, 1.2*, 1.2*, 0.9*, 1.4*, Auto" BackgroundColor="#F8F9FA">
-                <Label Text="{Binding PersonName}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding PersonName}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="1" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
-                    <Label Text="{Binding SourceTypeDisplay}" FontSize="12"/>
+                    <Label Text="{Binding SourceTypeDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="2" Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding RecoveryAmount, StringFormat='{0:N2} 元'}" FontSize="17" VerticalOptions="Center"/>
                 <Border Grid.Column="3" Style="{StaticResource ChipBase}" Padding="10,3" VerticalOptions="Center">
-                    <Label Text="{Binding StatusDisplay}" FontSize="12"/>
+                    <Label Text="{Binding StatusDisplay}" FontSize="14"/>
                 </Border>
-                <Label Grid.Column="4" Text="{Binding CreatedAtText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding CreatedAtText}" FontSize="16" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="5" Spacing="6" VerticalOptions="Center">
                     <Button Text="编辑" Style="{StaticResource ButtonSmall}" BackgroundColor="{StaticResource Primary}" TextColor="White"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditRecordCommand}"
@@ -103,47 +103,28 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
 
         <!-- 渐变英雄头部（橙色渐变） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <!-- 操作按钮 -->
-                    <HorizontalStackLayout Grid.Column="2" Spacing="12">
+        <!-- 统一页头（纸墨档案风报头 · Phase 6，操作按钮映射到 HeaderActions 插槽） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}"
+                                   Title="后补追缴"
+                                   Subtitle="低保 / 刚性支出 / 临时救助 / 高龄停止人员追缴"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.HeaderActions>
+<HorizontalStackLayout Grid.Column="2" Spacing="12">
                         <Button Text="{OnPlatform WinUI='&#xE710; 手工录入', Android='&#x2795; 手工录入'}"
                                 FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                                BackgroundColor="White"
+                                BackgroundColor="White" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
                                 TextColor="#E65100"
-                                FontSize="14"
+                                FontSize="16"
                                 FontAttributes="Bold"
                                 Command="{Binding GoToManualInputCommand}"
                                 VerticalOptions="Center"
                                 Padding="16,10"
-                                CornerRadius="20"/>
+                                CornerRadius="{StaticResource CornerRadiusMedium}"/>
                     </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8D1;', Android='&#x1F4B0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="后补追缴" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="低保 / 刚性支出 / 临时救助 / 高龄停止人员追缴" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+            </components:PageHeaderView.HeaderActions>
+        </components:PageHeaderView>
 
         <!-- 统计栏 -->
         <Grid Grid.Row="1" Padding="20,10" ColumnDefinitions="*,*,*,*" ColumnSpacing="12"
@@ -182,7 +163,7 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SwitchToStoppedCommand}"/>
                         </Border.GestureRecognizers>
-                        <Label Text="停止人员" FontSize="14" FontAttributes="Bold">
+                        <Label Text="停止人员" FontSize="16" FontAttributes="Bold">
                             <Label.Style>
                                 <Style TargetType="Label">
                                     <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
@@ -212,7 +193,7 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding SwitchToHistoryCommand}"/>
                         </Border.GestureRecognizers>
-                        <Label Text="我的追缴记录" FontSize="14" FontAttributes="Bold">
+                        <Label Text="我的追缴记录" FontSize="16" FontAttributes="Bold">
                             <Label.Style>
                                 <Style TargetType="Label">
                                     <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
@@ -237,14 +218,14 @@
                         <Grid ColumnDefinitions="Auto, *">
                             <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                   FontSize="14"
+                                   FontSize="16"
                                    TextColor="{StaticResource Gray500}"
                                    VerticalOptions="Center"
                                    Margin="0,0,8,0"/>
                             <Entry Grid.Column="1"
                                    Placeholder="输入姓名或身份证号搜索停止人员"
                                    Text="{Binding SearchKeyword}"
-                                   FontSize="16"
+                                   FontSize="18"
                                    BackgroundColor="Transparent"
                                    ReturnCommand="{Binding SearchCommand}"/>
                         </Grid>
@@ -269,14 +250,14 @@
                         <Grid ColumnDefinitions="Auto, *">
                             <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                    FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                   FontSize="14"
+                                   FontSize="16"
                                    TextColor="{StaticResource Gray500}"
                                    VerticalOptions="Center"
                                    Margin="0,0,8,0"/>
                             <Entry Grid.Column="1"
                                    Placeholder="输入姓名或身份证号搜索追缴记录"
                                    Text="{Binding HistoryKeyword}"
-                                   FontSize="16"
+                                   FontSize="18"
                                    BackgroundColor="Transparent"
                                    ReturnCommand="{Binding SearchHistoryCommand}"/>
                         </Grid>
@@ -333,12 +314,12 @@
                                 ItemTemplate="{StaticResource RecoverySearchSelector}">
                     <CollectionView.EmptyView>
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,0">
-                            <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48"
+                            <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="50"
                                    TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                             <Label Text="输入关键词搜索停止人员"
                                    HorizontalOptions="Center"
                                    TextColor="{StaticResource Gray500}"
-                                   FontSize="16"
+                                   FontSize="18"
                                    Margin="0,12,0,0"/>
                         </VerticalStackLayout>
                     </CollectionView.EmptyView>
@@ -351,10 +332,10 @@
                         Padding="16,12"
                         IsVisible="{Binding HasSearchResults}">
                     <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
-                        <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
                         <Label Text="选择人员后点击&quot;选择&quot;进入追缴表单"
-                               FontSize="13"
+                               FontSize="15"
                                TextColor="{StaticResource Gray500}"
                                VerticalOptions="Center"/>
                     </HorizontalStackLayout>
@@ -397,12 +378,12 @@
                                     ItemTemplate="{StaticResource RecoveryHistorySelector}">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60,0,0">
-                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48"
+                                <Label Text="{OnPlatform WinUI='&#xE74B;', Android='&#x2795;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="50"
                                        TextColor="{StaticResource Gray300}" HorizontalOptions="Center"/>
                                 <Label Text="暂无追缴记录"
                                        HorizontalOptions="Center"
                                        TextColor="{StaticResource Gray500}"
-                                       FontSize="16"
+                                       FontSize="18"
                                        Margin="0,12,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
@@ -415,10 +396,10 @@
                             Padding="16,12"
                             IsVisible="{Binding HasHistoryRecords}">
                         <HorizontalStackLayout HorizontalOptions="Center" Spacing="8">
-                            <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14"
+                            <Label Text="{OnPlatform WinUI='&#xE734;', Android='&#x1F3B2;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
                                    TextColor="{StaticResource Gray500}" VerticalOptions="Center"/>
                             <Label Text="草稿可编辑/删除，已确认/已打印记录可补打"
-                                   FontSize="13"
+                                   FontSize="15"
                                    TextColor="{StaticResource Gray500}"
                                    VerticalOptions="Center"/>
                         </HorizontalStackLayout>

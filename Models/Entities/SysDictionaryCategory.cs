@@ -1,8 +1,9 @@
-﻿namespace NewCosmos.Models.Entities;
+namespace NewCosmos.Models.Entities;
 
 /// <summary>
 /// 字典分类实体（种子数据）
-/// ID 为固定值，非自    /// </summary>
+/// ID 为固定值，非自
+/// </summary>
 public class SysDictionaryCategory
 {
     /// <summary>

@@ -104,14 +104,18 @@ public class UserService : BaseService, IUserService
             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, NOW(), NOW())
             RETURNING id";
 
-        var insertResult = await _db.ExecuteScalarAsync(sql, ct,
+        // 新代码用泛型版 ExecuteScalarAsync<T>（AGENTS §8：勿用旧版无泛型 API 取 RETURNING id——无行时返回 Success(0)）
+        var insertResult = await _db.ExecuteScalarAsync<int?>(sql, ct,
             request.Username, passwordHash, request.FullName, request.Phone, request.IdentityCard,
             request.Position, request.OrganizationId);
 
         if (insertResult.IsFailure)
             return Result.Failure<int>(insertResult.ErrorCode!, insertResult.Message!);
 
-        var userId = Convert.ToInt32(insertResult.Value);
+        if (insertResult.Value is null or <= 0)
+            return Result.Failure<int>(ErrorCodes.OPERATION_FAILED, "创建用户失败：未返回新用户ID");
+
+        var userId = insertResult.Value.Value;
 
         if (request.DefaultRoleId.HasValue)
         {

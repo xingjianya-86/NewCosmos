@@ -1,11 +1,13 @@
-﻿namespace NewCosmos.Services.Core;
+namespace NewCosmos.Services.Core;
 
 /// <summary>
-/// 数据脱敏工具    /// </summary>
+/// 数据脱敏工具
+/// </summary>
 public static class DataMasker
 {
     /// <summary>
-    /// 脱敏身份证号（前6    /// </summary>
+    /// 脱敏身份证号（前6
+/// </summary>
     /// <param name="idCard">身份证号</param>
     /// <returns>脱敏后的身份证号</returns>
     public static string MaskIdCard(string idCard)
@@ -16,7 +18,8 @@ public static class DataMasker
     }
 
     /// <summary>
-    /// 脱敏手机号（    /// </summary>
+    /// 脱敏手机号（
+/// </summary>
     /// <param name="phone">手机</param>
     /// <returns>脱敏后的手机</returns>
     public static string MaskPhone(string phone)
@@ -39,7 +42,8 @@ public static class DataMasker
     }
 
     /// <summary>
-    /// 脱敏银行账号（前4    /// </summary>
+    /// 脱敏银行账号（前4
+/// </summary>
     /// <param name="account">银行账号</param>
     /// <returns>脱敏后的银行账号</returns>
     public static string MaskBankAccount(string account)

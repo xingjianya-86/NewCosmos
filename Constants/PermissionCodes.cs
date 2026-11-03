@@ -85,6 +85,10 @@ public static class PermissionCodes
     public const string NEAR_RELATIVE_MANAGE = "NEAR_RELATIVE_MANAGE";
     #endregion
 
+    #region 大学生管理（2026-10-31 死亡联动待办：任务承接所需权限，死亡申报入口本身不设权限）
+    public const string COLLEGE_MANAGE = "COLLEGE_MANAGE";
+    #endregion
+
     #region 普惠高龄
     public const string ELDERLY_VIEW = "ELDERLY_VIEW";
     public const string ELDERLY_CREATE = "ELDERLY_CREATE";

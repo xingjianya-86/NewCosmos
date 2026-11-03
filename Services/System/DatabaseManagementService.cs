@@ -198,6 +198,13 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         return _backupService.BackupDatabaseAsync(backupPath, ct);
     }
 
+    /// <summary>备份还原（委托共享实现 IDatabaseBackupService；单事务回放，失败整体回滚）。</summary>
+    public Task<Result<string>> RestoreDatabaseAsync(string backupFilePath, CancellationToken ct = default)
+    {
+        Logger.LogSecurity("发起数据库还原", ("BackupFile", Path.GetFileName(backupFilePath)));
+        return _backupService.RestoreDatabaseAsync(backupFilePath, ct);
+    }
+
     public Task<Result<List<BackupFileInfo>>> GetBackupFilesAsync(CancellationToken ct = default)
     {
         LogInfo("获取备份文件列表");
@@ -600,20 +607,8 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
 
     #endregion
 
-    private string FormatSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        int order = 0;
-        double size = bytes;
-
-        while (size >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            size /= 1024;
-        }
-
-        return $"{size:0.##} {sizes[order]}";
-    }
+    /// <summary>字节数人性化——单点实现于 DatabaseBackupService.FormatSize（原两处格式不一致：0.## vs F2）。</summary>
+    private string FormatSize(long bytes) => DatabaseBackupService.FormatSize(bytes);
 
     private string GetTableComment(string tableName)
     {

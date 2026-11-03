@@ -26,22 +26,22 @@
                         FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                         BackgroundColor="Transparent"
                         TextColor="{StaticResource White}"
-                        FontSize="20"
+                        FontSize="22"
                         Command="{Binding CancelCommand}"
                         VerticalOptions="Center"
                         Padding="8"/>
                 <HorizontalStackLayout Grid.Column="1" Spacing="14" VerticalOptions="Center">
-                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="26" TextColor="{StaticResource White}"/>
+                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="{StaticResource White}"/>
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="高龄津贴申请登记" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
-                        <Label Text="输入身份证自动评估享受类别与补发金额" FontSize="13" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
+                        <Label Text="高龄津贴申请登记" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource White}"/>
+                        <Label Text="输入身份证自动评估享受类别与补发金额" FontSize="15" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
                 <!-- 模式提醒徽章（仅补全模式显示） -->
                 <Border Grid.Column="2" BackgroundColor="{StaticResource White}" Opacity="0.95"
                         StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="12,6"
                         VerticalOptions="Center" IsVisible="{Binding IsModeBannerVisible}" MaximumWidthRequest="360">
-                    <Label Text="{Binding ModeBannerText}" FontSize="12" FontAttributes="Bold"
+                    <Label Text="{Binding ModeBannerText}" FontSize="14" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center" LineBreakMode="WordWrap"/>
                 </Border>
             </Grid>
@@ -66,12 +66,12 @@
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="基本信息"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsSection0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -91,12 +91,12 @@
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="代办代领"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsSection1Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -116,12 +116,12 @@
                 <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="判定认证"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsSection2Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -152,7 +152,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -199,7 +199,7 @@
                     <Border BackgroundColor="#FEE2E2" StrokeThickness="0" Padding="12,8"
                             IsVisible="{Binding IsAddressScopeAvailable, Converter={StaticResource BoolToInverseConverter}}">
                         <Label Text="当前账号未绑定任何区划，地址不可选择。请先到「用户与权限管理 → 经办机构管理」为本单位补齐省/市/县/镇/村后再录入。"
-                               FontSize="12" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
+                               FontSize="14" TextColor="#7F1D1D" LineBreakMode="WordWrap"/>
                     </Border>
 
                     <!-- 卡片2：户籍与住址（2026-10-27：补省→五级；户籍限本单位管辖范围，住址全国可选） -->
@@ -211,13 +211,13 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource SuccessSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="{OnPlatform WinUI='&#xE81B;', Android='&#x1F465;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE81B;', Android='&#x1F465;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                            TextColor="{StaticResource Success}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <Label Grid.Column="1" Text="户籍与住址" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                             </Grid>
-                            <Label Text="{Binding AddressScopeDescription}" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
+                            <Label Text="{Binding AddressScopeDescription}" FontSize="14" TextColor="{StaticResource TextSecondary}" Margin="0,-6,0,0"/>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
                             <Label Text="户籍地址（限本单位管辖范围）" Style="{StaticResource FormFieldLabelStyle}" FontAttributes="Bold"/>
@@ -320,7 +320,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE8C7;', Android='&#x1F3E0;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                            TextColor="{StaticResource Warning}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -354,7 +354,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7A6;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                            TextColor="{StaticResource Info}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -418,7 +418,7 @@
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                    <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                            TextColor="{StaticResource Primary}"
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
@@ -433,7 +433,7 @@
                             <!-- 评估结果提示 -->
                             <Border IsVisible="{Binding HasEvaluateResult}" BackgroundColor="{StaticResource InfoSoft}"
                                     StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
-                                <Label Text="{Binding EvaluateMessage}" FontSize="15" TextColor="{StaticResource PrimaryDark}"/>
+                                <Label Text="{Binding EvaluateMessage}" FontSize="17" TextColor="{StaticResource PrimaryDark}"/>
                             </Border>
 
                             <!-- 享受类别判定（只读展示，命中 ☑ 高亮） -->
@@ -444,10 +444,10 @@
                                     <CollectionView.ItemTemplate>
                                         <DataTemplate x:DataType="CategoryDisplayItem">
                                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Padding="6,4">
-                                                <Label Text="{Binding Mark}" FontSize="16"
+                                                <Label Text="{Binding Mark}" FontSize="18"
                                                        TextColor="{Binding Matched, Converter={StaticResource BoolToColorConverter}}"
                                                        VerticalOptions="Center"/>
-                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="14"
+                                                <Label Grid.Column="1" Text="{Binding Label}" FontSize="16"
                                                        TextColor="{StaticResource TextPrimary}"
                                                        FontAttributes="{Binding Matched, Converter={StaticResource BoolToFontAttributeConverter}}"
                                                        VerticalOptions="Center"/>
@@ -515,11 +515,11 @@
                                     <CollectionView.ItemTemplate>
                                         <DataTemplate x:DataType="ent:ElderlyPaybackSegment">
                                             <Grid ColumnDefinitions="1.2*,0.8*,0.8*,0.6*,0.8*" Padding="6,4" ColumnSpacing="8">
-                                                <Label Text="{Binding CategoryName}" FontSize="13" VerticalOptions="Center"/>
-                                                <Label Grid.Column="1" Text="{Binding SegmentStartMonth}" FontSize="13" VerticalOptions="Center"/>
-                                                <Label Grid.Column="2" Text="{Binding SegmentEndMonth}" FontSize="13" VerticalOptions="Center"/>
-                                                <Label Grid.Column="3" Text="{Binding Months, StringFormat='{0}个月'}" FontSize="13" VerticalOptions="Center"/>
-                                                <Label Grid.Column="4" Text="{Binding SegmentAmount, StringFormat='{0:F2}元'}" FontSize="13" VerticalOptions="Center" HorizontalOptions="End"/>
+                                                <Label Text="{Binding CategoryName}" FontSize="15" VerticalOptions="Center"/>
+                                                <Label Grid.Column="1" Text="{Binding SegmentStartMonth}" FontSize="15" VerticalOptions="Center"/>
+                                                <Label Grid.Column="2" Text="{Binding SegmentEndMonth}" FontSize="15" VerticalOptions="Center"/>
+                                                <Label Grid.Column="3" Text="{Binding Months, StringFormat='{0}个月'}" FontSize="15" VerticalOptions="Center"/>
+                                                <Label Grid.Column="4" Text="{Binding SegmentAmount, StringFormat='{0:F2}元'}" FontSize="15" VerticalOptions="Center" HorizontalOptions="End"/>
                                             </Grid>
                                         </DataTemplate>
                                     </CollectionView.ItemTemplate>
@@ -531,22 +531,22 @@
                             <HorizontalStackLayout Spacing="24">
                                 <RadioButton Content="未及时登记" GroupName="PaybackReasonGroup"
                                              IsChecked="{Binding IsPaybackReasonMissed}"
-                                             FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="查找不到本人" GroupName="PaybackReasonGroup"
                                              IsChecked="{Binding IsPaybackReasonNotLocated}"
-                                             FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="短暂失联" GroupName="PaybackReasonGroup"
                                              IsChecked="{Binding IsPaybackReasonLostContact}"
-                                             FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                 <RadioButton Content="其他" GroupName="PaybackReasonGroup"
                                              IsChecked="{Binding IsPaybackReasonOther}"
-                                             FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                             FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                             </HorizontalStackLayout>
 
                             <!-- 特殊情况处理 -->
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                 <CheckBox Grid.Column="0" IsChecked="{Binding IsSpecialCase}" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="特殊情况处理（手动调整补发起止月份）" FontSize="14"
+                                <Label Grid.Column="1" Text="特殊情况处理（手动调整补发起止月份）" FontSize="16"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             </Grid>
                             <VerticalStackLayout IsVisible="{Binding IsSpecialCase}" Spacing="6">
@@ -554,7 +554,7 @@
                                 <Editor Text="{Binding SpecialReason}" HeightRequest="80"
                                         Placeholder="如：因身份登记信息纠错、材料延迟申报等，需手动调整补发起止月份"/>
                                 <Label Text="提示：补发起算月与止算月都留空 = 无补发；填写后补发月数/金额/分段按该区间立即重算，须与原因说明一致"
-                                       FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             </VerticalStackLayout>
                         </VerticalStackLayout>
                     </Border>

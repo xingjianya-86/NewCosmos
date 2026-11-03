@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Splash.SplashPage"
+             Title="启动中"
+             NavigationPage.HasNavigationBar="False"
+             SafeAreaEdges="None"
+             BackgroundColor="Black">
+
+    <!-- 启动动画：全屏 WebView 播放 Resources\Splash 下的 dsh-startup-screen 二次开发版；
+         动画结束/跳过经 newcosmos-splash://done 通知代码后置放行 ISplashGate，
+         App 再切到登录页或主界面。SKIP 按钮与 Esc 由动画运行时自己处理。 -->
+    <Grid BackgroundColor="Black">
+        <WebView x:Name="SplashWebView"
+                 HorizontalOptions="Fill"
+                 VerticalOptions="Fill"
+                 BackgroundColor="Black" />
+    </Grid>
+</ContentPage>

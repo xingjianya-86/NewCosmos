@@ -1238,7 +1238,7 @@ public partial class DutyService : BaseService, IDutyService
             SELECT COUNT(*) FROM nc_duty_shift_changes
             WHERE is_cancelled = FALSE AND group_code = $1
               AND (duty_date = $2 OR to_duty_date = $2)
-              AND ($3 IS NULL OR id <> $3)",
+              AND ($3::bigint IS NULL OR id <> $3)",
             ct, groupCode, dutyDate.Date, excludeChangeId);
         return result.IsSuccess ? Result.Success(result.Value) : Result.Failure<long>(result.ErrorCode!, result.Message!);
     }

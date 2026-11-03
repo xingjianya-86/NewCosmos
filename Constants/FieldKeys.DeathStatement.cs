@@ -110,7 +110,7 @@ public static partial class FieldKeys
     /// <summary>业务办理人</summary>
     public const string BUSINESS_AGENT = "BUSINESS_AGENT";
 
-    /// <summary>相关业务事项（默认「申请居民死亡医学证明」）</summary>
+    /// <summary>相关业务事项（多选 CheckBox 勾选，分隔符「、」拼接；选项=字典 BusinessMatters，首项默认勾选）</summary>
     public const string BUSINESS_MATTER = "BUSINESS_MATTER";
 
     /// <summary>所在省（组织机构省级级联 province_name，2026-10-26 加）</summary>

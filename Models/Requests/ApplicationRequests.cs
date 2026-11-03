@@ -1,44 +1,7 @@
 namespace NewCosmos.Models.Requests;
 
-/// <summary>
-/// 申请创建请求
-/// </summary>
-public class ApplicationCreateRequest
-{
-    public string ApplicantName { get; set; } = string.Empty;
-    public string ApplicantIdCard { get; set; } = string.Empty;
-    public string ApplicantPhone { get; set; } = string.Empty;
-    public string Gender { get; set; } = string.Empty;
-    public string Ethnicity { get; set; } = string.Empty;
-    public string MaritalStatus { get; set; } = string.Empty;
-    public string HukouType { get; set; } = string.Empty;
-    public string EducationLevel { get; set; } = string.Empty;
-    public string PoliticalStatus { get; set; } = string.Empty;
-    public string HukouAddress { get; set; } = string.Empty;
-    public string DisabilityCardNo { get; set; } = string.Empty;
-    public string Province { get; set; } = string.Empty;
-    public string City { get; set; } = string.Empty;
-    public string District { get; set; } = string.Empty;
-    public string Town { get; set; } = string.Empty;
-    public string Community { get; set; } = string.Empty;
-    public string Address { get; set; } = string.Empty;
-    public string PhysicalCondition { get; set; } = string.Empty;
-    public string DiseaseName { get; set; } = string.Empty;
-    public string SecondaryDiseaseName { get; set; } = string.Empty;
-    public string DiseaseCode { get; set; } = string.Empty;
-    public bool IsSevereDisease { get; set; }
-    public string DisabilityType { get; set; } = string.Empty;
-    public string DisabilityLevel { get; set; } = string.Empty;
-    public string HealthStatus { get; set; } = string.Empty;
-    public string EmploymentStatus { get; set; } = string.Empty;
-    public string WorkUnit { get; set; } = string.Empty;
-    public string IncomeSource { get; set; } = string.Empty;
-    public decimal AnnualIncome { get; set; }
-    public int FamilySize { get; set; }
-    public string ApplicationReason { get; set; } = string.Empty;
-    public string Remarks { get; set; } = string.Empty;
-    public string CreatedBy { get; set; } = string.Empty;
-}
+// 已删除（2026-11 死代码）：ApplicationCreateRequest——仅被已删除的
+// IApplicationService.CreateAsync(ApplicationCreateRequest) 零调用链引用。
 
 /// <summary>
 /// 申请更新请求
@@ -357,7 +320,8 @@ public class ChangeRecordCreateRequest
 }
 
 /// <summary>
-/// 渐退期设置请求    /// </summary>
+/// 渐退期设置请求
+/// </summary>
 public class GracePeriodSetRequest
 {
     public long ArchiveId { get; set; }

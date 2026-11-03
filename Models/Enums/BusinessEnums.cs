@@ -1,4 +1,4 @@
-﻿namespace NewCosmos.Models.Enums;
+namespace NewCosmos.Models.Enums;
 
 /// <summary>
 /// 变更类型
@@ -22,7 +22,8 @@ public enum ChangeCategory
 }
 
 /// <summary>
-/// 打印状    /// </summary>
+/// 打印状
+/// </summary>
 public enum PrintStatus
 {
     Pending,

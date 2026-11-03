@@ -23,8 +23,10 @@ public class WindowsPrinterService : IPrinterService
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            // 枚举失败降级空列表（打印入口自会提示无打印机）；留痕供排障
+            Serilog.Log.Warning(ex, "[WindowsPrinterService] 枚举已安装打印机失败（WMI），返回空列表");
         }
         return printers;
     }
@@ -41,8 +43,10 @@ public class WindowsPrinterService : IPrinterService
                 return printer["Name"]?.ToString() ?? string.Empty;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            // 查询失败返回空串（调用方按"无默认打印机"降级处理）；留痕供排障
+            Serilog.Log.Warning(ex, "[WindowsPrinterService] 查询默认打印机失败（WMI），返回空");
         }
         return string.Empty;
     }

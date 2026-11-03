@@ -14,14 +14,14 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="4">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border BackgroundColor="#F1F5F9" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center">
-                                <Label Text="{Binding MemberRole}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberRole}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                             <Label.FormattedText>
                                 <FormattedString>
                                     <Span Text="{Binding Age}"/><Span Text=" 周岁 · "/><Span Text="{Binding StatusLabel}"/>
@@ -29,7 +29,7 @@
                             </Label.FormattedText>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="办理" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="办理" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="{StaticResource Primary}" TextColor="White" VerticalOptions="Center"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
                             CommandParameter="{Binding .}"/>
@@ -42,14 +42,14 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="4">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border BackgroundColor="#F1F5F9" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center">
-                                <Label Text="{Binding MemberRole}" FontSize="11" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberRole}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                        <Label FontSize="13" TextColor="{StaticResource TextSecondary}">
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                             <Label.FormattedText>
                                 <FormattedString>
                                     <Span Text="{Binding Age}"/><Span Text=" 周岁 · "/><Span Text="{Binding StatusLabel}"/>
@@ -57,9 +57,38 @@
                             </Label.FormattedText>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="复核办理" FontSize="12" Padding="10,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="复核办理" FontSize="14" Padding="10,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="{StaticResource Warning}" TextColor="White" VerticalOptions="Center"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                            CommandParameter="{Binding .}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- 死亡待停发行（死亡联动待办 ElderlyStop 域） -->
+        <DataTemplate x:Key="DeathStopCard" x:DataType="DeathLinkageTaskItem">
+            <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <VerticalStackLayout Spacing="4">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding DeceasedName}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                            <Border BackgroundColor="#F1F5F9" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center">
+                                <Label Text="{Binding TaskDomainName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+                        <Label Text="{Binding DeceasedIdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="死亡 "/><Span Text="{Binding DeathDateText}"/><Span Text=" · "/><Span Text="{Binding DeathReason}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1" Text="停发办理" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                            BackgroundColor="{StaticResource Error}" TextColor="White" VerticalOptions="Center"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleDeathStopCommand}"
                             CommandParameter="{Binding .}"/>
                 </Grid>
             </Border>
@@ -69,33 +98,29 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 紫色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="10">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="高龄津贴下月待办" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="已完结档案中年满80周岁的待办老人名单" FontSize="13" TextColor="#E6FFFFFF"/>
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <components:StatCapsule Grid.Column="0" Value="{Binding PendingNewCountText}" Caption="待新增（人）"/>
-                    <components:StatCapsule Grid.Column="1" Value="{Binding PendingTransferCountText}" Caption="需停旧增新（人）"/>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="高龄津贴下月待办"
+                                   Subtitle="已完结档案中年满80周岁的待办老人名单"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+            <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding PendingNewCountText}" Caption="待新增（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding PendingTransferCountText}" Caption="需停旧增新（人）"/>
                 </Grid>
-            </VerticalStackLayout>
-        </Border>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
 
-        <!-- Tab 胶囊 -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
+        <!-- Tab 胶囊（第三格死亡待停发仅承接人可见） -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8" Padding="12,10" BackgroundColor="White">
             <Border Grid.Column="0" StrokeShape="RoundRectangle 16" Padding="10,8"
                     BackgroundColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
                 <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/></Border.GestureRecognizers>
                 <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
-                    <Label Text="待新增" FontSize="13" VerticalOptions="Center"
+                    <Label Text="待新增" FontSize="14" VerticalOptions="Center"
                            TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                    <Label Text="{Binding PendingNewCountText}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                    <Label Text="{Binding PendingNewCountText}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                            TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                 </HorizontalStackLayout>
             </Border>
@@ -103,10 +128,21 @@
                     BackgroundColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
                 <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/></Border.GestureRecognizers>
                 <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
-                    <Label Text="需停旧增新" FontSize="13" VerticalOptions="Center"
+                    <Label Text="需停旧增新" FontSize="14" VerticalOptions="Center"
                            TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                    <Label Text="{Binding PendingTransferCountText}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                    <Label Text="{Binding PendingTransferCountText}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                            TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
+                </HorizontalStackLayout>
+            </Border>
+            <Border Grid.Column="2" StrokeShape="RoundRectangle 16" Padding="10,8"
+                    IsVisible="{Binding CanHandleDeathStop}"
+                    BackgroundColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#DC2626|#FEE2E2'}">
+                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="2"/></Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Label Text="死亡待停发" FontSize="14" VerticalOptions="Center"
+                           TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                    <Label Text="{Binding DeathStopCountText}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
+                           TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#DC2626'}"/>
                 </HorizontalStackLayout>
             </Border>
         </Grid>
@@ -125,11 +161,17 @@
                     <Label Text="暂无需停旧增新的老人" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
                 </CollectionView.EmptyView>
             </CollectionView>
+            <CollectionView ItemsSource="{Binding DeathStopItems}" ItemTemplate="{StaticResource DeathStopCard}"
+                            IsVisible="{Binding IsTab2Selected}" Margin="12,8" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="暂无死亡待停发任务" TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center" Margin="0,32"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
         </Grid>
 
         <!-- 刷新 -->
         <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
-            <Button Text="刷新待办" HeightRequest="42" FontSize="14" CornerRadius="10"
+            <Button Text="刷新待办" HeightRequest="42" FontSize="15" CornerRadius="10"
                     BackgroundColor="{StaticResource Primary}" TextColor="White"
                     Command="{Binding RefreshCommand}"/>
         </Border>
@@ -139,7 +181,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

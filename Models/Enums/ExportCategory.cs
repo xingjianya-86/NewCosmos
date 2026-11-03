@@ -1,12 +1,14 @@
-﻿namespace NewCosmos.Models.Enums;
+namespace NewCosmos.Models.Enums;
 
 /// <summary>
 /// 导出分类枚举
-/// 定义不同业务场景的导出目    /// </summary>
+/// 定义不同业务场景的导出目
+/// </summary>
 public enum ExportCategory
 {
     /// <summary>
-    /// Schema检查报    /// </summary>
+    /// Schema检查报
+/// </summary>
     SchemaReport,
 
     /// <summary>
@@ -15,7 +17,8 @@ public enum ExportCategory
     ArchiveExport,
 
     /// <summary>
-    /// 月报    /// </summary>
+    /// 月报
+/// </summary>
     MonthlyReport,
 
     /// <summary>

@@ -125,6 +125,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                       AND m.id_card IS NOT NULL AND LENGTH(m.id_card) = 18
                       AND SUBSTRING(m.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(m.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                 ),
                 import_persons AS (
@@ -137,6 +138,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -146,6 +148,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -155,6 +158,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -164,6 +168,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -173,6 +178,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -182,6 +188,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                     UNION ALL
                     SELECT p.id, p.name, p.id_card, p.gender,
@@ -191,6 +198,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
                       AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
+                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                 ),
                 all_families AS (

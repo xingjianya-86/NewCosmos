@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyBenefitsHomePage"
@@ -13,39 +13,21 @@
             <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
 
                 <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
-                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-                    <VerticalStackLayout Spacing="16">
-
-                        <!-- 返回行 -->
-                        <Grid ColumnDefinitions="Auto,*">
-                            <HorizontalStackLayout Spacing="6">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
-                        </Grid>
-
-                        <!-- 标题与职责 -->
-                        <HorizontalStackLayout Spacing="14">
-                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                                <Label Text="高龄津贴发放" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="80 周岁以上老年人津贴申请登记 · 停发管理 · 类别复核 · 月度报表" Style="{StaticResource ModuleHeroSubtitle}"/>
-                            </VerticalStackLayout>
-                        </HorizontalStackLayout>
-
-                        <!-- 模块统计栏 -->
-                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                            <components:StatCapsule  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享领取（人）"/>
-                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyNewText}" Caption="本月新增登记（人）"/>
+                <!-- 统一页头（纸墨档案风报头 · Phase 6，统计胶囊迁入 Stats 插槽并转浅色变体） -->
+                <components:PageHeaderView
+                                           Glyph="{OnPlatform WinUI='&#xE7B8;', Android='&#x1F474;'}"
+                                           Title="高龄津贴发放"
+                                           Subtitle="80 周岁以上老年人津贴申请登记 · 停发管理 · 类别复核 · 月度报表"
+                                           BackCommand="{Binding GoBackCommand}"
+                                           BackText="返回工作台">
+                    <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule IsLight="True"  Grid.Column="0"  Value="{Binding ActiveCountText}" Caption="在享领取（人）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="1"  Value="{Binding MonthlyNewText}" Caption="本月新增登记（人）"/>
 
                             <Border Grid.Column="2" StrokeThickness="0" StrokeShape="RoundRectangle 8"
                                     BackgroundColor="Transparent" Padding="0">
-                                <components:StatCapsule Value="{Binding PendingNewText}" Caption="待新增（人）"/>
+                                <components:StatCapsule IsLight="True" Value="{Binding PendingNewText}" Caption="待新增（人）"/>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
                                 </Border.GestureRecognizers>
@@ -53,15 +35,14 @@
 
                             <Border Grid.Column="3" StrokeThickness="0" StrokeShape="RoundRectangle 8"
                                     BackgroundColor="Transparent" Padding="0">
-                                <components:StatCapsule Value="{Binding PendingTransferText}" Caption="需停旧增新（人）"/>
+                                <components:StatCapsule IsLight="True" Value="{Binding PendingTransferText}" Caption="需停旧增新（人）"/>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding NavigateToElderlyPendingCommand}"/>
                                 </Border.GestureRecognizers>
                             </Border>
                         </Grid>
-
-                    </VerticalStackLayout>
-                </Border>
+                    </components:PageHeaderView.Stats>
+                </components:PageHeaderView>
 
                 <!-- 子功能卡片区 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">

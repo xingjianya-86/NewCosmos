@@ -1,0 +1,52 @@
+# NewCosmos 内网 OCR 服务（Xiaomi-OCR-0）— Docker Compose
+#
+# 拓扑：ocr-api(:8788，宿主 LAN/ZeroTier 网卡绑定) → ollama(仅容器内网，不发布端口)
+# 内存预算（宿主 7.7G，已用 3.4G）：ollama ≤3G（BF16 权重 1.6G + KV/缓冲），api ≤300M
+#
+# 首次部署后必须执行 setup_model.sh 拉取模型（见 README.md）
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nc-ocr-ollama
+    restart: unless-stopped
+    environment:
+      # 模型常驻：避免每次识别重载 1.8GB（重载约 10-20 秒）
+      OLLAMA_KEEP_ALIVE: "24h"
+      # 单请求串行：CPU 推理无并发收益，排队好过抢核（宿主还有 10 个业务容器）
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ollama-models:/root/.ollama
+    mem_limit: 3g
+    networks:
+      - ocrnet
+    # ⚠️ 不发布 11434 到宿主机：模型服务仅容器网络可达，外部只能打 ocr-api
+
+  ocr-api:
+    build: .
+    container_name: nc-ocr-api
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_URL: "http://ollama:11434/v1"
+      # 由 setup_model.sh 从 longwayxu/xiaomi-ocr-0:bf16 派生（num_ctx=8192，见 Modelfile）
+      OLLAMA_MODEL: "nc-ocr:ctx8192"
+      OCR_MAX_TOKENS: "4096"
+      OCR_KIE_MAX_TOKENS: "1024"
+      OCR_KEEP_ALIVE: "24h"
+    ports:
+      # 只绑内网网卡（LAN + ZeroTier），不暴露公网；客户端配置其一即可（与 DB 可达性同源）
+      - "192.168.0.2:8788:8788"
+      - "10.110.0.2:8788:8788"
+    mem_limit: 300m
+    networks:
+      - ocrnet
+
+volumes:
+  ollama-models:
+
+networks:
+  ocrnet:
+    driver: bridge

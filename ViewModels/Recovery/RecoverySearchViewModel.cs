@@ -139,6 +139,64 @@ public partial class RecoverySearchViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 应用导航参数（RecoverySearchParameter，SetParameterAsync 于 Push 前调用）。
+    /// 纯内存写入不打 IO：关键词按目标页签落位，pending 标记留给 OnAppearing 的
+    /// <see cref="LoadInitialListAsync"/> 消费（属性 setter/参数注入里不做查询，§6）。
+    /// </summary>
+    public void ApplyNavigationParameter(RecoverySearchParameter? parameter)
+    {
+        if (parameter == null) return;
+
+        if (!string.IsNullOrWhiteSpace(parameter.Keyword))
+        {
+            if (parameter.OpenHistoryMode)
+                HistoryKeyword = parameter.Keyword;
+            else
+                SearchKeyword = parameter.Keyword;
+        }
+
+        if (parameter.OpenHistoryMode)
+        {
+            IsStoppedMode = false;
+            IsHistoryMode = true;
+            _pendingInitialLoad = true;
+        }
+        else if (!string.IsNullOrWhiteSpace(parameter.Keyword))
+        {
+            _pendingInitialLoad = true;
+        }
+
+        NotifyAllCommandsCanExecuteChanged();
+    }
+
+    /// <summary>导航参数触发的待执行初始加载（一次性消费，防重复 OnAppearing 触发）</summary>
+    private bool _pendingInitialLoad;
+
+    /// <summary>
+    /// 页面出现时的初始加载（桌面/手机孪生页 OnAppearing 统一入口）：
+    /// 统计必载；历史页签每次出现刷新列表（与手机端原行为一致）；
+    /// 参数注入的 pending 一次性消费——历史模式加载历史，停止人员模式带关键词自动搜索一次。
+    /// </summary>
+    public async Task LoadInitialListAsync()
+    {
+        await LoadStatsAsync();
+
+        if (IsHistoryMode)
+        {
+            await LoadHistoryAsync();
+            _pendingInitialLoad = false;
+            return;
+        }
+
+        if (_pendingInitialLoad)
+        {
+            _pendingInitialLoad = false;
+            if (!string.IsNullOrWhiteSpace(SearchKeyword))
+                await SearchAsync();
+        }
+    }
+
+    /// <summary>
     /// 搜索命令
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSearch))]
@@ -205,8 +263,9 @@ public partial class RecoverySearchViewModel : ViewModelBase
             IsBusy = true;
             LoadingMessage = "加载追缴表单...";
 
-            // 导航到追缴表单页面，传递选中的人员信息
-            await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage, StoppedPersonDto>(SelectedPerson);
+            // 导航到追缴表单页面，传递选中的人员信息（参数对象统一契约）
+            await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage, RecoveryFormParameter>(
+                new RecoveryFormParameter(Person: SelectedPerson));
         }
         catch (Exception ex)
         {
@@ -241,7 +300,9 @@ public partial class RecoverySearchViewModel : ViewModelBase
     {
         try
         {
-            await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage>();
+            // Record=null 即新建（参数对象统一契约，替代原无参跳转）
+            await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage, RecoveryManualParameter>(
+                new RecoveryManualParameter());
         }
         catch (Exception ex)
         {
@@ -383,11 +444,13 @@ public partial class RecoverySearchViewModel : ViewModelBase
         {
             if (record.InputMode == RecoveryConstants.INPUT_MODE_MANUAL)
             {
-                await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage, RecoveryRecord>(record);
+                await NavigateToPageAsync<Pages.Recovery.RecoveryManualPage, RecoveryManualParameter>(
+                    new RecoveryManualParameter(Record: record));
             }
             else
             {
-                await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage, RecoveryRecord>(record);
+                await NavigateToPageAsync<Pages.Recovery.RecoveryFormPage, RecoveryFormParameter>(
+                    new RecoveryFormParameter(Record: record));
             }
         }
         catch (Exception ex)
@@ -415,7 +478,7 @@ public partial class RecoverySearchViewModel : ViewModelBase
         {
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
             PrintNavigationData.ClearDocumentMode();
-            PrintNavigationData.BusinessType = "Recovery";
+            PrintNavigationData.BusinessType = PrintBusinessTypes.Recovery;
             PrintNavigationData.BusinessId = record.Id;
             PrintNavigationData.Classification = record.InputMode == RecoveryConstants.INPUT_MODE_MANUAL
                 ? RecoveryConstants.INPUT_MODE_MANUAL
@@ -452,7 +515,7 @@ public partial class RecoverySearchViewModel : ViewModelBase
         {
             var request = new PrintJobRequest
             {
-                BusinessType = "Recovery",
+                BusinessType = PrintBusinessTypes.Recovery,
                 BusinessId = record.Id,
                 Classification = record.InputMode == RecoveryConstants.INPUT_MODE_MANUAL
                     ? RecoveryConstants.INPUT_MODE_MANUAL
@@ -481,57 +544,12 @@ public partial class RecoverySearchViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 填报单位默认值：当前登录用户所属组织名称（单位全称，取不到时回退登录用户名）
+    /// 构建《追缴资金办理单》补打字段（单点装配于 RecoveryPrintFieldBuilder，三入口共用）
     /// </summary>
-    private async Task<string> GetReportUnitAsync()
-    {
-        var orgId = App.CurrentUserOrganizationId;
-        if (!orgId.HasValue)
-            return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-
-        try
-        {
-            var orgService = ServiceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IOrganizationService>();
-            var result = await orgService.GetByIdAsync(orgId.Value, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
-            {
-                var org = result.Value;
-                if (!string.IsNullOrWhiteSpace(org.Name)) return org.Name;
-                if (!string.IsNullOrWhiteSpace(org.TownName)) return org.TownName;
-                if (!string.IsNullOrWhiteSpace(org.CountyName)) return org.CountyName;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"获取填报单位默认值失败: {ex.Message}");
-        }
-
-        return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-    }
-
-    /// <summary>
-    /// 构建《追缴资金办理单》补打字段（key 与模板中文占位符对应）
-    /// </summary>
-    private async Task<Dictionary<string, string>> BuildPrintFieldsAsync(RecoveryRecord record)
-    {
-        var now = DateTime.Now;
-        var reportUnit = await GetReportUnitAsync();
-        var codeResult = await _recoveryService.GenerateRecoveryCodeAsync(now);
-        var startMonth = record.StartMonth ?? string.Empty;
-        var endMonth = record.EndMonth ?? string.Empty;
-
-        return new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [FieldKeys.RECOVERY_UNIT] = reportUnit,
-            [FieldKeys.RECOVERY_CODE] = codeResult.IsSuccess ? codeResult.Value : string.Empty,
-            [FieldKeys.RECOVERY_SEQ] = "1",
-            [FieldKeys.RECOVERY_PERSON_NAME] = record.PersonName,
-            [FieldKeys.RECOVERY_ID_CARD] = record.IdCard ?? string.Empty,
-            [FieldKeys.RECOVERY_SOURCE_TYPE] = record.SourceTypeDisplay,
-            [FieldKeys.RECOVERY_AMOUNT] = record.RecoveryAmount.ToString("N2"),
-            [FieldKeys.RECOVERED_AMOUNT] = record.RecoveredAmount.ToString("N2"),
-            [FieldKeys.RECOVERY_REPORT_DATE] = now.ToString("yyyy年MM月dd日"),
-            [FieldKeys.RECOVERY_RANGE] = $"{startMonth} 至 {endMonth}"
-        };
-    }
+    private Task<Dictionary<string, string>> BuildPrintFieldsAsync(RecoveryRecord record)
+        => RecoveryPrintFieldBuilder.BuildFieldsAsync(
+            ServiceProvider, _recoveryService, record.Id,
+            record.PersonName, record.IdCard, record.SourceTypeDisplay,
+            record.RecoveryAmount, record.RecoveredAmount,
+            record.StartMonth ?? string.Empty, record.EndMonth ?? string.Empty);
 }

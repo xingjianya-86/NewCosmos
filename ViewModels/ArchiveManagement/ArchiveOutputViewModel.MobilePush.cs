@@ -298,7 +298,7 @@ public partial class ArchiveOutputViewModel
             fields = await BuildDirectoryFieldsAsync(fields);
             rows = BuildDirectoryRows(timeline.MeetingDate);
         }
-        else if (template.Name.Contains("赡养费承诺书"))
+        else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
         {
             rows = PrintNavigationData.SupporterTableData ?? new List<Dictionary<string, string>>();
         }

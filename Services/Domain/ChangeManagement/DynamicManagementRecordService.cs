@@ -247,7 +247,8 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
                 [FieldKeys.APPLICANT_NAME] = app.ApplicantName ?? "", // 批4 双写→清理：原 DM_HEAD_NAME 已删（同源同值）
                 [FieldKeys.HUKOU_ADDRESS] = app.HukouAddress ?? "", // 批4 双写→清理：原 DM_HEAD_HUKOU 已删（同源同值）
                 // 批5 双写→清理：原 DM_HEAD_RESIDENCE 已删（同源同值）
-                [FieldKeys.RESIDENCE_ADDRESS] = $"{app.Town}{app.Community}{app.Address}",
+                // 地址统一走文本级唯一入口（县+镇+村+门牌，已含则跳过；原裸拼会重复）
+                [FieldKeys.RESIDENCE_ADDRESS] = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address),
                 [FieldKeys.DM_CATEGORY] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
                 [FieldKeys.DM_CYCLE] = CycleText,
 

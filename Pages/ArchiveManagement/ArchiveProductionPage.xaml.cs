@@ -5,7 +5,6 @@ using NewCosmos.ViewModels.Base;
 namespace NewCosmos.Pages.ArchiveManagement;
 
 public partial class ArchiveProductionPage : ContentPage,
-    IParameterizedPage<AssetCheckArchiveParameter>,
     IParameterizedPage<ApplicationArchiveParameter>,
     IParameterizedPage<ApplicationReviewArchiveParameter>
 {
@@ -44,10 +43,6 @@ public partial class ArchiveProductionPage : ContentPage,
         }
     }
 
-    /// <summary>导航参数入口：从资产核查记录初始化（接口显式实现）</summary>
-    Task IParameterizedPage<AssetCheckArchiveParameter>.SetParameterAsync(AssetCheckArchiveParameter parameter)
-        => _viewModel.InitializeFromAssetCheckAsync(parameter.VerificationId);
-
     /// <summary>导航参数入口：从申请记录初始化（接口显式实现）</summary>
     Task IParameterizedPage<ApplicationArchiveParameter>.SetParameterAsync(ApplicationArchiveParameter parameter)
         => _viewModel.InitializeFromApplicationAsync(parameter.ApplicationId);
@@ -56,3 +51,6 @@ public partial class ArchiveProductionPage : ContentPage,
     Task IParameterizedPage<ApplicationReviewArchiveParameter>.SetParameterAsync(ApplicationReviewArchiveParameter parameter)
         => _viewModel.InitializeFromApplicationReviewAsync(parameter.ApplicationId, parameter.BusinessTitle);
 }
+
+// 已删除（2026-11 死代码）：AssetCheckArchiveParameter 接口实现——该 record 全仓无 new 调用方
+// （"从资产核查进档案制作"的实际路径是 AssetCheckFormParameter → 申请表单），属断头路。

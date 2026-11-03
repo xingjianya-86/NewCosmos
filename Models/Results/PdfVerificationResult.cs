@@ -1,15 +1,6 @@
 ﻿namespace NewCosmos.Models.Results;
 
-public class PdfVerificationResult
-{
-    public bool IsValid { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string ExpectedName { get; set; } = string.Empty;
-    public bool NameFoundInFileName { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public string FilePath { get; set; } = string.Empty;
-    public DateTime VerifiedAt { get; set; } = DateTime.Now;
-}
+// 已删除（2026-11）：PdfVerificationResult 类——仅被死方法 BatchVerifyAsync 引用（全仓零调用方取证）。
 
 public class PdfVerificationRecord
 {

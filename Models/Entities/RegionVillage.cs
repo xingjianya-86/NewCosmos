@@ -1,4 +1,4 @@
-﻿namespace NewCosmos.Models.Entities;
+namespace NewCosmos.Models.Entities;
 
 /// <summary>
 /// ?社区实体（种子数据）
@@ -27,11 +27,13 @@ public class RegionVillage
     public string VillageCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 类型：村委会/居委    /// </summary>
+    /// 类型：村委会/居委
+/// </summary>
     public string VillageType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 排序    /// </summary>
+    /// 排序
+/// </summary>
     public int SortOrder { get; set; }
 
     /// <summary>

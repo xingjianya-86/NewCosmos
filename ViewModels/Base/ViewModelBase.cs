@@ -359,21 +359,10 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     /// <summary>
     /// Android 上尝试解析手机专用页面（Pages.Mobile.Mobile{原页面名}），找不到则回退原页面。
+    /// 解析规则单点实现于 <see cref="Navigation.PageResolver"/>（与 NavigationService/App 同源）。
     /// </summary>
     protected Page ResolvePage<TPage>() where TPage : Page
-    {
-        if (DeviceInfo.Platform == DevicePlatform.Android)
-        {
-            var mobileTypeName = $"NewCosmos.Pages.Mobile.Mobile{typeof(TPage).Name}";
-            var mobileType = typeof(TPage).Assembly.GetType(mobileTypeName);
-            if (mobileType != null)
-            {
-                var resolved = ServiceProvider.GetService(mobileType) as Page;
-                if (resolved != null) return resolved;
-            }
-        }
-        return ServiceProvider.GetRequiredService<TPage>();
-    }
+        => (Page)Navigation.PageResolver.Resolve(ServiceProvider, typeof(TPage));
 
     /// <summary>
     /// 带页面标题的导航：push 前将标题写入 Page.Title，使其成为窗口标题随导航栈恢复的数据源
@@ -475,6 +464,19 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     /// </summary>
     protected Task NavigateToPageAsync<TPage>() where TPage : Page
         => NavigateToPageAsync<TPage>((Action<TPage>?)null);
+
+    /// <summary>
+    /// 特困供养人员取消（停止）情况表 · 退出直出：准备上下文后跳档案输出页（TemplateFilter 强白名单，仅出本表）。
+    /// 供各特困停发入口（户主死亡整户停止/最后成员死亡/经济复核·成员变更停旧建新/归档终结判定不合格等）成功后调用，全场景复用。
+    /// 取数失败时服务内已记日志并返回 false，此处不导航。
+    /// </summary>
+    protected async Task NavigateToDestituteCancelFilingAsync(long applicationId, string? stopReasonKey)
+    {
+        var svc = ServiceProvider.GetRequiredService<Services.Domain.SocialAssistance.IDestituteCancelFilingService>();
+        var ok = await svc.PrepareNavigationAsync(applicationId, stopReasonKey, CancellationToken);
+        if (ok)
+            await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
+    }
 
     /// <summary>
     /// 参数化页面导航（单一传参通道）：DI 解析 → 按 <see cref="IParameterizedPage{TParam}"/> 注入参数 → 推送。

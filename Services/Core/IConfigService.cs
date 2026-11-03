@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Options;
+using NewCosmos.Models.Options;
 
 namespace NewCosmos.Services.Core;
 
@@ -13,7 +13,8 @@ public interface IConfigService
     AppOptions GetAppOptions();
 
     /// <summary>
-    /// 获取数据库配    /// </summary>
+    /// 获取数据库配置（连接参数；enc: 密文自动解密）
+/// </summary>
     DatabaseOptions GetDatabaseOptions();
 
     /// <summary>
@@ -85,15 +86,18 @@ public interface IConfigService
     void SaveSchemaOptions(SchemaOptions options);
 
     /// <summary>
-    /// 确保配置目录存在，不存在则创    /// </summary>
+    /// 确保配置目录存在，不存在则创
+/// </summary>
     void EnsureConfigDirectoryExists();
 
     /// <summary>
-    /// 检查所有配置文件是否存    /// </summary>
+    /// 检查所有配置文件是否存
+/// </summary>
     bool CheckConfigFilesExist();
 
     /// <summary>
-    /// 获取缺失的配置文件列    /// </summary>
+    /// 获取缺失的配置文件列
+/// </summary>
     List<string> GetMissingConfigFiles();
 
     /// <summary>

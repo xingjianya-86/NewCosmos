@@ -855,6 +855,8 @@ public partial class DutyService
                 if (!required.Contains(group)) continue;
 
                 // 开关规则：休息日的周日复用周六所选领导（不推进领导组休息日游标）
+                // 复用前必须校验当日可用性（请假 / 入职离职 / 同日已出班）：命中则回退正常轮转，
+                // 由下方轮转逻辑跳过不可用者（被跳过者视为已消耗轮次）
                 if (group == DutyConstants.Groups.LEADER &&
                     dateType == DutyConstants.DateTypes.RESTDAY &&
                     sameLeaderPair &&
@@ -863,8 +865,19 @@ public partial class DutyService
                     var saturdayLeader = await TryGetSaturdayLeaderAsync(date.AddDays(-1), pendingSchedules, ct);
                     if (saturdayLeader.HasValue)
                     {
-                        pendingSchedules.Add((date, dateType, group, saturdayLeader.Value.Id, saturdayLeader.Value.Name));
-                        continue;
+                        var saturdayMember = queues.TryGetValue(group, out var leaderQueue)
+                            ? leaderQueue.FirstOrDefault(m => m.Id == saturdayLeader.Value.Id)
+                            : null;
+                        if (saturdayMember is not null &&
+                            !selected.Contains(saturdayLeader.Value.Id) &&
+                            saturdayMember.AvailableOn(date) &&
+                            !IsOnLeave(leaveRanges, saturdayLeader.Value.Id, date))
+                        {
+                            pendingSchedules.Add((date, dateType, group, saturdayLeader.Value.Id, saturdayLeader.Value.Name));
+                            continue;
+                        }
+                        summary.UnavailableSkippedCount++;
+                        LogInfo($"休息日领导同人复用跳过：{saturdayLeader.Value.Name} 在 {date:yyyy-MM-dd} 请假/不可用，改按正常轮转顺延");
                     }
                     // 周六无领导班次（如领导组无人）时按正常轮转处理
                 }

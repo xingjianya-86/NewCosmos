@@ -33,18 +33,17 @@ public class NewPermissionService : BaseService, INewPermissionService
 
     public async Task<bool> HasPermissionAsync(int userId, string permissionCode, CancellationToken ct = default)
     {
-        LogDebug($"执行权限检查: UserId={userId}");
+        // 热路径（§10）：本方法每个 UI 门控都会调用——原两处 LogDebug 的 $"..." 插值
+        // 在调用侧总是分配（Serilog Debug 过滤发生在分配之后），已移除；
+        // 加载/缓存命中细节由 GetUserPermissionCodesAsync 的日志承载。
         var permissions = await GetUserPermissionCodesAsync(userId, ct);
-        var hasPermission = permissions.Contains(permissionCode);
-        LogDebug($"权限检查结果: UserId={userId}, HasPermission={hasPermission}");
-        return hasPermission;
+        return permissions.Contains(permissionCode);
     }
 
     public async Task<IReadOnlyCollection<string>> GetUserPermissionCodesAsync(int userId, CancellationToken ct = default)
     {
         if (_cache.TryGetValue(userId, out var cached) && !await IsCacheExpiredAsync(userId))
         {
-            LogDebug($"从缓存获取权限: UserId={userId}, Count={cached.Count}");
             return cached;
         }
 

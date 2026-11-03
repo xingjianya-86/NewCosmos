@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Mobile.OcrAssignPage"
+             x:DataType="OcrAssignViewModel"
+             Title="识别结果分配"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- 页头 -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="识别结果分配"
+                                   Subtitle="{Binding SummaryText}"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回" />
+
+        <!-- 校验码警告条 -->
+        <Border Grid.Row="1" IsVisible="{Binding HasChecksumWarning}"
+                BackgroundColor="#FFF7E6" Stroke="#FFD591" StrokeThickness="1"
+                StrokeShape="RoundRectangle 8" Padding="12,8" Margin="12,8,12,0">
+            <Label Text="⚠ 有记录身份证校验位不符，回填后请人工核对证件号"
+                   FontSize="13" TextColor="#D46B08"/>
+        </Border>
+
+        <!-- 记录卡片列表 -->
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Records}" Margin="12,8">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="results:OcrRecognizedRecord">
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White"
+                            StrokeThickness="0" Padding="14" Margin="0,5">
+                        <VerticalStackLayout Spacing="8">
+
+                            <!-- 标题行：类别 + 校验警告徽标 -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="{Binding Category, StringFormat='识别记录 · {0}'}"
+                                       FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                                <Label Grid.Column="1" IsVisible="{Binding IdCardChecksumInvalid}"
+                                       Text="校验位不符" FontSize="12" TextColor="#D46B08"
+                                       BackgroundColor="#FFF7E6" Padding="8,2"/>
+                            </Grid>
+
+                            <!-- 可编辑字段（每字段一行：标签 + Entry） -->
+                            <VerticalStackLayout Spacing="6"
+                                                 BindableLayout.ItemsSource="{Binding FieldItems}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="results:OcrFieldItem">
+                                        <Grid ColumnDefinitions="80,*" ColumnSpacing="8">
+                                            <Label Text="{Binding Label}" FontSize="13"
+                                                   TextColor="{StaticResource TextSecondary}"
+                                                   VerticalOptions="Center"/>
+                                            <Entry Grid.Column="1" Text="{Binding Value, Mode=TwoWay}"
+                                                   FontSize="14" BackgroundColor="#F7F5F0"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <!-- 目标选择 -->
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <Label Text="回填到" FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" FontSize="14"
+                                        ItemsSource="{Binding TargetOptions}"
+                                        ItemDisplayBinding="{Binding DisplayName}"
+                                        SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                                        TextColor="{StaticResource TextPrimary}"
+                                        BackgroundColor="#F7F5F0"
+                                        Title="选择去向"/>
+                            </Grid>
+
+                            <!-- 原始识别文本（展开样式简化为常显小字） -->
+                            <Label Text="原始识别文本" FontSize="12"
+                                   TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding RawText}" FontSize="12"
+                                   TextColor="{StaticResource TextTertiary}"
+                                   LineBreakMode="WordWrap"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- 底部操作 -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,1.5*" ColumnSpacing="10" Padding="12,8,12,24">
+            <Button Grid.Column="0" Text="全部不使用" HeightRequest="46" CornerRadius="12"
+                    FontSize="15" BackgroundColor="#F0EDE6" TextColor="{StaticResource TextSecondary}"
+                    Command="{Binding IgnoreAllCommand}"/>
+            <Button Grid.Column="1" Text="确认回填" HeightRequest="46" CornerRadius="12"
+                    FontSize="16" FontAttributes="Bold"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    Command="{Binding ConfirmCommand}"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

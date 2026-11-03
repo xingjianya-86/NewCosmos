@@ -83,7 +83,7 @@ public class NearRelativeService : BaseService, INearRelativeService
                 return Result.Failure<NearRelativeEntry>(ErrorCodes.NOT_FOUND, "备案不存在或已删除");
 
             var linksResult = await _db.QueryAsync<NearRelativeLink>(
-                @"SELECT * FROM nc_biz_near_relative_links
+                @"SELECT " + WideTableColumns.NearRelativeLinksColumns + @" FROM nc_biz_near_relative_links
                   WHERE staff_id = $1 AND deleted_at IS NULL
                   ORDER BY sort_order, id", ct, id);
             if (linksResult.IsFailure)
@@ -227,7 +227,7 @@ public class NearRelativeService : BaseService, INearRelativeService
 
             var staffIds = staffs.Select(s => s.Id).ToList();
             var linksResult = await _db.QueryAsync<NearRelativeLink>(
-                @"SELECT * FROM nc_biz_near_relative_links
+                @"SELECT " + WideTableColumns.NearRelativeLinksColumns + @" FROM nc_biz_near_relative_links
                   WHERE staff_id = ANY($1) AND deleted_at IS NULL
                   ORDER BY staff_id, sort_order, id", ct, staffIds);
             if (linksResult.IsFailure)
@@ -255,7 +255,7 @@ public class NearRelativeService : BaseService, INearRelativeService
         try
         {
             var linksResult = await _db.QueryAsync<NearRelativeLink>(
-                @"SELECT * FROM nc_biz_near_relative_links
+                @"SELECT " + WideTableColumns.NearRelativeLinksColumns + @" FROM nc_biz_near_relative_links
                   WHERE application_id = $1 AND deleted_at IS NULL
                   ORDER BY staff_id, sort_order, id", ct, applicationId);
             if (linksResult.IsFailure)
@@ -548,7 +548,8 @@ public class NearRelativeService : BaseService, INearRelativeService
     private NearRelativeLink MapApplicationToLink(ApplicationEntity app)
     {
         var birthDate = IdCardValidator.ExtractBirthDate(app.ApplicantIdCard ?? string.Empty);
-        var address = $"{app.Town}{app.Community}{app.Address}".Trim();
+        // 地址统一走文本级唯一入口（县+镇+村+门牌，已含则跳过）
+        var address = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
         var familySize = app.FamilySize > 0
             ? app.FamilySize
             : (app.ConfirmedFamilySize > 0 ? app.ConfirmedFamilySize : (int?)null);

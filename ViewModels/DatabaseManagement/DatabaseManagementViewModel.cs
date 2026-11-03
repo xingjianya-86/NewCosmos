@@ -247,7 +247,7 @@ public partial class DatabaseManagementViewModel : ViewModelBase
     /// </summary>
     public void StartLoadingInBackground() => SafeFireAndForget(async () =>
     {
-        await InitializePermissionsAsync(App.CurrentUserId ?? 1);
+        await InitializePermissionsAsync(App.CurrentUserId ?? 0); // 未登录兜底 0（无权限），禁止兜底 1（管理员）
         await OnAppearingAsync();
     }, nameof(StartLoadingInBackground));
 
@@ -433,6 +433,61 @@ public partial class DatabaseManagementViewModel : ViewModelBase
                 _logger.Error($"数据库备份异常: {ex.Message}");
             }
         }, "执行数据库备份...");
+    }
+
+    /// <summary>
+    /// 从备份文件还原数据库。三重防护：
+    /// ① 第一次确认（明示后果：当前数据将被该备份覆盖）；
+    /// ② 还原前自动再备份当前库（还原翻车也有退路）；
+    /// ③ 第二次确认后才执行，psql 单事务回放（失败整体回滚）。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanExecuteBackup))]
+    private async Task RestoreDatabaseAsync(BackupFileInfo file)
+    {
+        if (!CanBackupDatabase || file == null)
+            return;
+
+        var confirm1 = await _dialogService.DisplayAlertAsync(
+            "还原数据库（第一步确认）",
+            $"即将用备份文件还原数据库：\n\n文件: {file.FileName}\n时间: {file.CreatedAt:yyyy-MM-dd HH:mm:ss}大小: {file.SizeFormatted}\n\n" +
+            "⚠ 还原后当前数据库的全部数据将被该备份时点的数据【覆盖】，此后新增/修改的数据全部丢失！",
+            "下一步", "取消");
+        if (!confirm1) return;
+
+        await ExecuteAsync(async ct =>
+        {
+            // ② 还原前自动备份当前库（失败则中止还原）
+            var backup = await _dbManagementService.BackupDatabaseAsync(BackupPath, ct);
+            if (backup.IsFailure)
+            {
+                await _dialogService.DisplayAlertAsync("已中止",
+                    $"还原前的自动备份失败：{backup.Message}\n\n为避免无法回退，已取消还原操作。", "确定");
+                _logger.Error($"还原前自动备份失败，中止还原: {backup.Message}");
+                return;
+            }
+            _logger.LogBusiness("还原前自动备份完成", ("BackupPath", backup.Value));
+
+            var confirm2 = await _dialogService.DisplayAlertAsync(
+                "还原数据库（最终确认）",
+                $"还原前备份已保存：\n{backup.Value}\n\n确认现在还原？此操作将覆盖当前数据库。",
+                "确认还原", "取消");
+            if (!confirm2) return;
+
+            var result = await _dbManagementService.RestoreDatabaseAsync(file.FilePath, ct);
+            if (result.IsSuccess)
+            {
+                _logger.LogSecurity("数据库还原成功", ("BackupFile", file.FileName), ("PreBackup", backup.Value));
+                await _dialogService.DisplayAlertAsync("还原完成",
+                    $"数据库已从以下备份还原：\n{file.FileName}\n\n还原前的当前数据备份：\n{backup.Value}\n\n" +
+                    "建议重启应用以刷新缓存（权限/字典/标准配置均为进程内缓存）。", "确定");
+                await LoadBackupFilesAsync();
+            }
+            else
+            {
+                await _dialogService.DisplayAlertAsync("还原失败", $"数据库已回滚到还原前状态，未发生变更。\n\n{result.Message}", "确定");
+                _logger.Error($"数据库还原失败: {result.Message}");
+            }
+        }, "还原数据库中，请勿关闭应用...");
     }
 
     private bool CanExecuteBackup() => CanBackupDatabase && IsNotBusy;
@@ -703,32 +758,19 @@ public partial class DatabaseManagementViewModel : ViewModelBase
 
     #region 页面导航
 
+    /// <summary>
+    /// 数据中心子页导航：委托基类 NavigateToPageAsync（统一入口：Android 手机页回退 + 标题注册 +
+    /// PERF 埋点单点实现），本方法只保留"失败弹窗"这一数据中心特有交互。
+    /// （原实现是绕过基类的第三套导航：无 Android 回退、埋点重复）
+    /// </summary>
     private async Task PushPageAsync<T>() where T : Page
     {
         try
         {
-            // [PERF-PROBE] 阶段0归因埋点：分"DI解析+XAML膨胀"与"PushAsync(含动画)"两段计时；
-            // HostBusy/HostLoading 记录点击瞬间本页是否仍在加载，用于验证"上一页占用 UI 线程导致 push 排队"假设
-            var hostBusy = IsBusy;
-            var hostLoading = LoadingMessage;
-
-            var probe = Stopwatch.StartNew();
-            var page = _serviceProvider.GetRequiredService<T>();
-            _serviceProvider.GetRequiredService<IWindowTitleService>()?.Register(page);
-            probe.Stop();
-            _logger.LogPerf("导航-页面构造", probe.Elapsed.TotalMilliseconds,
-                ("Page", typeof(T).Name), ("HostBusy", hostBusy), ("HostLoading", hostLoading));
-
-            probe.Restart();
-            await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
-            probe.Stop();
-            _logger.LogPerf("导航-PushAsync", probe.Elapsed.TotalMilliseconds,
-                ("Page", typeof(T).Name), ("HostBusy", hostBusy));
+            await NavigateToPageAsync<T>();
         }
-
         catch (Exception ex)
         {
-            _logger.Error($"Navigation to {typeof(T).Name} failed: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"打开页面失败: {ex.Message}", "确定");
         }
     }

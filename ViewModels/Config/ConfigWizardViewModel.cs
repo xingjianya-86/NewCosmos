@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Models.Options;
+using NewCosmos.Navigation;
 using NewCosmos.Services.Core;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -208,7 +210,10 @@ public partial class ConfigWizardViewModel : ViewModelBase
             {
                 await _dialogService.DisplayAlertAsync("成功", "配置文件检查通过，应用将重新启动", "确定");
 
-                Helpers.WindowNavigator.CurrentPage = App.Services!.GetRequiredService<Pages.Auth.LoginPage>();
+                // 走导航服务设根页（含 NavigationPage 包装、标题注册、Android 回退解析），
+                // 不再裸赋 WindowNavigator.CurrentPage——旧写法产生无导航栈/无标题跟随的"野"登录页
+                var nav = _serviceProvider.GetRequiredService<INavigationService>();
+                await nav.SetRootAsync(NavigationKeys.Login);
             }
             else
             {

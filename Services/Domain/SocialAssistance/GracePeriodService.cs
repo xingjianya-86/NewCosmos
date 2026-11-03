@@ -1,4 +1,4 @@
-﻿using NewCosmos.Constants;
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
@@ -29,7 +29,8 @@ public class GracePeriodService : BaseService, IGracePeriodService
     }
 
     /// <summary>
-    /// 检查渐退期资格    /// </summary>
+    /// 检查渐退期资格
+/// </summary>
     public GracePeriodCheckResult CheckEligibility(
         string oldClassification, 
         string newClassification,
@@ -75,7 +76,8 @@ public class GracePeriodService : BaseService, IGracePeriodService
     }
 
     /// <summary>
-    /// 设置渐退期    /// </summary>
+    /// 设置渐退期
+/// </summary>
     public GracePeriodInfo SetGracePeriod(int months, decimal? originalGuaranteeAmount = null)
     {
         // 验证月数范围
@@ -126,7 +128,8 @@ public class GracePeriodService : BaseService, IGracePeriodService
     }
 
     /// <summary>
-    /// 清除渐退期    /// </summary>
+    /// 清除渐退期
+/// </summary>
     public void ClearGracePeriod(ApplicationEntity application)
     {
         application.IsInGracePeriod = false;

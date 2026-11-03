@@ -28,7 +28,7 @@ public partial class DutyAdjustPage : ContentPage, IParameterizedPage<DutyAdjust
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        await _viewModel.InitializePermissionsAsync(App.CurrentUserId ?? 1);
+        await _viewModel.InitializePermissionsAsync(App.CurrentUserId ?? 0); // 未登录兜底 0（无权限），禁止兜底 1（管理员）
         await _viewModel.OnAppearingAsync();
     }
 }

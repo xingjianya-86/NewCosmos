@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.Config.NetworkAccessPage"
@@ -10,26 +10,13 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- 渐变头部 -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="网络接入" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="ZeroTier 异地组网 · 私有化/公共服务器可选" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE774;', Android='&#x1F310;'}"
+                                   Title="网络接入"
+                                   Subtitle="ZeroTier 异地组网 · 私有化/公共服务器可选"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回"/>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="16">
@@ -42,7 +29,7 @@
                         <Picker ItemsSource="{Binding ModeOptions}" SelectedIndex="{Binding SelectedModeIndex}"
                                 Style="{StaticResource FormFieldPickerStyle}"/>
                         <Label Text="私有化服务器：使用自建控制器（推荐，数据自主）；公共服务器：使用 ZeroTier Central。"
-                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Border>
 
@@ -102,7 +89,7 @@
                         </Grid>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <Label Text="{Binding CurrentDbEndpointText, StringFormat='当前 database.ini 地址：{0}'}"
-                                   FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"
+                                   FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"
                                    LineBreakMode="WordWrap"/>
                             <Button Grid.Column="1" Text="同步为上方地址" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding SyncDbEndpointCommand}" MinimumWidthRequest="130"/>
@@ -116,17 +103,17 @@
                         <Label Text="连接状态" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="6">
-                            <Label Text="ZeroTier：" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Column="1" Text="{Binding NetworkStatusText}" FontSize="13"
+                            <Label Text="ZeroTier：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Column="1" Text="{Binding NetworkStatusText}" FontSize="15"
                                    TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
-                            <Label Grid.Row="1" Text="节点ID：" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding NodeId}" FontSize="13"
+                            <Label Grid.Row="1" Text="节点ID：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding NodeId}" FontSize="15"
                                    TextColor="{StaticResource TextPrimary}"/>
-                            <Label Grid.Row="2" Text="分配IP：" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding NetworkIpText}" FontSize="13"
+                            <Label Grid.Row="2" Text="分配IP：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding NetworkIpText}" FontSize="15"
                                    TextColor="{StaticResource TextPrimary}"/>
-                            <Label Grid.Row="3" Text="版本：" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding Version}" FontSize="13"
+                            <Label Grid.Row="3" Text="版本：" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding Version}" FontSize="15"
                                    TextColor="{StaticResource TextPrimary}"/>
                         </Grid>
 
@@ -139,7 +126,7 @@
                         </FlexLayout>
 
                         <Label Text="提示：接入后请在服务器网页端（授权地址）勾选授权本机节点，授权前网络层不通；接入成功会自动把数据库地址同步为上方 ZeroTier 地址。"
-                               FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
                     </VerticalStackLayout>
                 </Border>
 

@@ -174,7 +174,7 @@ public partial class RegionManagementViewModel : ViewModelBase
     /// <summary>页面可见后异步执行权限检查 + 数据加载（C 组：不阻塞 PushAsync）</summary>
     public void StartLoadingInBackground() => SafeFireAndForget(async () =>
     {
-        await InitializePermissionsAsync(App.CurrentUserId ?? 1);
+        await InitializePermissionsAsync(App.CurrentUserId ?? 0); // 未登录兜底 0（无权限），禁止兜底 1（管理员）
         await OnAppearingAsync();
     }, nameof(StartLoadingInBackground));
 

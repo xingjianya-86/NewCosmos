@@ -19,7 +19,7 @@
                 </VerticalStackLayout>
                 <Label Text="导入库建档补全：入户调查日期取纳入时间，不可修改"
                        IsVisible="{Binding IsSurveyDateLocked}"
-                       FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                 <VerticalStackLayout Spacing="4">
                     <Label Text="调查员" Style="{StaticResource FormFieldLabelStyle}"/>
                     <Entry Text="{Binding SurveyorName}" Placeholder="姓名" Style="{StaticResource FormFieldEntryStyle}"/>
@@ -50,7 +50,7 @@
                 <Editor Text="{Binding ApplicationReasonDetail}"
                         Placeholder="选择申请理由后自动填充模板，可编辑修改..."
                         HeightRequest="200" MaxLength="500"/>
-                <Label HorizontalOptions="End" FontSize="12" TextColor="{StaticResource TextSecondary}">
+                <Label HorizontalOptions="End" FontSize="14" TextColor="{StaticResource TextSecondary}">
                     <Label.FormattedText>
                         <FormattedString>
                             <Span Text="已输入: "/>

@@ -21,12 +21,14 @@ public partial class FormFieldDescriptor : ObservableObject
     private string _label = string.Empty;
 
     /// <summary>
-    /// 字段值    /// </summary>
+    /// 字段值
+/// </summary>
     [ObservableProperty]
     private string _value = string.Empty;
 
     /// <summary>
-    /// 占位符    /// </summary>
+    /// 占位符
+/// </summary>
     [ObservableProperty]
     private string _placeholder = string.Empty;
 
@@ -60,11 +62,13 @@ public partial class FormFieldDescriptor : ObservableObject
     public string ValidationPattern { get; set; } = string.Empty;
 
     /// <summary>
-    /// 最小长度    /// </summary>
+    /// 最小长度
+/// </summary>
     public int MinLength { get; set; }
 
     /// <summary>
-    /// 最大长度    /// </summary>
+    /// 最大长度
+/// </summary>
     public int MaxLength { get; set; }
 
     /// <summary>
@@ -131,7 +135,8 @@ public partial class FormFieldDescriptor : ObservableObject
     }
 
     /// <summary>
-    /// 焦点变化时触发动画    /// </summary>
+    /// 焦点变化时触发动画
+/// </summary>
     partial void OnIsFocusedChanged(bool value)
     {
         OnPropertyChanged(nameof(FieldStyle));

@@ -8,6 +8,14 @@
     "note": "死亡情况核实说明·三联出具（村留存/镇政府/卫生院，推送单位三份不同）；模板内 {印章} 已改为 (印章) 纯文本不参与替换"
   },
   {
+    "name": "特困供养人员取消备案表",
+    "file": "Templates_NEW/特困供养人员取消备案表.xlsx",
+    "configFile": "Templates_NEW/特困供养人员取消备案表.config.json",
+    "categories": ["档案_特困取消备案表", "停止"],
+    "sortOrder": 0,
+    "note": "特困供养人员退出/停发时专用（取消（停止）情况表）；退出直出经 TemplateFilter 强白名单命中，categories 唯一叶子+停止位"
+  },
+  {
     "name": "档案_定期复核审批表",
     "file": "Templates_NEW/档案_定期复核审批表.xlsx",
     "configFile": "Templates_NEW/档案_定期复核审批表.config.json",

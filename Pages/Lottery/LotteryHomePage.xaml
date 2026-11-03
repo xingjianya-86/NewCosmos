@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
@@ -15,45 +15,20 @@
             <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
 
                 <!-- 域色渐变头部横幅 -->
-                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-                    <VerticalStackLayout Spacing="16">
-
-                        <!-- 返回行 -->
-                        <Grid ColumnDefinitions="Auto,*">
-                            <HorizontalStackLayout Spacing="6">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
+                <!-- 统一页头（纸墨档案风报头 · Phase 6，统计胶囊迁入 Stats 插槽并转浅色变体） -->
+                <components:PageHeaderView
+                                           Glyph="{OnPlatform WinUI='&#xE834;', Android='&#x1F3C6;'}"
+                                           Title="彩票助手"
+                                           Subtitle="双色球 · 大乐透 · 历史数据 · 智能预测"
+                                           BackCommand="{Binding GoBackCommand}"
+                                           BackText="返回工作台">
+                    <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding LatestDrawNumber}" Caption="最新开奖期号"/>
+                            <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding TotalDrawCount, StringFormat='{0}'}" Caption="历史数据（期）"/>
                         </Grid>
-
-                        <!-- 标题与职责 -->
-                        <HorizontalStackLayout Spacing="14">
-                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="{OnPlatform WinUI='&#xE834;', Android='&#x1F3C6;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                                <Label Text="彩票助手" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="双色球 · 大乐透 · 历史数据 · 智能预测" Style="{StaticResource ModuleHeroSubtitle}"/>
-                            </VerticalStackLayout>
-                        </HorizontalStackLayout>
-
-                        <!-- 彩种选择器 -->
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Label Text="当前彩种" TextColor="#B3FFFFFF" VerticalOptions="Center" FontSize="14"/>
-                            <Picker ItemsSource="{Binding LotteryTypeOptions}" SelectedItem="{Binding SelectedLotteryTypeOption}" Grid.Column="1" WidthRequest="150" HorizontalOptions="End" HeightRequest="40" VerticalOptions="Center"/>
-                        </Grid>
-
-                        <!-- 模块统计栏 -->
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <components:StatCapsule Grid.Column="0" Value="{Binding LatestDrawNumber}" Caption="最新开奖期号"/>
-                            <components:StatCapsule Grid.Column="1" Value="{Binding TotalDrawCount, StringFormat='{0}'}" Caption="历史数据（期）"/>
-                        </Grid>
-
-                    </VerticalStackLayout>
-                </Border>
+                    </components:PageHeaderView.Stats>
+                </components:PageHeaderView>
 
                 <!-- 最新开奖信息卡片区 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">

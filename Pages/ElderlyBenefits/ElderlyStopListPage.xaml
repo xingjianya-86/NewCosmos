@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -15,12 +15,12 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 1.2*, 2*, 1.5*, 1.5*, Auto"
                   BackgroundColor="White">
-                <Label Text="{Binding Id}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding Id}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="17" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
                     <Button Text="停发" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
@@ -34,12 +34,12 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 1.2*, 2*, 1.5*, 1.5*, Auto"
                   BackgroundColor="#F8F9FA">
-                <Label Text="{Binding Id}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding Id}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="17" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
                     <Button Text="停发" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
@@ -61,12 +61,12 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 1.2*, 2*, 1.5*, 1.5*, Auto"
                   BackgroundColor="White">
-                <Label Text="{Binding Id}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="--" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Gray500}"/>
-                <Label Grid.Column="2" Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
-                <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding Id}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="--" FontSize="17" VerticalOptions="Center" TextColor="{StaticResource Gray500}"/>
+                <Label Grid.Column="2" Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
+                <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="17" VerticalOptions="Center"/>
                 <Button Grid.Column="6" Text="建档并停发" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource Warning}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
@@ -78,12 +78,12 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="50, 1.5*, 1.2*, 2*, 1.5*, 1.5*, Auto"
                   BackgroundColor="#F8F9FA">
-                <Label Text="{Binding Id}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="--" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Gray500}"/>
-                <Label Grid.Column="2" Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="13" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
-                <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="15" VerticalOptions="Center"/>
+                <Label Text="{Binding Id}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="--" FontSize="17" VerticalOptions="Center" TextColor="{StaticResource Gray500}"/>
+                <Label Grid.Column="2" Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
+                <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="17" VerticalOptions="Center"/>
                 <Button Grid.Column="6" Text="建档并停发" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource Warning}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
@@ -98,31 +98,14 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
 
         <!-- 渐变英雄头部（紫色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="停发办理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="在享人员停发登记 / 导入库搜索" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}"
+                                   Title="停发办理"
+                                   Subtitle="在享人员停发登记 / 导入库搜索"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+        </components:PageHeaderView>
 
         <!-- 统计栏（替换原"共 N 人"chip） -->
         <Grid Grid.Row="1" Padding="20,10" ColumnDefinitions="*,*,*,*" ColumnSpacing="12"
@@ -150,14 +133,14 @@
                     <Grid ColumnDefinitions="Auto, *, Auto">
                         <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                                FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                               FontSize="14"
+                               FontSize="16"
                                TextColor="{StaticResource Gray500}"
                                VerticalOptions="Center"
                                Margin="0,0,8,0"/>
                         <Entry Grid.Column="1"
                                Placeholder="搜索申请人姓名、身份证号（支持当前库+导入库）"
                                Text="{Binding SearchText}"
-                               FontSize="16"
+                               FontSize="18"
                                BackgroundColor="Transparent"
                                ReturnCommand="{Binding SearchImportedCommand}"/>
                         <Button Grid.Column="2"
@@ -185,11 +168,11 @@
                 <HorizontalStackLayout Spacing="8">
                     <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            TextColor="{StaticResource White}"
                            VerticalOptions="Center"/>
                     <Label Text="{Binding ErrorMessage}"
-                           FontSize="13"
+                           FontSize="15"
                            TextColor="{StaticResource White}"
                            VerticalOptions="Center"
                            LineBreakMode="WordWrap"/>

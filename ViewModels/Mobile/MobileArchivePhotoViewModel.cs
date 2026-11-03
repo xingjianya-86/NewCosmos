@@ -3,10 +3,12 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.Printing;
+using NewCosmos.Services.Platform;
 using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -26,6 +28,10 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IOcrRecognizeClient _ocrClient;
+
+    /// <summary>识别回填上下文（表单传入；null = 只存档不识别）</summary>
+    private IOcrAssignContext? _assignContext;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
@@ -55,7 +61,8 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         INewPermissionService permissionService,
         IDialogService dialogService,
         ILoggerService logger,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IOcrRecognizeClient ocrClient)
     {
         _photoService = photoService;
         _printQueueService = printQueueService;
@@ -63,6 +70,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         _dialogService = dialogService;
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _ocrClient = ocrClient;
         Title = "档案照片";
 
         foreach (var (code, name) in PhotoCategoryConstants.All)
@@ -86,6 +94,9 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         ApplicationId = applicationId;
         ApplicantName = applicantName ?? string.Empty;
     }
+
+    /// <summary>注入识别回填上下文（null = 只存档不识别，如档案查询/补传入口）。</summary>
+    public void ApplyAssignContext(IOcrAssignContext? context) => _assignContext = context;
 
     #region 补传会话（历史档案批量补传：拍完一人点「下一位」连续采集）
 
@@ -232,6 +243,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             var savedCount = 0;
             var failedCount = 0;
             string? firstError = null;
+            var savedImages = new List<byte[]>(); // 已保存照片的原始字节（识别用，仅驻留内存）
 
             await ExecuteAsync(async () =>
             {
@@ -276,6 +288,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                         }
 
                         savedCount++;
+                        savedImages.Add(raw);
                         _logger.LogBusiness("采集档案照片",
                             ("ApplicationId", ApplicationId?.ToString() ?? ""),
                             ("Category", SelectedCategoryCode),
@@ -300,6 +313,15 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             if (savedCount == 0 && failedCount == 0)
                 return; // 全部取消
 
+            // ── 识别询问流（2026-11-03 设计定稿）：存档后询问 → 逐张识别 → 跳分配页 ──
+            // 仅当：① 有回填上下文（表单入口）② 该类别需识别 ③ 有已保存图片
+            var categoryFields = OcrFieldKeys.GetFields(SelectedCategoryCode);
+            if (_assignContext is not null && categoryFields is not null && savedImages.Count > 0)
+            {
+                await PromptRecognizeAsync(savedImages, savedCount, failedCount, firstError);
+                return;
+            }
+
             var message = failedCount == 0
                 ? $"已保存 {savedCount} 张照片（{SelectedCategoryName}）"
                 : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）" +
@@ -318,6 +340,76 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         {
             _logger.LogError(ex, "采集照片失败");
             await _dialogService.DisplayAlertAsync("错误", $"采集失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 识别询问流：预提示（模型名/张数/预计耗时/内网声明）→ 用户确认 → 逐张识别（界面阻塞等待）
+    /// → 跳转识别结果分配页（用户定向回填）。跳过 = 仅存档，随时可再来。
+    /// </summary>
+    private async Task PromptRecognizeAsync(List<byte[]> images, int savedCount, int failedCount, string? firstError)
+    {
+        var estimate = OcrConstants.FormatEstimate(images.Count);
+        var failNote = failedCount == 0
+            ? string.Empty
+            : $"\n（另有 {failedCount} 张保存失败{(string.IsNullOrWhiteSpace(firstError) ? "" : $"：{firstError}")}）";
+
+        var start = await _dialogService.DisplayAlertAsync(OcrConstants.PromptTitle,
+            $"已上传 {images.Count} 张「{SelectedCategoryName}」照片。{failNote}\n\n" +
+            $"预计耗时 {estimate}（{OcrConstants.EstimateRangeText}）。\n" +
+            "图片仅发送至内网识别服务，不上传外网。\n" +
+            "识别完成后可为每条结果选择回填位置。",
+            "开始识别", "跳过");
+        if (!start)
+        {
+            _logger.LogBusiness("跳过证件 OCR 识别",
+                ("Category", SelectedCategoryCode), ("ImageCount", images.Count.ToString()));
+            return;
+        }
+
+        // 逐张识别（界面阻塞：ExecuteAsync 置 IsBusy + LoadingOverlay）
+        var results = new List<OcrRecognizeResult>();
+        await ExecuteAsync(async () =>
+        {
+            for (var i = 0; i < images.Count; i++)
+            {
+                LoadingMessage = string.Format(OcrConstants.ProgressTextFormat, i + 1, images.Count);
+                using var stream = new MemoryStream(images[i]);
+                var result = await _ocrClient.RecognizeAsync(stream, SelectedCategoryCode, CancellationToken);
+                if (result.IsSuccess && result.Value is not null && result.Value.HasAny)
+                {
+                    results.Add(result.Value);
+                }
+                else
+                {
+                    // 单张失败不阻断其余（分配页卡片锁定"不使用"由无内容记录处理）
+                    _logger.Warn($"照片 {i + 1} 识别失败: {result.ErrorCode} {result.Message}");
+                }
+            }
+            return Result.Success();
+        }, string.Format(OcrConstants.ProgressTextFormat, 1, images.Count));
+
+        if (results.Count == 0)
+        {
+            await _dialogService.DisplayAlertAsync("识别结果",
+                "均未识别出有效字段，请正对证件、保证光线充足后重拍，或手动录入", "确定");
+            return;
+        }
+
+        // 跳转识别结果分配页（用户选择每条回填去向）
+        var completion = new TaskCompletionSource<int>();
+        await NavigateToPageAsync<Pages.Mobile.OcrAssignPage, OcrAssignParameter>(
+            new OcrAssignParameter(results, _assignContext!, applied =>
+            {
+                completion.TrySetResult(applied);
+            }));
+
+        var applied = await completion.Task;
+        if (applied > 0)
+        {
+            _logger.LogBusiness("证件 OCR 回填返回档案照片页",
+                ("Category", SelectedCategoryCode), ("Applied", applied.ToString()));
+            await ShowSnackBarAsync($"已回填 {applied} 条识别结果", Components.SnackBarType.Success);
         }
     }
 
@@ -426,7 +518,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
             var request = new PrintJobRequest
             {
-                BusinessType = "ArchivePhoto",
+                BusinessType = PrintBusinessTypes.ArchivePhoto,
                 BusinessId = ApplicationId,
                 Classification = PhotoCategoryConstants.GetDisplayName(photo.PhotoCategory),
                 ApplicantName = ApplicantName,

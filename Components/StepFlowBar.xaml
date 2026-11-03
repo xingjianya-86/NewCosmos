@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Components.StepFlowBar">
+
+    <!-- PC 端六步线性向导进度条：圆点 + 连接线 + 文字标签（一步一标签，与 Tab 大按钮明确区分）。
+         当前步蓝底白字加粗、已完成步填色、未到步浅灰；点圆点/标签经 StepTappedCommand 回传步骤号（字符串）。
+         用法：<components:StepFlowBar CurrentStep="{Binding CurrentStep}" StepCount="{Binding TotalSteps}"
+                                       Labels="{Binding StepTitles}" StepTappedCommand="{Binding SwitchStepCommand}"/> -->
+    <Grid x:Name="Host" Padding="0,2" ColumnSpacing="0" />
+</ContentView>

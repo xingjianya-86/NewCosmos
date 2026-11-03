@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.ApplicationWorkflowPage"
@@ -20,10 +20,13 @@
                 </Border.Shadow>
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
 
-                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮 -->
-                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
-                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮（批量勾选框仅"已建档"Tab 显示） -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <CheckBox IsVisible="{Binding ShowBatchCheckbox}"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  VerticalOptions="Center" Margin="0"/>
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="18" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Padding="10,3" StrokeThickness="0" StrokeShape="RoundRectangle 999"
                                     BackgroundColor="{StaticResource InfoSoft}" VerticalOptions="Center">
@@ -41,7 +44,7 @@
                                         <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
                                     </DataTrigger>
                                 </Border.Triggers>
-                                <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource PrimaryDark}">
+                                <Label Text="{Binding StatusText}" FontSize="14" TextColor="{StaticResource PrimaryDark}">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Warning">
                                             <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
@@ -68,9 +71,9 @@
                             </Border>
                         </HorizontalStackLayout>
 
-                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
                             <Button Text="近亲属备案"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Gray500}"
                                     TextColor="White"
@@ -78,7 +81,7 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenNearRelativeForCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="查看档案"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Primary}"
                                     TextColor="White"
@@ -86,7 +89,7 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Primary}"
                                     TextColor="White"
@@ -94,15 +97,23 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Warning}"
                                     TextColor="White"
                                     IsVisible="{Binding ShowEditButtons}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=EditDraftCommand}"
                                     CommandParameter="{Binding .}"/>
+                            <Button Text="出文书"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Secondary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowDirectOutputButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenArchiveOutputCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="删除"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Error}"
                                     TextColor="White"
@@ -113,26 +124,26 @@
                     </Grid>
 
                     <!-- 身份证号 -->
-                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="13"
+                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="15"
                            TextColor="{StaticResource TextSecondary}"/>
 
                     <!-- 元信息（与户主关系 / 编号） + 申请添加时间 -->
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2" IsVisible="{Binding HasMeta}">
-                            <Label Text="{Binding MetaLabel}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding MetaValue}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding MetaLabel}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding MetaValue}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="申请添加时间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="12"
+                            <Label Text="申请添加时间" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <!-- 家庭地址（仅资产核查两 Tab） -->
                     <VerticalStackLayout Grid.Row="3" Spacing="2" IsVisible="{Binding HasAddress}">
-                        <Label Text="家庭地址" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding Address}" FontSize="13"
+                        <Label Text="家庭地址" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Address}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
                     </VerticalStackLayout>
                 </Grid>
@@ -146,10 +157,13 @@
                 </Border.Shadow>
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
 
-                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮 -->
-                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
-                            <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                    <!-- 姓名 + 状态标签 + 单人保 + 操作按钮（批量勾选框仅"已建档"Tab 显示） -->
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <CheckBox IsVisible="{Binding ShowBatchCheckbox}"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  VerticalOptions="Center" Margin="0"/>
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="18" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border Padding="10,3" StrokeThickness="0" StrokeShape="RoundRectangle 999"
                                     BackgroundColor="{StaticResource InfoSoft}" VerticalOptions="Center">
@@ -167,7 +181,7 @@
                                         <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
                                     </DataTrigger>
                                 </Border.Triggers>
-                                <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource PrimaryDark}">
+                                <Label Text="{Binding StatusText}" FontSize="14" TextColor="{StaticResource PrimaryDark}">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding StatusKind}" Value="Warning">
                                             <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
@@ -194,9 +208,9 @@
                             </Border>
                         </HorizontalStackLayout>
 
-                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
                             <Button Text="近亲属备案"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Gray500}"
                                     TextColor="White"
@@ -204,7 +218,7 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenNearRelativeForCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="查看档案"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Primary}"
                                     TextColor="White"
@@ -212,7 +226,7 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Primary}"
                                     TextColor="White"
@@ -220,15 +234,23 @@
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Warning}"
                                     TextColor="White"
                                     IsVisible="{Binding ShowEditButtons}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=EditDraftCommand}"
                                     CommandParameter="{Binding .}"/>
+                            <Button Text="出文书"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Secondary}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowDirectOutputButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenArchiveOutputCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="删除"
-                                    FontSize="13"
+                                    FontSize="15"
                                     Padding="16,8"
                                     BackgroundColor="{StaticResource Error}"
                                     TextColor="White"
@@ -239,26 +261,26 @@
                     </Grid>
 
                     <!-- 身份证号 -->
-                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="13"
+                    <Label Grid.Row="1" Text="{Binding IdCard}" FontSize="15"
                            TextColor="{StaticResource TextSecondary}"/>
 
                     <!-- 元信息（与户主关系 / 编号） + 申请添加时间 -->
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2" IsVisible="{Binding HasMeta}">
-                            <Label Text="{Binding MetaLabel}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding MetaValue}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding MetaLabel}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding MetaValue}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
-                            <Label Text="申请添加时间" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="12"
+                            <Label Text="申请添加时间" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                            <Label Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                     </Grid>
 
                     <!-- 家庭地址（仅资产核查两 Tab） -->
                     <VerticalStackLayout Grid.Row="3" Spacing="2" IsVisible="{Binding HasAddress}">
-                        <Label Text="家庭地址" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding Address}" FontSize="13"
+                        <Label Text="家庭地址" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding Address}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
                     </VerticalStackLayout>
                 </Grid>
@@ -272,34 +294,13 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="业务申请工作流" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="查看各阶段业务状态，办理与档案制作" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+              Glyph="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}"
+                                  Title="业务申请工作流"
+                                  Subtitle="查看各阶段业务状态，办理与档案制作"
+                                  BackCommand="{Binding GoBackCommand}"
+                                  BackText="返回工作台"/>
 
         <!-- Tab 栏 -->
         <Grid Grid.Row="1"
@@ -319,12 +320,12 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="已提交经济核对"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsTab0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -335,7 +336,7 @@
                             BackgroundColor="{StaticResource Secondary}"
                             IsVisible="{Binding SubmittedCount, Converter={StaticResource IntToVisibilityConverter}}">
                         <Label Text="{Binding SubmittedCount}"
-                               FontSize="12"
+                               FontSize="14"
                                FontAttributes="Bold"
                                TextColor="{StaticResource White}"
                                HorizontalOptions="Center"/>
@@ -357,12 +358,12 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE8E5;', Android='&#x1F4E4;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="有报告未建档"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsTab1Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -373,7 +374,7 @@
                             BackgroundColor="{StaticResource Warning}"
                             IsVisible="{Binding HasReportCount, Converter={StaticResource IntToVisibilityConverter}}">
                         <Label Text="{Binding HasReportCount}"
-                               FontSize="12"
+                               FontSize="14"
                                FontAttributes="Bold"
                                TextColor="{StaticResource White}"
                                HorizontalOptions="Center"/>
@@ -395,12 +396,12 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE74F;', Android='&#x1F552;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="草稿"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsTab2Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -411,7 +412,7 @@
                             BackgroundColor="{StaticResource Error}"
                             IsVisible="{Binding DraftCount, Converter={StaticResource IntToVisibilityConverter}}">
                         <Label Text="{Binding DraftCount}"
-                               FontSize="12"
+                               FontSize="14"
                                FontAttributes="Bold"
                                TextColor="{StaticResource White}"
                                HorizontalOptions="Center"/>
@@ -433,12 +434,12 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE7C4;', Android='&#x1F4DD;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="已建档未提交"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsTab3Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -449,7 +450,7 @@
                             BackgroundColor="{StaticResource Warning}"
                             IsVisible="{Binding ArchiveBuiltCount, Converter={StaticResource IntToVisibilityConverter}}">
                         <Label Text="{Binding ArchiveBuiltCount}"
-                               FontSize="12"
+                               FontSize="14"
                                FontAttributes="Bold"
                                TextColor="{StaticResource White}"
                                HorizontalOptions="Center"/>
@@ -471,12 +472,12 @@
                 <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
                     <Label Text="{OnPlatform WinUI='&#xE7C8;', Android='&#x2705;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
                            Text="已完结"
-                           FontSize="13"
+                           FontSize="15"
                            FontAttributes="{Binding IsTab4Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
                            TextColor="{StaticResource TextPrimary}"/>
@@ -487,7 +488,7 @@
                             BackgroundColor="{StaticResource Success}"
                             IsVisible="{Binding ArchiveCompletedCount, Converter={StaticResource IntToVisibilityConverter}}">
                         <Label Text="{Binding ArchiveCompletedCount}"
-                               FontSize="12"
+                               FontSize="14"
                                FontAttributes="Bold"
                                TextColor="{StaticResource White}"
                                HorizontalOptions="Center"/>
@@ -512,14 +513,14 @@
                 <Grid ColumnDefinitions="Auto, *">
                     <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            TextColor="{StaticResource Gray500}"
                            VerticalOptions="Center"
                            Margin="0,0,8,0"/>
                     <Entry Grid.Column="1"
                            Placeholder="搜索姓名、身份证号..."
                            Text="{Binding SearchText}"
-                           FontSize="16"
+                           FontSize="18"
                            BackgroundColor="Transparent"
                            ReturnCommand="{Binding SearchCommand}"/>
                 </Grid>
@@ -539,11 +540,11 @@
                 <HorizontalStackLayout Spacing="8">
                     <Label Text="{OnPlatform WinUI='&#xE783;', Android='&#x1F4CB;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            TextColor="{StaticResource White}"
                            VerticalOptions="Center"/>
                     <Label Text="{Binding ErrorMessage}"
-                           FontSize="13"
+                           FontSize="15"
                            TextColor="{StaticResource White}"
                            VerticalOptions="Center"
                            LineBreakMode="WordWrap"/>
@@ -565,7 +566,7 @@
                 </CollectionView.ItemsLayout>
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
-                        <Label Text="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="暂无已提交的经济核对记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
@@ -582,7 +583,7 @@
                 </CollectionView.ItemsLayout>
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
-                        <Label Text="{OnPlatform WinUI='&#xE8E5;', Android='&#x1F4E4;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8E5;', Android='&#x1F4E4;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="暂无有报告未建档的记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
@@ -599,28 +600,52 @@
                 </CollectionView.ItemsLayout>
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
-                        <Label Text="{OnPlatform WinUI='&#xE74F;', Android='&#x1F552;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE74F;', Android='&#x1F552;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="暂无草稿记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
             </CollectionView>
 
-            <!-- Tab 3: 已建档未提交列表 -->
-            <CollectionView ItemsSource="{Binding ArchiveBuiltItems}"
+            <!-- Tab 3: 已建档未提交列表 + 批量归档工具条 -->
+            <VerticalStackLayout IsVisible="{Binding IsTab3Selected}" Spacing="8">
+                <Border Padding="10,8" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                        BackgroundColor="{StaticResource Gray500}">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8">
+                        <Button Text="全选本页" FontSize="14" Padding="12,6"
+                                BackgroundColor="White" TextColor="{StaticResource TextPrimary}"
+                                Command="{Binding SelectAllBatchCommand}"/>
+                        <Button Grid.Column="1" Text="清空选择" FontSize="14" Padding="12,6"
+                                BackgroundColor="White" TextColor="{StaticResource TextPrimary}"
+                                Command="{Binding ClearBatchSelectionCommand}"/>
+                        <Label Grid.Column="2" Text="勾选后可批量生成文书并归档（状态推进为已完结）"
+                               FontSize="13" TextColor="White" VerticalOptions="Center"
+                               HorizontalTextAlignment="End" LineBreakMode="TailTruncation"/>
+                        <ProgressBar Grid.Column="3" IsVisible="{Binding IsBatchArchiving}"
+                                     Progress="{Binding BatchProgress}" WidthRequest="110"
+                                     VerticalOptions="Center"/>
+                        <Button Grid.Column="4" Text="批量归档" FontSize="15" Padding="16,8"
+                                BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                Command="{Binding BatchArchiveCommand}"/>
+                    </Grid>
+                </Border>
+                <Label Text="{Binding BatchProgressText}" FontSize="13"
+                       IsVisible="{Binding IsBatchArchiving}"
+                       TextColor="{StaticResource PrimaryDark}"/>
+                <CollectionView ItemsSource="{Binding ArchiveBuiltItems}"
                             SelectionMode="None"
                             VerticalOptions="Fill"
-                            IsVisible="{Binding IsTab3Selected}"
                             ItemTemplate="{StaticResource WorkflowCardSelector}">
-                <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
-                </CollectionView.ItemsLayout>
-                <CollectionView.EmptyView>
-                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
-                        <Label Text="{OnPlatform WinUI='&#xE7C4;', Android='&#x1F4DD;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                        <Label Text="暂无已建档未提交记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
-                    </VerticalStackLayout>
-                </CollectionView.EmptyView>
-            </CollectionView>
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
+                            <Label Text="{OnPlatform WinUI='&#xE7C4;', Android='&#x1F4DD;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                            <Label Text="暂无已建档未提交记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </VerticalStackLayout>
 
             <!-- Tab 4: 已完结档案列表 -->
             <CollectionView ItemsSource="{Binding ArchiveCompletedItems}"
@@ -633,7 +658,7 @@
                 </CollectionView.ItemsLayout>
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
-                        <Label Text="{OnPlatform WinUI='&#xE7C8;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7C8;', Android='&#x2705;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                         <Label Text="暂无已完结档案" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>

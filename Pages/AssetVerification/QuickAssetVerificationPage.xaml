@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.AssetVerification.QuickAssetVerificationPage"
@@ -29,7 +29,7 @@
                        MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
 
                 <!-- 查询按钮 -->
-                <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
+                <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                         WidthRequest="36" HeightRequest="36" CornerRadius="18" Padding="0"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=QueryHistoryCommand}"
@@ -42,7 +42,7 @@
                         HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
 
                 <!-- 删除按钮 -->
-                <Button Grid.Column="5" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                <Button Grid.Column="5" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                         WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0"
                         IsEnabled="{Binding IsHead, Converter={StaticResource BoolToInverseConverter}}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=RemoveApplicantCommand}"
@@ -80,7 +80,7 @@
                        MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
 
                 <!-- 查询按钮 -->
-                <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16"
+                <Button Grid.Column="3" Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
                         WidthRequest="36" HeightRequest="36" CornerRadius="18" Padding="0"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=QueryHistoryCommand}"
@@ -93,7 +93,7 @@
                         HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
 
                 <!-- 删除按钮 -->
-                <Button Grid.Column="5" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                <Button Grid.Column="5" Text="{OnPlatform WinUI='&#xE74D;', Android='&#x1F5D1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                         WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0"
                         IsEnabled="{Binding IsHead, Converter={StaticResource BoolToInverseConverter}}"
                         Command="{Binding Source={RelativeSource AncestorType={x:Type QuickAssetVerificationViewModel}}, Path=RemoveApplicantCommand}"
@@ -121,31 +121,13 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="0">
 
         <!-- 渐变英雄头部（橙色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8F5;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="低收入人口经济核对申请" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="快速申请 · 信息录入 · 提交核对" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                                   Title="低收入人口经济核对申请"
+                                   Subtitle="快速申请 · 信息录入 · 提交核对"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台"/>
 
         <!-- 表单内容 -->
         <ScrollView Grid.Row="1">
@@ -159,7 +141,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource PrimarySoft}" Padding="0" StrokeThickness="0">
-                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                        TextColor="{StaticResource Primary}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -171,10 +153,10 @@
 
                         <!-- 所属镇提示 -->
                         <HorizontalStackLayout Spacing="8" IsVisible="{Binding IsTownConfigured}">
-                            <Label Text="所属镇：" FontSize="16" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
-                            <Label Text="{Binding OperatorTownName}" FontSize="16" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
+                            <Label Text="所属镇：" FontSize="18" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Text="{Binding OperatorTownName}" FontSize="18" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
-                        <Label Text="提示：请先完善个人信息的镇归属" FontSize="15" TextColor="{StaticResource Error}"
+                        <Label Text="提示：请先完善个人信息的镇归属" FontSize="17" TextColor="{StaticResource Error}"
                                IsVisible="{Binding IsTownConfigured, Converter={StaticResource BoolToInverseConverter}}"/>
 
                         <!-- 表单字段 -->
@@ -182,34 +164,34 @@
 
                             <!-- 申请日期 -->
                             <VerticalStackLayout Spacing="8">
-                                <Label Text="申请日期" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="申请日期" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <DatePicker Date="{Binding ApplicationDate}" Format="yyyy-MM-dd" HeightRequest="48"/>
                             </VerticalStackLayout>
 
                             <!-- 村社区 -->
                             <VerticalStackLayout Grid.Column="1" Spacing="8">
-                                <Label Text="村社区" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="村社区" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Picker ItemsSource="{Binding Villages}" SelectedItem="{Binding SelectedVillage}"
                                         HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
 
                             <!-- 详细地址 -->
                             <VerticalStackLayout Grid.Column="2" Spacing="8">
-                                <Label Text="详细地址" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="详细地址" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Entry Text="{Binding FamilyAddressDetail}" Placeholder="门牌号等" HeightRequest="48"
                                         BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
 
                             <!-- 联系方式 -->
                             <VerticalStackLayout Grid.Column="3" Spacing="8">
-                                <Label Text="联系方式" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="联系方式" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Entry Text="{Binding ContactPhone}" Placeholder="手机号码" Keyboard="Telephone"
                                         MaxLength="11" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
 
                             <!-- 申请原因 -->
                             <VerticalStackLayout Grid.Column="4" Spacing="8">
-                                <Label Text="申请原因" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="申请原因" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Picker ItemsSource="{Binding ApplicationReasons}" SelectedItem="{Binding SelectedApplicationReason}"
                                         HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
@@ -225,7 +207,7 @@
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                             <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                     BackgroundColor="{StaticResource SuccessSoft}" Padding="0" StrokeThickness="0">
-                                <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18"
+                                <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
                                        TextColor="{StaticResource Success}"
                                        HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
@@ -258,7 +240,7 @@
 
                         <!-- 提示文字 -->
                         <Label Text="注：第一行必须填写户主本人信息，后续行请填写姓名、身份证号并选择家庭关系。"
-                               FontSize="15" TextColor="{StaticResource TextTertiary}"/>
+                               FontSize="17" TextColor="{StaticResource TextTertiary}"/>
                     </VerticalStackLayout>
                 </Border>
 
@@ -281,14 +263,14 @@
 
                             <!-- 代理人姓名 -->
                             <VerticalStackLayout Spacing="8">
-                                <Label Text="代理人姓名" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="代理人姓名" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Entry Text="{Binding AgentName}" Placeholder="输入代理人姓名" HeightRequest="48"
                                         BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
 
                             <!-- 代理人证件类型 -->
                             <VerticalStackLayout Grid.Column="1" Spacing="8">
-                                <Label Text="代理人证件类型" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="代理人证件类型" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Picker ItemsSource="{Binding IdTypes}"
                                         SelectedItem="{Binding AgentIdType}"
                                         HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
@@ -296,14 +278,14 @@
 
                             <!-- 代理人身份证号 -->
                             <VerticalStackLayout Grid.Column="2" Spacing="8">
-                                <Label Text="代理人身份证号" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="代理人身份证号" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Entry Text="{Binding AgentIdCard}" Placeholder="输入代理人身份证号"
                                        MaxLength="18" HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>
 
                             <!-- 代理人关系 -->
                             <VerticalStackLayout Grid.Column="3" Spacing="8">
-                                <Label Text="代理人关系" Style="{StaticResource LabelSmall}" FontSize="15"/>
+                                <Label Text="代理人关系" Style="{StaticResource LabelSmall}" FontSize="17"/>
                                 <Entry Text="{Binding AgentRelationship}" Placeholder="如：村干部、亲属"
                                        HeightRequest="48" BackgroundColor="{StaticResource Background}"/>
                             </VerticalStackLayout>

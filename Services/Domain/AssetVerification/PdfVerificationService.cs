@@ -18,90 +18,6 @@ public class PdfVerificationService : BaseService, IPdfVerificationService
         _db = db;
     }
 
-    public Task<Result<List<PdfVerificationResult>>> BatchVerifyAsync(
-        IEnumerable<string> pdfFilePaths,
-        IEnumerable<string> expectedNames,
-        CancellationToken ct = default)
-    {
-        LogInfo($"执行PDF批量核查");
-
-        var results = new List<PdfVerificationResult>();
-        var filePathsList = pdfFilePaths.ToList();
-        var namesList = expectedNames.ToList();
-
-        if (filePathsList.Count == 0)
-            return Task.FromResult(Result.Success(results));
-
-        foreach (var path in filePathsList)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                continue;
-
-            var fileName = Path.GetFileNameWithoutExtension(path);
-            var matched = false;
-            var matchedName = string.Empty;
-
-            var parts = fileName.Split('_', StringSplitOptions.RemoveEmptyEntries);
-            var nameToken = parts.Length >= 3 ? parts[1] : null;
-
-            if (nameToken != null)
-            {
-                foreach (var name in namesList)
-                {
-                    if (!string.IsNullOrWhiteSpace(name) && nameToken.Equals(name, StringComparison.OrdinalIgnoreCase))
-                    {
-                        matched = true;
-                        matchedName = name;
-                        break;
-                    }
-                }
-            }
-
-            results.Add(new PdfVerificationResult
-            {
-                IsValid = matched,
-                FileName = Path.GetFileName(path),
-                ExpectedName = matchedName,
-                NameFoundInFileName = matched,
-                FilePath = path,
-                VerifiedAt = DateTime.Now,
-                Message = matched ? "验证通过: " + matchedName : "验证失败: 未匹配到预期姓名"
-            });
-        }
-
-        var passCount = results.Count(r => r.IsValid);
-        LogInfo("PDF验证: 总数=" + results.Count + ", 通过=" + passCount + ", 失败=" + (results.Count - passCount));
-
-        Logger.LogBusiness("PDF批量核查完成");
-        return Task.FromResult(Result.Success(results));
-    }
-
-    public async Task<Result<AssetCheckItemResult?>> FindCheckByNameAsync(
-        string name, CancellationToken ct = default)
-    {
-        var trimmedName = name.Trim();
-        LogInfo("核查搜索: Name=" + DataMasker.MaskName(trimmedName));
-
-        var sql = "SELECT id, applicant_name, applicant_id_card, relationship, status, batch_id, head_id_card FROM nc_biz_asset_checks WHERE TRIM(applicant_name) ILIKE TRIM($1) AND status = ANY($2) ORDER BY id DESC LIMIT 1";
-
-        try
-        {
-            var result = await _db.QuerySingleAsync<AssetCheckItemResult>(sql, ct, trimmedName,
-                new List<string> { AssetCheckStatusConstants.SUBMITTED, AssetCheckStatusConstants.VERIFIED,
-                    AssetCheckStatusConstants.INCLUDED, AssetCheckStatusConstants.REFUSED });
-            if (result.IsFailure)
-                return Result.Failure<AssetCheckItemResult?>(result.ErrorCode!, result.Message!);
-
-            LogInfo("结果: " + (result.Value != null ? "找到" : "未找到"));
-            return Result.Success<AssetCheckItemResult?>(result.Value);
-        }
-        catch (Exception ex)
-        {
-            LogException(ex, "查询失败");
-            return Result.Failure<AssetCheckItemResult?>(ErrorCodes.UNKNOWN_ERROR, "核查记录查询失败: " + ex.Message);
-        }
-    }
-
     public async Task<Result<bool>> HasLowIncomeIdentityAsync(
         string name, string idCard, CancellationToken ct = default)
     {
@@ -159,32 +75,8 @@ public class PdfVerificationService : BaseService, IPdfVerificationService
         }
     }
 
-    public async Task<Result> UpdateCheckStatusAsync(
-        long checkId, string status, CancellationToken ct = default)
-    {
-        LogInfo("更新核查状态: CheckId=" + checkId + ", Status=" + status);
-
-        var sql = "UPDATE nc_biz_asset_checks SET status = $1, updated_at = NOW() WHERE head_id_card = (SELECT head_id_card FROM nc_biz_asset_checks WHERE id = $2) AND deleted_at IS NULL";
-
-        try
-        {
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, status, checkId);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-
-            LogInfo("状态更新成功: " + result.Value);
-            Logger.LogBusiness("核查状态更新（按户）",
-                ("CheckId", checkId),
-                ("Status", status),
-                ("AffectedRows", result.Value));
-            return Result.Success();
-        }
-        catch (Exception ex)
-        {
-            LogException(ex, "状态更新失败");
-            return Result.Failure(ErrorCodes.UNKNOWN_ERROR, "更新核查状态失败: " + ex.Message);
-        }
-    }
+    // UpdateCheckStatusAsync（按户更新核查状态）副本已删除（2026-11）：唯一调用方走
+    // IAssetVerificationService.UpdateCheckStatusAsync（带终态守卫），本副本零调用方且无守卫。
 
     public async Task<Result> MarkIncludedByIdCardAsync(
         string idCard, CancellationToken ct = default)
@@ -417,29 +309,6 @@ public class PdfVerificationService : BaseService, IPdfVerificationService
         {
             LogException(ex, "检查ID查询失败");
             return Result.Failure<bool>(ErrorCodes.UNKNOWN_ERROR, "检查ID查询失败: " + ex.Message);
-        }
-    }
-
-    public async Task<Result<List<PdfVerificationRecord>>> GetVerificationHistoryAsync(
-        int limit = 50, CancellationToken ct = default)
-    {
-        LogInfo("获取验证历史记录: Limit=" + limit);
-
-        var sql = "SELECT id, report_file_name AS file_name, applicant_name AS expected_name, is_valid, created_by AS verified_by, created_at AS verified_at, notes, version, is_current, report_size FROM nc_biz_asset_check_reports ORDER BY created_at DESC LIMIT $1";
-
-        try
-        {
-            var result = await _db.QueryAsync<PdfVerificationRecord>(sql, ct, limit);
-            if (result.IsFailure)
-                return Result.Failure<List<PdfVerificationRecord>>(result.ErrorCode!, result.Message!);
-
-            LogInfo("验证历史获取成功: " + result.Value.Count);
-            return Result.Success(result.Value);
-        }
-        catch (Exception ex)
-        {
-            LogException(ex, "历史查询失败");
-            return Result.Failure<List<PdfVerificationRecord>>(ErrorCodes.UNKNOWN_ERROR, "获取验证历史失败: " + ex.Message);
         }
     }
 

@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -37,9 +37,10 @@ public partial class ArchiveProductionViewModel
         var year = int.Parse(yearMonth[..4]);
         var month = int.Parse(yearMonth[4..]);
 
-        _currentBusinessType = "AssetVerificationMonthlyReport";
+        _currentBusinessType = PrintBusinessTypes.AssetVerificationMonthlyReport;
         _currentBusinessId = businessId;
         _currentClassification = ClassificationConstants.AssetVerification;
+        _docClassification = _currentClassification;   // 非申请单业务：文书基准分类 = 自身（防复用上一户残留）
 
         BusinessTypeDisplay = "经济核对月报表";
         DataSourceType = "经济核对月报表";
@@ -73,6 +74,7 @@ public partial class ArchiveProductionViewModel
         _currentBusinessType = businessType;
         _currentBusinessId = businessId;
         _currentClassification = businessType;
+        _docClassification = _currentClassification;   // 非申请单业务：文书基准分类 = 自身
 
         BusinessTypeDisplay = OutputPathHelper.GetCategoryDisplayName(businessType);
         DataSourceType = BusinessTypeDisplay;
@@ -260,11 +262,15 @@ public partial class ArchiveProductionViewModel
 
         // 地址信息组
         var addressGroup = new SidebarGroup("地址信息");
-        addressGroup.Items.Add(CreateSidebarItem("家庭地址", app.Address, fieldMapping));
+        // 与字段表 _fieldData[FAMILY_ADDRESS] 同口径（原实现只显示 app.Address 原文，侧栏与打印不一致）
+        var fullAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
+        addressGroup.Items.Add(CreateSidebarItem("家庭地址", fullAddress, fieldMapping));
         addressGroup.Items.Add(CreateSidebarItem("社区", app.Community, fieldMapping));
         addressGroup.Items.Add(CreateSidebarItem("乡镇", app.Town, fieldMapping));
         addressGroup.Items.Add(CreateSidebarItem("区县", app.District, fieldMapping));
-        addressGroup.Items.Add(CreateSidebarItem("户籍地址", app.HukouAddress, fieldMapping));
+        // 与 _fieldData[HUKOU_ADDRESS] 同口径：hukou_address 为空但户籍区域 ID 齐全时按 ID 补齐
+        //（原实现直读 app.HukouAddress，id=105 这类档侧栏显示空、打印却有值）
+        addressGroup.Items.Add(CreateSidebarItem("户籍地址", await ResolveHukouAddressAsync(app), fieldMapping));
         SidebarGroups.Add(addressGroup);
 
         // 经济信息组（使用从经济明细计算的值，而非 Application 表汇总字段）
@@ -286,7 +292,7 @@ public partial class ArchiveProductionViewModel
         if (!string.IsNullOrEmpty(app.ClassificationResult))
         {
             var classGroup = new SidebarGroup("分类结果");
-            classGroup.Items.Add(new SidebarItem { Label = "分类结果", Value = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""), IsMatchable = false });
+            classGroup.Items.Add(new SidebarItem { Label = "分类结果", Value = ClassificationConstants.ConvertToFullName(_docClassification), IsMatchable = false });
             classGroup.Items.Add(new SidebarItem { Label = "补贴类型", Value = app.ClassifiedSubsidyType, IsMatchable = false });
             classGroup.Items.Add(new SidebarItem { Label = "补贴金额", Value = FormatDecimal(app.ClassifiedSubsidyAmount), IsMatchable = false });
             classGroup.Items.Add(new SidebarItem { Label = "保障金总额", Value = FormatDecimal(app.TotalGuaranteeAmount), IsMatchable = false });
@@ -296,8 +302,8 @@ public partial class ArchiveProductionViewModel
             _fieldData[FieldKeys.GP_HEAD_ID_CARD] = app.ApplicantIdCard ?? "";
             _fieldData[FieldKeys.GP_HEAD_AGE] = (IdCardValidator.ExtractAge(app.ApplicantIdCard ?? "") ?? 0).ToString();
             _fieldData[FieldKeys.GP_FAMILY_SIZE] = app.FamilySize.ToString();
-            _fieldData[FieldKeys.GP_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
-            _fieldData[FieldKeys.GP_ADDRESS] = app.Address ?? "";
+            _fieldData[FieldKeys.GP_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification);
+            _fieldData[FieldKeys.GP_ADDRESS] = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
             _fieldData[FieldKeys.GP_PHONE] = app.ApplicantPhone ?? "";
             _fieldData[FieldKeys.GP_AUDIT_TIME] = DateTime.Now.ToString("yyyy年M月d日");
 
@@ -342,8 +348,8 @@ public partial class ArchiveProductionViewModel
             _fieldData[FieldKeys.ADJ_HEAD_NATION] = _dictCacheService.GetValue(DictionaryTypeCodes.Ethnicities, app.Ethnicity ?? "");
             _fieldData[FieldKeys.ADJ_HEAD_FAMILY_SIZE] = app.FamilySize.ToString();
             _fieldData[FieldKeys.ADJ_HEAD_FAMILY_TYPE] = app.HukouType ?? "";
-            _fieldData[FieldKeys.ADJ_HEAD_ADDRESS] = app.Address ?? "";
-            _fieldData[FieldKeys.ADJ_HEAD_CLASSIFICATION] = app.ClassificationResult ?? "";
+            _fieldData[FieldKeys.ADJ_HEAD_ADDRESS] = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
+            _fieldData[FieldKeys.ADJ_HEAD_CLASSIFICATION] = _docClassification;
             _fieldData[FieldKeys.ADJ_HEAD_HUKOU] = await ResolveHukouAddressAsync(app);
             _fieldData[FieldKeys.ADJ_HEAD_ID_CARD] = app.ApplicantIdCard ?? "";
             // 审批时间按 B 线时间轴审核确认日固定（2026-10-16 业务拍板：A/B/C 时间轴各按其口径，
@@ -452,7 +458,7 @@ public partial class ArchiveProductionViewModel
                 var adjustSummary = string.Join("；", summaryParts);
                 var reviewSituation = _fieldData.GetValueOrDefault(FieldKeys.REVIEW_SITUATION, "");
                 var familyFallback = $"{app.ApplicantName}户，家庭人口{app.FamilySize}人，" +
-                    $"{ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "")}，月保障金{FormatDecimal(app.TotalGuaranteeAmount)}元";
+                    $"{ClassificationConstants.ConvertToFullName(_docClassification)}，月保障金{FormatDecimal(app.TotalGuaranteeAmount)}元";
                 _fieldData[FieldKeys.ADJ_FAMILY_DETAIL] = string.IsNullOrWhiteSpace(reviewSituation)
                     ? (string.IsNullOrWhiteSpace(adjustSummary) ? familyFallback : $"{adjustSummary}。{familyFallback}")
                     : string.IsNullOrWhiteSpace(adjustSummary) ? reviewSituation : $"{adjustSummary}。{reviewSituation}";
@@ -783,13 +789,27 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
+    /// 收入城乡口径输出（模板行文「农村年度纯收入（城镇月收入）」，2026-11 起统一走本函数）：
+    /// 农村 = 年值原样；城市 = 年值÷12 的月值（一次舍入，与 INCOME_TOTAL 同写法，
+    /// 禁止从已舍入月值×12 反推年值——AGENTS §9.1/§9.2）。
+    /// 供给键：TOTAL_FAMILY_INCOME_ANNUAL / PER_CAPITA_INCOME_ANNUAL（键名沿用，口径以本注释为准）。
+    /// </summary>
+    private static string FormatIncomeByHukou(string? hukouType, decimal annualValue)
+    {
+        // 与既有 INCOME_TOTAL 口径一致：非 Urban（含 null/历史空值）一律按农村打年值
+        var isRural = !string.Equals(hukouType, ClassificationConstants.HukouType.URBAN, StringComparison.Ordinal);
+        return FormatDecimal(isRural ? annualValue : Math.Round(annualValue / 12m, 2));
+    }
+
+    /// <summary>
     /// 构建土地收入情况（复合字段）
     /// 格式：本人申请{享受类别}待遇，由{所在村屯}出具土地收入证明...
     /// includeLead=false 时跳过"本人申请…口人。"引言段（定期复核审批表专用，从"土地情况"开始）。
     /// </summary>
     private async Task<string> BuildLandIncomeSituationAsync(ApplicationEntity app, bool includeLead = true)
     {
-        var classificationDesc = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? "");
+        // 「本人申请{享受类别}待遇」用文书基准分类（复核前旧分类）
+        var classificationDesc = ClassificationConstants.ConvertFromCode(_docClassification);
         var village = app.Community ?? app.Town ?? "";
         var headName = app.ApplicantName;
         var familySize = app.FamilySize;
@@ -1198,7 +1218,7 @@ public partial class ArchiveProductionViewModel
     /// </summary>
     private string BuildSingleRescueSituation(ApplicationEntity app)
     {
-        if (app.ClassificationResult?.Contains("Single") == true)
+        if (_docClassification.Contains("Single", StringComparison.Ordinal))
         {
             var amount = FormatDecimal(app.HouseholdMonthlyGuaranteeAmount);
             return $"该家庭成员因存在重度残疾、重大疾病或三级智力/精神残疾等特殊情况，符合单人保相关政策，纳入单人保保障范围，月保障金额{amount}元。";

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -11,27 +11,13 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- 渐变英雄头部（紫色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="高龄津贴复核办理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="重评身份与年龄档次，变更后停旧增新并打印三表" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"
+                                   Title="高龄津贴复核办理"
+                                   Subtitle="重评身份与年龄档次，变更后停旧增新并打印三表"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回"/>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="16">
@@ -79,8 +65,8 @@
                                 BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent" Padding="12">
                             <VerticalStackLayout Spacing="10">
                                 <Label Text="该人员档案来自高龄导入名册，办理复核前需先补建并补全档案信息。补全保存后将自动返回本页继续复核（复核变更将停旧增新并打印三表）。"
-                                       FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
-                                <Label Text="{Binding CompletionHint}" FontSize="12"
+                                       FontSize="15" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                                <Label Text="{Binding CompletionHint}" FontSize="14"
                                        TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
                                 <Button Text="补全历史档案" Style="{StaticResource ButtonOutline}"
                                         Command="{Binding CompleteHistoryArchiveCommand}" HeightRequest="36"/>
@@ -98,18 +84,18 @@
                         <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="当前（旧）类别" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                                    <Label Text="{Binding OldCategoryName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                    <Label Text="{Binding OldAmountText}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="当前（旧）类别" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding OldCategoryName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="{Binding OldAmountText}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
                                 </VerticalStackLayout>
                             </Border>
-                            <Label Grid.Column="1" Text="{OnPlatform WinUI='&#xE72A;', Android='&#x2753;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
+                            <Label Grid.Column="1" Text="{OnPlatform WinUI='&#xE72A;', Android='&#x2753;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22"
                                    TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
                             <Border Grid.Column="2" BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="12">
                                 <VerticalStackLayout Spacing="4">
-                                    <Label Text="重评（新）类别" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
-                                    <Label Text="{Binding NewCategoryName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
-                                    <Label Text="{Binding NewAmountText}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="重评（新）类别" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding NewCategoryName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                    <Label Text="{Binding NewAmountText}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
                                 </VerticalStackLayout>
                             </Border>
                         </Grid>
@@ -158,15 +144,15 @@
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <CollectionView ItemsSource="{Binding HistoryRecords}">
                             <CollectionView.EmptyView>
-                                <Label Text="暂无复核记录" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="暂无复核记录" FontSize="15" TextColor="{StaticResource TextTertiary}"/>
                             </CollectionView.EmptyView>
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="ent:ElderlyReview">
                                     <Grid ColumnDefinitions="1.6*, 2.4*, 1.4*, 1.4*" Padding="0,6" ColumnSpacing="8">
-                                        <Label Text="{Binding ReviewedAt, StringFormat='{0:yyyy-MM-dd}'}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                                        <Label Grid.Column="1" Text="{Binding CategoryChangeDisplay}" FontSize="13" TextColor="{StaticResource TextPrimary}"/>
-                                        <Label Grid.Column="2" Text="{Binding ReviewResultName}" FontSize="13" TextColor="{StaticResource Success}"/>
-                                        <Label Grid.Column="3" Text="{Binding ReviewedBy}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                        <Label Text="{Binding ReviewedAt, StringFormat='{0:yyyy-MM-dd}'}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                        <Label Grid.Column="1" Text="{Binding CategoryChangeDisplay}" FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Grid.Column="2" Text="{Binding ReviewResultName}" FontSize="15" TextColor="{StaticResource Success}"/>
+                                        <Label Grid.Column="3" Text="{Binding ReviewedBy}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>

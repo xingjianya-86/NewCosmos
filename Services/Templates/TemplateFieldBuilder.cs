@@ -164,7 +164,10 @@ public class TemplateFieldBuilder
     }
 
     /// <summary>
-    /// 统一地址解析：FAMILY_ADDRESS 和所有 FAMILY_MEMBER_ADDRESS_N 都走 addressResolver
+    /// 统一地址解析：FAMILY_ADDRESS 和所有 FAMILY_MEMBER_ADDRESS_N 都走 addressResolver。
+    /// ⚠️ 入参 <c>Community</c> 是 **village_code**（RawFieldData 注释口径，资产核查/月报路径均先 Warmup）。
+    /// 申请表侧 community 存的是**村名文本**，不得走这里——请用 <c>AddressResolver.BuildAddressFromText</c>
+    /// （2026-11-02：曾有分步路径把村名喂进 code 版，缓存永远 miss、address 空时整格变空）。
     /// </summary>
     private void ResolveAddresses(Dictionary<string, string> fields, RawFieldData data)
     {

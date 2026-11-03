@@ -112,6 +112,9 @@ public partial class DutyAdjustViewModel : ViewModelBase
 
     private List<DutyMemberView> _allMembers = new();
 
+    /// <summary>各"未来班次"列表的加载序号：快速切换成员时只认最后一次加载，丢弃过期结果</summary>
+    private readonly Dictionary<object, int> _futureScheduleLoadVersions = new();
+
     /// <summary>是否显示已撤销的调整记录（默认隐藏，列表只看生效中）</summary>
     [ObservableProperty]
     private bool _showCancelled;
@@ -378,8 +381,15 @@ public partial class DutyAdjustViewModel : ViewModelBase
     [ObservableProperty]
     private string _swapReason = string.Empty;
 
-    partial void OnSelectedSwapFromMemberChanged(DutyMemberView? value) => _ = LoadFutureSchedulesAsync(
-        value, SwapFutureSchedules, () => { SelectedSwapSchedule = null; RefreshSwapToSchedules(); });
+    partial void OnSelectedSwapFromMemberChanged(DutyMemberView? value)
+    {
+        _ = LoadFutureSchedulesAsync(
+            value, SwapFutureSchedules, () => { SelectedSwapSchedule = null; RefreshSwapToSchedules(); });
+
+        // 班次未选前先列出甲方所在组的候选，避免"乙方"下拉空白（选定班次后按班次组收窄）
+        if (value is not null)
+            FillShiftTargets(SwapTargetOptions, value.Id, value.Groups.Select(g => g.GroupCode));
+    }
 
     partial void OnSelectedSwapScheduleChanged(DutyFutureSchedule? value)
     {
@@ -524,8 +534,16 @@ public partial class DutyAdjustViewModel : ViewModelBase
     [ObservableProperty]
     private string _substituteReason = string.Empty;
 
-    partial void OnSelectedSubstituteFromMemberChanged(DutyMemberView? value) => _ = LoadFutureSchedulesAsync(
-        value, SubstituteFutureSchedules, () => { SelectedSubstituteSchedule = null; SelectedSubstituteMember = null; SubstituteTargetOptions.Clear(); });
+    partial void OnSelectedSubstituteFromMemberChanged(DutyMemberView? value)
+    {
+        _ = LoadFutureSchedulesAsync(
+            value, SubstituteFutureSchedules,
+            () => { SelectedSubstituteSchedule = null; SelectedSubstituteMember = null; SubstituteTargetOptions.Clear(); });
+
+        // 班次未选前先列出被代班人所在组的候选，避免"代班人"下拉空白（选定班次后按班次组收窄）
+        if (value is not null)
+            FillShiftTargets(SubstituteTargetOptions, value.Id, value.Groups.Select(g => g.GroupCode));
+    }
 
     partial void OnSelectedSubstituteScheduleChanged(DutyFutureSchedule? value) =>
         RefreshShiftTargets(SubstituteTargetOptions, () => SelectedSubstituteMember = null, value);
@@ -733,17 +751,25 @@ public partial class DutyAdjustViewModel : ViewModelBase
         return false;
     }
 
-    /// <summary>加载某成员今天及以后的班次（串班/代班表单选班列表）</summary>
+    /// <summary>
+    /// 加载某成员今天及以后的班次（串班/代班表单选班列表）。
+    /// 不走 ExecuteAsync：它在上一操作未结束时直接丢弃本次加载，会让班次/候选列表静默空白。
+    /// 快速切换成员时按加载序号丢弃过期结果。
+    /// </summary>
     private async Task LoadFutureSchedulesAsync(
         DutyMemberView? member, ObservableCollection<DutyFutureSchedule> target, Action resetSelections)
     {
         target.Clear();
         resetSelections();
+
+        var version = _futureScheduleLoadVersions.TryGetValue(target, out var current) ? current + 1 : 1;
+        _futureScheduleLoadVersions[target] = version;
         if (member is null) return;
 
-        await ExecuteAsync(async ct =>
+        try
         {
-            var result = await _dutyService.GetMemberFutureSchedulesAsync(member.Id, ct);
+            var result = await _dutyService.GetMemberFutureSchedulesAsync(member.Id, CancellationToken);
+            if (_futureScheduleLoadVersions[target] != version) return;   // 已有更新的加载，丢弃过期结果
             if (result.IsFailure)
             {
                 await ShowFailureAsync(result, "加载未来班次");
@@ -753,7 +779,15 @@ public partial class DutyAdjustViewModel : ViewModelBase
             {
                 target.Add(s);
             }
-        }, "正在加载未来班次...");
+        }
+        catch (OperationCanceledException)
+        {
+            // 页面离开 / 新操作顶掉旧操作：正常取消，不提示
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载未来班次异常");
+        }
     }
 
     /// <summary>按所选班次的组刷新顶班人候选（同组其他启用成员，排除原班人员）</summary>
@@ -763,14 +797,24 @@ public partial class DutyAdjustViewModel : ViewModelBase
         resetSelection();
         if (schedule is null) return;
 
-        var fromId = schedule.MemberId;
-        var targets = _allMembers
-            .Where(m => m.IsActive && m.Id != fromId)
-            .Where(m => m.Groups.Any(g => g.GroupCode == schedule.GroupCode))
-            .OrderBy(m => m.Name);
-        foreach (var t in targets)
+        FillShiftTargets(options, schedule.MemberId, new[] { schedule.GroupCode });
+    }
+
+    /// <summary>按"所属组 + 排除人员"填充顶班候选（同组其他启用成员；组为空时不填充）</summary>
+    private void FillShiftTargets(
+        ObservableCollection<DutyMemberView> options, long excludeMemberId, IEnumerable<string> groupCodes)
+    {
+        var groups = groupCodes
+            .Where(code => !string.IsNullOrEmpty(code))
+            .ToHashSet(StringComparer.Ordinal);
+        if (groups.Count == 0) return;
+
+        foreach (var member in _allMembers
+            .Where(m => m.IsActive && m.Id != excludeMemberId)
+            .Where(m => m.Groups.Any(g => groups.Contains(g.GroupCode)))
+            .OrderBy(m => m.Name))
         {
-            options.Add(t);
+            options.Add(member);
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using SpecialApprovalEntity = NewCosmos.Models.Entities.SpecialApproval;
+using NewCosmos.Constants;
+using SpecialApprovalEntity = NewCosmos.Models.Entities.SpecialApproval;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 
@@ -19,7 +20,7 @@ public class SpecialApprovalService : BaseService, ISpecialApprovalService
 
     public async Task<SpecialApprovalEntity?> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        var sql = "SELECT * FROM nc_biz_special_approvals WHERE application_id = $1 AND deleted_at IS null";
+        var sql = "SELECT " + WideTableColumns.SpecialApprovalsColumns + " FROM nc_biz_special_approvals WHERE application_id = $1 AND deleted_at IS null";
         var result = await _db.QuerySingleAsync<SpecialApprovalEntity>(sql, ct, applicationId);
         return result.IsSuccess ? result.Value : null;
     }

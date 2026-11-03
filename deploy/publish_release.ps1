@@ -82,10 +82,12 @@ if (-not $SkipVersionSync) {
     $iss = [regex]::Replace($iss, '#define MyAppVersion "[^"]*"', "#define MyAppVersion ""$Version""")
     $year = [int]$numeric.Substring(0, 4)
     $md = [int]$numeric.Substring(4, 4)
-    $iss = [regex]::Replace($iss, 'VersionInfoVersion=[0-9.]+', "VersionInfoVersion=1.1.$year.$md")
+    # 主次版本从 $Version 派生（勿硬编码：历史 1.1 硬编码在版本升到 1.2 后导致文件属性版本主次不一致）
+    $majorMinor = ($Version -split '\.')[0..1] -join '.'
+    $iss = [regex]::Replace($iss, 'VersionInfoVersion=[0-9.]+', "VersionInfoVersion=$majorMinor.$year.$md")
     [IO.File]::WriteAllText($issPath, $iss, (New-Object System.Text.UTF8Encoding($false)))
 
-    Write-Host "已同步：$Version / $numeric / VersionInfo=1.1.$year.$md"
+    Write-Host "已同步：$Version / $numeric / VersionInfo=$majorMinor.$year.$md"
 }
 
 # ── 2. 发布与打包 ──

@@ -923,7 +923,7 @@ public partial class ElderlyApplicationFormViewModel
                 var fields = ElderlyPrintDataBuilder.BuildSingleFields(savedResult.Value);
                 // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
                 PrintNavigationData.ClearDocumentMode();
-                PrintNavigationData.BusinessType = "ElderlyBenefits";
+                PrintNavigationData.BusinessType = PrintBusinessTypes.ElderlyBenefits;
                 PrintNavigationData.BusinessId = _id;
                 PrintNavigationData.Classification = "New";
                 PrintNavigationData.FieldData = fields;

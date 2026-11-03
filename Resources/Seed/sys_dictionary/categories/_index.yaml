@@ -76,3 +76,9 @@ tables:
 
       # 死亡原因 (ID: 95)
       - { id: 95, category: "DeathReasons", display_name: "死亡原因", description: "户主死亡变更死亡原因预设", sort_order: 95, is_active: true }
+
+      # 死亡情况说明表单选项 (ID: 96-99，2026-10-30；默认值=字典首项)
+      - { id: 96, category: "DeathPlaces", display_name: "死亡地点", description: "死亡情况说明-死亡地点下拉预设（首项为默认值）", sort_order: 96, is_active: true }
+      - { id: 97, category: "DeathSituations", display_name: "现场所见情况", description: "死亡情况说明-现场所见情况预设（首项为默认值）", sort_order: 97, is_active: true }
+      - { id: 98, category: "DeathRemainsArrangements", display_name: "遗体安置情况", description: "死亡情况说明-遗体安置情况预设（首项为默认值）", sort_order: 98, is_active: true }
+      - { id: 99, category: "BusinessMatters", display_name: "相关业务事项", description: "死亡情况说明-相关业务事项多选项（首项默认勾选）", sort_order: 99, is_active: true }

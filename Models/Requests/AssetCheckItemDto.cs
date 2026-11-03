@@ -27,7 +27,8 @@ public partial class AssetCheckItemDto : ObservableObject
     private string _applicantIdCard = string.Empty;
 
     /// <summary>
-    /// 与户主关系    /// </summary>
+    /// 与户主关系
+/// </summary>
     [ObservableProperty]
     private string _relationship = string.Empty;
 
@@ -58,7 +59,8 @@ public partial class AssetCheckItemDto : ObservableObject
     };
 
     /// <summary>
-    /// 批次号（用于批量提交标识）    /// </summary>
+    /// 批次号（用于批量提交标识）
+/// </summary>
     [ObservableProperty]
     private string _batchId = string.Empty;
 
@@ -69,27 +71,32 @@ public partial class AssetCheckItemDto : ObservableObject
     private string _contactPhone = string.Empty;
 
     /// <summary>
-    /// 是否委托代理    /// </summary>
+    /// 是否委托代理
+/// </summary>
     [ObservableProperty]
     private bool _isAgent;
 
     /// <summary>
-    /// 代理人姓名    /// </summary>
+    /// 代理人姓名
+/// </summary>
     [ObservableProperty]
     private string _agentName = string.Empty;
 
     /// <summary>
-    /// 代理人身份证号    /// </summary>
+    /// 代理人身份证号
+/// </summary>
     [ObservableProperty]
     private string _agentIdCard = string.Empty;
 
     /// <summary>
-    /// 代理人关系    /// </summary>
+    /// 代理人关系
+/// </summary>
     [ObservableProperty]
     private string _agentRelationship = string.Empty;
 
     /// <summary>
-    /// 代理人证件类型    /// </summary>
+    /// 代理人证件类型
+/// </summary>
     [ObservableProperty]
     private string _agentIdType = string.Empty;
 }

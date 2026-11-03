@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -28,7 +29,7 @@ public class CapabilityAssessmentService : BaseService, ICapabilityAssessmentSer
         LogInfo($"获取能力鉴定: ApplicationId={applicationId}");
         try
         {
-            var sql = @"SELECT * FROM nc_biz_capability_assessments
+            var sql = @"SELECT " + WideTableColumns.CapabilityAssessmentsColumns + @" FROM nc_biz_capability_assessments
                        WHERE application_id = $1 AND deleted_at IS NULL
                        ORDER BY created_at DESC LIMIT 1";
             var result = await _db.QuerySingleAsync<CapabilityAssessment>(sql, ct, applicationId);

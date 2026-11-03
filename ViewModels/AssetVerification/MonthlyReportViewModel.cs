@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -250,28 +250,20 @@ public partial class MonthlyReportViewModel : ViewModelBase
         {
             _logger.LogBusiness($"导出全部{label}人员");
 
-            var startDate = new DateTime(2000, 1, 1);
-            var endDate = new DateTime(2100, 12, 31);
+            var startDate = UIConstants.FullRangeStart;
+            var endDate = UIConstants.FullRangeEnd;
 
-            var allItems = new List<AssetVerificationTask>();
-            var pageIndex = 1;
-            const int pageSize = 500;
-
-            while (true)
+            // 分页拉全（单点：PagedQueryHelper.FetchAllPagesAsync）
+            var fetchResult = await PagedQueryHelper.FetchAllPagesAsync<AssetVerificationTask>(
+                (page, size, token) => _verificationService.SearchByDateRangePagedAsync(
+                    startDate, endDate, null, status, page, size, token),
+                $"加载{label}数据失败", ct);
+            if (fetchResult.IsFailure)
             {
-                var result = await _verificationService.SearchByDateRangePagedAsync(
-                    startDate, endDate, null, status, pageIndex, pageSize, ct);
-
-                if (result.IsFailure || result.Value == null)
-                {
-                    ErrorMessage = $"加载{label}数据失败: " + (result.Message ?? "未知错误");
-                    return;
-                }
-
-                allItems.AddRange(result.Value.Items);
-                if (allItems.Count >= result.Value.TotalCount) break;
-                pageIndex++;
+                ErrorMessage = fetchResult.Message;
+                return;
             }
+            var allItems = fetchResult.Value;
 
             if (allItems.Count == 0)
             {
@@ -304,7 +296,7 @@ public partial class MonthlyReportViewModel : ViewModelBase
 
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
             PrintNavigationData.ClearDocumentMode();
-            PrintNavigationData.BusinessType = "AssetVerificationMonthlyReport";
+            PrintNavigationData.BusinessType = PrintBusinessTypes.AssetVerificationMonthlyReport;
             PrintNavigationData.BusinessId = null;
             PrintNavigationData.Classification = ClassificationConstants.AssetVerification;
             PrintNavigationData.FieldData = new Dictionary<string, string>
@@ -312,8 +304,8 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 ["REPORT_PERIOD"] = "全部月份",
                 ["REPORT_ROSTER_SCOPE"] = OnlyCurrentStatusPersons ? "当前状态人员" : "整户名册",
                 ["REPORT_LABEL"] = label,
-                ["REPORT_START_DATE"] = "2000-01-01",
-                ["REPORT_END_DATE"] = "2100-12-31"
+                ["REPORT_START_DATE"] = UIConstants.FullRangeStart.ToString("yyyy-MM-dd"),
+                ["REPORT_END_DATE"] = UIConstants.FullRangeEnd.ToString("yyyy-MM-dd")
             };
             PrintNavigationData.TableData = dedupedItems.OrderBy(x => x.HeadIdCard).ThenBy(x => x.Relationship == "Head" ? 0 : x.Relationship == "Spouse" ? 1 : 2).Select(x =>
             {
@@ -364,24 +356,17 @@ public partial class MonthlyReportViewModel : ViewModelBase
                 ("PeriodType", IsWeeklyMode ? "weekly" : "monthly"),
                 ("Status", statusFilter ?? "全部"));
 
-            var allItems = new List<AssetVerificationTask>();
-            var pageIndex = 1;
-            const int pageSize = 500;
-
-            while (true)
+            // 分页拉全（单点：PagedQueryHelper.FetchAllPagesAsync）
+            var fetchResult = await PagedQueryHelper.FetchAllPagesAsync<AssetVerificationTask>(
+                (page, size, token) => _verificationService.SearchByDateRangePagedAsync(
+                    start, end, null, statusFilter, page, size, token),
+                $"加载{label}数据失败", ct);
+            if (fetchResult.IsFailure)
             {
-                var result = await _verificationService.SearchByDateRangePagedAsync(start, end, null, statusFilter, pageIndex, pageSize, ct);
-
-                if (result.IsFailure || result.Value == null)
-                {
-                    ErrorMessage = $"加载{label}数据失败: " + (result.Message ?? "未知错误");
-                    return;
-                }
-
-                allItems.AddRange(result.Value.Items);
-                if (allItems.Count >= result.Value.TotalCount) break;
-                pageIndex++;
+                ErrorMessage = fetchResult.Message;
+                return;
             }
+            var allItems = fetchResult.Value;
 
             if (allItems.Count == 0)
             {
@@ -412,7 +397,7 @@ public partial class MonthlyReportViewModel : ViewModelBase
 
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
             PrintNavigationData.ClearDocumentMode();
-            PrintNavigationData.BusinessType = "AssetVerificationMonthlyReport";
+            PrintNavigationData.BusinessType = PrintBusinessTypes.AssetVerificationMonthlyReport;
             // BusinessId 编码：月报=year*100+month，周报=year*100+weekNumber
             PrintNavigationData.BusinessId = IsWeeklyMode && SelectedWeekNumber.HasValue
                 ? long.Parse($"{SelectedYear}{SelectedWeekNumber.Value:D2}")

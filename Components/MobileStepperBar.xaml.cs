@@ -97,7 +97,7 @@ public partial class MobileStepperBar : ContentView
             Content = new Label
             {
                 Text = step.ToString(),
-                FontSize = 13,
+                FontSize = 12,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = done || active ? Colors.White : InactiveText,
                 HorizontalOptions = LayoutOptions.Center,

@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Entities;
+using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
@@ -11,7 +11,8 @@ using ApplicationEntity = NewCosmos.Models.Entities.Application;
 public interface IClassificationService
 {
     /// <summary>
-    /// 执行完整分类判定（含赡养人、照料人    /// </summary>
+    /// 执行完整分类判定（含赡养人、照料人
+/// </summary>
     Task<Result<ClassificationResult>> DetermineClassificationAsync(
         ApplicationEntity application, 
         List<FamilyMember> members,
@@ -19,22 +20,9 @@ public interface IClassificationService
         List<Caregiver> caregivers,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// 执行分类判定（简化版，不含赡养人/照料人）
-    /// </summary>
-    Task<Result<ClassificationResult>> DetermineClassificationAsync(
-        ApplicationEntity application, 
-        List<FamilyMember> members, 
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// 执行分类（参数版    /// </summary>
-    Task<Result<ClassificationResult>> ClassifyAsync(
-        string hukouType, 
-        decimal perCapitaIncome, 
-        int familySize, 
-        List<string> healthConditions, 
-        CancellationToken ct = default);
+    // 已删除（2026-11 死代码，零调用方取证）：
+    // ① 简化版 DetermineClassificationAsync(app, members, ct)——全部调用均为 5 参全量版；
+    // ② ClassifyAsync(hukouType, perCapitaIncome, …)——实现为转发壳且无调用方。
 
     /// <summary>
     /// 计算保障金额
@@ -47,7 +35,8 @@ public interface IClassificationService
         CancellationToken ct = default);
 
     /// <summary>
-    /// 检查是否符合渐退期条    /// </summary>
+    /// 检查是否符合渐退期条
+/// </summary>
     GracePeriodCheckResult CheckGracePeriodEligibility(
         string oldClassification, 
         string newClassification,
@@ -105,15 +94,18 @@ public class ClassificationResult
     public bool IsEligible { get; set; }
 
     /// <summary>
-    /// 不符合原    /// </summary>
+    /// 不符合原
+/// </summary>
     public string IneligibleReason { get; set; } = string.Empty;
 
     /// <summary>
-    /// 是否触发渐退    /// </summary>
+    /// 是否触发渐退
+/// </summary>
     public bool ShouldTriggerGracePeriod { get; set; }
 
     /// <summary>
-    /// 渐退期信    /// </summary>
+    /// 渐退期信
+/// </summary>
     public GracePeriodCheckResult GracePeriod { get; set; } = new();
 
     /// <summary>
@@ -143,11 +135,13 @@ public class ClassificationResult
 }
 
 /// <summary>
-/// 渐退期检查结    /// </summary>
+/// 渐退期检查结
+/// </summary>
 public class GracePeriodCheckResult
 {
     /// <summary>
-    /// 是否符合渐退期条    /// </summary>
+    /// 是否符合渐退期条
+/// </summary>
     public bool IsEligible { get; set; }
 
     /// <summary>
@@ -156,15 +150,18 @@ public class GracePeriodCheckResult
     public string OriginalClassification { get; set; } = string.Empty;
 
     /// <summary>
-    /// 渐退期月数（默认6个月    /// </summary>
+    /// 渐退期月数（默认6个月
+/// </summary>
     public int Months { get; set; } = 6;
 
     /// <summary>
-    /// 渐退期开始日    /// </summary>
+    /// 渐退期开始日
+/// </summary>
     public DateTime StartDate { get; set; }
 
     /// <summary>
-    /// 渐退期结束日    /// </summary>
+    /// 渐退期结束日
+/// </summary>
     public DateTime EndDate { get; set; }
 }
 
@@ -179,7 +176,8 @@ public class ClassifiedSubsidyResult
     public string Types { get; set; } = string.Empty;
 
     /// <summary>
-    /// 符合条件的人    /// </summary>
+    /// 符合条件的人
+/// </summary>
     public int Count { get; set; }
 
     /// <summary>
@@ -188,6 +186,7 @@ public class ClassifiedSubsidyResult
     public decimal PerPersonAmount { get; set; }
 
     /// <summary>
-    /// 分类施保总金    /// </summary>
+    /// 分类施保总金
+/// </summary>
     public decimal TotalAmount { get; set; }
 }

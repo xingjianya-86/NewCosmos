@@ -29,4 +29,13 @@ public static class UIConstants
     public const double RIGID_EXPENDITURE_LIST_MAX_HEIGHT = 600;
     public const double SUPPORTER_LIST_MAX_HEIGHT = 780;
     public const double LIST_MIN_HEIGHT = 40;
+
+    /// <summary>
+    /// "全时间范围"查询下界：列表默认不限年月时用，
+    /// 替代 6+ 处散落的 <c>new DateTime(2000,1,1)/new DateTime(2100,12,31)</c> 魔法值。
+    /// </summary>
+    public static readonly DateTime FullRangeStart = new(2000, 1, 1);
+
+    /// <summary>全时间范围查询上界（闭区间，见 <see cref="FullRangeStart"/>）</summary>
+    public static readonly DateTime FullRangeEnd = new(2100, 12, 31);
 }

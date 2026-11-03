@@ -605,10 +605,10 @@ public partial class RecoveryFormViewModel : ViewModelBase
             return;
         }
 
-        var fields = await BuildPrintFieldsAsync();
+        var fields = await BuildPrintFieldsAsync(result.Value);
         var request = new PrintJobRequest
         {
-            BusinessType = "Recovery",
+            BusinessType = PrintBusinessTypes.Recovery,
             BusinessId = result.Value,
             Classification = RecoveryConstants.INPUT_MODE_SEARCH,
             ApplicantName = PersonName,
@@ -655,7 +655,8 @@ public partial class RecoveryFormViewModel : ViewModelBase
                 AmountSource = AmountSource,
                 AmountNote = AmountNote,
                 AutoAmount = AutoAmount,
-                Segments = Segments.ToList()
+                Segments = Segments.ToList(),
+                CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
             };
 
             Result<long> result;
@@ -739,7 +740,8 @@ public partial class RecoveryFormViewModel : ViewModelBase
                 AmountSource = AmountSource,
                 AmountNote = AmountNote,
                 AutoAmount = AutoAmount,
-                Segments = Segments.ToList()
+                Segments = Segments.ToList(),
+                CreatedBy = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName
             };
 
             Result<long> result;
@@ -781,10 +783,10 @@ public partial class RecoveryFormViewModel : ViewModelBase
     {
         // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
         PrintNavigationData.ClearDocumentMode();
-        PrintNavigationData.BusinessType = "Recovery";
+        PrintNavigationData.BusinessType = PrintBusinessTypes.Recovery;
         PrintNavigationData.BusinessId = recordId;
         PrintNavigationData.Classification = RecoveryConstants.INPUT_MODE_SEARCH;
-        PrintNavigationData.FieldData = await BuildPrintFieldsAsync();
+        PrintNavigationData.FieldData = await BuildPrintFieldsAsync(recordId);
         PrintNavigationData.TableData = new();
         PrintNavigationData.SupporterTableData = null;
         PrintNavigationData.NearRelativePairs = null;
@@ -793,55 +795,11 @@ public partial class RecoveryFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 填报单位默认值：当前登录用户所属组织名称（单位全称，取不到时回退登录用户名）
+    /// 构建《追缴资金办理单》打印字段（单点装配于 RecoveryPrintFieldBuilder，三入口共用）
     /// </summary>
-    private async Task<string> GetReportUnitAsync()
-    {
-        var orgId = App.CurrentUserOrganizationId;
-        if (!orgId.HasValue)
-            return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-
-        try
-        {
-            var orgService = ServiceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IOrganizationService>();
-            var result = await orgService.GetByIdAsync(orgId.Value, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
-            {
-                var org = result.Value;
-                if (!string.IsNullOrWhiteSpace(org.Name)) return org.Name;
-                if (!string.IsNullOrWhiteSpace(org.TownName)) return org.TownName;
-                if (!string.IsNullOrWhiteSpace(org.CountyName)) return org.CountyName;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn($"获取填报单位默认值失败: {ex.Message}");
-        }
-
-        return string.IsNullOrWhiteSpace(App.CurrentUserName) ? string.Empty : App.CurrentUserName;
-    }
-
-    /// <summary>
-    /// 构建《追缴资金办理单》打印字段（key 与模板中文占位符对应）
-    /// </summary>
-    private async Task<Dictionary<string, string>> BuildPrintFieldsAsync()
-    {
-        var now = DateTime.Now;
-        var reportUnit = await GetReportUnitAsync();
-        var codeResult = await _recoveryService.GenerateRecoveryCodeAsync(now);
-
-        return new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [FieldKeys.RECOVERY_UNIT] = reportUnit,
-            [FieldKeys.RECOVERY_CODE] = codeResult.IsSuccess ? codeResult.Value : string.Empty,
-            [FieldKeys.RECOVERY_SEQ] = "1",
-            [FieldKeys.RECOVERY_PERSON_NAME] = PersonName,
-            [FieldKeys.RECOVERY_ID_CARD] = IdCard,
-            [FieldKeys.RECOVERY_SOURCE_TYPE] = SourceDisplay,
-            [FieldKeys.RECOVERY_AMOUNT] = RecoveryAmount.ToString("N2"),
-            [FieldKeys.RECOVERED_AMOUNT] = RecoveredAmount.ToString("N2"),
-            [FieldKeys.RECOVERY_REPORT_DATE] = now.ToString("yyyy年MM月dd日"),
-            [FieldKeys.RECOVERY_RANGE] = $"{StartMonth} 至 {EndMonth}"
-        };
-    }
+    private Task<Dictionary<string, string>> BuildPrintFieldsAsync(long recordId)
+        => RecoveryPrintFieldBuilder.BuildFieldsAsync(
+            ServiceProvider, _recoveryService, recordId,
+            PersonName, IdCard, SourceDisplay,
+            RecoveryAmount, RecoveredAmount, StartMonth, EndMonth);
 }

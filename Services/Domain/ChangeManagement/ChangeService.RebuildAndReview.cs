@@ -954,7 +954,7 @@ public partial class ChangeService
 
         // 4. 复制家庭成员（member_id 映射）
         var oldMembersResult = await _db.QueryAsync<FamilyMember>(
-            "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
+            "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
         if (oldMembersResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(oldMembersResult.ErrorCode!, oldMembersResult.Message ?? "源成员查询失败");
         var oldMembers = oldMembersResult.Value ?? new List<FamilyMember>();
@@ -988,7 +988,7 @@ public partial class ChangeService
 
         // 成员ID映射（按身份证/姓名匹配）
         var newMembersResult = await _db.QueryAsync<FamilyMember>(
-            "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
+            "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
         if (newMembersResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(newMembersResult.ErrorCode!, newMembersResult.Message ?? "新档案成员查询失败");
         var newMembers = newMembersResult.Value ?? new List<FamilyMember>();
@@ -1063,7 +1063,7 @@ public partial class ChangeService
 
         // 7. 复制照料人（cared_member_id 迁移）
         var caregiversResult = await _db.QueryAsync<Caregiver>(
-            "SELECT * FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
+            "SELECT " + WideTableColumns.CaregiversColumns + " FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL", ct, sourceApplicationId);
         if (caregiversResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(caregiversResult.ErrorCode!, caregiversResult.Message ?? "照料人查询失败");
         var caregivers = caregiversResult.Value ?? new List<Caregiver>();
@@ -1349,7 +1349,7 @@ public partial class ChangeService
 
             // 2. 获取家庭成员（查询失败不能按"空成员"继续——分类判定会漏掉
             //    残疾/疾病等成员型补贴，算出错误金额并写库）
-            var membersSql = "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
+            var membersSql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {
@@ -1722,7 +1722,7 @@ public partial class ChangeService
             var oldFamilySize = context.OldFamilySize > 0 ? context.OldFamilySize : application.FamilySize;
 
             // 2. 家庭成员（表单已保存增删结果；查询失败不能按"空成员"继续，否则漏算成员型补贴）
-            var membersSql = "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
+            var membersSql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
             var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
             if (membersResult.IsFailure)
             {

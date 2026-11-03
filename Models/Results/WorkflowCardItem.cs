@@ -1,3 +1,5 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace NewCosmos.Models.Results;
 
 /// <summary>
@@ -19,7 +21,7 @@ public enum WorkflowCardAction
 /// 五个 Tab 共用同一套卡片模板，差异仅由本模型承载：
 /// 状态文案/色调、是否单人保、元信息（关系或编号）、地址（资产两 Tab）、操作类型。
 /// </summary>
-public class WorkflowCardItem
+public class WorkflowCardItem : ObservableObject
 {
     /// <summary>原始实体（AssetVerificationTask 或 Application），供命令分派</summary>
     public object Source { get; init; } = null!;
@@ -68,4 +70,26 @@ public class WorkflowCardItem
 
     /// <summary>是否显示"近亲属备案"按钮（仅申请卡片；资产核查任务卡不显示）</summary>
     public bool ShowNearRelativeButton => Source is NewCosmos.Models.Entities.Application;
+
+    #region 批量归档勾选
+
+    /// <summary>是否允许批量勾选（仅"已建档未提交"Tab 的申请卡片为 true）</summary>
+    public bool IsBatchSelectable { get; init; }
+
+    /// <summary>是否显示批量勾选框（= IsBatchSelectable）</summary>
+    public bool ShowBatchCheckbox => IsBatchSelectable;
+
+    /// <summary>是否显示"出文书"直达按钮（= IsBatchSelectable：已建档卡片可绕道五步表单直达档案制作页）</summary>
+    public bool ShowDirectOutputButton => IsBatchSelectable;
+
+    private bool _isSelected;
+
+    /// <summary>批量勾选状态（ObservableObject 通知，供批量归档命令收集）</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
+    #endregion
 }

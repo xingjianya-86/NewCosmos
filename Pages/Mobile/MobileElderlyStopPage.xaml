@@ -10,19 +10,13 @@
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
         <!-- 紫色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="高龄津贴停发办理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="停发后自动生成《取消备案表》" FontSize="13" TextColor="#E6FFFFFF"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="高龄津贴停发办理"
+                                   Subtitle="停发后自动生成《取消备案表》"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="12" Spacing="12">
@@ -114,7 +108,7 @@
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                             <CheckBox Grid.Column="0" IsChecked="{Binding IsRecover}" VerticalOptions="Center"/>
-                            <Label Grid.Column="1" Text="需要追缴（多发的高龄津贴需返还）" FontSize="13"
+                            <Label Grid.Column="1" Text="需要追缴（多发的高龄津贴需返还）" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                         </Grid>
                         <VerticalStackLayout IsVisible="{Binding IsRecover}" Spacing="12">
@@ -155,7 +149,7 @@
 
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent">
                     <Label Text="停发后实际停发时间取系统当前时间，自动生成《取消备案表》"
-                           FontSize="13" TextColor="{StaticResource PrimaryDark}"/>
+                           FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
                 </Border>
 
             </VerticalStackLayout>
@@ -164,11 +158,11 @@
         <!-- 底部按钮栏 -->
         <Border Grid.Row="2" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button Grid.Column="0" Text="取消" HeightRequest="46" CornerRadius="10" FontSize="15"
+                <Button Grid.Column="0" Text="取消" HeightRequest="46" CornerRadius="10" FontSize="16"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding CancelCommand}"/>
-                <Button Grid.Column="1" Text="确认停发" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                <Button Grid.Column="1" Text="确认停发" HeightRequest="46" CornerRadius="10" FontSize="16" FontAttributes="Bold"
                         BackgroundColor="{StaticResource Error}" TextColor="White"
                         Command="{Binding ConfirmStopCommand}" IsEnabled="{Binding CanConfirm}"/>
             </Grid>
@@ -179,7 +173,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

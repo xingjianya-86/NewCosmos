@@ -155,8 +155,10 @@ public static partial class FieldKeys
     public const string LAND_INCOME_SELF_FARM = "LAND_INCOME_SELF_FARM";          // 自种收入
     public const string LAND_INCOME_SUBLEASE = "LAND_INCOME_SUBLEASE";            // 转包收入
     public const string LAND_INCOME_CONTRACT = "LAND_INCOME_CONTRACT";            // 承包收入
-    public const string TOTAL_FAMILY_INCOME_ANNUAL = "TOTAL_FAMILY_INCOME_ANNUAL"; // 家庭总收入（年）
-    public const string PER_CAPITA_INCOME_ANNUAL = "PER_CAPITA_INCOME_ANNUAL";    // 家庭人均收入（年）
+    // 城乡口径金额（2026-11 起，键名沿用 *_ANNUAL 但值按户籍分流；模板行文「农村年度纯收入（城镇月收入）」）：
+    // 农村 = 年值原样；城市 = 年值÷12 月值。单点实现 ArchiveProductionViewModel.FormatIncomeByHukou（AGENTS §9）
+    public const string TOTAL_FAMILY_INCOME_ANNUAL = "TOTAL_FAMILY_INCOME_ANNUAL"; // 家庭总收入（城市=月值/农村=年值）
+    public const string PER_CAPITA_INCOME_ANNUAL = "PER_CAPITA_INCOME_ANNUAL";    // 家庭人均收入（城市=月值/农村=年值）
     public const string APPLICATION_REASON_DETAIL = "APPLICATION_REASON_DETAIL";    // 申请理由
     public const string SURVEY_VISIT_SITUATION = "SURVEY_VISIT_SITUATION";        // 调查走访情况
     public const string SINGLE_RESCUE_SITUATION = "SINGLE_RESCUE_SITUATION";      // 单人保情况
@@ -240,13 +242,15 @@ public static partial class FieldKeys
 
     // 收入状况
     public const string INCOME_BREEDING = "INCOME_BREEDING";
+    // 打印值 = 务工明细月值 + 转移性（工资性）收入月值（2026-11 业务确认；三张模板无"转移收入"行，
+    // 不并入则分项加总≠家庭总收入）——供给行 ArchiveProductionViewModel INCOME_LABOR
     public const string INCOME_LABOR = "INCOME_LABOR";
     public const string INCOME_BUSINESS = "INCOME_BUSINESS";
     public const string INCOME_PROPERTY = "INCOME_PROPERTY";
-    public const string INCOME_TRANSFER = "INCOME_TRANSFER";
+    public const string INCOME_TRANSFER = "INCOME_TRANSFER";                        // 当前无模板引用（保留）
     public const string INCOME_ALIMONY = "INCOME_ALIMONY";
     public const string INCOME_OTHER = "INCOME_OTHER";
-    public const string INCOME_TOTAL = "INCOME_TOTAL";
+    public const string INCOME_TOTAL = "INCOME_TOTAL";                              // 家庭总收入（城市=年÷12 月值/农村=年值）
     public const string INCOME_RIGID_EXPENDITURE = "INCOME_RIGID_EXPENDITURE";
     public const string LABOR_LOCATION = "LABOR_LOCATION";
     public const string LABOR_TYPE = "LABOR_TYPE";
@@ -379,6 +383,13 @@ public static partial class FieldKeys
     public const string DESTITUTE_AUDIT_CATEGORY = "DESTITUTE_AUDIT_CATEGORY";       // 人员类别（特困全称）
     public const string DESTITUTE_AUDIT_CLASSIFICATION = "DESTITUTE_AUDIT_CLASSIFICATION"; // 享受待遇类型（特困全称）
     public const string DESTITUTE_DISABILITY = "DESTITUTE_DISABILITY";              // 残疾类别（类型+等级）
+
+    // 特困供养人员取消（停止）情况表（退出/停发专用；姓名/性别/年龄/身份证/住址复用 APPLICANT_*/FAMILY_ADDRESS、
+    // 保障类型复用 DESTITUTE_SUPPORT_TYPE，此处仅新增退出专属 4 键）
+    public const string DESTITUTE_CANCEL_ANNUAL_AMOUNT = "DESTITUTE_CANCEL_ANNUAL_AMOUNT"; // 年保障金额 = 特困供养标准(月)×12，一次舍入（§9 口径）
+    public const string DESTITUTE_CANCEL_STOP_REASON = "DESTITUTE_CANCEL_STOP_REASON";     // 取消（停止）原因（☑/□ 勾选文本）
+    public const string DESTITUTE_CANCEL_STOP_TIME = "DESTITUTE_CANCEL_STOP_TIME";         // 取消（停止）时间
+    public const string DESTITUTE_CANCEL_APPROVAL_DATE = "DESTITUTE_CANCEL_APPROVAL_DATE"; // 业务审批时间（村委会/乡镇两处共用同键）
 
     // 能力鉴定（六项考核指标）
     public const string CAPABILITY_ASSESSMENT_DATE = "CAPABILITY_ASSESSMENT_DATE";  // 评估日期

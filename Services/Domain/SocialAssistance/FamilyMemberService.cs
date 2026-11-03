@@ -24,7 +24,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
     public async Task<Result<List<FamilyMember>>> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
         LogInfo($"执行操作");
-        var sql = "SELECT * FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL ORDER BY is_applicant DESC, created_at";
+        var sql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL ORDER BY is_applicant DESC, created_at";
         var result = await _db.QueryAsync<FamilyMember>(sql, ct, applicationId);
 
         // 归一化 member_category（历史/导入数据可能存中文显示值或空值），并推导户主内存标记。
@@ -47,7 +47,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
     public async Task<Result<FamilyMember>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"执行操作");
-        var sql = "SELECT * FROM nc_biz_family_members WHERE id = $1 AND deleted_at IS null";
+        var sql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE id = $1 AND deleted_at IS null";
         return await _db.QuerySingleAsync<FamilyMember>(sql, ct, id);
     }
 
@@ -138,6 +138,129 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             await tx.RollbackAsync(ct);
             LogException(ex, "失败");
             return Result.FromException<long>(ex);
+        }
+    }
+
+    /// <summary>
+    /// 多行 VALUES 批量插入家庭成员（保存草稿/提交的批写路径，替代逐人 AddAsync N+1：
+    /// 6 口之家原 ~18 条串行 SQL（每人 COUNT 防重 + INSERT）→ 本方法 2 条）。
+    /// 防重语义：① 批内去重由调用方负责（表单层已按身份证去重）；② 库内已存在同身份证
+    /// 则整体 Failure DUPLICATE_ID_CARD（比逐人静默跳过更强的显式失败，§7）。
+    /// 不做 IsHouseholdHead 清位（调用方先 DeleteByApplicationIdAsync 全删，无残留行可冲突）。
+    /// 返回 id_card → 新 id 映射（RETURNING id, id_card，供赡养人落库引用）。
+    /// </summary>
+    public async Task<Result<IReadOnlyDictionary<string, long>>> AddRangeAsync(
+        IReadOnlyList<FamilyMemberCreateRequest> requests, CancellationToken ct = default)
+    {
+        ValidateNotNull(requests, nameof(requests));
+        if (requests.Count == 0)
+            return Result.Success<IReadOnlyDictionary<string, long>>(
+                new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase));
+
+        foreach (var r in requests)
+        {
+            ValidateNotNull(r, nameof(requests));
+            ValidateNotNullOrEmpty(r.Name, nameof(r.Name));
+            ValidateNotNullOrEmpty(r.IdCard, nameof(r.IdCard));
+        }
+
+        LogInfo($"批量添加家庭成员: {requests.Count} 人");
+
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+        try
+        {
+            // 库内防重（一次批查替代逐人 COUNT）：任一身份证已存在则整体拒绝
+            var existsSql = "SELECT id_card FROM nc_biz_family_members WHERE application_id = $1 AND id_card = ANY($2::text[]) AND deleted_at IS NULL";
+            var existsResult = await _db.QueryAsync<string>(existsSql, ct,
+                requests[0].ApplicationId, requests.Select(r => r.IdCard.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+            if (existsResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<IReadOnlyDictionary<string, long>>(existsResult.ErrorCode!, existsResult.Message!);
+            }
+            var existing = new HashSet<string>(existsResult.Value ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            var conflict = requests.FirstOrDefault(r => existing.Contains(r.IdCard.Trim()));
+            if (conflict != null)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<IReadOnlyDictionary<string, long>>(ErrorCodes.DUPLICATE_ID_CARD,
+                    $"身份证号 {DataMasker.MaskIdCard(conflict.IdCard)} 已在此申请中存在");
+            }
+
+            // 多行 VALUES 批插：52 列（50 业务列 + created_at/updated_at）× N 行，$1..$50N 平铺（§8 鼓励的批写模式）
+            // [SQL 白名单背书] cols=本地 const 列清单（硬编码 52 列，与 ApplicationColumns 同模式）；
+            // values 由硬编码 rowTpl + 请求对象字段生成，无外部 SQL 输入（check_standards SQL1 豁免 cols/values）。
+            const string cols = @"application_id, name, id_card, relationship_to_head, gender, age, ethnicity, phone,
+                hukou_type, hukou_address, home_province, home_city, home_district, home_town, home_village, home_address,
+                hukou_province, hukou_city, hukou_district, hukou_town,
+                marital_status, education_level, political_status,
+                health_status, is_severe_disability, is_disabled, disability_type, disability_level,
+                disability_certificate_no, disease_category, disease_name, secondary_disease,
+                disease_code, is_severe_disease, is_labor_exempt,
+                is_applicant, member_category, employment_status, work_unit, main_income_source, annual_income, work_capacity,
+                monthly_income_capacity, family_size, person_type, annual_support_fee, monthly_support_fee,
+                support_months, is_support_ability, birth_date,
+                created_at, updated_at";
+            // 占位符必须与 cols 的业务列数严格相等（50）：曾漏 ${48}/${49} → "INSERT has more target columns than expressions"。
+            var rowTpl = @"(${0},${1},${2},${3},${4},${5},${6},${7},${8},${9},${10},${11},${12},${13},${14},${15},${16},${17},${18},${19},
+                ${20},${21},${22},${23},${24},${25},${26},${27},${28},${29},${30},${31},${32},${33},${34},${35},${36},${37},${38},${39},
+                ${40},${41},${42},${43},${44},${45},${46},${47},${48},${49}, NOW(), NOW())";
+
+            var values = new List<string>(requests.Count);
+            var args = new List<object>(requests.Count * 50);
+            foreach (var r in requests)
+            {
+                var baseIdx = args.Count;
+                values.Add(string.Format(global::System.Globalization.CultureInfo.InvariantCulture, rowTpl,
+                    baseIdx + 1, baseIdx + 2, baseIdx + 3, baseIdx + 4, baseIdx + 5, baseIdx + 6, baseIdx + 7, baseIdx + 8, baseIdx + 9, baseIdx + 10,
+                    baseIdx + 11, baseIdx + 12, baseIdx + 13, baseIdx + 14, baseIdx + 15, baseIdx + 16, baseIdx + 17, baseIdx + 18, baseIdx + 19, baseIdx + 20,
+                    baseIdx + 21, baseIdx + 22, baseIdx + 23, baseIdx + 24, baseIdx + 25, baseIdx + 26, baseIdx + 27, baseIdx + 28, baseIdx + 29, baseIdx + 30,
+                    baseIdx + 31, baseIdx + 32, baseIdx + 33, baseIdx + 34, baseIdx + 35, baseIdx + 36, baseIdx + 37, baseIdx + 38, baseIdx + 39, baseIdx + 40,
+                    baseIdx + 41, baseIdx + 42, baseIdx + 43, baseIdx + 44, baseIdx + 45, baseIdx + 46, baseIdx + 47, baseIdx + 48,
+                    baseIdx + 49, baseIdx + 50));
+
+                args.AddRange(new object[]
+                {
+                    r.ApplicationId, r.Name, r.IdCard, r.Relation,
+                    r.Gender, r.Age!, r.Ethnicity, r.Phone,
+                    r.HukouType, r.HukouAddress,
+                    r.HomeProvince, r.HomeCity, r.HomeDistrict, r.HomeTown, r.HomeVillage, r.HomeAddress,
+                    r.HukouProvince, r.HukouCity, r.HukouDistrict, r.HukouTown,
+                    r.MaritalStatus, r.EducationLevel, r.PoliticalStatus,
+                    r.HealthStatus, r.HasSevereIllness, r.HasDisability,
+                    r.DisabilityType, r.DisabilityLevel,
+                    r.DisabilityCertificateNo, r.DiseaseCategory, r.DiseaseName, r.SecondaryDiseaseName,
+                    r.DiseaseCode, r.IsSevereDisease, r.IsLaborExempt,
+                    r.IsHouseholdHead, r.MemberCategory,
+                    r.EmploymentStatus, r.WorkUnit, r.MainIncomeSource, r.AnnualIncome, r.WorkCapacity,
+                    r.MonthlyIncomeCapacity, (object?)r.FamilySize!, r.PersonType,
+                    r.AnnualSupportFee, r.MonthlySupportFee, (object?)r.SupportMonths!,
+                    r.IsSupportAbility, (object?)r.BirthDate!
+                });
+            }
+
+            var sql = $"INSERT INTO nc_biz_family_members ({cols}) VALUES {string.Join(", ", values)} RETURNING id, id_card";
+            var insertResult = await _db.QueryAsync<(long Id, string IdCard)>(sql, ct, args.ToArray());
+            if (insertResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<IReadOnlyDictionary<string, long>>(insertResult.ErrorCode!, insertResult.Message!);
+            }
+
+            await tx.CommitAsync(ct);
+
+            var map = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (id, idCard) in insertResult.Value ?? new List<(long, string)>())
+                if (!string.IsNullOrWhiteSpace(idCard)) map[idCard.Trim()] = id;
+
+            Logger.LogBusiness("批量添加家庭成员", ("Count", requests.Count), ("ApplicationId", requests[0].ApplicationId));
+            return Result.Success<IReadOnlyDictionary<string, long>>(map);
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(ct);
+            LogException(ex, "批量添加家庭成员失败");
+            return Result.FromException<IReadOnlyDictionary<string, long>>(ex);
         }
     }
 

@@ -50,10 +50,6 @@ public sealed record NearRelativeEntryParameter(
     string? ApplicantName = null,
     string? ApplicantIdCard = null);
 
-/// <summary>
-/// 档案产出页初始化来源参数（三选一：资产核查 / 申请档案 / 经济复核归档）。
-/// </summary>
-public sealed record AssetCheckArchiveParameter(long VerificationId);
 
 /// <summary>档案产出页初始化来源参数：申请档案。</summary>
 public sealed record ApplicationArchiveParameter(long ApplicationId);
@@ -62,13 +58,15 @@ public sealed record ApplicationArchiveParameter(long ApplicationId);
 /// 档案照片页导航参数：按人（身份证）+ 申请定位，采集/查阅该人的证件与核查照片。
 /// SessionQueue/SessionIndex：补传会话模式（历史档案批量补传），提供"下一位"连续采集；
 /// 从各业务表单单人进入时为 null。
+/// AssignContext：识别结果回填上下文（表单 VM 实现）；null = 只存档不识别（档案查询/补传入口）。
 /// </summary>
 public sealed record ArchivePhotoParameter(
     string ApplicantIdCard,
     long? ApplicationId = null,
     string? ApplicantName = null,
     IReadOnlyList<NewCosmos.Models.Entities.PhotoBackfillPerson>? SessionQueue = null,
-    int SessionIndex = 0);
+    int SessionIndex = 0,
+    NewCosmos.Services.Platform.IOcrAssignContext? AssignContext = null);
 
 /// <summary>
 /// 档案产出页初始化来源参数：复核/成员变更归档。

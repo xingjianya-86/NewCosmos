@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
 using NewCosmos.Services.Core;
@@ -349,7 +350,7 @@ public partial class ElderlyReviewViewModel : ViewModelBase
 
         // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
         PrintNavigationData.ClearDocumentMode();
-        PrintNavigationData.BusinessType = "ElderlyBenefits";
+        PrintNavigationData.BusinessType = PrintBusinessTypes.ElderlyBenefits;
         PrintNavigationData.BusinessId = _newAppId;
         PrintNavigationData.Classification = "Review";
         PrintNavigationData.FieldData = BuildReviewPrintFields(newAppResult.Value, oldAppResult?.Value, _evaluation!);
@@ -379,9 +380,12 @@ public partial class ElderlyReviewViewModel : ViewModelBase
         // 调整备案表：批D2 清理（2026-10-16）——原 ELDERLY_ADJUST_NAME/ID_CARD/HUKOU_ADDRESS/FAMILY_ADDRESS
         // 四键供给已删（全库 config 读取 0；T250 已迁 APPLICANT_*/HUKOU_ADDRESS/FAMILY_ADDRESS）。
         // 下方 FAMILY_ADDRESS 双写必须保留：含 DetailAddress 拼接口径，覆盖 BuildSingleFields 的 plain 值。
-        var adjustFamilyAddress = string.IsNullOrWhiteSpace(newApp.DetailAddress)
+        // detail_address 库中实测存占位 "-"（如「牡丹江市林口县柳树镇复兴村委会」+「-」），
+        // 原 IsNullOrWhiteSpace 判空拦不住 → 打出「…村委会-」；CleanLevel 把 -/空 一并视为无值。
+        var elderlyDetail = AddressResolver.CleanLevel(newApp.DetailAddress);
+        var adjustFamilyAddress = string.IsNullOrEmpty(elderlyDetail)
             ? (newApp.FamilyAddress ?? string.Empty)
-            : $"{newApp.FamilyAddress}{newApp.DetailAddress}";
+            : $"{newApp.FamilyAddress}{elderlyDetail}";
         // 批5 双写（2026-10-16，B/SOLO）：T250 {调整家庭地址}→FAMILY_ADDRESS。必须后写覆盖
         // BuildSingleFields 的 plain FamilyAddress——此处是含 DetailAddress 的拼接口径。
         f[FieldKeys.FAMILY_ADDRESS] = adjustFamilyAddress;

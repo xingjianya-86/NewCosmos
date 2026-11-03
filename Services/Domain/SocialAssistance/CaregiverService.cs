@@ -19,7 +19,7 @@ public class CaregiverService : BaseService, ICaregiverService
     public async Task<Result<List<Caregiver>>> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
         LogInfo($"查询照料人: ApplicationId={applicationId}");
-        var sql = "SELECT * FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL ORDER BY created_at";
+        var sql = "SELECT " + WideTableColumns.CaregiversColumns + " FROM nc_biz_caregivers WHERE application_id = $1 AND deleted_at IS NULL ORDER BY created_at";
         return await _db.QueryAsync<Caregiver>(sql, ct, applicationId);
     }
 

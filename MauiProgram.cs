@@ -84,29 +84,54 @@ public static class MauiProgram
         builder.Services.AddSingleton<ILoadingProgressRunner, Navigation.LoadingProgressRunner>();
         builder.Services.AddSingleton<IOutputRootMigrationService, OutputRootMigrationService>();
         builder.Services.AddSingleton<ISystemService, SystemService>();
-        builder.Services.AddSingleton<IBackgroundLoaderService, BackgroundLoaderService>();
         builder.Services.AddSingleton<Helpers.IPinyinConverter, Helpers.PinyinConverter>();
+        // 启动动画：闸门（动画 vs 会话恢复双就绪）+ Web 资产/配置组装
+        builder.Services.AddSingleton<ISplashGate, SplashGate>();
+        builder.Services.AddSingleton<ISplashAssetsService, SplashAssetsService>();
 #if WINDOWS
         builder.Services.AddSingleton<IFolderPickerService, Platforms.Windows.WindowsFolderPickerService>();
         builder.Services.AddSingleton<IFilePickerService, Platforms.Windows.WindowsFilePickerService>();
         builder.Services.AddSingleton<IPrinterService, Platforms.Windows.WindowsPrinterService>();
-        builder.Services.AddSingleton<IIdentityReader, Platforms.Windows.WindowsIdentityReader>();
         builder.Services.AddSingleton<IAppPackageInstaller, Platforms.Windows.WindowsPackageInstaller>();
         builder.Services.AddSingleton<IAlbumExportService, Platforms.Windows.WindowsAlbumExportService>();
+        // 系统栏控制：桌面无系统栏，注入空实现以统调用点
+        builder.Services.AddSingleton<ISystemBarsService, Platforms.Windows.WindowsSystemBarsService>();
+        // 自定义标题栏（纸墨风改色）
+        builder.Services.AddSingleton<Platforms.Windows.WindowsTitleBarService>();
 #elif ANDROID
         builder.Services.AddSingleton<IFolderPickerService, NewCosmos.Services.Platform.AndroidFolderPickerService>();
         builder.Services.AddSingleton<IFilePickerService, NewCosmos.Services.Platform.AndroidFilePickerService>();
         builder.Services.AddSingleton<IPrinterService, NewCosmos.Services.Platform.AndroidPrinterService>();
-        builder.Services.AddSingleton<IIdentityReader, NewCosmos.Services.Platform.AndroidIdentityReader>();
         builder.Services.AddSingleton<IAppPackageInstaller, NewCosmos.Services.Platform.AndroidPackageInstaller>();
         builder.Services.AddSingleton<IAlbumExportService, NewCosmos.Platforms.Android.AndroidAlbumExportService>();
+        // 系统栏控制：沉浸式全屏 / EdgeToEdge（config app.ini [Android] FullscreenMode）
+        builder.Services.AddSingleton<ISystemBarsService, NewCosmos.Platforms.Android.AndroidSystemBarsService>();
         // 原生 Camera2 预览控件（身份证扫描取景框）
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<NewCosmos.Controls.CameraPreviewView, NewCosmos.Platforms.Android.Camera.CameraPreviewViewHandler>());
+
+        // 行盒治理（手机端文字上下留白）：关闭 Android includeFontPadding。
+        // 根因：Noto Sans/Serif CJK 的 head 表全局字形边界达 2.86em（字身行高仅 1.45em），
+        // includeFontPadding=true（TextView 默认）时每行按全局边界撑高，汉字上下各空出近
+        // 一个字高，界面大面积留白（用户 2026-11-03 截图反馈）；关闭后行盒回落字身高度。
+        // 挂 ViewHandler.ViewMapper 一处覆盖全部文字控件（Label/Entry/Editor/Button/
+        // Picker/DatePicker/TimePicker/CheckBox/RadioButton 等）；WinUI 无此属性，不受影响。
+        // 注：SearchBar 平台控件为 SearchView（非 TextView）不在覆盖内，全库仅
+        // UnifiedReprintPage 一处使用，暂不处理。
+        builder.ConfigureMauiHandlers(handlers =>
+            Microsoft.Maui.Handlers.ViewHandler.ViewMapper.AppendToMapping("NoFontPadding",
+                static (handler, _) =>
+                {
+                    if (handler.PlatformView is Android.Widget.TextView tv)
+                        tv.SetIncludeFontPadding(false); // .NET 10 绑定 IncludeFontPadding 无 setter，走方法形态
+                }));
 #endif
 
         builder.Services.AddSingleton<IDictCacheService, DictCacheService>();
         builder.Services.AddSingleton<IFileService, FileService>();
+
+        // 内网证件 OCR 识别（Xiaomi-OCR-0，deploy\ocr\ocr_api.py）：图片+类别 → 字段/文本行
+        builder.Services.AddSingleton<Services.Platform.IOcrRecognizeClient, Services.Platform.RemoteOcrRecognizeClient>();
 
         // 在线更新与客户端版本台账
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
@@ -160,6 +185,7 @@ public static class MauiProgram
         #region 领域服务注册 - 社会救助
 
         builder.Services.AddSingleton<IApplicationService, ApplicationService>();
+        builder.Services.AddSingleton<IDestituteCancelFilingService, DestituteCancelFilingService>();
         // 状态流转单一权威入口（§9 规范2：状态机单一权威 + §8 审计留痕）
         builder.Services.AddSingleton<IApplicationStatusService, ApplicationStatusService>();
         builder.Services.AddSingleton<IHouseholdSurveyService, HouseholdSurveyService>();
@@ -212,7 +238,6 @@ public static class MauiProgram
         #region 领域服务注册 - 资产核查
 
         builder.Services.AddSingleton<IAssetVerificationService, AssetVerificationService>();
-        builder.Services.AddSingleton<IAssetVerificationReportService, AssetVerificationReportService>();
         builder.Services.AddSingleton<IPdfVerificationService, PdfVerificationService>();
 
         #endregion
@@ -314,11 +339,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.ITemplateService, Services.Domain.ArchiveManagement.TemplateService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchiveService, Services.Domain.ArchiveManagement.ArchiveService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IProofUnitTemplateService, Services.Domain.ArchiveManagement.ProofUnitTemplateService>();
+        builder.Services.AddSingleton<Services.Domain.ArchiveManagement.DeathIdentityAggregator>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IDeathStatementService, Services.Domain.ArchiveManagement.DeathStatementService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoService, Services.Domain.ArchiveManagement.ArchivePhotoService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoWebPMigrationService, Services.Domain.ArchiveManagement.ArchivePhotoWebPMigrationService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IPublicityOutputService, Services.Domain.ArchiveManagement.PublicityOutputService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeService, Services.Domain.ChangeManagement.ChangeService>();
+        builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeDocumentApplicabilityService, Services.Domain.ChangeManagement.ChangeDocumentApplicabilityService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IImportedArchiveService, Services.Domain.ChangeManagement.ImportedArchiveService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IDynamicManagementRecordService, Services.Domain.ChangeManagement.DynamicManagementRecordService>();
         builder.Services.AddSingleton<Services.Domain.SpecialApproval.ISpecialApprovalService, Services.Domain.SpecialApproval.SpecialApprovalService>();
@@ -380,7 +407,6 @@ public static class MauiProgram
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.ProofUnitTemplateManageViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.MonthlyPublicityViewModel>();
 
-        builder.Services.AddTransient<NewCosmos.ViewModels.ChangeManagement.ChangeManagementViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ChangeManagement.ChangeViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ChangeManagement.MemberChangeReasonPopupViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ChangeManagement.GracePeriodConfirmViewModel>();
@@ -398,6 +424,7 @@ public static class MauiProgram
         builder.Services.AddTransient<DataImportViewModel>();
 
         builder.Services.AddTransient<MonthlyReportMainViewModel>();
+        builder.Services.AddTransient<ReportHistoryViewModel>();
 
         builder.Services.AddTransient<UserManagementViewModel>();
         builder.Services.AddTransient<OnlineSessionsViewModel>();
@@ -465,6 +492,7 @@ public static class MauiProgram
         #region Page 注册
 
         builder.Services.AddTransient<LoginPage>();
+        builder.Services.AddTransient<Pages.Splash.SplashPage>();
         builder.Services.AddTransient<MainPage>();
 
         // 手机端专用页面（Phase 2: UI 分离）
@@ -473,7 +501,9 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.Mobile.MobileAssetVerificationHomePage>();
         builder.Services.AddTransient<Pages.Mobile.MobileQuickAssetVerificationPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileMonthlyAssetAuditPage>();
-        builder.Services.AddTransient<Pages.Mobile.MobileIdCardScanPage>();
+        builder.Services.AddTransient<Pages.Mobile.MobileOcrScanPage>();
+        builder.Services.AddTransient<ViewModels.Mobile.OcrAssignViewModel>();
+        builder.Services.AddTransient<Pages.Mobile.OcrAssignPage>();
         // P1：低收入人口救助帮扶手机端
         builder.Services.AddTransient<Pages.Mobile.MobileApplicationWorkflowPage>();
         builder.Services.AddTransient<Pages.Mobile.MobileApplicationFormPage>();
@@ -562,7 +592,6 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.ChangeManagement.HeadChangePage>();
         builder.Services.AddTransient<Pages.ChangeManagement.MemberChangeReasonPopup>();
         builder.Services.AddTransient<Pages.ChangeManagement.GracePeriodConfirmPage>();
-        builder.Services.AddTransient<Pages.SocialAssistance.AddMemberPopup>();
         builder.Services.AddTransient<Pages.SocialAssistance.SelectMembersPopup>();
         
         builder.Services.AddTransient<ConfigWizardPage>();

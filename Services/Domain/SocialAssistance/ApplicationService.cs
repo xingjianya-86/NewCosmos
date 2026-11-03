@@ -79,7 +79,8 @@ public class ApplicationService : BaseService, IApplicationService
     /// ClassificationConstants.IsProtectedLowIncomeCode（低保/单人/边缘/特困，不含刚性支出）；
     /// 失败仅记日志不阻断主流程。处于环境事务中时自动随事务提交/回滚。
     /// </summary>
-    private async Task TryMarkAssetChecksIncludedAsync(ApplicationEntity app, CancellationToken ct)
+    private async Task TryMarkAssetChecksIncludedAsync(
+        (long Id, string? ClassificationResult, string? ApplicantIdCard) app, CancellationToken ct)
     {
         try
         {
@@ -200,84 +201,6 @@ public class ApplicationService : BaseService, IApplicationService
             return Result.Failure<PagedResult<ApplicationEntity>>(listResult.ErrorCode!, listResult.Message!);
 
         return Result.Success(PagedResult<ApplicationEntity>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(countResult.Value)));
-    }
-
-    public async Task<Result<PagedResult<ApplicationEntity>>> SearchPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
-    {
-        LogInfo($"搜索申请: keywordLength={keyword.Length}, 第{pageIndex}页");
-        return await GetPagedAsync(pageIndex, pageSize, null, keyword, ct);
-    }
-
-    public async Task<Result<PagedResult<ApplicationEntity>>> SearchPagedAsync(string? keyword, string? status, string? role, int pageIndex, int pageSize, CancellationToken ct = default)
-    {
-        LogInfo($"搜索申请: keywordLength={keyword?.Length ?? 0}, status={status}, role={role}, 第{pageIndex}页");
-        return await GetPagedAsync(pageIndex, pageSize, status!, keyword!, ct);
-    }
-
-    public async Task<Result<long>> CreateAsync(ApplicationCreateRequest request, CancellationToken ct = default)
-    {
-        ValidateNotNull(request, nameof(request));
-        ValidateNotNullOrEmpty(request.ApplicantName, nameof(request.ApplicantName));
-        ValidateNotNullOrEmpty(request.ApplicantIdCard, nameof(request.ApplicantIdCard));
-
-        LogInfo($"创建申请: {DataMasker.MaskName(request.ApplicantName)}");
-
-        await using var tx = await _db.BeginTransactionScopeAsync(ct);
-
-        try
-        {
-            var existsResult = await CheckIdCardExistsAsync(request.ApplicantIdCard, null, ct);
-            if (existsResult.IsSuccess && existsResult.Value)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<long>(ErrorCodes.DUPLICATE_ID_CARD, "该身份证号已存在");
-            }
-
-            var appNoResult = await GetNextApplicationNoAsync(ct);
-            if (appNoResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<long>(appNoResult.ErrorCode!, appNoResult.Message!);
-            }
-
-            var sql = $@"INSERT INTO nc_biz_applications 
-            (application_no, applicant_name, applicant_id_card, applicant_phone, 
-             gender, ethnicity, marital_status, hukou_type, education_level, political_status, hukou_address, disability_card_no,
-             province, city, district, town, community, address,
-              physical_condition, disease_name, secondary_disease_name, disease_code, is_severe_disease, disability_type, disability_level, health_status,
-             employment_status, work_unit, income_source,
-             family_size, total_family_income, application_reason, status, created_by, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $34, $33, NOW(), NOW())
-            RETURNING id";
-
-            var hukouType = request.HukouType ?? "Rural";
-            var insertResult = await _db.ExecuteScalarAsync(sql, ct,
-                appNoResult.Value, request.ApplicantName, request.ApplicantIdCard, request.ApplicantPhone,
-                request.Gender ?? "", request.Ethnicity, request.MaritalStatus, hukouType, request.EducationLevel, request.PoliticalStatus, request.HukouAddress, request.DisabilityCardNo,
-                request.Province, request.City, request.District, request.Town, request.Community, request.Address,
-                request.PhysicalCondition, request.DiseaseName, request.SecondaryDiseaseName, request.DiseaseCode, request.IsSevereDisease, request.DisabilityType, request.DisabilityLevel, request.HealthStatus,
-                request.EmploymentStatus, request.WorkUnit, request.IncomeSource,
-                request.FamilySize, request.AnnualIncome, request.ApplicationReason, request.CreatedBy,
-                ApplicationStatusCodes.DRAFT);
-
-            if (insertResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<long>(insertResult.ErrorCode!, insertResult.Message!);
-            }
-
-            await tx.CommitAsync(ct);
-
-            LogInfo($"执行操作");
-            Logger.LogBusiness("创建申请", ("ApplicationId", insertResult.Value), ("ApplicantName", DataMasker.MaskName(request.ApplicantName)));
-            return Result.Success(insertResult.Value);
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync(ct);
-            LogException(ex, "创建申请失败");
-            return Result.FromException<long>(ex);
-        }
     }
 
     public async Task<Result<long>> CreateAsync(ApplicationEntity application, CancellationToken ct = default)
@@ -434,84 +357,108 @@ public class ApplicationService : BaseService, IApplicationService
             var args = new List<object?>();
             void Set(string col, object? v) { args.Add(v); sets.Add($"{col} = ${args.Count}"); }
 
-            Set("applicant_name", request.ApplicantName);
-            Set("applicant_id_card", request.ApplicantIdCard);
-            Set("applicant_phone", request.ApplicantPhone);
-            Set("address", request.Address);
-            Set("town", request.Town);
-            Set("community", request.Community);
-            Set("family_size", request.FamilySize);
-            Set("total_family_income", request.AnnualIncome);
-            Set("updated_by", request.UpdatedBy);
-            Set("gender", request.Gender);
-            Set("ethnicity", request.Ethnicity);
-            Set("marital_status", request.MaritalStatus);
-            Set("hukou_type", request.HukouType);
-            Set("education_level", request.EducationLevel);
-            Set("political_status", request.PoliticalStatus);
-            Set("hukou_address", request.HukouAddress);
-            Set("disability_card_no", request.DisabilityCardNo);
-            Set("province", request.Province);
-            Set("city", request.City);
-            Set("district", request.District);
+            // 增量写（2026-11 A5）：与上方事务内已读行（app）逐列比较，只写变化列。
+            // 与全量写【结果状态完全等价】——相等跳过 = 写回同值；不等写入 = 原样写入，
+            // 故「未编辑列原样回写」语义（BuildApplication 回填契约）不受影响，且写放大显著减少。
+            // 宁可多写不漏写：类型不匹配/无法比较时 Equals 返回 false → 写入（退化为原全量写行为）。
+            void SetIfChanged(string col, object? newValue, object? currentValue)
+            {
+                if (ValuesEqual(newValue, currentValue)) return;
+                args.Add(newValue);
+                sets.Add($"{col} = ${args.Count}");
+            }
+
+            // 值相等判定：null/null、同型值、string Ordinal 精确比较（null ≠ ""——
+            // 与原全量写逐字节等价：DB NULL→请求 "" 仍会写入，不静默改变 NULL/空串语义）。
+            // 类型不匹配（int vs long 等）Equals 返回 false → 写入，退化为原全量写行为，宁可多写不漏写。
+            static bool ValuesEqual(object? a, object? b)
+            {
+                if (a is null && b is null) return true;
+                if (a is null || b is null) return false;
+                if (a is string sa && b is string sb)
+                    return string.Equals(sa, sb, StringComparison.Ordinal);
+                return a.Equals(b);
+            }
+
+            SetIfChanged("applicant_name", request.ApplicantName, app.ApplicantName);
+            SetIfChanged("applicant_id_card", request.ApplicantIdCard, app.ApplicantIdCard);
+            SetIfChanged("applicant_phone", request.ApplicantPhone, app.ApplicantPhone);
+            SetIfChanged("address", request.Address, app.Address);
+            SetIfChanged("town", request.Town, app.Town);
+            SetIfChanged("community", request.Community, app.Community);
+            SetIfChanged("family_size", request.FamilySize, app.FamilySize);
+            SetIfChanged("total_family_income", request.AnnualIncome, app.TotalFamilyIncome);
+            SetIfChanged("gender", request.Gender, app.Gender);
+            SetIfChanged("ethnicity", request.Ethnicity, app.Ethnicity);
+            SetIfChanged("marital_status", request.MaritalStatus, app.MaritalStatus);
+            SetIfChanged("hukou_type", request.HukouType, app.HukouType);
+            SetIfChanged("education_level", request.EducationLevel, app.EducationLevel);
+            SetIfChanged("political_status", request.PoliticalStatus, app.PoliticalStatus);
+            SetIfChanged("hukou_address", request.HukouAddress, app.HukouAddress);
+            SetIfChanged("disability_card_no", request.DisabilityCardNo, app.DisabilityCardNo);
+            SetIfChanged("province", request.Province, app.Province);
+            SetIfChanged("city", request.City, app.City);
+            SetIfChanged("district", request.District, app.District);
             // 补齐历史缺失字段（与 CreateAsync INSERT 列对齐；注：nc_biz_applications 无 village 列，
             // 表单的村/社区数据走 community 列）
-            Set("city_id", request.CityId);
-            Set("county_id", request.CountyId);
-            Set("town_id", request.TownId);
-            Set("village_id", request.VillageId);
-            Set("hukou_city_id", request.HukouCityId);
-            Set("hukou_county_id", request.HukouCountyId);
-            Set("hukou_town_id", request.HukouTownId);
-            Set("hukou_village_id", request.HukouVillageId);
-            Set("physical_condition", request.PhysicalCondition);
-            Set("disease_name", request.DiseaseName);
-            Set("secondary_disease_name", request.SecondaryDiseaseName);
-            Set("disease_code", request.DiseaseCode);
-            Set("is_severe_disease", request.IsSevereDisease);
-            Set("disability_type", request.DisabilityType);
-            Set("disability_level", request.DisabilityLevel);
-            Set("health_status", request.HealthStatus);
-            Set("employment_status", request.EmploymentStatus);
-            Set("work_unit", request.WorkUnit);
-            Set("income_source", request.IncomeSource);
-            Set("bank_name", request.BankName);
-            Set("bank_account", request.BankAccount);
-            Set("application_reason", request.ApplicationReason);
-            Set("application_reason_detail", request.ApplicationReasonDetail);
-            Set("work_income_total", request.WorkIncomeTotal);
-            Set("business_income_total", request.BusinessIncomeTotal);
-            Set("property_income_total", request.PropertyIncomeTotal);
-            Set("transfer_income_total", request.TransferIncomeTotal);
-            Set("other_income_total", request.OtherIncomeTotal);
-            Set("alimony_income", request.AlimonyIncome);
-            Set("per_capita_income", request.PerCapitaIncome);
-            Set("total_annual_income", request.TotalAnnualIncome);
-            Set("per_capita_annual_income", request.PerCapitaAnnualIncome);
-            Set("rigid_expenditure", request.RigidExpenditure);
-            Set("family_land_area", request.FamilyLandArea);
-            Set("self_farmed_land_area", request.SelfFarmedLandArea);
-            Set("subleased_land_area", request.SubleasedLandArea);
-            Set("contracted_land_area", request.ContractedLandArea);
-            Set("land_income_total", request.LandIncomeTotal);
-            Set("subsidy_total", request.SubsidyTotal);
-            Set("is_eligible", request.IsEligible);
-            Set("classification_result", request.ClassificationResult);
-            Set("classified_subsidy_type", request.ClassifiedSubsidyType);
-            Set("classified_subsidy_amount", request.ClassifiedSubsidyAmount);
-            Set("household_monthly_guarantee_amount", request.HouseholdMonthlyGuaranteeAmount);
-            Set("person_category_protection_total_amount", request.PersonCategoryProtectionTotalAmount);
-            Set("caregiver_subsidy_amount", request.CaregiverSubsidyAmount);
-            Set("total_guarantee_amount", request.TotalGuaranteeAmount);
-            Set("is_special_approval", request.IsSpecialApproval);
-            Set("special_approval_id", request.SpecialApprovalId);
-            Set("caregiver_type", request.CaregiverType);
-            Set("destitute_support_type", request.DestituteSupportType);
-            Set("confirmed_family_size", request.ConfirmedFamilySize);
-            Set("is_single_rescue", request.IsSingleRescue);
-            Set("support_mode", request.SupportMode);
-            Set("support_institution_id", request.SupportInstitutionId);
-            Set("current_step", request.CurrentStep);
+            SetIfChanged("city_id", request.CityId, app.CityId);
+            SetIfChanged("county_id", request.CountyId, app.CountyId);
+            SetIfChanged("town_id", request.TownId, app.TownId);
+            SetIfChanged("village_id", request.VillageId, app.VillageId);
+            SetIfChanged("hukou_city_id", request.HukouCityId, app.HukouCityId);
+            SetIfChanged("hukou_county_id", request.HukouCountyId, app.HukouCountyId);
+            SetIfChanged("hukou_town_id", request.HukouTownId, app.HukouTownId);
+            SetIfChanged("hukou_village_id", request.HukouVillageId, app.HukouVillageId);
+            SetIfChanged("physical_condition", request.PhysicalCondition, app.PhysicalCondition);
+            SetIfChanged("disease_name", request.DiseaseName, app.DiseaseName);
+            SetIfChanged("secondary_disease_name", request.SecondaryDiseaseName, app.SecondaryDiseaseName);
+            SetIfChanged("disease_code", request.DiseaseCode, app.DiseaseCode);
+            SetIfChanged("is_severe_disease", request.IsSevereDisease, app.IsSevereDisease);
+            SetIfChanged("disability_type", request.DisabilityType, app.DisabilityType);
+            SetIfChanged("disability_level", request.DisabilityLevel, app.DisabilityLevel);
+            SetIfChanged("health_status", request.HealthStatus, app.HealthStatus);
+            SetIfChanged("employment_status", request.EmploymentStatus, app.EmploymentStatus);
+            SetIfChanged("work_unit", request.WorkUnit, app.WorkUnit);
+            SetIfChanged("income_source", request.IncomeSource, app.IncomeSource);
+            SetIfChanged("bank_name", request.BankName, app.BankName);
+            SetIfChanged("bank_account", request.BankAccount, app.BankAccount);
+            SetIfChanged("application_reason", request.ApplicationReason, app.ApplicationReason);
+            SetIfChanged("application_reason_detail", request.ApplicationReasonDetail, app.ApplicationReasonDetail);
+            SetIfChanged("work_income_total", request.WorkIncomeTotal, app.WorkIncomeTotal);
+            SetIfChanged("business_income_total", request.BusinessIncomeTotal, app.BusinessIncomeTotal);
+            SetIfChanged("property_income_total", request.PropertyIncomeTotal, app.PropertyIncomeTotal);
+            SetIfChanged("transfer_income_total", request.TransferIncomeTotal, app.TransferIncomeTotal);
+            SetIfChanged("other_income_total", request.OtherIncomeTotal, app.OtherIncomeTotal);
+            SetIfChanged("alimony_income", request.AlimonyIncome, app.AlimonyIncome);
+            SetIfChanged("per_capita_income", request.PerCapitaIncome, app.PerCapitaIncome);
+            SetIfChanged("total_annual_income", request.TotalAnnualIncome, app.TotalAnnualIncome);
+            SetIfChanged("per_capita_annual_income", request.PerCapitaAnnualIncome, app.PerCapitaAnnualIncome);
+            SetIfChanged("rigid_expenditure", request.RigidExpenditure, app.RigidExpenditure);
+            SetIfChanged("family_land_area", request.FamilyLandArea, app.FamilyLandArea);
+            SetIfChanged("self_farmed_land_area", request.SelfFarmedLandArea, app.SelfFarmedLandArea);
+            SetIfChanged("subleased_land_area", request.SubleasedLandArea, app.SubleasedLandArea);
+            SetIfChanged("contracted_land_area", request.ContractedLandArea, app.ContractedLandArea);
+            SetIfChanged("land_income_total", request.LandIncomeTotal, app.LandIncomeTotal);
+            SetIfChanged("subsidy_total", request.SubsidyTotal, app.SubsidyTotal);
+            SetIfChanged("is_eligible", request.IsEligible, app.IsEligible);
+            SetIfChanged("classification_result", request.ClassificationResult, app.ClassificationResult);
+            SetIfChanged("classified_subsidy_type", request.ClassifiedSubsidyType, app.ClassifiedSubsidyType);
+            SetIfChanged("classified_subsidy_amount", request.ClassifiedSubsidyAmount, app.ClassifiedSubsidyAmount);
+            SetIfChanged("household_monthly_guarantee_amount", request.HouseholdMonthlyGuaranteeAmount, app.HouseholdMonthlyGuaranteeAmount);
+            SetIfChanged("person_category_protection_total_amount", request.PersonCategoryProtectionTotalAmount, app.PersonCategoryProtectionTotalAmount);
+            SetIfChanged("caregiver_subsidy_amount", request.CaregiverSubsidyAmount, app.CaregiverSubsidyAmount);
+            SetIfChanged("total_guarantee_amount", request.TotalGuaranteeAmount, app.TotalGuaranteeAmount);
+            SetIfChanged("is_special_approval", request.IsSpecialApproval, app.IsSpecialApproval);
+            SetIfChanged("special_approval_id", request.SpecialApprovalId, app.SpecialApprovalId);
+            SetIfChanged("caregiver_type", request.CaregiverType, app.CaregiverType);
+            SetIfChanged("destitute_support_type", request.DestituteSupportType, app.DestituteSupportType);
+            SetIfChanged("confirmed_family_size", request.ConfirmedFamilySize, app.ConfirmedFamilySize);
+            SetIfChanged("is_single_rescue", request.IsSingleRescue, app.IsSingleRescue);
+            SetIfChanged("support_mode", request.SupportMode, app.SupportMode);
+            SetIfChanged("support_institution_id", request.SupportInstitutionId, app.SupportInstitutionId);
+            SetIfChanged("current_step", request.CurrentStep, app.CurrentStep);
+            // 审计与并发令牌列无条件写（updated_at 是乐观并发令牌 + 列表排序键，必须推进）
+            Set("updated_by", request.UpdatedBy);
             sets.Add("updated_at = NOW()");
 
             // WHERE 参数（放在 SET 参数之后）
@@ -857,7 +804,7 @@ public class ApplicationService : BaseService, IApplicationService
 
             // 审批通过成为保障对象 → 联动升级资产核查状态（同事务，失败不阻断）
             if (request.Approved)
-                await TryMarkAssetChecksIncludedAsync(app, ct);
+                await TryMarkAssetChecksIncludedAsync((app.Id, app.ClassificationResult, app.ApplicantIdCard), ct);
 
             await tx.CommitAsync(ct);
 
@@ -961,41 +908,24 @@ public class ApplicationService : BaseService, IApplicationService
     {
         LogInfo("获取已完成档案建设但未提交的申请（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
-        var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step = $2 AND deleted_at IS NULL";
-        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND current_step = $2 AND deleted_at IS NULL";
-        var conditions = new List<string>();
-        var parameters = new List<object> { ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE };
-        var paramIndex = 3;
+        // 2026-11 收敛：三份手抄 COUNT+LIMIT 分页（草稿/已建档/已完结）统一走 PagedQueryHelper.RunAsync
+        //（规范推荐模式，此前零调用方=死规范）；行为与原手抄版逐语句等价。
+        var conditions = new SqlConditionBuilder()
+            .Add("status = {0}", ApplicationStatusCodes.DRAFT)
+            .Add("current_step = {0}", WorkflowSteps.PENDING_ARCHIVE)
+            .Add("deleted_at IS NULL")
+            // 18 位身份证走精确匹配（命中 idx_applications_applicant_id_card 索引）；
+            // 其余关键词保持 ILIKE 姓名模糊（前后通配本就无索引可用）
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length == 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card = {1})", "%" + keyword + "%", keyword.Trim())
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length != 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", "%" + keyword + "%");
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            conditions.Add(" (applicant_name ILIKE $" + paramIndex + " OR applicant_id_card ILIKE $" + paramIndex + ") ");
-            parameters.Add("%" + keyword + "%");
-            paramIndex++;
-        }
-
-        if (conditions.Count > 0)
-        {
-            var whereClause = " AND " + string.Join(" AND ", conditions);
-            countSql += whereClause;
-            querySql += whereClause;
-        }
-
-        var countResult = await _db.ExecuteScalarAsync(countSql, ct, parameters.ToArray());
-        if (countResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(countResult.ErrorCode!, countResult.Message!);
-
-        var totalCount = countResult.Value;
-        var offset = (pageIndex - 1) * pageSize;
-        querySql += " ORDER BY updated_at DESC LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
-        parameters.Add(pageSize);
-        parameters.Add(offset);
-
-        var listResult = await _db.QueryAsync<ApplicationEntity>(querySql, ct, parameters.ToArray());
-        if (listResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(listResult.ErrorCode!, listResult.Message!);
-
-        return Result.Success(PagedResult<ApplicationEntity>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(totalCount)));
+        return await PagedQueryHelper.RunAsync<ApplicationEntity>(
+            _db,
+            "SELECT COUNT(*) FROM nc_biz_applications{WHERE}",
+            "SELECT " + ApplicationColumns.List + " FROM nc_biz_applications{WHERE} ORDER BY updated_at DESC{PAGE}",
+            conditions, pageIndex, pageSize, ct);
     }
 
     public async Task<Result<int>> GetArchiveBuiltNotSubmittedCountAsync(CancellationToken ct = default)
@@ -1013,43 +943,21 @@ public class ApplicationService : BaseService, IApplicationService
 
         // 「已完结档案」= 已归档（current_step=6）且已出草稿态：
         // 加 status 过滤防止 Draft/Refused 的异常行（如补全模式遗留的 Draft+step6）被当作"已完结"显示
-        var countSql = @"SELECT COUNT(*) FROM nc_biz_applications
-            WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
-        var querySql = $@"SELECT {ApplicationColumns.Full} FROM nc_biz_applications
-            WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
-        var conditions = new List<string>();
-        var parameters = new List<object> { WorkflowSteps.ARCHIVED, ArchivedStatusFilter };
-        var paramIndex = 3;
+        // 2026-11 收敛：分页走 PagedQueryHelper.RunAsync（与草稿/已建档两方法同模式）
+        var conditions = new SqlConditionBuilder()
+            .Add("current_step = {0}", WorkflowSteps.ARCHIVED)
+            .Add("status = ANY({0})", ArchivedStatusFilter)
+            .Add("deleted_at IS NULL")
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length == 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card = {1})", "%" + keyword + "%", keyword.Trim())
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length != 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", "%" + keyword + "%");
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            conditions.Add(" (applicant_name ILIKE $" + paramIndex + " OR applicant_id_card ILIKE $" + paramIndex + ") ");
-            parameters.Add("%" + keyword + "%");
-            paramIndex++;
-        }
-
-        if (conditions.Count > 0)
-        {
-            var whereClause = " AND " + string.Join(" AND ", conditions);
-            countSql += whereClause;
-            querySql += whereClause;
-        }
-
-        var countResult = await _db.ExecuteScalarAsync(countSql, ct, parameters.ToArray());
-        if (countResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(countResult.ErrorCode!, countResult.Message!);
-
-        var totalCount = countResult.Value;
-        var offset = (pageIndex - 1) * pageSize;
-        querySql += " ORDER BY updated_at DESC LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
-        parameters.Add(pageSize);
-        parameters.Add(offset);
-
-        var listResult = await _db.QueryAsync<ApplicationEntity>(querySql, ct, parameters.ToArray());
-        if (listResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(listResult.ErrorCode!, listResult.Message!);
-
-        return Result.Success(PagedResult<ApplicationEntity>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(totalCount)));
+        return await PagedQueryHelper.RunAsync<ApplicationEntity>(
+            _db,
+            "SELECT COUNT(*) FROM nc_biz_applications{WHERE}",
+            "SELECT " + ApplicationColumns.List + " FROM nc_biz_applications{WHERE} ORDER BY updated_at DESC{PAGE}",
+            conditions, pageIndex, pageSize, ct);
     }
 
     public async Task<Result<int>> GetArchivedCountAsync(CancellationToken ct = default)
@@ -1058,56 +966,6 @@ public class ApplicationService : BaseService, IApplicationService
         var sql = @"SELECT COUNT(*) FROM nc_biz_applications
             WHERE current_step = $1 AND status = ANY($2) AND deleted_at IS NULL";
         var result = await _db.ExecuteScalarAsync(sql, ct, WorkflowSteps.ARCHIVED, ArchivedStatusFilter);
-        if (result.IsFailure)
-            return Result.Failure<int>(result.ErrorCode!, result.Message!);
-        return Result.Success(Convert.ToInt32(result.Value));
-    }
-
-    public async Task<Result<PagedResult<ApplicationEntity>>> GetStoppedPagedAsync(string keyword, int pageIndex, int pageSize, CancellationToken ct = default)
-    {
-        LogInfo("获取已停保档案（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
-
-        var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
-        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
-        var conditions = new List<string>();
-        var parameters = new List<object> { ApplicationStatusCodes.STOPPED };
-        var paramIndex = 2;
-
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            conditions.Add($" (applicant_name ILIKE ${paramIndex} OR applicant_id_card ILIKE ${paramIndex}) ");
-            parameters.Add("%" + keyword + "%");
-            paramIndex++;
-        }
-
-        if (conditions.Count > 0)
-        {
-            var whereClause = " AND " + string.Join(" AND ", conditions);
-            countSql += whereClause;
-            querySql += whereClause;
-        }
-
-        var countResult = await _db.ExecuteScalarAsync(countSql, ct, parameters.ToArray());
-        if (countResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(countResult.ErrorCode!, countResult.Message!);
-
-        var totalCount = countResult.Value;
-        var offset = (pageIndex - 1) * pageSize;
-        querySql += $" ORDER BY stop_date DESC, updated_at DESC LIMIT ${paramIndex} OFFSET ${paramIndex + 1}";
-        parameters.Add(pageSize);
-        parameters.Add(offset);
-
-        var listResult = await _db.QueryAsync<ApplicationEntity>(querySql, ct, parameters.ToArray());
-        if (listResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(listResult.ErrorCode!, listResult.Message!);
-
-        return Result.Success(PagedResult<ApplicationEntity>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(totalCount)));
-    }
-
-    public async Task<Result<int>> GetStoppedCountAsync(CancellationToken ct = default)
-    {
-        var sql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND deleted_at IS NULL";
-        var result = await _db.ExecuteScalarAsync(sql, ct, ApplicationStatusCodes.STOPPED);
         if (result.IsFailure)
             return Result.Failure<int>(result.ErrorCode!, result.Message!);
         return Result.Success(Convert.ToInt32(result.Value));
@@ -1126,9 +984,12 @@ public class ApplicationService : BaseService, IApplicationService
             return result;
 
         // 归档即审批通过 → 联动升级资产核查状态（失败不阻断）
-        var appResult = await GetByIdAsync(applicationId, ct);
-        if (appResult.IsSuccess && appResult.Value != null)
-            await TryMarkAssetChecksIncludedAsync(appResult.Value, ct);
+        // 窄列重读（原 GetByIdAsync 取 95 列全行，此处仅消费 3 字段——宽表 IO 减 ~90%）
+        var markLookup = await _db.QuerySingleAsync<(long Id, string? ClassificationResult, string? ApplicantIdCard)>(
+            "SELECT id, classification_result, applicant_id_card FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL",
+            ct, applicationId);
+        if (markLookup.IsSuccess)
+            await TryMarkAssetChecksIncludedAsync(markLookup.Value, ct);
 
         // 归档联动：为年满80周岁的户主/共同生活成员自动创建普惠高龄草稿（失败不阻断归档主流程）
         try
@@ -1167,41 +1028,21 @@ public class ApplicationService : BaseService, IApplicationService
     {
         LogInfo("获取草稿申请（分页）: keywordLength=" + keyword.Length + ", 第" + pageIndex + "页");
 
-        var countSql = "SELECT COUNT(*) FROM nc_biz_applications WHERE status = $1 AND current_step < $2 AND deleted_at IS NULL";
-        var querySql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE status = $1 AND current_step < $2 AND deleted_at IS NULL";
-        var conditions = new List<string>();
-        var parameters = new List<object> { ApplicationStatusCodes.DRAFT, WorkflowSteps.PENDING_ARCHIVE };
-        var paramIndex = 3;
+        // 2026-11 收敛：分页走 PagedQueryHelper.RunAsync（与已建档/已完结两方法同模式）
+        var conditions = new SqlConditionBuilder()
+            .Add("status = {0}", ApplicationStatusCodes.DRAFT)
+            .Add("current_step < {0}", WorkflowSteps.PENDING_ARCHIVE)
+            .Add("deleted_at IS NULL")
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length == 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card = {1})", "%" + keyword + "%", keyword.Trim())
+            .AddIf(!string.IsNullOrWhiteSpace(keyword) && keyword.Length != 18,
+                "(applicant_name ILIKE {0} OR applicant_id_card ILIKE {0})", "%" + keyword + "%");
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            conditions.Add(" (applicant_name ILIKE $" + paramIndex + " OR applicant_id_card ILIKE $" + paramIndex + ") ");
-            parameters.Add("%" + keyword + "%");
-            paramIndex++;
-        }
-
-        if (conditions.Count > 0)
-        {
-            var whereClause = " AND " + string.Join(" AND ", conditions);
-            countSql += whereClause;
-            querySql += whereClause;
-        }
-
-        var countResult = await _db.ExecuteScalarAsync(countSql, ct, parameters.ToArray());
-        if (countResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(countResult.ErrorCode!, countResult.Message!);
-
-        var totalCount = countResult.Value;
-        var offset = (pageIndex - 1) * pageSize;
-        querySql += " ORDER BY updated_at DESC LIMIT $" + paramIndex + " OFFSET $" + (paramIndex + 1);
-        parameters.Add(pageSize);
-        parameters.Add(offset);
-
-        var listResult = await _db.QueryAsync<ApplicationEntity>(querySql, ct, parameters.ToArray());
-        if (listResult.IsFailure)
-            return Result.Failure<PagedResult<ApplicationEntity>>(listResult.ErrorCode!, listResult.Message!);
-
-        return Result.Success(PagedResult<ApplicationEntity>.FromList(listResult.Value, pageIndex, pageSize, Convert.ToInt32(totalCount)));
+        return await PagedQueryHelper.RunAsync<ApplicationEntity>(
+            _db,
+            "SELECT COUNT(*) FROM nc_biz_applications{WHERE}",
+            "SELECT " + ApplicationColumns.List + " FROM nc_biz_applications{WHERE} ORDER BY updated_at DESC{PAGE}",
+            conditions, pageIndex, pageSize, ct);
     }
 
     public async Task<Result<int>> GetDraftCountAsync(CancellationToken ct = default)

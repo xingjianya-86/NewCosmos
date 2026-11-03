@@ -1,0 +1,13 @@
+# 相关业务事项字典（固定 ID）
+# 分类 ID=99，字典项 ID 范围: 99001-99999；首项为表单默认勾选（多选 CheckBox，「、」拼接落库）
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 99001, category: "BusinessMatters", item_key: "申请居民死亡医学证明", item_value: "申请居民死亡医学证明", sort_order: 1, is_active: true }
+      - { id: 99002, category: "BusinessMatters", item_key: "户口注销", item_value: "户口注销", sort_order: 2, is_active: true }
+      - { id: 99003, category: "BusinessMatters", item_key: "社保待遇停发", item_value: "社保待遇停发", sort_order: 3, is_active: true }
+      - { id: 99004, category: "BusinessMatters", item_key: "高龄津贴停发", item_value: "高龄津贴停发", sort_order: 4, is_active: true }
+      - { id: 99005, category: "BusinessMatters", item_key: "其他", item_value: "其他", sort_order: 5, is_active: true }

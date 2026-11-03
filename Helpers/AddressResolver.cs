@@ -6,8 +6,14 @@ using NewCosmos.Services.System;
 namespace NewCosmos.Helpers;
 
 /// <summary>
-/// 统一地址拼接服务 — 所有模板输出的地址都走这里
-/// 规则：镇名 + 村名(去除"村委会"/"居民委员会"后缀) + 门牌号
+/// 统一地址拼装服务 — 所有模板输出的地址都走这里。
+/// <para>两种入参语义**分家**，禁止混用：</para>
+/// <list type="number">
+/// <item><see cref="BuildAddressFromText"/>：入参是**名称文本**（district/town/community/address 四列），
+/// 纯字符串去重拼装，<c>nc_biz_applications</c> 侧一律走它；</item>
+/// <item><see cref="BuildAddress"/> / <see cref="BuildFullAddress"/>：入参 <c>communityCode</c> 是
+/// **village_code**（资产核查、月报等 community 列存编码的表），依赖区划表查询。</item>
+/// </list>
 /// </summary>
 public class AddressResolver
 {
@@ -71,12 +77,115 @@ public class AddressResolver
         }
     }
 
-    /// <summary>去掉村级名称后缀（与历史口径完全一致，勿改顺序）</summary>
+    /// <summary>
+    /// 去掉村级名称后缀。
+    /// 「村民委员会」必须排在最前：它内部**不含**连续的「村委会」三字（村-民-委-员-会），
+    /// 若按旧顺序先替换「村委会」会落空，导致「柞木村村民委员会」清理后原样残留（2026-11-02 实测缺陷）。
+    /// </summary>
     private static string StripVillageSuffix(string? villageName) =>
         (villageName ?? string.Empty)
+            .Replace("村民委员会", "")
             .Replace("村委会", "")
             .Replace("居民委员会", "")
             .Replace("社区", "");
+
+    /// <summary>
+    /// 规范化村级名称（**地址用途专用**，与 <see cref="StripVillageSuffix"/> 分工不同，勿混用）：
+    /// <list type="bullet">
+    /// <item><c>柞木村村民委员会</c> → <c>柞木村</c>（去掉「村民委员会」，村字已在其前）</item>
+    /// <item><c>土甸子村委会</c> → <c>土甸子村</c>（「村委会」→「村」，否则丢掉「村」字）</item>
+    /// <item><c>东关居民委员会</c> → <c>东关社区</c></item>
+    /// </list>
+    /// <see cref="StripVillageSuffix"/> 会把 <c>土甸子村委会</c> 变成 <c>土甸子</c>（丢字），
+    /// 故地址拼装不得走它；它只服务「村名缓存」这一既有口径。
+    /// 只处理**结尾**后缀，地址中段的「XX村」不动。
+    /// </summary>
+    private static string NormalizeVillageForAddress(string? name)
+    {
+        var s = name?.Trim() ?? string.Empty;
+        if (s.EndsWith("村民委员会", StringComparison.Ordinal)) return s[..^5];
+        if (s.EndsWith("居民委员会", StringComparison.Ordinal)) return s[..^5] + "社区";
+        if (s.EndsWith("村委会", StringComparison.Ordinal)) return s[..^3] + "村";
+        return s;
+    }
+
+    /// <summary>
+    /// 清理单个地址级：去首尾空白；<c>-</c> / 空 视为无值（库中确有 3 行存了占位横杠，
+    /// 高龄表 detail_address 亦实测存 <c>-</c>，直接拼接会打出「…复兴村委会-」）。
+    /// </summary>
+    public static string CleanLevel(string? value)
+    {
+        var s = value?.Trim() ?? string.Empty;
+        return s is "-" or "—" ? string.Empty : s;
+    }
+
+    /// <summary>
+    /// **文本级地址拼装唯一入口**（纯字符串，不查库、可单测）。
+    /// 适用：<c>nc_biz_applications</c> 的 <c>district/town/community/address</c> 四列都是**名称文本**的场景。
+    /// ⚠️ 与 <c>BuildAddress(communityCode, …)</c> 入参语义不同——那个吃 village_code，
+    /// 这个吃村名；村名喂给 code 版会永远查不到缓存（2026-11-02 修复的分步路径缺陷）。
+    ///
+    /// <para>规则：以 <paramref name="detail"/> 为基底，县/镇/村三级**已含则跳过、缺则插入**；
+    /// 插入按**游标定位**（补在已含级之后），不是整串前置——否则 detail 只带县缺镇村时会拼成
+    /// 「柳树镇柞木村林口县…」这种乱序。输出 = 县 + 镇 + 村 + 门牌（不含省/市，与户籍地址口径对齐）。</para>
+    ///
+    /// <para>实测数据六形态对照（district=林口县, town=柳树镇, community=柞木村村民委员会）：</para>
+    /// <list type="table">
+    /// <item><term>detail=<c>林口县柳树镇柞木村委会</c></term><description>→ <c>林口县柳树镇柞木村</c>（三级全含，只清后缀）</description></item>
+    /// <item><term>detail=<c>柳树镇土甸子村</c></term><description>→ <c>林口县柳树镇土甸子村</c>（只补县）</description></item>
+    /// <item><term>detail=<c>土甸子村委会</c></term><description>→ <c>林口县柳树镇土甸子村</c>（补县镇）</description></item>
+    /// <item><term>detail=<c>工农屯245号</c></term><description>→ <c>林口县柳树镇柞木村工农屯245号</c>（三级全补）</description></item>
+    /// <item><term>detail=<c>林口县工农屯245号</c></term><description>→ <c>林口县柳树镇柞木村工农屯245号</c>（镇村插在县之后）</description></item>
+    /// <item><term>detail=空 或 <c>-</c></term><description>→ <c>林口县柳树镇柞木村</c>（不再整格变空）</description></item>
+    /// </list>
+    ///
+    /// <para>已知边界：detail 自带**外县**名（数据冲突）时按「已含县字样」跳过、不重复叠加本县名，
+    /// 该冲突属数据问题、不在拼装层强行纠正。</para>
+    /// </summary>
+    public static string BuildAddressFromText(string? district, string? town, string? community, string? detail)
+    {
+        var county = CleanLevel(district);
+        var townName = CleanLevel(town);
+        var village = NormalizeVillageForAddress(community);
+        // detail 同样做结尾后缀规范化（全地址形态「…柞木村委会」→「…柞木村」）
+        var result = NormalizeVillageForAddress(CleanLevel(detail));
+        var cursor = 0;
+
+        // 每级的匹配 token：本级名称 + 该级的层级字样（名称缺失/写法不一时靠层级字样兜底）
+        cursor = ApplyLevel(result, cursor, county, new[] { county, "县" }, out result);
+        cursor = ApplyLevel(result, cursor, townName, new[] { townName, "镇", "街道", "乡" }, out result);
+        _ = ApplyLevel(result, cursor, village, new[] { village, "村" }, out result);
+
+        return result;
+    }
+
+    /// <summary>
+    /// 应用一个地址级：从 <paramref name="cursor"/> 起找得到 → 游标推进到该级之后（不重复拼）；
+    /// 找不到 → 在游标处插入该级、游标推进插入长度。返回新游标，结果经 <paramref name="output"/> 返回。
+    /// </summary>
+    private static int ApplyLevel(string source, int cursor, string level, string[] tokens, out string output)
+    {
+        output = source;
+        if (string.IsNullOrEmpty(level)) return cursor;
+
+        var best = -1;
+        var bestLen = 0;
+        foreach (var token in tokens)
+        {
+            if (string.IsNullOrEmpty(token)) continue;
+            var i = source.IndexOf(token, cursor, StringComparison.Ordinal);
+            if (i >= 0 && (best < 0 || i < best))
+            {
+                best = i;
+                bestLen = token.Length;
+            }
+        }
+
+        if (best >= 0) return best + bestLen;
+
+        output = source.Insert(cursor, level);
+        return cursor + level.Length;
+    }
 
     /// <summary>
     /// 获取村名（去后缀）

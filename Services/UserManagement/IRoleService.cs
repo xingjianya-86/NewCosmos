@@ -9,8 +9,7 @@ public interface IRoleService
     Task<Role?> GetRoleByCodeAsync(string code, CancellationToken ct = default);
     Task<IReadOnlyCollection<Role>> GetAllRolesAsync(CancellationToken ct = default);
     Task<IReadOnlyCollection<Role>> GetUserRolesAsync(int userId, CancellationToken ct = default);
-    Task<bool> AssignRoleToUserAsync(int userId, int roleId, CancellationToken ct = default);
-    Task<bool> RemoveRoleFromUserAsync(int userId, int roleId, CancellationToken ct = default);
+    // 角色分配/移除用户见 UserService.AssignRoleAsync/RemoveRoleAsync（唯一入口，带审计+权限变更踢会话）
     Task<bool> CheckUserHasRoleAsync(int userId, string roleCode, CancellationToken ct = default);
 
     Task<Result<int>> CreateRoleAsync(RoleCreateRequest request, CancellationToken ct = default);

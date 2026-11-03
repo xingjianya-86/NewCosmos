@@ -500,6 +500,24 @@ public interface IChangeService
     Task<Result<List<ChangeRecord>>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
+    /// 单人户户主死亡：只整户停止、不建新档案（唯一成员即户主，无人可接任新户主）。
+    /// 事务内：状态校验 → 定位死亡户主 → 写死亡记录（无新户主/新档）→ 停止旧档 → 结清渐退期 → 写变更记录。
+    /// </summary>
+    Task<Result<ChangeResult>> ExecuteHouseholdHeadDeathStopOnlyAsync(HouseholdDeathContext context, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询本月（当前自然月）内本档案链上发生过的变更类型项（按 change_type + change_reason_type 去重），
+    /// 供变更入口"本月已办理"提示判断。
+    /// </summary>
+    Task<Result<List<MonthlyChangeEntry>>> GetThisMonthChangeEntriesAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条"户主死亡整户停止"记录（单人户户主死亡只停不建新档；无则 Value 为 null）。
+    /// 档案输出据此追加《变更告知书》并装配"停止/停止享受"字段（理由含死亡日期）。
+    /// </summary>
+    Task<Result<HouseholdDeathStopRecord?>> GetLatestHouseholdDeathStopRecordAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 查询最近一条触发停保的 CategoryStop 变更记录（档案告知书字段装配用；无则 Value 为 null）
     /// </summary>
     Task<Result<TriggeredStopChangeRecord?>> GetLatestTriggeredStopRecordAsync(long applicationId, IReadOnlyCollection<string> newClassifications, CancellationToken ct = default);
@@ -595,6 +613,26 @@ public class ChangeRecord
     public bool IsFundChangeRegistration =>
         string.Equals(ChangeType, DictionaryConstants.ChangeType.FUND_CHANGE, global::System.StringComparison.Ordinal)
         && string.Equals(ChangeReasonType, ChangeReasonTypeConstants.FundChangeRegistration, global::System.StringComparison.Ordinal);
+}
+
+/// <summary>
+/// 本月变更类型项（变更入口"本月已办理"提示用：按 (change_type, change_reason_type) 去重）
+/// </summary>
+public class MonthlyChangeEntry
+{
+    public string ChangeType { get; set; } = string.Empty;
+
+    /// <summary>变更原因类型（change_reason_type；FundChange 靠它区分"经济复核"与"保障金变更登记"）</summary>
+    public string? ChangeReasonType { get; set; }
+}
+
+/// <summary>
+/// 户主死亡整户停止记录（单人户户主死亡只停不建新档；供档案输出追加《变更告知书》并装配"停止"字段）
+/// </summary>
+public class HouseholdDeathStopRecord
+{
+    /// <summary>死亡日期（= change_record.change_date，办理时写入的业务日期）</summary>
+    public DateTime DeathDate { get; set; }
 }
 
 /// <summary>

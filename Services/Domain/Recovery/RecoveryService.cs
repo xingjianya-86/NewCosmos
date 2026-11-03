@@ -181,6 +181,101 @@ public class RecoveryService : BaseService, IRecoveryService
     }
 
     /// <inheritdoc/>
+    public async Task<Result<RecoveryArchiveLookupDto?>> LookupArchiveByIdCardAsync(
+        string idCard, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idCard))
+        {
+            return Result.Failure<RecoveryArchiveLookupDto?>(ErrorCodes.VALIDATION_FAILED, "请输入身份证号");
+        }
+
+        try
+        {
+            // 取数口径镜像 SearchStoppedPersonsAsync（同样的表/列/月保障额列），
+            // 差异仅两点：① 不限定 status（改为 is_stopped 优先排序，非停保状态也能带出）；
+            // ② 多出 stop_reason（追缴原因来源）。$1=身份证 $2=停保状态码，全部位置参数。
+            // 同一来源多条档案（停发流程会新建一条金额为 0 的停发记录行）时，
+            // 优先取带保障标准的那条——0 金额行是停发动作的产物，不携带可依据的标准。
+            var sql = @"
+                SELECT source_type, source_id, person_name, id_card,
+                       monthly_amount, stop_reason, is_stopped
+                FROM (
+                    SELECT 1 AS prio, 'RuralSubsistence' AS source_type, a.id AS source_id,
+                           a.applicant_name AS person_name, a.applicant_id_card AS id_card,
+                           COALESCE(a.household_monthly_guarantee_amount, 0) AS monthly_amount,
+                           a.stop_reason AS stop_reason, (a.status = $2) AS is_stopped, a.created_at
+                    FROM nc_biz_applications a
+                    WHERE a.applicant_id_card = $1
+                      AND a.source_table = 'nc_biz_rural_subsistence_families'
+
+                    UNION ALL
+
+                    SELECT 2, 'UrbanSubsistence', a.id,
+                           a.applicant_name, a.applicant_id_card,
+                           COALESCE(a.household_monthly_guarantee_amount, 0),
+                           a.stop_reason, (a.status = $2), a.created_at
+                    FROM nc_biz_applications a
+                    WHERE a.applicant_id_card = $1
+                      AND a.source_table = 'nc_biz_urban_subsistence_families'
+
+                    UNION ALL
+
+                    SELECT 3, 'RigidExpenditure', a.id,
+                           a.applicant_name, a.applicant_id_card,
+                           COALESCE(a.rigid_expenditure, 0),
+                           a.stop_reason, (a.status = $2), a.created_at
+                    FROM nc_biz_applications a
+                    WHERE a.applicant_id_card = $1
+                      AND a.source_table = 'nc_biz_rigid_expenditure_families'
+
+                    UNION ALL
+
+                    SELECT 4, 'TempRelief', t.id,
+                           t.applicant_name, t.applicant_id_card,
+                           COALESCE(t.confirm_amount, 0),
+                           t.stop_reason, (t.status = $2), t.created_at
+                    FROM nc_biz_temp_relief_applications t
+                    WHERE t.applicant_id_card = $1
+
+                    UNION ALL
+
+                    SELECT 5, 'Elderly', e.id,
+                           e.name, e.id_card,
+                           COALESCE(e.issue_amount, 0),
+                           e.stop_reason, (e.status = $2), e.created_at
+                    FROM nc_biz_elderly_applications e
+                    WHERE e.id_card = $1
+                ) hits
+                ORDER BY is_stopped DESC,
+                         prio ASC,
+                         (monthly_amount > 0) DESC,
+                         created_at DESC NULLS LAST,
+                         source_id DESC
+                LIMIT 1";
+
+            var result = await _db.QuerySingleAsync<RecoveryArchiveLookupDto>(sql, ct,
+                idCard.Trim(), ApplicationStatusCodes.STOPPED);
+
+            // 无行 = 未命中（Success(null)），由界面提示转手工填写；失败才上抛
+            if (result.IsSuccess && result.Value != null)
+            {
+                LogInfo($"手工追缴查档命中: sourceType={result.Value.SourceType}, " +
+                        $"stopped={result.Value.IsStopped}, " +
+                        $"monthly={result.Value.MonthlyAmount}");
+            }
+
+            return result.IsSuccess
+                ? Result.Success<RecoveryArchiveLookupDto?>(result.Value)
+                : Result.Failure<RecoveryArchiveLookupDto?>(result.ErrorCode!, result.Message!);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "手工追缴按身份证查档");
+            return Result.FromException<RecoveryArchiveLookupDto?>(ex);
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<Result<long>> SaveRecoveryRecordAsync(
         RecoveryRecordDto dto, CancellationToken ct = default)
     {
@@ -219,13 +314,19 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.AutoAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                "System", ApplicationStatusCodes.DRAFT); // TODO: 从当前用户获取
+                string.IsNullOrWhiteSpace(dto.CreatedBy) ? "System" : dto.CreatedBy,
+                ApplicationStatusCodes.DRAFT);
 
             if (!result.IsSuccess || !result.Value.HasValue)
             {
                 LogWarn($"追缴记录保存失败: {result.Message}");
                 return Result.Failure<long>(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message ?? "保存追缴记录失败");
             }
+
+            // 编号随保存一次分配（同一环境事务内；失败不阻断保存，打印时 GetOrAssignRecoveryCodeAsync 兜底补分配）
+            var codeResult = await GetOrAssignRecoveryCodeAsync(result.Value.Value, ct);
+            if (codeResult.IsFailure)
+                LogWarn($"追缴编号分配失败（打印时将重试）: {codeResult.Message}");
 
             var segments = await ReplaceSegmentsAsync(result.Value.Value, dto.Segments, ct);
             if (!segments.IsSuccess)
@@ -284,13 +385,19 @@ public class RecoveryService : BaseService, IRecoveryService
                 dto.AutoAmount,
                 dto.StartMonth,
                 dto.EndMonth,
-                "System", ApplicationStatusCodes.DRAFT); // TODO: 从当前用户获取
+                string.IsNullOrWhiteSpace(dto.CreatedBy) ? "System" : dto.CreatedBy,
+                ApplicationStatusCodes.DRAFT);
 
             if (!result.IsSuccess || !result.Value.HasValue)
             {
                 LogWarn($"手工追缴记录保存失败: {result.Message}");
                 return Result.Failure<long>(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message ?? "保存手工追缴记录失败");
             }
+
+            // 编号随保存一次分配（同一环境事务内；失败不阻断保存，打印时 GetOrAssignRecoveryCodeAsync 兜底补分配）
+            var codeResult = await GetOrAssignRecoveryCodeAsync(result.Value.Value, ct);
+            if (codeResult.IsFailure)
+                LogWarn($"追缴编号分配失败（打印时将重试）: {codeResult.Message}");
 
             var segments = await ReplaceSegmentsAsync(result.Value.Value, dto.Segments, ct);
             if (!segments.IsSuccess)
@@ -559,12 +666,21 @@ public class RecoveryService : BaseService, IRecoveryService
         {
             LogInfo($"更新追缴记录状态: id={id}, status={status}");
 
+            // 状态守卫（与本服务其余方法"SQL 内联状态校验"风格一致）：
+            // 追缴记录状态机实际只有 Draft→Printed（归档写回），禁止 Printed 回退 Draft 或跳转其他状态。
+            if (status != RecoveryConstants.STATUS_PRINTED)
+                return Result.Failure<bool>(ErrorCodes.VALIDATION_FAILED,
+                    $"追缴记录不支持的目标状态: {status}（仅支持 {RecoveryConstants.STATUS_PRINTED}）");
+
             var sql = @"
                 UPDATE nc_biz_recovery_records 
                 SET status = $1, updated_at = NOW()
-                WHERE id = $2";
+                WHERE id = $2 AND status = $3";
 
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, status, id);
+            var result = await _db.ExecuteNonQueryAsync(sql, ct, status, id, RecoveryConstants.STATUS_DRAFT);
+
+            if (result.IsSuccess && result.Value == 0)
+                return Result.Success(true); // 已是 Printed 的幂等重入（重复点归档不报错）
 
             if (result.IsSuccess)
             {
@@ -710,29 +826,103 @@ public class RecoveryService : BaseService, IRecoveryService
     }
 
     /// <inheritdoc/>
-    public async Task<Result<string>> GenerateRecoveryCodeAsync(DateTime month, CancellationToken ct = default)
+    public async Task<Result<string>> GetOrAssignRecoveryCodeAsync(long recordId, CancellationToken ct = default)
     {
         try
         {
-            var monthKey = month.ToString("yyyyMM");
-            var sql = "SELECT COUNT(*) FROM nc_biz_recovery_records WHERE TO_CHAR(created_at, 'YYYYMM') = $1";
-            var result = await _db.ExecuteScalarAsync<long>(sql, ct, monthKey);
-
-            if (result.IsSuccess)
+            // ① 已有编号直接返回——补打同号的关键：编号随记录固定，不再按打印时刻现算
+            //    （旧实现每次打印 COUNT+1：跨月补打变号、并发撞号、TO_CHAR 包列索引失效）
+            var existing = await _db.QuerySingleAsync<string>(
+                "SELECT COALESCE(recovery_code, '') FROM nc_biz_recovery_records WHERE id = $1", ct, recordId);
+            if (existing.IsFailure)
             {
-                var code = $"{monthKey}-{result.Value + 1:D3}";
-                LogInfo($"生成追缴编码: {code}");
-                return Result.Success(code);
+                // recovery_code 列不存在（docs/migrations/20261101_recovery_code.sql 未执行）
+                // → 降级为按记录创建月现算（不落库），功能不断但并发/补打保障降级
+                if (existing.Message?.Contains("recovery_code", StringComparison.OrdinalIgnoreCase) == true)
+                    return await FallbackGenerateByCreatedMonthAsync(recordId, ct);
+                return Result.Failure<string>(existing.ErrorCode!, existing.Message!);
+            }
+            if (!string.IsNullOrEmpty(existing.Value))
+                return Result.Success(existing.Value);
+
+            // ② 首次分配：单事务内 advisory 锁串行化同月编号 + 条件回写
+            await using var tx = await _db.BeginTransactionScopeAsync(ct);
+
+            var monthResult = await _db.QuerySingleAsync<string>(
+                "SELECT TO_CHAR(created_at, 'YYYYMM') FROM nc_biz_recovery_records WHERE id = $1 FOR UPDATE",
+                ct, recordId);
+            if (monthResult.IsFailure || string.IsNullOrEmpty(monthResult.Value))
+                return Result.Failure<string>(monthResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    monthResult.Message ?? "读取追缴记录创建月失败");
+            var monthKey = monthResult.Value;
+
+            // 同月编号生成串行化（事务级 advisory 锁随外层事务提交/回滚自动释放）
+            await _db.ExecuteNonQueryAsync(
+                "SELECT pg_advisory_xact_lock(hashtext($1))", ct, $"recovery_code:{monthKey}");
+
+            // 计数按【已分配编号】而非记录行数：串行化下后到者能数到先到者刚写入的编号
+            var countResult = await _db.ExecuteScalarAsync<long>(
+                "SELECT COUNT(*) FROM nc_biz_recovery_records WHERE recovery_code LIKE $1 || '-%'", ct, monthKey);
+            if (countResult.IsFailure)
+                return Result.Failure<string>(countResult.ErrorCode!, countResult.Message!);
+
+            var code = $"{monthKey}-{countResult.Value + 1:D3}";
+
+            // 条件回写防并发双分配：0 行 = 其他会话已抢先写入 → 回读其值
+            var upd = await _db.ExecuteNonQueryAsync(
+                "UPDATE nc_biz_recovery_records SET recovery_code = $1, updated_at = NOW() " +
+                "WHERE id = $2 AND recovery_code IS NULL", ct, code, recordId);
+            if (upd.IsFailure)
+                return Result.Failure<string>(upd.ErrorCode!, upd.Message!);
+
+            if (upd.Value == 0)
+            {
+                var again = await _db.QuerySingleAsync<string>(
+                    "SELECT recovery_code FROM nc_biz_recovery_records WHERE id = $1", ct, recordId);
+                if (again.IsSuccess && !string.IsNullOrEmpty(again.Value))
+                    return Result.Success(again.Value);
+                return Result.Failure<string>(ErrorCodes.DB_QUERY_ERROR, "追缴编号分配冲突且回读失败，请重试");
             }
 
-            LogWarn($"生成追缴编码失败: {result.Message}");
-            return Result.Failure<string>(result.ErrorCode!, result.Message ?? "生成追缴编码失败");
+            await tx.CommitAsync(ct);
+            LogInfo($"分配追缴编号: {code}");
+            return Result.Success(code);
         }
         catch (Exception ex)
         {
-            LogException(ex, "生成追缴编码");
+            LogException(ex, "分配追缴编号");
             return Result.FromException<string>(ex);
         }
+    }
+
+    /// <summary>
+    /// 降级：recovery_code 列缺失（迁移未执行）时按记录创建月现算编号（不落库）。
+    /// 月份与计数都在 SQL 侧计算（date_trunc/TO_CHAR 同库时区口径），保证跨月补打取创建月而非打印月。
+    /// </summary>
+    private async Task<Result<string>> FallbackGenerateByCreatedMonthAsync(long recordId, CancellationToken ct)
+    {
+        const string sql = @"
+            SELECT TO_CHAR(r1.created_at, 'YYYYMM') AS month_key,
+                   (SELECT COUNT(*) FROM nc_biz_recovery_records r2
+                     WHERE r2.created_at >= date_trunc('month', r1.created_at)
+                       AND r2.created_at <  date_trunc('month', r1.created_at) + interval '1 month') AS cnt
+            FROM nc_biz_recovery_records r1
+            WHERE r1.id = $1";
+        var row = await _db.QuerySingleAsync<CodeFallbackRow>(sql, ct, recordId);
+        if (row.IsFailure)
+            return Result.Failure<string>(row.ErrorCode!, row.Message!);
+        if (row.Value == null)
+            return Result.Failure<string>(ErrorCodes.RECORD_NOT_FOUND, "追缴记录不存在");
+
+        var code = $"{row.Value.MonthKey}-{row.Value.Cnt + 1:D3}";
+        LogWarn($"recovery_code 列缺失（迁移未执行），降级现算编号: {code}（请执行 docs/migrations/20261101_recovery_code.sql）");
+        return Result.Success(code);
+    }
+
+    private sealed class CodeFallbackRow
+    {
+        public string MonthKey { get; set; } = string.Empty;
+        public long Cnt { get; set; }
     }
 
     /// <inheritdoc/>

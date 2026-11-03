@@ -65,6 +65,7 @@ public partial class MobileMainViewModel : ViewModelBase
     [ObservableProperty] private bool _canAccessTempRelief;
     [ObservableProperty] private bool _canAccessSocialAssistanceReport;
     [ObservableProperty] private bool _canAccessAssetMonthlyReport;
+    [ObservableProperty] private bool _canAccessCollegeStudent;
 
     #endregion
 
@@ -244,6 +245,7 @@ public partial class MobileMainViewModel : ViewModelBase
                 PermissionCodes.TEMP_CREATE,
                 PermissionCodes.REPORT_VIEW,
                 PermissionCodes.ASSET_REPORT,
+                PermissionCodes.COLLEGE_MANAGE,
             };
             var result = await _permissionService.CheckPermissionsAsync(userId, codes);
             if (result != null)
@@ -263,6 +265,9 @@ public partial class MobileMainViewModel : ViewModelBase
                 CanAccessTempRelief = Has(PermissionCodes.TEMP_CREATE);
                 CanAccessSocialAssistanceReport = Has(PermissionCodes.REPORT_VIEW);
                 CanAccessAssetMonthlyReport = Has(PermissionCodes.ASSET_REPORT);
+                // 大学生管理入口与承接同权（与桌面 MainViewModel.NavigateToCollegeStudentAsync 口径一致，
+                // 旧实现用 INCOME_VIEW 导致手机端低收入查看权即可进大学生管理页）
+                CanAccessCollegeStudent = Has(PermissionCodes.COLLEGE_MANAGE);
                 CanAccessReprint = Has(PermissionCodes.INCOME_VIEW) || Has(PermissionCodes.ELDERLY_VIEW)
                     || Has(PermissionCodes.ASSET_VIEW) || Has(PermissionCodes.ARCHIVE_VIEW);
 
@@ -341,7 +346,7 @@ public partial class MobileMainViewModel : ViewModelBase
     {
         WorkspaceCards.Clear();
         AddWorkspaceCard("📝", "低收入人口救助帮扶", "申请建档 · 草稿续办 · 档案编辑", "#EBF5FF", CanAccessSocialAssistance, NavigateToSocialAssistanceAsync);
-        AddWorkspaceCard("🎓", "大学生管理", "在校大学生救助帮扶管理", "#EBF5FF", CanAccessSocialAssistance, NavigateToCollegeStudentAsync);
+        AddWorkspaceCard("🎓", "大学生管理", "在校大学生救助帮扶管理", "#EBF5FF", CanAccessCollegeStudent, NavigateToCollegeStudentAsync);
         AddWorkspaceCard("📊", "救助月报表", "救助统计月度报表", "#EFF6FF", CanAccessSocialAssistanceReport, NavigateToSocialAssistanceMonthlyReportAsync);
         AddWorkspaceCard("👴", "高龄津贴发放", "申请登记 · 停发 · 复核", "#F5F3FF", CanAccessElderlyBenefit, NavigateToElderlyBenefitsAsync);
         AddWorkspaceCard("🔄", "保障对象动态管理", "户主变更 · 成员增减 · 死亡减员", "#ECFDF5", CanAccessChange, NavigateToChangeManagementAsync);
@@ -495,7 +500,7 @@ public partial class MobileMainViewModel : ViewModelBase
         await NavigateToPageAsync<Pages.Mobile.MobileArchiveQueryPage>("救助档案管理");
     }
 
-    /// <summary>死亡情况说明（工作台卡片入口：申报填写 → 身份与提醒 → 文书输出）</summary>
+    /// <summary>死亡情况说明（工作台卡片入口：六步线性向导——申报填写 → 身份与提醒 → 文书输出）</summary>
     private async Task NavigateToDeathStatementAsync()
     {
         await NavigateToPageAsync<Pages.Mobile.MobileDeathStatementPage>("死亡情况说明");
@@ -509,6 +514,16 @@ public partial class MobileMainViewModel : ViewModelBase
 
     private async Task NavigateToCollegeStudentAsync()
     {
+        // 入口门控（与桌面 MainViewModel.NavigateToCollegeStudentAsync 同口径：COLLEGE_MANAGE）
+        var userId = App.CurrentUserId ?? 0;
+        if (userId <= 0 ||
+            !await _permissionService.HasPermissionAsync(userId, PermissionCodes.COLLEGE_MANAGE, CancellationToken))
+        {
+            _logger.LogSecurity("大学生管理入口被拦截", ("UserId", userId), ("Reason", "NoPermission"), ("Platform", "Android"));
+            await _dialogService.DisplayAlertAsync("无权限", "无权限访问大学生管理，请联系管理员分配权限。", "确定");
+            return;
+        }
+
         await NavigateToPageAsync<Pages.SocialAssistance.CollegeStudentManagementPage>("大学生管理");
     }
 
@@ -562,10 +577,7 @@ public partial class MobileMainViewModel : ViewModelBase
         await NavigateToPageAsync<Pages.AssetVerification.MonthlyReportPage>("核对月报表");
     }
 
-    private async Task ShowPcOnlyAsync()
-    {
-        await _dialogService.DisplayAlertAsync("提示", "此功能请使用电脑端操作", "确定");
-    }
+    // 已删除（2026-11 死代码）：ShowPcOnlyAsync——非 RelayCommand 且全仓无调用方/无 XAML 绑定。
 
     #endregion
 }

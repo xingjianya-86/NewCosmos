@@ -16,6 +16,9 @@
 #   -PrevVersion <ver>  指定上一版（补丁基线/SoftUpdate 用；缺省从 DB 或本机 release 目录推断）
 #   -Force              清单 force=true（无论版本都强制更新）
 #   -SkipWindows / -SkipAndroid / -SkipGit / -SkipDownloadVerify
+#   -SkipTemplateCheck   跳过模板字段体检
+#   -SkipTests           跳过发布前 dotnet test 门槛（默认执行，~1-2 分钟）
+#   -SkipStandardsCheck  跳过 check_standards 规范检查（默认执行，红线类命中即中断）
 #
 # 依赖：.NET 10 SDK + maui；Inno Setup 6；JDK17 + Android SDK；keystore\keystore.props。
 # 内网地址来自 deploy\deploy.local.ps1（gitignored）；上一版查询/入库需环境变量 NEWCOSMOS_DB_PASSWORD。
@@ -34,6 +37,8 @@ param(
     [switch]$SkipGit,
     [switch]$SkipDownloadVerify,
     [switch]$SkipTemplateCheck,
+    [switch]$SkipTests,
+    [switch]$SkipStandardsCheck,
     [switch]$NonInteractive,
     [switch]$DryRun,
     [string]$JavaSdkDirectory = "C:\AndroidJdk\jdk-17.0.2",
@@ -49,6 +54,43 @@ $Repo = Split-Path -Parent $ScriptsDir
 Set-Location $Repo
 
 function Write-Step([string]$t) { Write-Host ""; Write-Host "== $t ==" -ForegroundColor Cyan }
+
+# ── 发布环境体检（DryRun 与正式发布共用；只报告不构建）──
+# 2026-11 新增：DryRun 原只打印计划，缺依赖（Inno/JDK/SDK/SSH/签名键/deploy.local）要到真跑
+# 才 throw——DryRun 最有价值的动作恰是提前暴露 80% 失败原因。
+function Test-PublishEnvironment {
+    $issues = @()
+    function _chk([string]$name, [bool]$ok, [string]$hint) {
+        if ($ok) { Write-Host "  [OK] $name" -ForegroundColor DarkGray }
+        else { $issues += "$name —— $hint"; Write-Host "  [缺失] $name（$hint）" -ForegroundColor Yellow }
+    }
+    if (-not $SkipWindows) {
+        # 与 publish_release.ps1 的 ISCC 探测保持一致（4 路候选）：Inno Setup 可按用户装到
+        # %LOCALAPPDATA%\Programs，只查 Program Files (x86) 会误报缺失（2026-11-02 实测）。
+        $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Inno Setup 6\ISCC.exe"
+        )
+        $isccOk = @($isccCandidates | Where-Object { Test-Path -LiteralPath $_ }).Count -gt 0
+        _chk "Inno Setup 6 (ISCC.exe)" $isccOk "安装 Inno Setup 6 或改用 -SkipWindows（已搜索 Program Files(x86)/Program Files/LOCALAPPDATA）"
+    }
+    if (-not $SkipAndroid) {
+        _chk "JDK17 ($JavaSdkDirectory)" (Test-Path -LiteralPath $JavaSdkDirectory) "安装 JDK 或改用 -SkipAndroid"
+        _chk "Android SDK ($AndroidSdkDirectory)" (Test-Path -LiteralPath $AndroidSdkDirectory) "安装 Android SDK 或改用 -SkipAndroid"
+        _chk "keystore\keystore.props" (Test-Path -LiteralPath (Join-Path $Repo "keystore\keystore.props")) "配置 APK 签名或改用 -SkipAndroid"
+    }
+    if (-not $SkipGit) {
+        _chk "SSH 私钥 ($SshKey)" (Test-Path -LiteralPath $SshKey) "配置 git 推送密钥或改用 -SkipGit"
+    }
+    _chk "更新签名私钥 ($SigningKey)" (Test-Path -LiteralPath $SigningKey) "UpdateSigningTool 生成或改用 -SkipDownloadVerify"
+    _chk "deploy\deploy.local.ps1（服务器参数）" (Test-Path -LiteralPath $deployLocal) "复制 deploy.sample.ps1 填内网参数"
+    if ([string]::IsNullOrEmpty($env:NEWCOSMOS_DB_PASSWORD)) {
+        Write-Host "  [提示] NEWCOSMOS_DB_PASSWORD 未设置：补丁基线/上一版查询走本地目录回退，发布历史不入库" -ForegroundColor DarkGray
+    }
+    return $issues
+}
 
 # ── 本地部署配置（gitignored）──
 $deployLocal = Join-Path $ScriptsDir "deploy.local.ps1"
@@ -72,7 +114,8 @@ if ($Version -eq "") {
 if ($Version -notmatch '^\d+\.\d+\.\d{8}$') { throw "版本号格式应为 主.次.yyyyMMdd，如 1.1.20261010（当前: $Version）" }
 
 # ── 交互向导（运行后按 Y/F 选择；已显式传入的参数不再询问；自动化用 -NonInteractive 关闭）──
-if (-not $NonInteractive) {
+# DryRun 跳过向导（只体检与打印计划，不构建；原实现 DryRun 仍被 5 个 Read-Host 卡住）。
+if (-not $NonInteractive -and -not $DryRun) {
     Write-Host ""
     Write-Host "===== 发布向导（回车=默认；Y=是，F/N=否）=====" -ForegroundColor Cyan
     if (-not $PSBoundParameters.ContainsKey('Version')) {
@@ -135,6 +178,9 @@ Write-Host "发布版本: $Version（最低支持 $MinSupported，渠道 $Channe
 if ($DryRun) {
     Write-Host ""
     Write-Host "===== DRY RUN（不构建/不上传/不推 GitHub）=====" -ForegroundColor Yellow
+    # 环境体检：提前暴露缺依赖（Inno/JDK/SDK/SSH/签名键/deploy.local），不再等真跑才 throw
+    Write-Step "发布环境体检"
+    $envIssues = Test-PublishEnvironment
     $winFlags = @()
     if (-not $WithPatch) { $winFlags += '-SkipPatch' }
     if ($Force) { $winFlags += '-Force' }
@@ -143,11 +189,58 @@ if ($DryRun) {
     Write-Host ("  上一版  : {0}" -f $(if ($prevResolved) { $prevResolved } else { "（未解析到）" }))
     Write-Host ("  回环校验: {0}" -f $(if ($SkipDownloadVerify) { "跳过" } else { "执行（下载两端安装包）" }))
     Write-Host ("  模板体检: {0}" -f $(if ($SkipTemplateCheck) { "跳过" } else { "执行（check_template_fields -FailOn NonAscii,MultiSource -MaxUnknown 0，命中即中断）" }))
+    Write-Host ("  测试门槛: {0}" -f $(if ($SkipTests) { "跳过" } else { "执行（dotnet test，全过才发版）" }))
+    Write-Host ("  规范检查: {0}" -f $(if ($SkipStandardsCheck) { "跳过" } else { "执行（check_standards 红线类命中即中断）" }))
     Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
     Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
     Write-Host ("  版本同步: {0}（csproj/app.ini/iss；DryRun 不写入）" -f $Version)
+    if ($envIssues.Count -gt 0) {
+        Write-Host ""
+        Write-Host "体检发现 $($envIssues.Count) 个缺失依赖（正式发版将中断）：" -ForegroundColor Red
+        $envIssues | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+        exit 1
+    }
+    Write-Host ""
+    Write-Host "体检通过：无缺失依赖。" -ForegroundColor Green
     return
 }
+
+# ── 0-. 发布环境体检（缺依赖早失败，不动版本文件）──
+Write-Step "发布环境体检"
+$envIssues = Test-PublishEnvironment
+if ($envIssues.Count -gt 0) {
+    $envIssues | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    throw "发布环境体检失败（$($envIssues.Count) 项缺失依赖），见上方清单"
+}
+
+# ── 0-.2 规范检查（check_standards：AGENTS §5/§7/§8/§10/§12 防回潮，命中红线类即中断）──
+# 退出码语义：脚本现恒 0（报告式），故按报告行数判红线（SEC/UI1/SQL1/SQL2/SQL4）。
+if (-not $SkipStandardsCheck) {
+    Write-Step "规范检查（check_standards.ps1）"
+    $std = Join-Path $ScriptsDir "check_standards.ps1"
+    if (Test-Path -LiteralPath $std) {
+        & $std -Category ALL | Out-Host
+        $report = Join-Path $ScriptsDir "standards_report.txt"
+        if (Test-Path -LiteralPath $report) {
+            $redlines = @(Get-Content -LiteralPath $report | Where-Object { $_ -match '^\[(SEC|UI1|SQL1|SQL2|SQL4)\]' })
+            if ($redlines.Count -gt 0) {
+                $redlines | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+                throw "规范检查命中红线 $($redlines.Count) 处（SEC/UI1/SQL1/SQL2/SQL4），勿强行发版；见 deploy\standards_report.txt"
+            }
+            Write-Host "  红线 0 处" -ForegroundColor Green
+        }
+    }
+    else { Write-Host "  未找到 check_standards.ps1，跳过" -ForegroundColor Yellow }
+}
+else { Write-Host "跳过规范检查（-SkipStandardsCheck）" -ForegroundColor Yellow }
+
+# ── 0-.3 测试门槛（AGENTS §0：测试全过是发版前提，原仅靠人工记忆 → 机器门槛）──
+if (-not $SkipTests) {
+    Write-Step "测试门槛（dotnet test）"
+    & dotnet test (Join-Path $Repo "NewCosmos.Tests\NewCosmos.Tests.csproj") --nologo -v q
+    if ($LASTEXITCODE -ne 0) { throw "测试未通过（退出码 $LASTEXITCODE）：勿强行发版" }
+}
+else { Write-Host "跳过测试门槛（-SkipTests）" -ForegroundColor Yellow }
 
 # ── 0-. 模板字段体检（批6 长效机制，2026-10-16）──
 # 在版本号同步之前执行（早失败，不动 csproj/app.ini/iss 三处版本文件）。命中即 throw 中断发版。
@@ -188,9 +281,11 @@ $iss = [IO.File]::ReadAllText($issPath)
 $iss = [regex]::Replace($iss, '#define MyAppVersion "[^"]*"', "#define MyAppVersion ""$Version""")
 $yearV = [int]$numeric.Substring(0, 4)
 $mdV   = [int]$numeric.Substring(4, 4)
-$iss = [regex]::Replace($iss, 'VersionInfoVersion=[0-9.]+', "VersionInfoVersion=1.1.$yearV.$mdV")
+# 主次版本从 $Version 派生（勿硬编码：历史 1.1 硬编码在版本升到 1.2 后导致文件属性版本主次不一致）
+$majorMinor = ($Version -split '\.')[0..1] -join '.'
+$iss = [regex]::Replace($iss, 'VersionInfoVersion=[0-9.]+', "VersionInfoVersion=$majorMinor.$yearV.$mdV")
 [IO.File]::WriteAllText($issPath, $iss, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "已同步：$Version / $numeric / VersionInfo=1.1.$yearV.$mdV"
+Write-Host "已同步：$Version / $numeric / VersionInfo=$majorMinor.$yearV.$mdV"
 
 $releaseDir = Join-Path $Repo "publish\release\$Version"
 $apkName    = "NewCosmosSetup_$Version.apk"

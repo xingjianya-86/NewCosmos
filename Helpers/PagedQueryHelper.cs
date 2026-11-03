@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Database;
 
@@ -89,4 +90,39 @@ public static class PagedQueryHelper
     }
 
     private static int ParamCountFor(SqlConditionBuilder conditions) => conditions.ParamCount + 1;
+
+    /// <summary>
+    /// 分页拉全（取满全部记录）：按 pageSize=500 循环翻页直到收齐 totalCount。
+    /// 此前核对月报/月度审核两 VM 三处各抄一份 while 循环（2026-11 收敛为单点）。
+    /// 失败返回 Failure（调用方自行提示）；空页提前终止防 TotalCount 漂移导致的死循环。
+    /// </summary>
+    /// <param name="fetchPage">取某一页的回调（pageIndex 从 1 起）</param>
+    /// <param name="errorPrefix">失败消息前缀（如"加载待核查人员数据失败"）</param>
+    public static async Task<Result<List<T>>> FetchAllPagesAsync<T>(
+        Func<int, int, CancellationToken, Task<Result<PagedResult<T>>>> fetchPage,
+        string errorPrefix,
+        CancellationToken ct = default,
+        int pageSize = 500)
+    {
+        var all = new List<T>();
+        var pageIndex = 1;
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var result = await fetchPage(pageIndex, pageSize, ct);
+            if (result.IsFailure || result.Value == null)
+                return Result.Failure<List<T>>(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"{errorPrefix}: {result.Message ?? "未知错误"}");
+
+            if (result.Value.Items.Count == 0) break; // 空页提前终止
+
+            all.AddRange(result.Value.Items);
+            if (all.Count >= result.Value.TotalCount) break;
+            pageIndex++;
+        }
+
+        return Result.Success(all);
+    }
 }

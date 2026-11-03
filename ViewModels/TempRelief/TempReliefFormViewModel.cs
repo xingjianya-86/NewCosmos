@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -447,7 +447,8 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
         _logger.LogBusiness("临时救助-照片采集/查看", ("ApplicationId", _id.ToString()));
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _id > 0 ? _id : null, ApplicantName));
+            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _id > 0 ? _id : null, ApplicantName,
+                AssignContext: this));
     }
 
     /// <summary>救助对象选项条目</summary>
@@ -1086,7 +1087,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
             if (usersResult.IsFailure || usersResult.Value == null || usersResult.Value.Count == 0)
                 return string.Empty;
 
-            var civilAssistant = usersResult.Value.FirstOrDefault(u => u.Position == "民政助理");
+            var civilAssistant = usersResult.Value.FirstOrDefault(u => u.Position == PositionTitles.CivilAssistant);
             return civilAssistant?.FullName ?? string.Empty;
         }
         catch (Exception ex)

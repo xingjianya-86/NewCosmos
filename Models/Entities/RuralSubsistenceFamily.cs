@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace NewCosmos.Models.Entities;
 
@@ -25,11 +25,13 @@ public class RuralSubsistenceFamily
     public string ApplicantIdCard { get; set; } = string.Empty;
 
     /// <summary>
-    /// 家庭人口    /// </summary>
+    /// 家庭人口
+/// </summary>
     public int FamilySize { get; set; } = 1;
 
     /// <summary>
-    /// 保障人口    /// </summary>
+    /// 保障人口
+/// </summary>
     public int GuaranteeSize { get; set; }
 
     /// <summary>
@@ -38,23 +40,28 @@ public class RuralSubsistenceFamily
     public decimal AnnualIncome { get; set; }
 
     /// <summary>
-    /// 家庭年均收入（元    /// </summary>
+    /// 家庭年均收入（元
+/// </summary>
     public decimal PerCapitaIncome { get; set; }
 
     /// <summary>
-    /// 户月保障金额（元    /// </summary>
+    /// 户月保障金额（元
+/// </summary>
     public decimal MonthlyGuaranteeAmount { get; set; }
 
     /// <summary>
-    /// 家庭分类施保总额（元    /// </summary>
+    /// 家庭分类施保总额（元
+/// </summary>
     public decimal FamilyClassifiedAmount { get; set; }
 
     /// <summary>
-    /// 人员分类施保总额（元    /// </summary>
+    /// 人员分类施保总额（元
+/// </summary>
     public decimal PersonClassifiedAmount { get; set; }
 
     /// <summary>
-    /// 合计（元    /// </summary>
+    /// 合计（元
+/// </summary>
     public decimal TotalAmount { get; set; }
 
     /// <summary>
@@ -68,23 +75,28 @@ public class RuralSubsistenceFamily
     public string Address { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属省    /// </summary>
+    /// 所属省
+/// </summary>
     public string Province { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属市    /// </summary>
+    /// 所属市
+/// </summary>
     public string City { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属区    /// </summary>
+    /// 所属区
+/// </summary>
     public string District { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属街    /// </summary>
+    /// 所属街
+/// </summary>
     public string Street { get; set; } = string.Empty;
 
     /// <summary>
-    /// 所属社    /// </summary>
+    /// 所属社
+/// </summary>
     public string Community { get; set; } = string.Empty;
 
     /// <summary>
@@ -93,7 +105,8 @@ public class RuralSubsistenceFamily
     public string CertificateNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// 最初享受月    /// </summary>
+    /// 最初享受月
+/// </summary>
     public string FirstReceiveMonth { get; set; } = string.Empty;
 
     /// <summary>
@@ -102,7 +115,8 @@ public class RuralSubsistenceFamily
     public string ApplyReason { get; set; } = string.Empty;
 
     /// <summary>
-    /// 救助金计算方    /// </summary>
+    /// 救助金计算方
+/// </summary>
     public string CalculationMethod { get; set; } = string.Empty;
 
     /// <summary>
@@ -111,7 +125,8 @@ public class RuralSubsistenceFamily
     public string GradeType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 开户银    /// </summary>
+    /// 开户银
+/// </summary>
     public string BankName { get; set; } = string.Empty;
 
     /// <summary>
@@ -125,7 +140,8 @@ public class RuralSubsistenceFamily
     public string BankAccount { get; set; } = string.Empty;
 
     /// <summary>
-    /// 一卡通账    /// </summary>
+    /// 一卡通账
+/// </summary>
     public string OneCardAccount { get; set; } = string.Empty;
 
     /// <summary>
@@ -139,7 +155,8 @@ public class RuralSubsistenceFamily
     public decimal HousingArea { get; set; }
 
     /// <summary>
-    /// 金融资产总额（元    /// </summary>
+    /// 金融资产总额（元
+/// </summary>
     public decimal FinancialAssets { get; set; }
 
     /// <summary>

@@ -20,21 +20,21 @@ public partial class ElderlyApplicationService
     {
         try
         {
-            // 申请人 + 共同生活成员（赡养抚养人不参与）；排除死亡登记成员
-            const string appSql = "SELECT applicant_id_card FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
+            // 申请人 + 共同生活成员（赡养抚养人不参与）；已死亡人员豁免（NotDeadSql：登记∪有效申报，全库匹配）
+            // 户主查询：命中死亡即查无行 → Success(null) → 不入队（QuerySingleAsync 空行返回 Success(default)）
+            var appSql = @"SELECT applicant_id_card FROM nc_biz_applications
+                           WHERE id = $1 AND deleted_at IS NULL AND " + NotDeadSql("applicant_id_card");
             var appResult = await _db.QuerySingleAsync<string?>(appSql, ct, applicationId);
             if (appResult.IsFailure)
                 return Result.Failure<int>(appResult.ErrorCode!, appResult.Message!);
 
-            const string memberSql = @"
+            var memberSql = @"
                 SELECT DISTINCT m.id_card
                 FROM nc_biz_family_members m
                 WHERE m.application_id = $1 AND m.deleted_at IS NULL
                   AND m.id_card IS NOT NULL AND length(m.id_card) = 18
                   AND (m.is_applicant OR m.member_category = 'SharedLiving')
-                  AND NOT EXISTS (
-                      SELECT 1 FROM nc_biz_death_records d
-                      WHERE d.application_id = m.application_id AND d.member_id_card = m.id_card)";
+                  AND " + NotDeadSql("m.id_card");
             var membersResult = await _db.QueryAsync<string>(memberSql, ct, applicationId);
             if (membersResult.IsFailure)
                 return Result.Failure<int>(membersResult.ErrorCode!, membersResult.Message!);
@@ -63,7 +63,8 @@ public partial class ElderlyApplicationService
             // （内部走 MatchIdentityAsync 重探 + HasChange 判定）精确兜底。
             // 身份命中 = 5 张导入 persons 表任一 ∪ Approved 救助档案的户主/成员（二级探测，
             // 与 ElderlyCategoryService.MatchIdentityAsync 的两级口径对齐）。
-            const string sql = @"
+            // 死亡豁免拼 NotDeadSql（方法调用），故非常量串
+            string sql = @"
                 SELECT DISTINCT cand.id_card
                 FROM (
                     SELECT h.id_card FROM nc_biz_elderly_subsidy_history h
@@ -90,6 +91,7 @@ public partial class ElderlyApplicationService
                 )
                 AND NOT EXISTS (SELECT 1 FROM nc_biz_elderly_reviews r
                                 WHERE r.id_card = cand.id_card AND r.status = $4 AND r.deleted_at IS NULL)
+                AND " + NotDeadSql("cand.id_card") + @"
                 ORDER BY cand.id_card
                 LIMIT 1000";
 
@@ -300,7 +302,7 @@ public partial class ElderlyApplicationService
     public async Task<Result<List<ElderlyReview>>> GetPendingReviewsAsync(CancellationToken ct = default)
     {
         // 上限保护：待复核队列超千条属异常积压，防无界列表（调用方为全量绑定列表，无分页）
-        const string sql = @"SELECT * FROM nc_biz_elderly_reviews
+        const string sql = @"SELECT " + WideTableColumns.ElderlyReviewsColumns + @" FROM nc_biz_elderly_reviews
                      WHERE status = $1 AND deleted_at IS NULL
                      ORDER BY created_at, id LIMIT 1000";
         var result = await _db.QueryAsync<ElderlyReview>(sql, ct, ElderlyBenefitConstants.ReviewStatusPending);
@@ -319,7 +321,7 @@ public partial class ElderlyApplicationService
 
         var where = conditions.ToWhereClause();
         var countSql = $"SELECT COUNT(*) FROM nc_biz_elderly_reviews{where}";
-        var querySql = $"SELECT * FROM nc_biz_elderly_reviews{where}";
+        var querySql = $"SELECT {WideTableColumns.ElderlyReviewsColumns} FROM nc_biz_elderly_reviews{where}";
 
         var countResult = await _db.ExecuteScalarAsync<long>(countSql, ct, conditions.GetParameters());
         if (countResult.IsFailure)
@@ -340,7 +342,7 @@ public partial class ElderlyApplicationService
     public async Task<Result<List<ElderlyReview>>> GetReviewsByPersonAsync(string idCard, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(idCard)) return Result.Success(new List<ElderlyReview>());
-        const string sql = @"SELECT * FROM nc_biz_elderly_reviews
+        const string sql = @"SELECT " + WideTableColumns.ElderlyReviewsColumns + @" FROM nc_biz_elderly_reviews
                              WHERE id_card = $1 AND deleted_at IS NULL
                              ORDER BY COALESCE(reviewed_at, created_at) DESC, id DESC";
         var result = await _db.QueryAsync<ElderlyReview>(sql, ct, idCard.Trim());
@@ -1124,15 +1126,25 @@ public partial class ElderlyApplicationService
         if (rows.Count == 0) return Result.Success(0);
 
         var nextMonth = new DateTime(year, month, 1).AddMonths(1).ToString("yyyy-MM");
+
+        // 批查已入队身份证（原逐行 SELECT id...：rows 最多 1000 → 1000 次往返；与
+        // TriggerReviewsForIdCardsAsync 的 = ANY($1) 批查同构，同型问题一次修全）
+        var pendingSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var existingResult = await _db.QueryAsync<string>(
+            "SELECT id_card FROM nc_biz_elderly_reviews WHERE id_card = ANY($1) AND status = $2 AND deleted_at IS NULL",
+            ct, rows.Select(r => r.IdCard).ToArray(), ElderlyBenefitConstants.ReviewStatusPending);
+        if (existingResult.IsSuccess && existingResult.Value != null)
+        {
+            foreach (var c in existingResult.Value)
+                if (!string.IsNullOrWhiteSpace(c)) pendingSet.Add(c.Trim());
+        }
+
         var created = 0;
         foreach (var row in rows)
         {
             try
             {
-                var exists = await _db.ExecuteScalarAsync<long?>(
-                    "SELECT id FROM nc_biz_elderly_reviews WHERE id_card = $1 AND status = $2 AND deleted_at IS NULL LIMIT 1",
-                    ct, row.IdCard, ElderlyBenefitConstants.ReviewStatusPending);
-                if (exists.IsSuccess && exists.Value is > 0) continue;
+                if (pendingSet.Contains(row.IdCard.Trim())) continue;
 
                 var eval = new ElderlyReviewEvaluation
                 {
@@ -1159,6 +1171,8 @@ public partial class ElderlyApplicationService
                 await InsertPendingReviewAsync(eval, ElderlyBenefitConstants.ReviewTriggerAge90, null,
                     $"{year}年{month}月满90周岁自动入队", ct);
                 created++;
+                // 批内去重：同批重复身份证的后续行不再插入（原逐行查库天然拦住，批查后须自维护）
+                pendingSet.Add(row.IdCard.Trim());
             }
             catch (Exception ex)
             {
@@ -1206,7 +1220,7 @@ public partial class ElderlyApplicationService
     public async Task<Result<ElderlyReviewEvaluation>> EvaluateReviewByPendingAsync(long reviewId, CancellationToken ct = default)
     {
         var rowResult = await _db.QuerySingleAsync<ElderlyReview>(
-            "SELECT * FROM nc_biz_elderly_reviews WHERE id = $1 AND deleted_at IS NULL", ct, reviewId);
+            "SELECT " + WideTableColumns.ElderlyReviewsColumns + " FROM nc_biz_elderly_reviews WHERE id = $1 AND deleted_at IS NULL", ct, reviewId);
         if (rowResult.IsFailure || rowResult.Value == null)
             return Result.Failure<ElderlyReviewEvaluation>(ErrorCodes.RECORD_NOT_FOUND, "复核记录不存在");
 

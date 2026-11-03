@@ -167,7 +167,7 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
 
         var request = new PrintJobRequest
         {
-            BusinessType = "ElderlyBenefits",
+            BusinessType = PrintBusinessTypes.ElderlyBenefits,
             BusinessId = applicationId,
             Classification = classification,
             ApplicantName = app.Name,

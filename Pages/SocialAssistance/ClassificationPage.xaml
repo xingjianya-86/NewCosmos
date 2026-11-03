@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.ClassificationPage"
@@ -6,34 +6,13 @@
              Title="分类认定" BackgroundColor="{StaticResource Background}">
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="12">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="{OnPlatform WinUI='&#xE892;', Android='&#x1F3F7;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="分类认定" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="根据收入与资产判定救助类别" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+              Glyph="{OnPlatform WinUI='&#xE892;', Android='&#x1F3F7;&#xFE0F;'}"
+                                  Title="分类认定"
+                                  Subtitle="根据收入与资产判定救助类别"
+                                  BackCommand="{Binding GoBackCommand}"
+                                  BackText="返回"/>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="16">
@@ -41,8 +20,8 @@
                 <Border Style="{StaticResource CardBorderElevated}">
                     <VerticalStackLayout Spacing="12">
                         <Label Text="判定结果" Style="{StaticResource SectionTitleLabel}" Margin="0" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding ClassificationName}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
-                        <Label FontSize="18" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center">
+                        <Label Text="{Binding ClassificationName}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                        <Label FontSize="20" TextColor="{StaticResource TextPrimary}" HorizontalOptions="Center">
                             <Label.FormattedText>
                                 <FormattedString><Span Text="保障金额: "/><Span Text="{Binding GuaranteeAmount,StringFormat='{0:F2}'}" FontAttributes="Bold"/><Span Text=" 元/月"/></FormattedString>
                             </Label.FormattedText>
@@ -52,7 +31,7 @@
                 <!-- 一事一议按钮 -->
                 <Border Style="{StaticResource CardBorder}" IsVisible="{Binding ShowSpecialApproval}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Text="⚠ 当前判定为：不符合条件" FontSize="18" TextColor="{StaticResource Error}"/>
+                        <Label Text="⚠ 当前判定为：不符合条件" FontSize="20" TextColor="{StaticResource Error}"/>
                         <Button Text="一事一议" Command="{Binding SpecialApprovalCommand}" Style="{StaticResource WarningButton}"/>
                     </VerticalStackLayout>
                 </Border>

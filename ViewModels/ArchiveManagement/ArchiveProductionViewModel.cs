@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -176,29 +176,6 @@ public partial class ArchiveProductionViewModel : ViewModelBase
     #region 从外部页面初始化（工作流页面调用）
 
     /// <summary>
-    /// 从资产核查记录初始化（工作流页面 Tab0/Tab2 点击调用）
-    /// </summary>
-    public async Task InitializeFromAssetCheckAsync(long verificationId)
-    {
-        IsBusy = true;
-        StatusText = "正在加载经济核对数据...";
-
-        try
-        {
-            var success = await LoadAssetVerificationDataAsync(verificationId, null);
-            if (!success)
-            {
-                StatusText = "加载经济核对数据失败";
-                await _dialogService.DisplayAlertAsync("提示", "未找到对应的经济核对记录", "确定");
-            }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    /// <summary>
     /// 从申请记录初始化（工作流页面 Tab1 点击调用）
     /// </summary>
     public async Task InitializeFromApplicationAsync(long applicationId)
@@ -270,7 +247,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             }
 
             // 切到复核业务类型：模板分类走 [分类代码, 经济复核]
-            _currentBusinessType = "EconomicReview";
+            _currentBusinessType = PrintBusinessTypes.EconomicReview;
             BusinessTypeDisplay = businessTitle;
             DataSourceType = businessTitle;
 
@@ -453,7 +430,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
 
     #region 返回
 
-    // 返回首页：归档完成后直接回到社会救助首页，跳过中间页面
+    // 返回上一页：优先回工作流列表页（页内 OnAppearing 自动刷新），栈中无列表页才退回主首页
     public override async Task GoBackAsync()
     {
         try
@@ -465,13 +442,13 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 return;
             }
 
-            await navigation.PopToRootAsync();
-            // PopToRoot 直接回到主首页，必须恢复窗口标题（历史 BUG：标题残留档案生成页）
+            await Helpers.WindowNavigator.PopToPageAsync(typeof(Pages.SocialAssistance.ApplicationWorkflowPage));
+            // 返回后按栈顶页面恢复窗口标题（历史 BUG：标题残留档案生成页）
             RestoreWindowTitleFromNavigation();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "返回首页失败");
+            Logger.LogError(ex, "返回失败");
         }
     }
 
@@ -519,9 +496,10 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         var civilAssistantName = await GetCivilAssistantNameAsync();
         var orgInfo = await GetOrganizationInfoAsync();
 
-        _currentBusinessType = "AssetVerification";
+        _currentBusinessType = PrintBusinessTypes.AssetVerification;
         _currentBusinessId = detail.Id;
         _currentClassification = ClassificationConstants.AssetVerification;
+        _docClassification = _currentClassification;   // 资产核查非救助档：文书基准分类 = 自身
 
         BusinessTypeDisplay = "家庭经济状况核对";
         DataSourceType = "家庭经济状况核对";
@@ -533,6 +511,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         StatusText = $"已加载 {detail.ApplicantName}";
 
         // 构建地址信息（10秒超时）
+        // ⚠️ 资产核查表 community 列存的是 **village_code**（QuickAssetVerificationViewModel 有 code 映射），
+        // 故此处必须走 code 版；申请表（community=村名文本）走 AddressResolver.BuildAddressFromText。两语义分家。
         using var addressCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var fullAddress = await _addressResolver.BuildAddressAsync(detail.Community, detail.FamilyAddress, CancellationToken);
 
@@ -566,7 +546,10 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.OPERATOR_UNIT_PHONE] = orgInfo.OperatorUnitPhone,
             [FieldKeys.HEAD_ID_CARD] = detail.HeadIdCard,
             [FieldKeys.APPLICATION_NO] = "",
-            [FieldKeys.HUKOU_ADDRESS] = fullAddress,
+            // 户籍地址：核查记录**没有户籍侧数据源**（AssetVerificationDetail 无 HukouAddress/Hukou*Id）。
+            // 原实现误填 fullAddress（现住地址）——把现住地址打进「{户主户籍地址}」属键错写，
+            // 打印端对空值按占位符缺省显示 "-"，比错值诚实。
+            [FieldKeys.HUKOU_ADDRESS] = "",
             [FieldKeys.FAMILY_MEMBER_INFO] = BuildAssetCheckFamilyMemberInfo(detail),
         };
 
@@ -614,10 +597,16 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         var orgInfo = await GetOrganizationInfoAsync();
         _logger.LogBusiness("机构信息获取完成", ("OperatorUnitName", orgInfo.OperatorUnitName));
 
-        _currentBusinessType = "FamilyApplication";
+        _currentBusinessType = PrintBusinessTypes.FamilyApplication;
         _currentBusinessId = app.Id;
+        // 模板选型/导航用档案自身分类（停保档的变更告知书、封面、目录靠它选中，禁止改旧分类）
         _currentClassification = app.ClassificationResult ?? "";
         _currentStatus = app.Status ?? "";
+
+        // 文书内容用「复核前旧分类」：复核/停旧建新后新档分类是复核结论，
+        // 文书（入户调查表标题、定期复核表享受类别、封面/目录、调查走访情况…）仍描述原救助身份
+        StatusText = "正在解析文书分类...";
+        _docClassification = await ResolveDocumentClassificationAsync(app, CancellationToken);
 
         BusinessTypeDisplay = "社会救助申请";
         DataSourceType = "社会救助申请";
@@ -630,7 +619,10 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         // 构建地址信息
         StatusText = "正在构建地址信息...";
         _logger.LogBusiness("构建地址信息", ("Community", app.Community ?? ""));
-        var fullAddress = $"{app.Town ?? ""}{app.Community ?? ""}{app.Address ?? ""}";
+        // 地址统一走文本级唯一入口（缺哪级补哪级、已含则跳过、清村后缀）。
+        // 原实现 $"{app.Town}{app.Community}{app.Address}" 裸拼：address 列本身已是全地址时
+        // 会重复叠加（实测 id=105 → 「柳树镇柞木村村民委员会林口县柳树镇柞木村委会」）。
+        var fullAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
         _logger.LogBusiness("地址信息构建完成", ("FullAddress", fullAddress));
 
         StatusText = "正在构建字段数据...";
@@ -709,12 +701,14 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.OPERATOR_UNIT_PHONE] = orgInfo.OperatorUnitPhone,
             [FieldKeys.HEAD_ID_CARD] = app.ApplicantIdCard,
             [FieldKeys.APPLICATION_NO] = app.ApplicationNo ?? "",
-            [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            // 文书分类文字（目录{社会救助类型}/一事一议/渐退{享受类型}）一律用复核前旧分类
+            [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(_docClassification),
             [FieldKeys.HUKOU_ADDRESS] = hukouAddress,
             [FieldKeys.SURVEY_DATE] = surveyDate, // SURVEY_TIME 已于 2026-10-16 批3 并入本键（config 同批迁移，供给行随之删除）
             [FieldKeys.APPLICATION_REASON_DETAIL] = "-",  // 模板10其它困难原因：需求要求固定留空为"-"
-            [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatDecimal(app.TotalAnnualIncome),
-            [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatDecimal(app.PerCapitaAnnualIncome),
+            // 家庭总收入/人均收入：城乡口径（城市=月值=年÷12、农村=年值），见 FormatIncomeByHukou
+            [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatIncomeByHukou(app.HukouType, app.TotalAnnualIncome),
+            [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatIncomeByHukou(app.HukouType, app.PerCapitaAnnualIncome),
             [FieldKeys.TOTAL_FAMILY_INCOME_MONTHLY] = FormatDecimal(app.TotalFamilyIncome),
             [FieldKeys.PER_CAPITA_INCOME_MONTHLY] = FormatDecimal(app.PerCapitaIncome),
             [FieldKeys.RIGID_EXPENDITURE_DETAIL] = BuildRigidExpenditureDisplay(app, economicDetail),
@@ -734,9 +728,9 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.INCOME_SITUATION] = BuildIncomeSituationText(app, economicDetail),
             [FieldKeys.FAMILY_MEMBER_INFO] = "",  // 延迟到加载家庭成员后填充
             // 模板10（最低生活保障申请书）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.APPLY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
-            // 定期复核审批表：享受类别缩写（低保/低保边缘/特困/刚性支出）
-            [FieldKeys.CLASSIFICATION_MAJOR] = ClassificationConstants.ConvertToMajorCategoryName(app.ClassificationResult ?? ""),
+            [FieldKeys.APPLY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(_docClassification),
+            // 定期复核审批表：享受类别缩写（低保/低保边缘/特困/刚性支出）——复核后仍出复核前类别
+            [FieldKeys.CLASSIFICATION_MAJOR] = ClassificationConstants.ConvertToMajorCategoryName(_docClassification),
 
             // 模板8（邻里访问调查表）需要的字段
             [FieldKeys.INCOME_SOURCE] = BuildIncomeSourceSummary(app, economicDetail),
@@ -748,16 +742,17 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.PROPERTY_HOUSE_DESC] = BuildHouseDesc(economicDetail),
             [FieldKeys.APPLICANT_LIFE_SITUATION] = "",  // 延迟到加载家庭成员后填充
             // 模板8（邻里访问调查表）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
+            // 入户调查表(159)标题「林口县申请城乡{保障类型}入户调查表」与邻里访问(162)均取复核前旧分类
+            [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(_docClassification),
 
             // 模板13（公示文件）需要的字段
-            ["GUARANTEE_TYPE_DISPLAY"] = BuildGuaranteeTypeDisplay(app.ClassificationResult ?? ""),
+            ["GUARANTEE_TYPE_DISPLAY"] = BuildGuaranteeTypeDisplay(_docClassification),
             [FieldKeys.GUARANTEE_AMOUNT] = app.TotalGuaranteeAmount.ToString("N2"),
             [FieldKeys.PUBLICITY_START_DATE] = publicityStart,
             [FieldKeys.PUBLICITY_END_DATE] = publicityEnd,
             [FieldKeys.PUBLICITY_RANGE] = BuildPublicityRange(tl),
             // 模板13（公示文件）专用：避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
 
             // 模板14（低保审核确认表）需要的字段
             [FieldKeys.CONFIRM_AMOUNT] = app.HouseholdMonthlyGuaranteeAmount > 0 ? $"{app.HouseholdMonthlyGuaranteeAmount:N2}元" : "",
@@ -774,7 +769,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.DISABILITY_ALLOWANCE_AMOUNT] = "",
             [FieldKeys.ENJOY_ELDERLY_ALLOWANCE] = BuildCheckboxWithLabel(false, "享受高龄老人津贴"),
             [FieldKeys.ELDERLY_ALLOWANCE_AMOUNT] = "",
-            [FieldKeys.SINGLE_PERSON_GUARANTEE] = BuildYesNoCheckbox(ClassificationConstants.IsCodeSingleRescue(app.ClassificationResult ?? "")),
+            [FieldKeys.SINGLE_PERSON_GUARANTEE] = BuildYesNoCheckbox(ClassificationConstants.IsCodeSingleRescue(_docClassification)),
             [FieldKeys.GUARANTEE_FAMILY_SIZE] = $"{app.FamilySize}口人",
             [FieldKeys.RIGID_EXPENDITURE] = BuildYesNoCheckbox(app.RigidExpenditure > 0),
             [FieldKeys.KINSHIP_FILING] = BuildYesNoCheckbox(false),
@@ -792,7 +787,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.REVIEW_CLASSIFICATION_CHANGE] = "",
             [FieldKeys.REVIEW_AMOUNT_CHANGE] = "",
             // 模板14（低保审核确认表）专用：简称，单人保显示为"单人保"
-            [FieldKeys.AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToShortName(app.ClassificationResult ?? ""),
+            [FieldKeys.AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToShortName(_docClassification),
 
             // 模板15（分类施保调整表）需要的字段
             [FieldKeys.APPLICANT_BIRTH_DATE] = IdCardValidator.ExtractBirthDate(app.ApplicantIdCard)?.ToString("yyyy-MM-dd") ?? "",
@@ -857,7 +852,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.ADJ_ADD_COUNT] = "0", [FieldKeys.ADJ_REMOVE_COUNT] = "0",
 
             // 模板16（经济财产声明书）需要的字段 — 从 economicDetail 填充
-            [FieldKeys.DECLARATION_CLASSIFICATION] = BuildClassificationCheckbox(app.ClassificationResult ?? ""),
+            [FieldKeys.DECLARATION_CLASSIFICATION] = BuildClassificationCheckbox(_docClassification),
             [FieldKeys.LAND_STATUS] = BuildLandStatusCheckbox(app),
             [FieldKeys.LAND_AREA] = BuildLandAreaDetail(app),
             [FieldKeys.HAS_PENSION] = "否",
@@ -913,7 +908,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
 
             // 特困审核确认表（模板75）专用字段
             [FieldKeys.DESTITUTE_AUDIT_CATEGORY] = BuildPersonCategory(app),
-            [FieldKeys.DESTITUTE_AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            [FieldKeys.DESTITUTE_AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
             [FieldKeys.DESTITUTE_DISABILITY] = BuildDisabilityDisplay(app),
 
             // 户口性质（特困审核确认表/分散供养协议共用）
@@ -973,12 +968,14 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.CAREGIVER_ORG_PHONE] = "",
 
             // 档案封面专用字段（避免与模板16的CLASSIFICATION_RESULT冲突）
-            [FieldKeys.COVER_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
-            // 定期复核审批表：档案分类 A类/B类（享受待遇4族=A，停保/其他=B）
-            [FieldKeys.ARCHIVE_CLASS] = ClassificationConstants.ArchiveCategoryCodes.Contains(app.ClassificationResult ?? "") ? "A类" : "B类",
+            [FieldKeys.COVER_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
+            // 定期复核审批表：档案分类 A类/B类（享受待遇4族=A，停保/其他=B）——按复核前旧分类判族
+            [FieldKeys.ARCHIVE_CLASS] = ClassificationConstants.ArchiveCategoryCodes.Contains(_docClassification) ? "A类" : "B类",
             [FieldKeys.ARCHIVE_NUMBER] = volumeDate,
 
             // 档案认定结果告知书专用字段（避免与模板16的CLASSIFICATION_RESULT冲突）
+            // ⚠️ 例外（2026-11 业务确认）：认定结果告知书公告的是**本次**认定/复核结果，
+            //    保留档案自身分类，不随文书基准分类（复核前旧分类）改写
             [FieldKeys.NOTICE_CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
         };
 
@@ -1009,7 +1006,30 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                     ("ClassificationResult", app.ClassificationResult ?? ""));
             }
 
-            if (!string.IsNullOrEmpty(stopNewClassification))
+            // 单人户户主死亡整户停止：无 CategoryStop 记录、分类未变（非停保码），按死亡事实装配
+            // "停止/停止享受"告知书（理由复用现有户主死亡句式）。走最前——死亡停保最具体，优先于通用分支。
+            var deathStopResult = await _changeService.GetLatestHouseholdDeathStopRecordAsync(applicationId, CancellationToken);
+            var deathStopRecord = deathStopResult.IsSuccess ? deathStopResult.Value : null;
+            if (deathStopRecord != null)
+            {
+                _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "停止";
+                _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
+                _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
+                _fieldData[FieldKeys.NOTICE_HANDLING_CATEGORY] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
+                _fieldData[FieldKeys.NOTICE_BENEFIT_TYPE] = "停止享受";
+                _fieldData[FieldKeys.NOTICE_BENEFIT_RESULT] = "社会救助保障待遇";
+                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] =
+                    $"于{deathStopRecord.DeathDate:yyyy年MM月dd日}原户主死亡，依据相关规定，经批准，予以停止保障";
+                _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
+                _fieldData[FieldKeys.NOTICE_DELIVERER] = App.CurrentUserFullName ?? "";
+                _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
+                _fieldData[FieldKeys.NOTICE_DATE] = DateTime.Now.ToString("yyyy年MM月dd日");
+
+                _logger.LogBusiness("户主死亡整户停止告知书字段已装配",
+                    ("ApplicationId", applicationId.ToString()),
+                    ("DeathDate", deathStopRecord.DeathDate.ToString("yyyy-MM-dd")));
+            }
+            else if (!string.IsNullOrEmpty(stopNewClassification))
             {
                 var newClassification = stopNewClassification;
 
@@ -1040,9 +1060,11 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 // 按 newClassification 分流——原实现对所有停保无差别套「收入超标」模板，
                 // 致使 IneligibleWithLabor（有劳动力）档案被写成「已超过低收入标准上限」，
                 // 与其自身数字（713.92 < 948）自相矛盾。分类是拒保理由的唯一事实来源。
-                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] = IsLaborIneligible(newClassification)
+                // TrimEnd('。')：模板 241 正文「具体原因：{具体原因}。」自带收尾句号，生成文本再带
+                // 句号会渲染成「。。」（20261103 修复）；死亡/待遇调整/渐退三分支的文案本就不带尾句号。
+                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] = (IsLaborIneligible(newClassification)
                     ? await BuildLaborIneligibleReasonAsync(app, CancellationToken)
-                    : await BuildIncomeExceededReasonAsync(app, newClassification);
+                    : await BuildIncomeExceededReasonAsync(app, newClassification)).TrimEnd('。');
                 _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
                 _fieldData[FieldKeys.NOTICE_DELIVERER] = App.CurrentUserFullName ?? "";
                 _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
@@ -1100,6 +1122,21 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                         ("OldAmount", reg.OldGuaranteeAmount.ToString("F2")),
                         ("NewAmount", reg.NewGuaranteeAmount.ToString("F2")));
                 }
+                else
+                {
+                    // 登记缺失 → 次级子场景：**渐退封顶减发**（A2 口径，2026-11 拍板；登记优先由本 if/else 结构保证）
+                    var noticeFilled = await TryFillGraceCapReduceNoticeAsync(app, orgInfo, applicationId);
+                    if (!noticeFilled
+                        && string.Equals(app.Status, ApplicationStatusCodes.STOPPED, StringComparison.Ordinal))
+                    {
+                        // 方向④落空（死亡 / 停保·不予认定 / 待遇调整 / 渐退封顶减发四者皆空）且档案已停保：
+                        // 此时若清单门仍放行告知书，打出来就是空白告知书（app95 同型错例的可观测化）。
+                        // 正常在保档案四方向皆空属预期（根本不会出告知书），不记日志防噪音。
+                        _logger.Warn($"告知书方向未命中（死亡/停保/待遇调整/渐退封顶减发四者皆空），若输出告知书将为空白: "
+                            + $"ApplicationId={applicationId}, Status={app.Status}, "
+                            + $"ClassificationResult={app.ClassificationResult}");
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -1155,6 +1192,29 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             _logger.Warn($"近亲属备案字段装配失败: {ex.Message}");
         }
 
+        // 特困供养人员取消（停止）情况表字段装配（仅停发特困档案；退出/停发时专用）：
+        // 复用 DestitutePrintDataBuilder（含年保障金额=特困供养标准×12 一次舍入），停发原因按 app.StopReason 自由文本归一。
+        try
+        {
+            if (string.Equals(app.Status, ApplicationStatusCodes.STOPPED, StringComparison.Ordinal)
+                && ClassificationConstants.IsCodeDestitute(app.ClassificationResult ?? string.Empty))
+            {
+                var cancelReasonKey = Constants.DestituteStopReason.ResolveKeyFromText(app.StopReason);
+                var cancelFields = await Services.Domain.SocialAssistance.DestitutePrintDataBuilder
+                    .BuildSingleFieldsAsync(_standardConfigService, app, cancelReasonKey, CancellationToken);
+                // 仅补 DESTITUTE_CANCEL_* 新键；共享键（APPLICANT_NAME/FAMILY_ADDRESS/DESTITUTE_SUPPORT_TYPE…）
+                // 制作中心已按各自口径装配（FAMILY_ADDRESS 等有 code/文本双语义），此处不覆盖，避免影响封面/告知书等其它模板。
+                foreach (var kv in cancelFields)
+                    if (kv.Key.StartsWith("DESTITUTE_CANCEL_", StringComparison.Ordinal))
+                        _fieldData[kv.Key] = kv.Value;
+                _logger.LogBusiness("特困取消备案表字段已装配", ("ApplicationId", applicationId.ToString()));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"特困取消备案表字段装配失败: {ex.Message}");
+        }
+
         // 从经济明细补充住房类别
         if (economicDetail?.FamilyProperties != null && economicDetail.FamilyProperties.Count > 0)
         {
@@ -1182,11 +1242,9 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         _logger.LogBusiness("家庭成员查询完成", ("IsSuccess", membersResult.IsSuccess.ToString()), ("Count", membersResult.Value?.Count.ToString() ?? "0"));
 if (membersResult.IsSuccess && membersResult.Value != null)
         {
-            _logger.Info($"家庭成员总数: {membersResult.Value.Count}");
-            foreach (var m in membersResult.Value)
-            {
-                _logger.Info($"成员: Name={m.Name}, MemberCategory={m.MemberCategory}, IsHouseholdHead={m.IsHouseholdHead}, IdCard={m.IdCard}");
-            }
+            // 聚合为一条 Debug 且脱敏（原逐成员 Info：热路径刷日志 + 姓名/身份证明文入盘，违反 AGENTS §10）
+            _logger.Debug($"家庭成员明细({membersResult.Value.Count}): " + string.Join("; ", membersResult.Value.Select(m =>
+                $"{DataMasker.MaskName(m.Name)}/{m.MemberCategory}/户主={m.IsHouseholdHead}/{DataMasker.MaskIdCard(m.IdCard ?? string.Empty)}")));
 
             // 查询已死亡登记成员（历史数据未软删，生成档案时须统一过滤）
             var deathIdCards = new List<string>();
@@ -1628,7 +1686,12 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         var monthToDisplay = isRural ? 12m : 1m;
 
         // 档案_定期复核审批表收入行：标签在单元格文字里已含"收入"，值格统一补"元"单位
-        _fieldData[FieldKeys.INCOME_LABOR] = FormatDecimal(app.WorkIncomeTotal * monthToDisplay) + "元";
+        // 打印口径（2026-11 业务确认）：{务工收入} = 务工明细月值 + 转移性（工资性）收入月值。
+        // 入户调查表/定期复核审批表/特困入户调查表三张模板都没有"转移性收入"行，
+        // 不并入则分项加总 ≠ 家庭总收入（奚德芳：务工0 + 其他0 vs 家庭总收入2000）。
+        // INCOME_TRANSFER 键当前无任何模板引用，不存在重复显示。
+        _fieldData[FieldKeys.INCOME_LABOR] = FormatDecimal(
+            (app.WorkIncomeTotal + app.TransferIncomeTotal) * monthToDisplay) + "元";
         _fieldData[FieldKeys.INCOME_BUSINESS] = FormatDecimal(app.BusinessIncomeTotal * monthToDisplay) + "元";
         _fieldData[FieldKeys.INCOME_TRANSFER] = FormatDecimal(app.TransferIncomeTotal * monthToDisplay);
         // 财产性收入 = 月财产性收入(×12) + 年土地收入 + 年补贴
@@ -1641,10 +1704,9 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         _fieldData[FieldKeys.INCOME_SUBSIDY] = FormatDecimal(app.SubsidyTotal) + subsidyRatioNote;  // 年收入直接显示；折算后附条件注记
         _fieldData[FieldKeys.INCOME_LAND] = FormatDecimal(app.LandIncomeTotal);  // 年收入直接显示
 
-        // 总收入：农村打印年值权威口径（TotalAnnualIncome），城市打印月值（年÷12）
+        // 总收入：农村打印年值权威口径（TotalAnnualIncome），城市打印月值（年÷12）——单点 FormatIncomeByHukou
         var annualTotal = app.TotalAnnualIncome;
-        _fieldData[FieldKeys.INCOME_TOTAL] = FormatDecimal(
-            isRural ? annualTotal : Math.Round(annualTotal / 12m, 2));
+        _fieldData[FieldKeys.INCOME_TOTAL] = FormatIncomeByHukou(app.HukouType, annualTotal);
         _fieldData[FieldKeys.INCOME_RIGID_EXPENDITURE] = BuildRigidExpenditureDisplay(app, economicDetail);
 
         _logger.LogBusiness("收入数据计算完成",
@@ -1686,9 +1748,11 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         _cachedApplication = result.Value;
 
         var orgInfo = await GetOrganizationInfoAsync();
-        _currentBusinessType = "FamilyApplication";
+        _currentBusinessType = PrintBusinessTypes.FamilyApplication;
         _currentBusinessId = applicationId;
         _currentClassification = _cachedApplication.ClassificationResult ?? "";
+        // 先取自身分类兜底；BuildFieldDataFromCacheAsync 再解析复核前旧分类覆盖
+        _docClassification = _currentClassification;
         _currentStatus = _cachedApplication.Status ?? "";
 
         BusinessTypeDisplay = "社会救助申请";
@@ -1740,11 +1804,17 @@ if (membersResult.IsSuccess && membersResult.Value != null)
 
         var app = _cachedApplication;
 
+        // 文书基准分类（复核前旧分类）：须在下方所有分类/土地情况装配之前解析，见 DocClassification.cs
+        _docClassification = await ResolveDocumentClassificationAsync(app, CancellationToken);
+
         var civilAssistantName = await GetCivilAssistantNameAsync();
         var operatorIdentity = await GetOperatorIdentityAsync();
         var orgInfo = await GetOrganizationInfoAsync();
 
-        var fullAddress = await _addressResolver.BuildAddressAsync(app.Community, app.Address, CancellationToken);
+        // 地址统一走文本级唯一入口（与主路径 LoadApplicationDataAsync 同口径，保证两条路径出表一致）。
+        // 原实现 BuildAddressAsync(app.Community, app.Address) 把**村名**当 village_code 传 → 缓存永远 miss，
+        // address 为空的档（实测 id=526）整格变空。
+        var fullAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
 
         var landIncomeSituation = await BuildLandIncomeSituationAsync(app);
 
@@ -1792,12 +1862,14 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.DISTRICT] = orgInfo.District,
             [FieldKeys.TOWN] = orgInfo.Town,
             [FieldKeys.HEAD_ID_CARD] = app.ApplicantIdCard,
-            [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            // 文书分类文字一律用复核前旧分类（分步路径与主路径同口径）
+            [FieldKeys.CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(_docClassification),
             [FieldKeys.HUKOU_ADDRESS] = hukouAddress,
             [FieldKeys.SURVEY_DATE] = surveyDate, // SURVEY_TIME 已于 2026-10-16 批3 并入本键（config 同批迁移，供给行随之删除）
             [FieldKeys.APPLICATION_REASON_DETAIL] = "-",  // 模板10其它困难原因：需求要求固定留空为"-"
-            [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatDecimal(app.TotalAnnualIncome),
-            [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatDecimal(app.PerCapitaAnnualIncome),
+            // 家庭总收入/人均收入：城乡口径（城市=月值=年÷12、农村=年值），见 FormatIncomeByHukou
+            [FieldKeys.TOTAL_FAMILY_INCOME_ANNUAL] = FormatIncomeByHukou(app.HukouType, app.TotalAnnualIncome),
+            [FieldKeys.PER_CAPITA_INCOME_ANNUAL] = FormatIncomeByHukou(app.HukouType, app.PerCapitaAnnualIncome),
             [FieldKeys.TOTAL_FAMILY_INCOME_MONTHLY] = FormatDecimal(app.TotalFamilyIncome),
             [FieldKeys.PER_CAPITA_INCOME_MONTHLY] = FormatDecimal(app.PerCapitaIncome),
             [FieldKeys.RIGID_EXPENDITURE_DETAIL] = BuildRigidExpenditureDisplay(app, economicDetail),
@@ -1816,19 +1888,19 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.PROPERTY_HOUSE_DESC] = BuildHouseDesc(economicDetail),
             [FieldKeys.APPLICANT_LIFE_SITUATION] = "",  // 延迟到加载经济明细/入户调查后填充
             // 模板8（邻里访问调查表）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
+            [FieldKeys.SURVEY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(_docClassification),
             // 模板10（最低生活保障申请书）专用：简称，避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.APPLY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? ""),
+            [FieldKeys.APPLY_CLASSIFICATION] = ClassificationConstants.ConvertFromCode(_docClassification),
 
             // 公示文件字段
             [FieldKeys.GUARANTEE_AMOUNT] = app.TotalGuaranteeAmount.ToString("N2"),
-            [FieldKeys.GUARANTEE_TYPE_DISPLAY] = BuildGuaranteeTypeDisplay(app.ClassificationResult ?? ""),
+            [FieldKeys.GUARANTEE_TYPE_DISPLAY] = BuildGuaranteeTypeDisplay(_docClassification),
             [FieldKeys.OPERATOR_UNIT_PHONE] = orgInfo.OperatorUnitPhone,
             [FieldKeys.PUBLICITY_START_DATE] = publicityStart,
             [FieldKeys.PUBLICITY_END_DATE] = publicityEnd,
             [FieldKeys.PUBLICITY_RANGE] = BuildPublicityRange(tl),
             // 模板13（公示文件）专用：避免与模板16的CLASSIFICATION_RESULT冲突
-            [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            [FieldKeys.PUBLICITY_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
 
             // 模板14（低保审核确认表）
             [FieldKeys.CONFIRM_AMOUNT] = app.HouseholdMonthlyGuaranteeAmount > 0 ? $"{app.HouseholdMonthlyGuaranteeAmount:N2}元" : "",
@@ -1836,7 +1908,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.HEALTH_STATUS] = _dictCacheService.GetValue(DictionaryTypeCodes.HealthStatuses, app.HealthStatus ?? ""),
             [FieldKeys.RIGID_EXPENDITURE] = BuildYesNoCheckbox(app.RigidExpenditure > 0),
             [FieldKeys.GUARANTEE_FAMILY_SIZE] = app.FamilySize.ToString(),
-            [FieldKeys.SINGLE_PERSON_GUARANTEE] = BuildYesNoCheckbox(ClassificationConstants.IsCodeSingleRescue(app.ClassificationResult ?? "")),
+            [FieldKeys.SINGLE_PERSON_GUARANTEE] = BuildYesNoCheckbox(ClassificationConstants.IsCodeSingleRescue(_docClassification)),
             [FieldKeys.AUDIT_DATE] = auditDate,
             [FieldKeys.VERIFIED_BENEFIT] = BuildVerifiedBenefitText(app),
             [FieldKeys.PUBLICITY_STATUS] = "已公示、无异议",
@@ -1844,7 +1916,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.URBAN_MONTHLY_INCOME] = ClassificationConstants.HukouType.IsHukouUrban(app.HukouType) ? FormatDecimal(app.TotalFamilyIncome) : "",
 [FieldKeys.RURAL_ANNUAL_INCOME] = ClassificationConstants.HukouType.IsHukouRural(app.HukouType) ? FormatDecimal(app.TotalAnnualIncome) : "",
 // 模板14（低保审核确认表）专用：简称，单人保显示为"单人保"
-            [FieldKeys.AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToShortName(app.ClassificationResult ?? ""),
+            [FieldKeys.AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToShortName(_docClassification),
 
             // 定期复核审批表：审核次月日期 + 复核组默认值（真实值由 ApplyReviewGroupAsync 覆写；无变更记录时打 "-" 而非报未映射）
             [FieldKeys.REVIEW_EFFECTIVE_DATE] = reviewEffective,
@@ -1854,15 +1926,16 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.REVIEW_AMOUNT_CHANGE] = "",
 
             // 档案封面专用字段（避免与模板16的CLASSIFICATION_RESULT冲突）
-            [FieldKeys.COVER_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            [FieldKeys.COVER_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
             [FieldKeys.ARCHIVE_NUMBER] = volumeDate,
 
             // 档案认定结果告知书专用字段（避免与模板16的CLASSIFICATION_RESULT冲突）
+            // ⚠️ 例外（同主路径）：认定结果告知书保留档案自身分类（本次认定/复核结果）
             [FieldKeys.NOTICE_CLASSIFICATION_RESULT] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
 
             // 特困审核确认表（模板75）专用字段
             [FieldKeys.DESTITUTE_AUDIT_CATEGORY] = BuildPersonCategory(app),
-            [FieldKeys.DESTITUTE_AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            [FieldKeys.DESTITUTE_AUDIT_CLASSIFICATION] = ClassificationConstants.ConvertToFullName(_docClassification),
             [FieldKeys.DESTITUTE_DISABILITY] = BuildDisabilityDisplay(app),
 
             // 户口性质（特困审核确认表/分散供养协议共用）

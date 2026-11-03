@@ -14,11 +14,11 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding CategoryChangeDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding TriggerSourceName}" FontSize="12" TextColor="{StaticResource Info}"/>
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CategoryChangeDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding TriggerSourceName}" FontSize="14" TextColor="{StaticResource Info}"/>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="办理" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="办理" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
@@ -32,11 +32,11 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="4">
                         <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                        <Label Text="{Binding CategoryName}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding IssueStartMonth}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="{Binding CategoryName}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding IssueStartMonth}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="复核" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="复核" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
                             IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
@@ -49,19 +49,13 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="0">
 
         <!-- 紫色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardPurpleGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="高龄津贴复核" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="身份 + 年龄重评 · 停旧增新" FontSize="13" TextColor="#E6FFFFFF"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="高龄津贴复核"
+                                   Subtitle="身份 + 年龄重评 · 停旧增新"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="12" Spacing="12">
@@ -69,7 +63,7 @@
                 <!-- 待复核队列 -->
                 <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasPendingReviews}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="{Binding PendingCount, StringFormat='待复核队列（{0} 人）'}" FontSize="15"
+                        <Label Text="{Binding PendingCount, StringFormat='待复核队列（{0} 人）'}" FontSize="16"
                                FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                         <VerticalStackLayout BindableLayout.ItemsSource="{Binding PendingReviews}"
                                              BindableLayout.ItemTemplate="{StaticResource PendingReviewCard}" Spacing="0"/>
@@ -82,12 +76,12 @@
                         <Label Text="在享人员检索" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Grid.Column="0" Placeholder="搜索在享人员姓名、身份证号" Text="{Binding SearchText}"
-                                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
-                            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="40"
+                                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding SearchCommand}"/>
+                            <Button Grid.Column="1" Text="搜索" FontSize="14" Padding="14,0" HeightRequest="40"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                                     Command="{Binding SearchCommand}"/>
                         </Grid>
-                        <Button Text="按身份证复核（18位）" HeightRequest="42" FontSize="14" CornerRadius="10"
+                        <Button Text="按身份证复核（18位）" HeightRequest="42" FontSize="15" CornerRadius="10"
                                 BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
                                 Command="{Binding ReviewByIdCardCommand}" IsEnabled="{Binding CanReview}"/>
                     </VerticalStackLayout>
@@ -99,12 +93,12 @@
 
                 <!-- 分页 -->
                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="12" Margin="0,6">
-                    <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                    <Button Text="上一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                             BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                             BorderColor="{StaticResource Gray200}" BorderWidth="1"
                             Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                    <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                    <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                    <Label Text="{Binding PageStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Button Text="下一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                             BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                             BorderColor="{StaticResource Gray200}" BorderWidth="1"
                             Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
@@ -118,7 +112,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

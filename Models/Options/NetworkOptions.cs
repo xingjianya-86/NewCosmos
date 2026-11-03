@@ -29,6 +29,12 @@ public class NetworkOptions
     /// <summary>网页授权地址（自建控制器 UI）</summary>
     public string WebControllerUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 内网证件 OCR 识别服务地址（deploy\ocr\ocr_api.py，如 http://192.168.0.2:8788）。
+    /// 空 = 未启用识别；图片仅允许发内网端点（§12 PII 边界）。
+    /// </summary>
+    public string OcrServiceUrl { get; set; } = string.Empty;
+
     /// <summary>ZeroTier CLI 搜索路径（分号分隔；空则用内置默认）</summary>
     public string ZeroTierCliPaths { get; set; } = string.Empty;
 

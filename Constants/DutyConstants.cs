@@ -152,6 +152,9 @@ public static class DutyConstants
         /// <summary>法定节假日数据下载接口地址，{year} 为年份占位符</summary>
         public const string HOLIDAY_API_URL = "holiday_api_url";
 
+        /// <summary>法定节假日备用下载接口地址，{year} 为年份占位符（主接口无数据/不可达时回退）</summary>
+        public const string HOLIDAY_FALLBACK_API_URL = "holiday_fallback_api_url";
+
         /// <summary>批量导入的轮转锚点起始日期（yyyy-MM-dd）：生成该月值班表时自动从此日起生成</summary>
         public const string IMPORT_ANCHOR_DATE = "duty_import_anchor_date";
 
@@ -166,6 +169,18 @@ public static class DutyConstants
 
     /// <summary>节假日数据下载接口默认地址（timor.tech 免费节假日 API，{year} 占位替换）</summary>
     public const string DefaultHolidayApiUrl = "https://timor.tech/api/holiday/year/{year}";
+
+    /// <summary>
+    /// 节假日备用下载接口默认地址（holiday-cn，直接跟踪国务院办公厅公报，{year} 占位替换）。
+    /// 主接口（timor.tech）网络不可达或当年安排尚未收录时自动回退。
+    /// 注意其 JSON 结构与 timor.tech 不同（days 数组 / isOffDay 字段），由 HolidayApiParser 分别解析。
+    /// </summary>
+    public const string DefaultHolidayFallbackApiUrl = "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json";
+
+    /// <summary>
+    /// 节假日备用接口的第二地址（GitHub raw）。jsdelivr 在部分网络环境下不可达，失败时再试此地址。
+    /// </summary>
+    public const string DefaultHolidayFallbackApiUrlAlt = "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json";
 
     /// <summary>节假日接口请求超时（秒）</summary>
     public const int HolidayApiTimeoutSeconds = 30;

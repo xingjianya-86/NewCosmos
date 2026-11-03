@@ -1,6 +1,7 @@
 using NewCosmos.Constants;
 using NewCosmos.Models.Exceptions;
 using NewCosmos.Models.Options;
+using System.Globalization;
 using System.Text.Json;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -332,6 +333,52 @@ public class ConfigService : IConfigService
                             value, FundChangeThresholdConstants.DefaultFundChangeThreshold);
                     }
                     break;
+                case "SplashEnabled":
+                    // 启动动画总开关（默认开）。关闭后直接进登录页。
+                    _appOptions.SplashEnabled = ParseSwitch(value, defaultValue: true, key);
+                    break;
+                case "SplashSound":
+                    // 启动动画音频（真声台词 + 音效）：现场静音分发用。
+                    _appOptions.SplashSound = ParseSwitch(value, defaultValue: true, key);
+                    break;
+                case "SplashSpeed":
+                    // 速度倍率（0.35–3；1 = 原速）。非法值回退默认并告警。
+                    if (double.TryParse(value, NumberStyles.Float,
+                            CultureInfo.InvariantCulture, out var splashSpeed)
+                        && splashSpeed >= SplashConstants.MinSpeed
+                        && splashSpeed <= SplashConstants.MaxSpeed)
+                    {
+                        _appOptions.SplashSpeed = splashSpeed;
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("[ConfigService] app.ini SplashSpeed 配置无效: {Value}，使用默认 {Default}",
+                            value, SplashConstants.DefaultSpeed);
+                    }
+                    break;
+                case "SplashRequireInteraction":
+                    // 是否要求人工确认（默认关 = 自动连播）。
+                    _appOptions.SplashRequireInteraction = ParseSwitch(value, defaultValue: false, key);
+                    break;
+                case "SplashTimeoutSeconds":
+                    // 脚本异常兜底超时（10–180 秒）。非法值回退默认并告警。
+                    if (int.TryParse(value, out var splashTimeout)
+                        && splashTimeout >= SplashConstants.MinTimeoutSeconds
+                        && splashTimeout <= SplashConstants.MaxTimeoutSeconds)
+                    {
+                        _appOptions.SplashTimeoutSeconds = splashTimeout;
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("[ConfigService] app.ini SplashTimeoutSeconds 配置无效: {Value}，使用默认 {Default}",
+                            value, SplashConstants.DefaultTimeoutSeconds);
+                    }
+                    break;
+                case "FullscreenMode":
+                    // 安卓端系统栏形态：Immersive（默认，隐藏系统栏）/ EdgeToEdge（透明可见）。其它值按默认处理。
+                    _appOptions.AndroidImmersiveFullscreen =
+                        !string.Equals(value, "EdgeToEdge", StringComparison.OrdinalIgnoreCase);
+                    break;
             }
         }
 
@@ -339,6 +386,33 @@ public class ConfigService : IConfigService
         Serilog.Log.Information("[ConfigService] 应用配置加载完成: Version={Version}", _appOptions.Version);
         
         return _appOptions;
+    }
+
+    /// <summary>
+    /// 开关型配置解析：兼容 1/0、true/false、on/off、yes/no。
+    /// 无法识别时回退默认值并告警，不阻断启动（与其它数值型配置口径一致）。
+    /// </summary>
+    private static bool ParseSwitch(string value, bool defaultValue, string key)
+    {
+        var trimmed = value.Trim();
+
+        if (trimmed is "1" || trimmed.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (trimmed is "0" || trimmed.Equals("false", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("off", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("no", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        Serilog.Log.Warning("[ConfigService] app.ini {Key} 配置无效: {Value}，使用默认 {Default}",
+            key, value, defaultValue);
+        return defaultValue;
     }
 
 #if ANDROID
@@ -850,6 +924,7 @@ public class ConfigService : IConfigService
         }
 
         File.WriteAllLines(filePath, lines);
+        lock (_iniCacheLock) { _iniLinesCache.Remove(filePath); } // 写后失效，避免同进程读到旧值
         _schemaOptions = options;
         Serilog.Log.Information("[ConfigService] Schema配置已保存: Version={Version}", options.CurrentVersion);
     }
@@ -885,6 +960,7 @@ public class ConfigService : IConfigService
                     case "DbHost": _networkOptions.DbHost = value; break;
                     case "DbPort": if (int.TryParse(value, out var port)) _networkOptions.DbPort = port; break;
                     case "WebControllerUrl": _networkOptions.WebControllerUrl = value; break;
+                    case "OcrServiceUrl": _networkOptions.OcrServiceUrl = value; break;
                 }
             }
         }
@@ -999,6 +1075,7 @@ public class ConfigService : IConfigService
         sb.AppendLine($"DbHost={options.DbHost}");
         sb.AppendLine($"DbPort={options.DbPort}");
         sb.AppendLine($"WebControllerUrl={options.WebControllerUrl}");
+        sb.AppendLine($"OcrServiceUrl={options.OcrServiceUrl}");
 
         File.WriteAllText(filePath, sb.ToString(),
             new global::System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
@@ -1226,21 +1303,15 @@ public class ConfigService : IConfigService
         RetryDelayMilliseconds=1000
         ExponentialBackoff=true
 
-        [Timeout]
-        ConnectionTimeoutSeconds=5
-        CommandTimeoutSeconds=30
-
         [Thresholds]
         SlowOperationThresholdMs=500
+        # 打印三键已解析入 PerformanceOptions 但暂无运行时消费者（见 PerformanceOptions.Validate）
         PrintTaskTimeoutMinutes=5
         PrintRetryBaseDelayMs=2000
         PrintRetryIncrementMs=1000
         PermissionCacheMinutes=3
         PermissionVersionCheckIntervalSeconds=30
-
-        [ConnectionPool]
-        MinPoolSize=10
-        MaxPoolSize=30
+        DataCenterReloadSeconds=30
         """;
 
     /// <summary>
@@ -1364,34 +1435,42 @@ public class ConfigService : IConfigService
         DbHost=127.0.0.1
         DbPort=5432
         WebControllerUrl=
+        # 内网证件 OCR 识别服务地址（deploy\ocr\ocr_api.py；空=不启用识别）
+        OcrServiceUrl=
         """;
 
     public void SaveDatabaseOptions(DatabaseOptions options)
     {
         var filePath = Path.Combine(_configDirectory, "database.ini");
-        var lines = new[]
+
+        // 段落级更新：只改 [Database] 段的键值，保留其余段落（[Schema]、PgDumpPath 等）与注释。
+        // 旧实现整文件重写只写 [Database] 段，会抹掉 SaveSchemaOptions 写入的 [Schema] 键。
+        var sectionValues = new (string Key, string Value)[]
         {
-            "# 数据库连接配置",
-            "# 此文件由配置向导自动生成，也可手工编辑。",
-            "",
-            "[Database]",
-            $"Host={options.Host}",
-            $"Port={options.Port}",
-            $"DatabaseName={options.DatabaseName}",
-            $"Username={options.Username}",
-            $"Password={options.Password}",
-            $"ConnectionTimeout={options.ConnectionTimeout}",
-            $"CommandTimeout={options.CommandTimeout}",
-            $"MaxPoolSize={options.MaxPoolSize}",
-            $"MinPoolSize={options.MinPoolSize}",
-            $"IsProduction={options.IsProduction.ToString().ToLowerInvariant()}",
-            $"SslMode={options.SslMode}",
-            $"TrustServerCertificate={options.TrustServerCertificate.ToString().ToLowerInvariant()}",
-            $"IncludeErrorDetail={options.IncludeErrorDetail.ToString().ToLowerInvariant()}",
-            $"ApplicationName={options.ApplicationName}"
+            ("Host", options.Host),
+            ("Port", options.Port.ToString()),
+            ("DatabaseName", options.DatabaseName),
+            ("Username", options.Username),
+            ("Password", options.Password),
+            ("ConnectionTimeout", options.ConnectionTimeout.ToString()),
+            ("CommandTimeout", options.CommandTimeout.ToString()),
+            ("MaxPoolSize", options.MaxPoolSize.ToString()),
+            ("MinPoolSize", options.MinPoolSize.ToString()),
+            ("IsProduction", options.IsProduction.ToString().ToLowerInvariant()),
+            ("SslMode", options.SslMode),
+            ("TrustServerCertificate", options.TrustServerCertificate.ToString().ToLowerInvariant()),
+            ("IncludeErrorDetail", options.IncludeErrorDetail.ToString().ToLowerInvariant()),
+            ("ApplicationName", options.ApplicationName)
         };
 
+        var lines = File.Exists(filePath)
+            ? File.ReadAllLines(filePath).ToList()
+            : new List<string> { "# 数据库连接配置", "# 此文件由配置向导自动生成，也可手工编辑。" };
+
+        UpdateIniSection(lines, "Database", sectionValues);
+
         File.WriteAllLines(filePath, lines);
+        lock (_iniCacheLock) { _iniLinesCache.Remove(filePath); } // 写后失效，避免同进程读到旧值
 
         // 就地更新已有的 singleton（DI 中的引用不变，值同步更新）
         if (_databaseOptions != null)
@@ -1417,6 +1496,71 @@ public class ConfigService : IConfigService
         }
 
         Serilog.Log.Information("[ConfigService] 数据库配置已保存: Host={Host}", options.Host);
+    }
+
+    /// <summary>
+    /// INI 段落级更新：更新指定 section 内已有键的值、追加缺失键，保留文件其余内容（段落/注释/顺序）。
+    /// 段落不存在时在文件末尾追加。
+    /// </summary>
+    private static void UpdateIniSection(List<string> lines, string sectionName, (string Key, string Value)[] values)
+    {
+        var sectionHeader = $"[{sectionName}]";
+        var inSection = false;
+        var updatedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sectionEndIndex = -1;
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i].Trim();
+
+            if (line.Equals(sectionHeader, StringComparison.OrdinalIgnoreCase))
+            {
+                inSection = true;
+                sectionEndIndex = i;
+                continue;
+            }
+
+            if (line.StartsWith('[') && line.EndsWith(']'))
+            {
+                if (inSection) break; // 段落结束
+                continue;
+            }
+
+            if (!inSection) continue;
+
+            sectionEndIndex = i;
+            var parts = line.Split('=', 2);
+            if (parts.Length != 2 || line.StartsWith('#')) continue;
+
+            var key = parts[0].Trim();
+            foreach (var (k, v) in values)
+            {
+                if (k.Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    lines[i] = $"{k}={v}";
+                    updatedKeys.Add(k);
+                    break;
+                }
+            }
+        }
+
+        // 段落不存在 → 追加到文件末尾
+        if (sectionEndIndex < 0)
+        {
+            if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines[^1]))
+                lines.Add(string.Empty);
+            lines.Add(sectionHeader);
+            sectionEndIndex = lines.Count - 1;
+            inSection = true;
+        }
+
+        // 段内缺失键 → 插入段尾
+        var insertIndex = sectionEndIndex + 1;
+        foreach (var (k, v) in values)
+        {
+            if (updatedKeys.Contains(k)) continue;
+            lines.Insert(insertIndex++, $"{k}={v}");
+        }
     }
 
     /// <summary>document_output.yaml 反序列化 DTO（YamlDotNet 下划线命名约定映射）</summary>

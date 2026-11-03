@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace NewCosmos.Models.Entities;
 
@@ -14,7 +14,8 @@ public class FamilyExpenditure
     public long Id { get; set; }
 
     /// <summary>
-    /// 家庭ID（关对应 nc_biz_applications.id 对应 nc_low_income_families.id ??   /// </summary>
+    /// 家庭ID（关对应 nc_biz_applications.id 对应 nc_low_income_families.id ??
+/// </summary>
     [Required(ErrorMessage = "家庭ID不能为空")]
     public long FamilyId { get; set; }
 
@@ -36,11 +37,13 @@ public class FamilyExpenditure
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
-    /// 支出关联家庭成员ID（如医疗支出对应患病成员    /// </summary>
+    /// 支出关联家庭成员ID（如医疗支出对应患病成员
+/// </summary>
     public long RelatedMemberId { get; set; }
 
     /// <summary>
-    /// 支出关联家庭成员姓名（显示用    /// </summary>
+    /// 支出关联家庭成员姓名（显示用
+/// </summary>
     public string RelatedMemberName { get; set; } = string.Empty;
 
     /// <summary>
@@ -59,7 +62,8 @@ public class FamilyExpenditure
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
-    /// 版本号（乐观并发控制    /// </summary>
+    /// 版本号（乐观并发控制
+/// </summary>
     public int Version { get; set; } = 1;
 
     /// <summary>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.FamilyMembersPage"
@@ -6,34 +6,13 @@
              Title="家庭成员" BackgroundColor="{StaticResource Background}">
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
-        <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="12">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="家庭成员" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="管理共同生活家庭成员信息" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+              Glyph="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}"
+                                  Title="家庭成员"
+                                  Subtitle="管理共同生活家庭成员信息"
+                                  BackCommand="{Binding GoBackCommand}"
+                                  BackText="返回"/>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="12">
@@ -48,8 +27,8 @@
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                     <Switch IsToggled="{Binding IsEnabled}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                                        <Label Text="{Binding Name}" FontSize="19" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                        <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
                                             <Label.FormattedText>
                                                 <FormattedString>
                                                     <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/> <Span Text=" "/>
@@ -60,7 +39,7 @@
                                             </Label.FormattedText>
                                         </Label>
                                     </VerticalStackLayout>
-                                    <Button Grid.Column="2" Text="编辑详情" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource Primary}" FontSize="14" CornerRadius="8" Padding="12,0" HeightRequest="36"/>
+                                    <Button Grid.Column="2" Text="编辑详情" BackgroundColor="{StaticResource Gray200}" TextColor="{StaticResource Primary}" FontSize="16" CornerRadius="8" Padding="12,0" HeightRequest="36"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>

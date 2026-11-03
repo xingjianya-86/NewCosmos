@@ -19,11 +19,13 @@ public interface IOrganizationService
     Task<Result<Organization>> GetByNameAsync(string name, CancellationToken ct = default);
 
     /// <summary>
-    /// 获取所有组织列    /// </summary>
+    /// 获取所有组织列
+/// </summary>
     Task<Result<List<Organization>>> GetAllAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 获取子组织列    /// </summary>
+    /// 获取子组织列
+/// </summary>
     Task<Result<List<Organization>>> GetChildrenAsync(int parentId, CancellationToken ct = default);
 
     /// <summary>
@@ -42,11 +44,13 @@ public interface IOrganizationService
     Task<Result> UpdateAsync(OrganizationUpdateRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// 更新组织（带id ??   /// </summary>
+    /// 更新组织（带id ??
+/// </summary>
     Task<Result> UpdateAsync(int id, OrganizationSaveRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// 保存组织（新增或更新    /// </summary>
+    /// 保存组织（新增或更新
+/// </summary>
     Task<Result> SaveAsync(OrganizationSaveRequest request, CancellationToken ct = default);
 
     /// <summary>
@@ -55,7 +59,8 @@ public interface IOrganizationService
     Task<Result> DeleteAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// 获取组织树结    /// </summary>
+    /// 获取组织树结
+/// </summary>
     Task<Result<List<OrganizationTreeNode>>> GetTreeAsync(CancellationToken ct = default);
 
     /// <summary>
@@ -65,7 +70,8 @@ public interface IOrganizationService
     List<OrganizationTreeNode> BuildTree(List<Organization> allOrgs);
 
     /// <summary>
-    /// 检查组织名称是否存    /// </summary>
+    /// 检查组织名称是否存
+/// </summary>
     Task<Result<bool>> CheckNameExistsAsync(string name, int? excludeId = null, CancellationToken ct = default);
 
     /// <summary>
@@ -94,7 +100,8 @@ public class OrganizationCsvPreview
 }
 
 /// <summary>
-/// 组织预览    /// </summary>
+/// 组织预览
+/// </summary>
 public class OrganizationPreviewRow
 {
     public int RowNumber { get; set; }
@@ -108,7 +115,8 @@ public class OrganizationPreviewRow
 }
 
 /// <summary>
-/// 组织实体 - 对应数据库 organizations     /// </summary>
+/// 组织实体 - 对应数据库 organizations
+/// </summary>
 public class Organization
 {
     public int Id { get; set; }
@@ -150,7 +158,8 @@ public class Organization
 }
 
 /// <summary>
-/// 组织树节    /// </summary>
+/// 组织树节
+/// </summary>
 public class OrganizationTreeNode
 {
     public int Id { get; set; }

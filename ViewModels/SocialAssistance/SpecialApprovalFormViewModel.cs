@@ -182,7 +182,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
                 ApplicantName = app.ApplicantName;
                 ApplicantIdCard = app.ApplicantIdCard;
                 ApplicantPhone = app.ApplicantPhone;
-                FamilyAddress = $"{app.Town ?? ""}{app.Community ?? ""}{app.Address ?? ""}".Trim();
+                FamilyAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
                 FamilySizeText = $"{app.FamilySize} 人";
                 ClassificationName = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
                 ReportUnit = string.IsNullOrWhiteSpace(ReportUnit) ? await GetOrganizationNameAsync() : ReportUnit;

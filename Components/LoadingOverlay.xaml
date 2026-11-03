@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="NewCosmos.Components.LoadingOverlay"
@@ -10,20 +10,27 @@
              InputTransparent="False"
              ZIndex="999">
 
+    <!-- 加载卡片宽度 280→320：原 Padding 32×2=64 使文字可用宽仅 216px，
+         叠加全局字号+2 与加粗后，加载文案必溢出；改 320/24 后可用宽 272px，
+         且 Label 允许换行兜底（LineBreakMode=WordWrap），任何长度文案都不越界。 -->
     <Grid VerticalOptions="Center" HorizontalOptions="Center"
-          WidthRequest="280">
+          WidthRequest="320">
 
-        <!-- 现代风格卡片 -->
-        <Border Padding="32,24" StrokeShape="RoundRectangle 16" BackgroundColor="White">
+        <!-- 纸墨档案卡片：纸底 + 发丝线描边 + 近直角（原为白底/圆角16/重阴影，与全站风格不符） -->
+        <Border Padding="24,20"
+                StrokeShape="{StaticResource ShapeMedium}"
+                BackgroundColor="{StaticResource CardBackground}"
+                Stroke="{StaticResource Line}"
+                StrokeThickness="1">
             <Border.Shadow>
-                <Shadow Brush="#40000000" Offset="0,4" Radius="16" Opacity="0.25"/>
+                <Shadow Brush="#40000000" Offset="0,3" Radius="10" Opacity="0.12"/>
             </Border.Shadow>
 
             <VerticalStackLayout Spacing="20" HorizontalOptions="Center">
 
                 <!-- 动画圆环 -->
                 <Grid WidthRequest="64" HeightRequest="64" HorizontalOptions="Center">
-                    <!-- 外圈 -->
+                    <!-- 外圈（RoundRectangle 32 = 64 的一半，本意是画正圆，非装饰圆角，须保留） -->
                     <Border WidthRequest="64" HeightRequest="64"
                             StrokeShape="RoundRectangle 32"
                             Stroke="{StaticResource Primary}"
@@ -38,13 +45,16 @@
                                        VerticalOptions="Center"/>
                 </Grid>
 
-                <!-- 加载文字 -->
+                <!-- 加载文字（WordWrap 兜底：超宽自动换行，杜绝字符越界） -->
                 <Label x:Name="LoadingTextLabel"
                        Text="{Binding LoadingText, Source={x:Reference RootOverlay}}"
-                       FontSize="16"
+                       FontSize="{OnPlatform WinUI=18, Android=14, Default=18}"
                        FontAttributes="Bold"
                        TextColor="{StaticResource TextPrimary}"
-                       HorizontalOptions="Center"/>
+                       LineBreakMode="WordWrap"
+                       HorizontalTextAlignment="Center"
+                       HorizontalOptions="Center"
+                       WidthRequest="272"/>
 
                 <!-- 进度条（可选） -->
                 <Grid IsVisible="{Binding ShowProgress, Source={x:Reference RootOverlay}}" HeightRequest="6">
@@ -55,7 +65,7 @@
 
                 <!-- 进度百分比（可选） -->
                 <Label IsVisible="{Binding ShowProgress, Source={x:Reference RootOverlay}}"
-                       FontSize="14"
+                       FontSize="{OnPlatform WinUI=16, Android=13, Default=16}"
                        TextColor="{StaticResource Primary}"
                        HorizontalOptions="Center">
                     <Label.Text>

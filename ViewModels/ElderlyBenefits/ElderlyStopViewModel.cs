@@ -1,10 +1,11 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ElderlyBenefits;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 
@@ -16,6 +17,7 @@ public partial class ElderlyStopViewModel : ViewModelBase
     private readonly ILoggerService _logger = null!;
     private readonly IServiceProvider _serviceProvider = null!;
     private readonly IDialogService _dialogService = null!;
+    private readonly INewPermissionService _permissionService = null!;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -121,12 +123,14 @@ public partial class ElderlyStopViewModel : ViewModelBase
         IElderlyApplicationService applicationService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        INewPermissionService permissionService)
     {
         _applicationService = applicationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
+        _permissionService = permissionService;
 
         var now = DateTime.Today;
         var startYear = ElderlyBenefitConstants.PolicyStartDate.Year;
@@ -184,9 +188,34 @@ public partial class ElderlyStopViewModel : ViewModelBase
         }
     }
 
+    /// <summary>办理权限校验（异常按无权限处理，保守拒绝）</summary>
+    private async Task<bool> HasEditPermissionAsync()
+    {
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId <= 0) return false;
+            var permissions = await _permissionService.CheckPermissionsAsync(userId, new[] { PermissionCodes.ELDERLY_EDIT });
+            return permissions != null && permissions.TryGetValue(PermissionCodes.ELDERLY_EDIT, out var granted) && granted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "停发办理权限校验失败");
+            return false;
+        }
+    }
+
     [RelayCommand]
     private async Task ConfirmStopAsync()
     {
+        // 办理权限门控（2026-10-31 方案2 堵洞）：此前本页零权限校验，村级可经
+        // 待办列表/死亡联动跳入直接停发——停发是镇级手续，保存前强制 ELDERLY_EDIT。
+        if (!await HasEditPermissionAsync())
+        {
+            await _dialogService.DisplayAlertAsync("提示", "无权限办理停发，请联系管理员分配「编辑普惠高龄」权限。", "确定");
+            return;
+        }
+
         if (SelectedStopReason == null)
         {
             await _dialogService.DisplayAlertAsync("提示", "请选择停发原因", "确定");
@@ -261,7 +290,9 @@ public partial class ElderlyStopViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _logger.LogBusiness("普惠高龄登记停发成功", ("ApplicationId", _applicationId));
-                await _dialogService.ShowSnackBarAsync("停发成功");
+                // 联动失败时主操作成功但带警告（SuccessWithWarning），需让用户看到可重试提示
+                await _dialogService.ShowSnackBarAsync(
+                    string.IsNullOrEmpty(result.Message) ? "停发成功" : result.Message);
 
                 // 先关闭停发登记页，再推入档案输出页：
                 // 导航栈由 …→停发办理列表→停发登记→档案输出 变为 …→停发办理列表→档案输出，
@@ -285,7 +316,7 @@ public partial class ElderlyStopViewModel : ViewModelBase
             var fields = ElderlyPrintDataBuilder.BuildSingleFields(savedResult.Value);
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
             PrintNavigationData.ClearDocumentMode();
-            PrintNavigationData.BusinessType = "ElderlyBenefits";
+            PrintNavigationData.BusinessType = PrintBusinessTypes.ElderlyBenefits;
             PrintNavigationData.BusinessId = _applicationId;
             PrintNavigationData.Classification = "Stop";
             PrintNavigationData.FieldData = fields;

@@ -1,18 +1,21 @@
-﻿namespace NewCosmos.Models.Requests;
+namespace NewCosmos.Models.Requests;
 
 /// <summary>
-/// 分页请求参数（带安全校验）    /// </summary>
+/// 分页请求参数（带安全校验）
+/// </summary>
 public class PaginationRequest
 {
     private int _page = 1;
     private int _pageSize = 20;
 
     /// <summary>
-    /// 最大每页条数    /// </summary>
+    /// 最大每页条数
+/// </summary>
     public const int MaxPageSize = 100;
 
     /// <summary>
-    /// 最大页码    /// </summary>
+    /// 最大页码
+/// </summary>
     public const int MaxPage = 10000;
 
     /// <summary>
@@ -39,11 +42,13 @@ public class PaginationRequest
     }
 
     /// <summary>
-    /// 计算偏移量    /// </summary>
+    /// 计算偏移量
+/// </summary>
     public int CalculateOffset() => (Page - 1) * PageSize;
 
     /// <summary>
-    /// 重置为默认值    /// </summary>
+    /// 重置为默认值
+/// </summary>
     public void Reset()
     {
         _page = 1;

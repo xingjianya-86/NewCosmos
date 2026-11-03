@@ -14,6 +14,8 @@
 	</queries>
 	<application
 		android:allowBackup="true"
+		android:icon="@mipmap/appicon"
+		android:roundIcon="@mipmap/appicon_round"
 		android:usesCleartextTraffic="true"
 		android:networkSecurityConfig="@xml/network_security_config">
 		<!-- 更新包安装：经 FileProvider 授权读取应用私有目录中的 APK -->

@@ -7,7 +7,7 @@ namespace NewCosmos.Helpers;
 ///     分类映射 copiesByClassification[classification]（分类级，最高优先） → copies（模板级默认） → 1。
 /// 档案输出页（ArchiveOutputViewModel）与手机推送打印（PrintJobFactory）必须经此解析，
 /// 禁止各自另写份数规则（曾两套口径）。
-/// 非法/损坏 config_json 一律回退默认值 1，不向外抛异常——与 ArchiveOutputViewModel.LoadTemplateConfigAsync
+/// 非法/损坏 config_json 一律回退默认值 1，不向外抛异常——与 ArchiveOutputViewModel.ResolveTemplateConfig
 /// 既有兜底口径一致（损坏配置只影响份数，不得阻断打印与模板管理页选择）。
 /// </summary>
 public static class TemplateCopiesResolver

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -11,31 +11,14 @@
     <Grid RowDefinitions="Auto, Auto, *" Padding="0">
 
         <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE943;', Android='&#x1F527;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="文书模板管理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="管理、上传和维护各类文书模板" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE943;', Android='&#x1F527;'}"
+                                   Title="文书模板管理"
+                                   Subtitle="管理、上传和维护各类文书模板"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+        </components:PageHeaderView>
 
         <!-- ========== 工具栏 ========== -->
         <Border Grid.Row="1" BackgroundColor="{StaticResource White}"
@@ -47,10 +30,10 @@
                         Padding="16,8"
                         HorizontalOptions="Fill">
                     <Grid ColumnDefinitions="Auto, *">
-                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="16"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center" Margin="0,0,8,0"/>
                         <Entry Grid.Column="1" Placeholder="搜索模板名称..."
-                               Text="{Binding SearchText}" FontSize="16"
+                               Text="{Binding SearchText}" FontSize="18"
                                BackgroundColor="Transparent"
                                ReturnCommand="{Binding SearchCommand}"/>
                     </Grid>
@@ -78,7 +61,7 @@
                             <HorizontalStackLayout Spacing="8">
                                 <Label Text="模板列表" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                                 <Label Text="{Binding Templates.Count, StringFormat='({0})'}"
-                                       FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                       FontSize="16" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                             </HorizontalStackLayout>
 
                             <BoxView Style="{StaticResource Divider}"/>
@@ -98,18 +81,18 @@
                                                          Color="{Binding FileType, Converter={StaticResource TemplateTypeToColorConverter}}"
                                                          VerticalOptions="Fill"/>
                                                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4">
-                                                    <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
+                                                    <Label Text="{Binding Name}" FontSize="18" FontAttributes="Bold"
                                                            TextColor="{StaticResource TextPrimary}"/>
                                                     <HorizontalStackLayout Spacing="8">
                                                         <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                                             <Label Text="{Binding FileType}" Style="{StaticResource ChipInfoText}"/>
                                                         </Border>
                                                         <Label Text="{Binding Categories, Converter={StaticResource CategoryDisplayConverter}}"
-                                                               FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                                               FontSize="16" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                                     </HorizontalStackLayout>
                                                 </VerticalStackLayout>
                                                 <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                                                       FontSize="16" TextColor="{StaticResource Gray400}"
+                                                       FontSize="18" TextColor="{StaticResource Gray400}"
                                                        VerticalOptions="Center"/>
                                             </Grid>
                                         </Border>
@@ -129,7 +112,7 @@
                             <!-- 标题 + 类型标签 -->
                             <Grid ColumnDefinitions="*, Auto">
                                 <Label Grid.Column="0" Text="{Binding SelectedTemplate.Name}"
-                                       FontSize="18" FontAttributes="Bold"
+                                       FontSize="20" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Grid.Column="1"
                                         BackgroundColor="{Binding SelectedTemplate.FileType, Converter={StaticResource TemplateTypeToColorConverter}}"
@@ -137,7 +120,7 @@
                                         StrokeShape="RoundRectangle 999"
                                         Padding="12,4"
                                         VerticalOptions="Center">
-                                    <Label Text="{Binding SelectedTemplate.FileType}" FontSize="12"
+                                    <Label Text="{Binding SelectedTemplate.FileType}" FontSize="14"
                                            TextColor="{StaticResource White}" FontAttributes="Bold"/>
                                 </Border>
                             </Grid>
@@ -148,27 +131,27 @@
                             <Grid RowDefinitions="Auto, Auto, Auto" ColumnDefinitions="Auto, *"
                                   RowSpacing="10" ColumnSpacing="12">
                                 <Label Grid.Row="0" Grid.Column="0" Text="创建时间:"
-                                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextSecondary}"/>
                                 <Label Grid.Row="0" Grid.Column="1"
                                        Text="{Binding SelectedTemplate.CreatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
-                                       FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                 <Label Grid.Row="1" Grid.Column="0" Text="分类标签:"
-                                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextSecondary}"/>
                                 <Label Grid.Row="1" Grid.Column="1"
                                        Text="{Binding SelectedTemplate.Categories, Converter={StaticResource CategoryDisplayConverter}}"
-                                       FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                 <Label Grid.Row="2" Grid.Column="0" Text="更新时间:"
-                                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextSecondary}"/>
                                 <Label Grid.Row="2" Grid.Column="1"
                                        Text="{Binding SelectedTemplate.UpdatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
-                                       FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                             </Grid>
 
                             <!-- 打印默认份数（只写 config_json 的 copies 键） -->
                             <BoxView Style="{StaticResource Divider}"/>
                             <Label Text="打印默认份数" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                             <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
-                                <Label Grid.Column="0" Text="{Binding CopiesHint}" FontSize="12"
+                                <Label Grid.Column="0" Text="{Binding CopiesHint}" FontSize="14"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Entry Grid.Column="1" Text="{Binding EditingCopies}" Keyboard="Numeric"
                                        WidthRequest="70" HeightRequest="40" HorizontalTextAlignment="Center"
@@ -190,11 +173,11 @@
                                         StrokeThickness="1" Padding="12">
                                     <Grid>
                                         <Label Text="{Binding SelectedTemplate.ConfigJson, TargetNullValue='暂无配置'}"
-                                               FontSize="14" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
+                                               FontSize="16" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
                                                TextColor="{StaticResource TextPrimary}"
                                                IsVisible="{Binding IsEditingConfig, Converter={StaticResource BoolToInverseConverter}}"/>
                                         <Editor Text="{Binding EditingConfigJson}"
-                                                FontSize="14" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
+                                                FontSize="16" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}"
                                                 TextColor="{StaticResource TextPrimary}"
                                                 IsVisible="{Binding IsEditingConfig}"/>
                                     </Grid>
@@ -209,7 +192,7 @@
                                     StrokeThickness="1" Padding="12"
                                     IsVisible="{Binding IsEditingCategories, Converter={StaticResource BoolToInverseConverter}}">
                                 <Label Text="{Binding SelectedTemplate.Categories, Converter={StaticResource CategoryDisplayConverter}, TargetNullValue='暂无分类'}"
-                                       FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                       FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                             </Border>
                             <Border BackgroundColor="{StaticResource Gray50}"
                                     StrokeShape="RoundRectangle 8" Stroke="{StaticResource Gray200}"
@@ -225,7 +208,7 @@
                                                       HeightRequest="34">
                                                     <Label Grid.Column="0"
                                                            Text="{Binding IsExpanded, Converter={StaticResource BoolToExpandIconConverter}}"
-                                                           FontSize="14" VerticalOptions="Center"
+                                                           FontSize="16" VerticalOptions="Center"
                                                            HorizontalOptions="Center"
                                                            IsVisible="{Binding IsLeaf, Converter={StaticResource BoolToInverseConverter}}">
                                                         <Label.GestureRecognizers>
@@ -238,7 +221,7 @@
                                                               Color="{StaticResource Primary}"
                                                               VerticalOptions="Center"/>
                                                     <Label Grid.Column="1"
-                                                           Text="{Binding Label}" FontSize="14"
+                                                           Text="{Binding Label}" FontSize="16"
                                                            FontAttributes="{Binding Depth, Converter={StaticResource DepthToBoldConverter}}"
                                                            VerticalOptions="Center"/>
                                                 </Grid>
@@ -315,14 +298,14 @@
 
                             <!-- 文件选择 -->
                             <VerticalStackLayout Spacing="8">
-                                <Label Text="模板文件" FontSize="14" FontAttributes="Bold"
+                                <Label Text="模板文件" FontSize="16" FontAttributes="Bold"
                                        TextColor="{StaticResource TextSecondary}"/>
                                 <Border BackgroundColor="{StaticResource Gray50}"
                                         StrokeShape="RoundRectangle 8" Stroke="{StaticResource Gray200}"
                                         StrokeThickness="1" Padding="12">
                                     <Grid ColumnDefinitions="*, Auto" ColumnSpacing="8">
                                         <Label Grid.Column="0" Text="{Binding FileName, TargetNullValue='未选择文件'}"
-                                               FontSize="14" VerticalOptions="Center" LineBreakMode="TailTruncation"
+                                               FontSize="16" VerticalOptions="Center" LineBreakMode="TailTruncation"
                                                TextColor="{StaticResource TextPrimary}"/>
                                         <Button Grid.Column="1" Text="选择文件" Command="{Binding SelectFileCommand}"
                                                 Style="{StaticResource ButtonOutline}"
@@ -333,11 +316,11 @@
 
                             <!-- 名称 / 类型 -->
                             <Grid ColumnDefinitions="Auto, *, Auto, Auto" ColumnSpacing="12">
-                                <Label Grid.Column="0" Text="模板名称" FontSize="14"
+                                <Label Grid.Column="0" Text="模板名称" FontSize="16"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Entry Grid.Column="1" Text="{Binding TemplateName}"
                                        Placeholder="输入模板名称" HeightRequest="40"/>
-                                <Label Grid.Column="2" Text="类型" FontSize="14"
+                                <Label Grid.Column="2" Text="类型" FontSize="16"
                                        TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                                 <Picker Grid.Column="3" ItemsSource="{Binding TemplateTypes}"
                                         SelectedItem="{Binding TemplateType}"
@@ -348,7 +331,7 @@
                             <Grid ColumnDefinitions="*, *" ColumnSpacing="16">
                                 <!-- 左列: 分类选择 -->
                                 <VerticalStackLayout Grid.Column="0" Spacing="8">
-                                    <Label Text="分类选择" FontSize="14" FontAttributes="Bold"
+                                    <Label Text="分类选择" FontSize="16" FontAttributes="Bold"
                                            TextColor="{StaticResource TextSecondary}"/>
                                     <Border BackgroundColor="{StaticResource Gray50}"
                                             StrokeShape="RoundRectangle 8" Stroke="{StaticResource Gray200}"
@@ -363,7 +346,7 @@
                                                               HeightRequest="34">
                                                             <Label Grid.Column="0"
                                                                    Text="{Binding IsExpanded, Converter={StaticResource BoolToExpandIconConverter}}"
-                                                                   FontSize="14" VerticalOptions="Center"
+                                                                   FontSize="16" VerticalOptions="Center"
                                                                    HorizontalOptions="Center"
                                                                    IsVisible="{Binding IsLeaf, Converter={StaticResource BoolToInverseConverter}}">
                                                                 <Label.GestureRecognizers>
@@ -376,7 +359,7 @@
                                                                       Color="{StaticResource Primary}"
                                                                       VerticalOptions="Center"/>
                                                             <Label Grid.Column="1"
-                                                                   Text="{Binding Label}" FontSize="14"
+                                                                   Text="{Binding Label}" FontSize="16"
                                                                    FontAttributes="{Binding Depth, Converter={StaticResource DepthToBoldConverter}}"
                                                                    VerticalOptions="Center"/>
                                                         </Grid>
@@ -389,16 +372,16 @@
 
                                 <!-- 右列: 字段映射配置 -->
                                 <VerticalStackLayout Grid.Column="1" Spacing="8">
-                                    <Label Text="字段映射配置 (JSON)" FontSize="14" FontAttributes="Bold"
+                                    <Label Text="字段映射配置 (JSON)" FontSize="16" FontAttributes="Bold"
                                            TextColor="{StaticResource TextSecondary}"/>
-                                    <Label Text="定义占位符与数据源的对应关系" FontSize="14"
+                                    <Label Text="定义占位符与数据源的对应关系" FontSize="16"
                                            TextColor="{StaticResource TextTertiary}"/>
                                     <Border BackgroundColor="{StaticResource Gray50}"
                                             StrokeShape="RoundRectangle 8" Stroke="{StaticResource Gray200}"
                                             StrokeThickness="1" Padding="12">
                                         <Editor Text="{Binding ConfigJson}"
                                                 Placeholder='{}{"fields":[{"placeholder":"{户主姓名}","fieldKey":"HEAD_NAME"}]}'
-                                                HeightRequest="242" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}" FontSize="14"
+                                                HeightRequest="242" FontFamily="{OnPlatform WinUI='Consolas', Android='monospace'}" FontSize="16"
                                                 TextColor="{StaticResource TextPrimary}"/>
                                     </Border>
                                 </VerticalStackLayout>

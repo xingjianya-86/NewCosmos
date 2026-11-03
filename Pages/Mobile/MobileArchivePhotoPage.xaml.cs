@@ -34,6 +34,7 @@ public partial class MobileArchivePhotoPage : ContentPage, IParameterizedPage<Ar
     {
         _viewModel.ApplyParameter(parameter.ApplicantIdCard, parameter.ApplicationId, parameter.ApplicantName);
         _viewModel.ApplySession(parameter.SessionQueue, parameter.SessionIndex);
+        _viewModel.ApplyAssignContext(parameter.AssignContext);
         return Task.CompletedTask;
     }
 }

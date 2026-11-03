@@ -46,7 +46,7 @@ public class DashboardStatistics
     /// <summary>新申请资产核查：status='0'（已申请未出授权报告）且 application_date∈B线周期</summary>
     public int NewAssetChecks { get; set; }
 
-    /// <summary>本月新增高龄老人：status∈(Confirmed,Stopped) 且 apply_date∈当月自然月（普惠高龄月报"新增明细"口径）</summary>
+    /// <summary>本月新增高龄老人：满足「当月真正新增」单点口径（<c>Helpers.ElderlyNewArchiveFilter</c>：状态 + 排除补录档 + 建档时已死亡兜底）且 apply_date∈当月自然月（普惠高龄月报"新增明细"口径）</summary>
     public int MonthlyNewElderly { get; set; }
 }
 
@@ -73,7 +73,7 @@ public class ElderlyModuleStats
     /// <summary>在享领取人数（当前库 Confirmed 且未死亡 + 导入库尚未建档且未登记死亡）</summary>
     public int ActiveCount { get; set; }
 
-    /// <summary>本月新增登记数（status∈(Confirmed,Stopped) 且 apply_date∈当月自然月）</summary>
+    /// <summary>本月新增登记数：满足「当月真正新增」单点口径（<c>Helpers.ElderlyNewArchiveFilter</c>）且 apply_date∈当月自然月</summary>
     public int MonthlyNew { get; set; }
 }
 

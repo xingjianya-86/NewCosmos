@@ -20,4 +20,15 @@ public static class ApplicationColumns
         "special_approval_id, status, current_step, submit_at, submit_by, created_at, updated_at, created_by, " +
         "updated_by, deleted_at, original_application_id, source_type, chain_type, source_table, data_completed_at, first_approved_at, " +
         "family_land_area, self_farmed_land_area, subleased_land_area, contracted_land_area, land_income_total, subsidy_total, total_confirmed_land_area, confirmed_person_count";
+
+    /// <summary>
+    /// 工作流列表卡片窄列（2026-11 性能收口：原 Full 约 95 列，卡片仅消费下列 9 列，
+    /// 20 行 × 95 列的无谓 IO/映射减 ~90%）。
+    /// 适用范围：GetDraftPagedAsync / GetArchiveBuiltNotSubmittedPagedAsync / GetArchivedPagedAsync
+    /// （全仓仅 ApplicationWorkflowViewModel 调用，卡片与命令只用到以下字段）。
+    /// ORDER BY updated_at 需要该列，故一并 SELECT。
+    /// </summary>
+    public const string List =
+        "id, application_no, applicant_name, applicant_id_card, status, current_step, " +
+        "is_single_rescue, created_at, updated_at";
 }

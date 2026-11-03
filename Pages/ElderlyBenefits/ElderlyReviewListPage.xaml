@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -15,10 +15,10 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="1.4*, 2*, 2.6*, 1.4*, Auto"
                   BackgroundColor="White">
-                <Label Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding IdCard}" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding CategoryChangeDisplay}" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding TriggerSourceName}" FontSize="13"
+                <Label Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding IdCard}" FontSize="16" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding CategoryChangeDisplay}" FontSize="16" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding TriggerSourceName}" FontSize="15"
                        TextColor="{StaticResource Info}" VerticalOptions="Center"/>
                 <Button Grid.Column="4" Text="办理" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource ModuleElderly}"
@@ -34,11 +34,11 @@
                   Style="{StaticResource TableRowInteractive}"
                   ColumnDefinitions="1.4*, 1.4*, 2*, 2.4*, 1.4*, Auto"
                   BackgroundColor="White">
-                <Label Text="{Binding ApplicationNo}" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="1" Text="{Binding Name}" FontSize="15" VerticalOptions="Center"/>
-                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="3" Text="{Binding CategoryName}" FontSize="14" VerticalOptions="Center"/>
-                <Label Grid.Column="4" Text="{Binding IssueStartMonth}" FontSize="14" VerticalOptions="Center"/>
+                <Label Text="{Binding ApplicationNo}" FontSize="16" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding Name}" FontSize="17" VerticalOptions="Center"/>
+                <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="16" VerticalOptions="Center"/>
+                <Label Grid.Column="3" Text="{Binding CategoryName}" FontSize="16" VerticalOptions="Center"/>
+                <Label Grid.Column="4" Text="{Binding IssueStartMonth}" FontSize="16" VerticalOptions="Center"/>
                 <Button Grid.Column="5" Text="复核" Style="{StaticResource ButtonSmall}"
                         BackgroundColor="{StaticResource ModuleElderly}"
                         IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
@@ -51,36 +51,22 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*">
 
         <!-- 渐变英雄头部（紫色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-            <VerticalStackLayout Spacing="16">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="高龄津贴复核" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="身份 + 年龄重评 · 停旧增新 · 停止/新增/调整三表" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE9D5;', Android='&#x26A0;&#xFE0F;'}"
+                                   Title="高龄津贴复核"
+                                   Subtitle="身份 + 年龄重评 · 停旧增新 · 停止/新增/调整三表"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台"/>
 
         <!-- 待复核队列 -->
         <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="24,16,24,0" Padding="0"
                 IsVisible="{Binding HasPendingReviews}">
             <VerticalStackLayout Spacing="0">
                 <Grid Padding="16,12" ColumnDefinitions="Auto,*" ColumnSpacing="8" BackgroundColor="{StaticResource WarningSoft}">
-                    <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
+                    <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
                     <Label Grid.Column="1" Text="{Binding PendingCount, StringFormat='待复核队列（{0} 人）'}"
-                           FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                           FontSize="17" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                 </Grid>
                 <Grid Padding="16,8" Style="{StaticResource TableHeader}" ColumnDefinitions="1.4*, 2*, 2.6*, 1.4*, Auto">
                     <Label Text="姓名" Style="{StaticResource TableHeaderLabel}"/>
@@ -100,10 +86,10 @@
                 <Border Grid.Column="1" BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
                         StrokeShape="RoundRectangle 24" Padding="16,8" HorizontalOptions="Fill">
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="14"
+                        <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="16"
                                TextColor="{StaticResource Gray500}" VerticalOptions="Center" Margin="0,0,8,0"/>
                         <Entry Grid.Column="1" Placeholder="搜索在享人员姓名、身份证号"
-                               Text="{Binding SearchText}" FontSize="16" BackgroundColor="Transparent"
+                               Text="{Binding SearchText}" FontSize="18" BackgroundColor="Transparent"
                                ReturnCommand="{Binding SearchCommand}"/>
                         <Button Grid.Column="2" Text="搜索" Style="{StaticResource ButtonSmall}"
                                 BackgroundColor="{StaticResource Primary}" Command="{Binding SearchCommand}"

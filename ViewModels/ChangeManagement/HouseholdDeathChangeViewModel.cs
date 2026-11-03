@@ -2,10 +2,12 @@
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ChangeManagement;
 using NewCosmos.Services.Domain.SocialAssistance;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 
@@ -27,6 +29,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     private readonly IDialogService _dialogService = null!;
     private readonly ILoggerService _logger = null!;
     private readonly IDictCacheService _dictCacheService = null!;
+    private readonly INewPermissionService _permissionService = null!;
 
     /// <summary>
     /// 全部家庭成员（加载时缓存，供提交使用）
@@ -38,6 +41,9 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     /// 须用 is_applicant / member_category='HouseholdHead' / 与旧档案申请人一致 定位）
     /// </summary>
     private FamilyMember? _originalHeadMember;
+
+    /// <summary>本档案是否特困（单人户户主死亡→整户停止时，特困退出需追加《特困供养人员取消备案表》）</summary>
+    private bool _isDestitute;
 
     #region 原户主信息
 
@@ -60,15 +66,14 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
 
     #region 死亡信息
 
-    [ObservableProperty]
-    private DateTime _deathDate = DateTime.Today;
-
     /// <summary>
-    /// 死亡确切时间（TimePicker 恒有值，必填在结构上成立；表单标签显式标注必填，
-    /// 服务侧另有 DeathTime 空值校验（ChangeService）双门把关。
+    /// 死亡日期与时刻（唯一事实来源；null = 未选择）。
+    /// 组件 DateTimeEntryView 绑定本属性：未确认选择前保持 null，
+    /// 「必填」由 ValidateInput 的 null 拦截真实把关（替代旧 TimePicker 默认 12:00 的假必填），
+    /// 组件 MaximumDate 默认当前时刻，禁止选未来。
     /// </summary>
     [ObservableProperty]
-    private TimeSpan _deathTime = new(12, 0, 0);
+    private DateTime? _deathDateTime;
 
     /// <summary>
     /// 死亡原因（提交时由预设选择组装，不由 UI 直接编辑）
@@ -109,6 +114,22 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     [ObservableProperty]
     private FamilyMember _selectedNewHead = null!;
 
+    /// <summary>是否单人户（除死亡户主外无其他共同生活成员 → 走"整户停止"简化流程，不建新档）</summary>
+    [ObservableProperty]
+    private bool _isSinglePersonHousehold;
+
+    /// <summary>是否显示"选择新户主"区（单人户隐藏）</summary>
+    public bool IsNewHeadSelectionVisible => !IsSinglePersonHousehold;
+
+    /// <summary>提交按钮文案（单人户="确认整户停止"；多人口="停旧建新并去规划新档案"）</summary>
+    public string SubmitButtonText => IsSinglePersonHousehold ? "确认整户停止" : "停旧建新并去规划新档案";
+
+    partial void OnIsSinglePersonHouseholdChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNewHeadSelectionVisible));
+        OnPropertyChanged(nameof(SubmitButtonText));
+    }
+
     #endregion
 
     public HouseholdDeathChangeViewModel(
@@ -118,7 +139,8 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         IChangeService changeService,
         IDialogService dialogService,
         ILoggerService logger,
-        IDictCacheService dictCacheService)
+        IDictCacheService dictCacheService,
+        INewPermissionService permissionService)
     {
         _serviceProvider = serviceProvider;
         _applicationService = applicationService;
@@ -127,6 +149,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
         _dialogService = dialogService;
         _logger = logger;
         _dictCacheService = dictCacheService;
+        _permissionService = permissionService;
         Title = "户主死亡变更";
     }
 
@@ -163,6 +186,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                 OriginalHeadIdCard = app.ApplicantIdCard;
                 OriginalFamilySize = app.FamilySize;
                 OriginalGuaranteeAmount = app.TotalGuaranteeAmount;
+                _isDestitute = ClassificationConstants.IsCodeDestitute(app.ClassificationResult ?? string.Empty);
             }
 
             // 加载全部成员并缓存；定位死亡原户主成员（is_applicant=true / member_category='HouseholdHead' /
@@ -187,6 +211,9 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                 {
                     EligibleMembers.Add(member);
                 }
+
+                // 单人户判定：除死亡户主外无其他共同生活成员（EligibleMembers 已排除户主与赡养人）→ 走"整户停止"简化流程
+                IsSinglePersonHousehold = EligibleMembers.Count == 0;
             }
 
             _logger.LogBusiness("数据加载完成");
@@ -206,9 +233,34 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     /// <summary>
     /// 提交：停旧建新，成功后跳转统一申请表单规划新档案
     /// </summary>
+    /// <summary>办理权限校验（异常按无权限处理，保守拒绝）</summary>
+    private async Task<bool> HasManagePermissionAsync()
+    {
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId <= 0) return false;
+            var permissions = await _permissionService.CheckPermissionsAsync(userId, new[] { PermissionCodes.CHANGE_MANAGE });
+            return permissions != null && permissions.TryGetValue(PermissionCodes.CHANGE_MANAGE, out var granted) && granted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "户主死亡变更办理权限校验失败");
+            return false;
+        }
+    }
+
     [RelayCommand]
     private async Task SubmitAsync()
     {
+        // 办理权限门控（2026-10-31 方案2 堵洞）：此前本页零权限校验，村级可经
+        // 死亡联动跳入直接提交镇级变更手续——提交前强制 CHANGE_MANAGE。
+        if (!await HasManagePermissionAsync())
+        {
+            await _dialogService.DisplayAlertAsync("提示", "无权限办理户主死亡变更，请联系管理员分配「办理信息变更」权限。", "确定");
+            return;
+        }
+
         _logger.LogBusiness("开始提交户主死亡变更");
 
         if (!ValidateInput())
@@ -231,19 +283,72 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                 DeceasedHeadMemberId = _originalHeadMember?.Id ?? 0,
                 DeceasedHeadName = OriginalHeadName,
                 DeceasedHeadIdCard = OriginalHeadIdCard,
-                NewHeadMemberId = SelectedNewHead.Id,
-                NewHeadName = SelectedNewHead.Name,
-                NewHeadIdCard = SelectedNewHead.IdCard,
-                DeathDate = DeathDate,
-                DeathTime = DeathTime,
+                NewHeadMemberId = SelectedNewHead?.Id ?? 0,
+                NewHeadName = SelectedNewHead?.Name ?? string.Empty,
+                NewHeadIdCard = SelectedNewHead?.IdCard ?? string.Empty,
+                // ValidateInput 已保证 DeathDateTime 非空；此处拆回日期/时刻两列（DB 契约不变）
+                DeathDate = DeathDateTime!.Value.Date,
+                DeathTime = DeathDateTime!.Value.TimeOfDay,
                 DeathReason = DeathReason,
                 DeathCertificateNo = DeathCertificateNo,
                 OperatorName = operatorName
             };
 
-            var result = await _changeService.ExecuteHouseholdDeathAsync(context, CancellationToken);
+            // 单人户：唯一成员即户主、无人接任 → 只整户停止、不建新档；多人口走停旧建新
+            var result = IsSinglePersonHousehold
+                ? await _changeService.ExecuteHouseholdHeadDeathStopOnlyAsync(context, CancellationToken)
+                : await _changeService.ExecuteHouseholdDeathAsync(context, CancellationToken);
             if (result.IsSuccess && result.Value != null)
             {
+                // 单人户整户停止：整户已死、家庭不存在 → 引导进档案制作中心出停保卷宗
+                //（封面/目录/变更告知书；不打入户调查表——已无家庭可调查）
+                if (IsSinglePersonHousehold)
+                {
+                    _logger.LogBusiness("单人户户主死亡整户停止提交成功",
+                        ("ApplicationId", ApplicationId),
+                        ("ChangeId", result.Value.ChangeId));
+
+                    await _dialogService.DisplayAlertAsync("成功",
+                        "单人户户主死亡已登记，整户保障已停止（无继承人建立新档案），档案已置为已停保。\n"
+                        + "已进入档案制作中心，可点击「档案输出」打印《档案_变更告知书》（终止）及停保卷宗封面/目录。", "确定");
+
+                    // 预置文书输出上下文（PrepareAndNavigateAsync 不清这三项）：
+                    // ① OutputCategories=停保码 → 候选池为停保卷宗（封面/目录/入户调查表/变更告知书，靠停保码命中）；
+                    // ② TemplateFilter=封面/目录/变更告知书 → 白名单剔除入户调查表（整户已死，无需入户调查）。
+                    PrintNavigationData.OutputCategories = ClassificationConstants.StopCategoryCodes;
+                    PrintNavigationData.TemplateFilter = new[]
+                    {
+                        DocumentTemplateNames.Cover,
+                        DocumentTemplateNames.Directory,
+                        DocumentTemplateNames.ChangeNotice
+                    };
+                    if (_isDestitute)
+                    {
+                        // 特困退出：追加《特困供养人员取消备案表》——唯一叶子「档案_特困取消备案表」使其加载命中，
+                        // TemplateFilter 白名单使其列入清单（字段已由 ArchiveProductionViewModel 停发特困分支装配）。
+                        PrintNavigationData.OutputCategories = ClassificationConstants.StopCategoryCodes
+                            .Concat(new[] { "档案_特困取消备案表" }).ToArray();
+                        PrintNavigationData.TemplateFilter = new[]
+                        {
+                            DocumentTemplateNames.Cover,
+                            DocumentTemplateNames.Directory,
+                            DocumentTemplateNames.ChangeNotice,
+                            DocumentTemplateNames.DestituteCancelFiling
+                        };
+                    }
+                    PrintNavigationData.PrefilterTemplateNames = null;
+                    PrintNavigationData.OperationOverride = null;
+
+                    // 弹出本页 → 进档案制作中心（加载本停保档案），用户点「档案输出」即得 3 张停保卷宗
+                    var stopNav = Helpers.WindowNavigator.CurrentPage!.Navigation;
+                    await stopNav.PopAsync();
+                    RestoreWindowTitleFromNavigation();
+
+                    await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveProductionPage, ApplicationArchiveParameter>(
+                        new ApplicationArchiveParameter(ApplicationId));
+                    return;
+                }
+
                 var newApplicationId = result.Value.NewApplicationId;
                 _logger.LogBusiness("户主死亡变更提交成功",
                     ("OldApplicationId", ApplicationId),
@@ -285,16 +390,18 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
 
     private bool ValidateInput()
     {
-        if (DeathDate == default)
+        // 死亡日期与时刻必填（组件 DateTimeEntryView 未选择前 DeathDateTime 恒为 null，此处为真实把关；
+        // 服务侧 ChangeService 另有 DeathTime 空值校验双门）
+        if (DeathDateTime is null)
         {
-            _dialogService.DisplayAlertAsync("验证失败", "请选择死亡日期", "确定");
+            _dialogService.DisplayAlertAsync("验证失败", "请选择死亡日期与时间", "确定");
             return false;
         }
 
-        // 死亡确切时间必填（TimePicker 恒有值，此处为防御性校验，防绑定异常导致 0 值以外的非法时刻）
-        if (DeathTime < TimeSpan.Zero || DeathTime >= TimeSpan.FromDays(1))
+        // 未来时刻拦截（组件 MaximumDate 已在选择侧拦截，此处防预填/绑定异常绕过）
+        if (DeathDateTime.Value > DateTime.Now)
         {
-            _dialogService.DisplayAlertAsync("验证失败", "请选择死亡确切时间", "确定");
+            _dialogService.DisplayAlertAsync("验证失败", "死亡时间不能晚于当前时间", "确定");
             return false;
         }
 
@@ -311,7 +418,8 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
             return false;
         }
 
-        if (SelectedNewHead == null)
+        // 单人户无新户主可选（走整户停止），跳过"新户主必选"校验
+        if (!IsSinglePersonHousehold && SelectedNewHead == null)
         {
             _dialogService.DisplayAlertAsync("验证失败", "请选择新户主", "确定");
             return false;
@@ -326,11 +434,14 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     /// </summary>
     public void ApplyDeathPrefill(DateTime? deathDate, string? deathTime, string? deathReason, string? deathCertificateNo)
     {
+        // 日期 + 时刻合成唯一来源；缺时刻时只回填日期部分（00:00），仍由本页校验与确认把关
         if (deathDate is { } date && date != default)
-            DeathDate = date;
-
-        if (!string.IsNullOrWhiteSpace(deathTime) && TimeSpan.TryParse(deathTime, out var time))
-            DeathTime = time;
+        {
+            var time = !string.IsNullOrWhiteSpace(deathTime) && TimeSpan.TryParse(deathTime, out var t)
+                ? t
+                : TimeSpan.Zero;
+            DeathDateTime = date.Date + time;
+        }
 
         if (!string.IsNullOrWhiteSpace(deathReason))
         {

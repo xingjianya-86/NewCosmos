@@ -84,7 +84,7 @@ public class ImportServiceManager : BaseService, IImportServiceManager
     {
         if (!_combinedServices.TryGetValue(importType, out var service))
         {
-            LogError($"操作失败");
+            LogError($"双文件预览失败：不支持的导入类型 {importType}");
             return new CombinedPreviewResult { ErrorMessage = $"不支持的导入类型: {importType}" };
         }
 
@@ -96,7 +96,7 @@ public class ImportServiceManager : BaseService, IImportServiceManager
     {
         if (!_combinedServices.TryGetValue(importType, out var service))
         {
-            LogError($"操作失败");
+            LogError($"双文件导入失败：不支持的导入类型 {importType}");
             return new CombinedImportResult { ErrorMessage = $"不支持的导入类型: {importType}" };
         }
 
@@ -285,14 +285,14 @@ public class ImportServiceManager : BaseService, IImportServiceManager
     {
         if (!ImportTypeCodes.IsSingleFileType(importType))
         {
-            LogError($"操作失败");
+            LogError($"单文件导入失败：非单文件导入类型 {importType}");
             return ImportResult.Failed($"不支持的导入类型: {importType}");
         }
 
         var service = _singleFileServices.FirstOrDefault(s => s.ImportTypeName == importType);
         if (service == null)
         {
-            LogError($"操作失败");
+            LogError($"单文件导入失败：未找到导入服务 {importType}");
             return ImportResult.Failed($"未找到导入服务: {importType}");
         }
 
@@ -330,7 +330,7 @@ public class ImportServiceManager : BaseService, IImportServiceManager
                 var clearResult = await service.ClearTableAsync(ct);
                 if (clearResult.IsFailure)
                 {
-                    LogError($"操作失败");
+                    LogError($"{importType}: 清空数据表失败（中止导入）");
                     return ImportResult.Failed("清空数据失败");
                 }
                 LogInfo($"已清空现有数据");
@@ -367,9 +367,20 @@ public class ImportServiceManager : BaseService, IImportServiceManager
 
                 if (fileResult.ErrorCount > 0)
                 {
-                    foreach (var error in fileResult.Errors.Take(3))
+                    // UI 只展示每文件前 3 条（避免刷屏），但【全部错误必须落日志】——
+                    // 旧实现 Take(3) 后其余错误既不入 result 也不留痕，排障时无从追查
+                    var errors = fileResult.Errors.ToList();
+                    foreach (var error in errors.Take(3))
                     {
                         result.Errors.Add($"文件: {fileName}, 错误: {error}");
+                    }
+                    foreach (var error in errors)
+                    {
+                        LogError($"导入错误: {fileName} - {error}");
+                    }
+                    if (errors.Count > 3)
+                    {
+                        result.Errors.Add($"文件: {fileName}, 另有 {errors.Count - 3} 条错误（详见导入日志）");
                     }
                 }
 

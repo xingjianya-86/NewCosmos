@@ -9,6 +9,7 @@ using NewCosmos.Models.Exceptions;
 using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
+using NewCosmos.Services.Platform;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.AssetVerification;
@@ -762,7 +763,15 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsClassificationLocked))]
+    [NotifyPropertyChangedFor(nameof(SubmitDisabledReason))]
     private bool _isClassificationDone;
+
+    /// <summary>
+    /// 提交按钮灰禁原因（替代"无说明灰禁"）：
+    /// 最后一步未分类判定时给出可操作提示，其余情况为空串（提示随步进/判定自动刷新）。
+    /// </summary>
+    public string SubmitDisabledReason =>
+        IsSubmitVisible && !IsClassificationDone ? "请先完成「分类判定」，之后才能提交" : string.Empty;
 
     [ObservableProperty]
     private string _determinationBasis = string.Empty;
@@ -2209,6 +2218,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         OnPropertyChanged(nameof(IsNotFirstStep));
         OnPropertyChanged(nameof(IsNotLastStep));
         OnPropertyChanged(nameof(IsSubmitVisible));
+        OnPropertyChanged(nameof(SubmitDisabledReason));
         
         OnPropertyChanged(nameof(Step1CardBgColor));
         OnPropertyChanged(nameof(Step1CardBorderColor));
@@ -2248,51 +2258,41 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
         _logger.LogBusiness("低收入认定-照片采集/查看", ("ApplicationId", _applicationId.ToString()));
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _applicationId > 0 ? _applicationId : null, ApplicantName));
+            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _applicationId > 0 ? _applicationId : null, ApplicantName,
+                AssignContext: this));
     }
 
     /// <summary>
-    /// 手机端：扫描身份证（Camera2 预览 + 端侧 OCR），回填户主姓名/身份证并触发现有联动。
-    /// 桌面端 IIdentityReader.IsSupported=false（无摄像头/OCR），提示改用手机端。
+    /// 扫描证件（Camera2 取景 + 类别识别）：跳转扫描页选拍证件 → 内网识别 → 分配页定向回填。
+    /// 回填经 <see cref="IOcrAssignContext"/>（本 VM 实现），完成后回传实际回填条数。
     /// </summary>
     [RelayCommand]
     private async Task ScanIdCardAsync()
     {
-        var identityReader = _serviceProvider.GetRequiredService<Services.Platform.IIdentityReader>();
-        if (!identityReader.IsSupported)
+        if (DeviceInfo.Platform != DevicePlatform.Android)
         {
             await _serviceProvider.GetRequiredService<IDialogService>()
-                .DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请在手机上使用", "确定");
+                .DisplayAlertAsync("提示", "扫描功能请在手机上使用；电脑端可在「照片采集」中选图识别", "确定");
             return;
         }
 
         try
         {
-            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
-            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
-                new IdCardScanParameter(result => completion.TrySetResult(result)));
+            var completion = new TaskCompletionSource<int>();
+            await NavigateToPageAsync<Pages.Mobile.MobileOcrScanPage, OcrScanParameter>(
+                new OcrScanParameter(this, applied => completion.TrySetResult(applied)));
 
-            var scanResult = await completion.Task;
-            if (scanResult is null) return; // 用户取消
-
-            if (scanResult.IsFailure || scanResult.Value is null)
-            {
+            var applied = await completion.Task;
+            if (applied > 0)
                 await _serviceProvider.GetRequiredService<IDialogService>()
-                    .DisplayAlertAsync("识别失败", scanResult.Message ?? "未识别到身份证信息", "确定");
-                return;
-            }
+                    .ShowSnackBarAsync($"已回填 {applied} 条识别结果", Components.SnackBarType.Success);
 
-            var info = scanResult.Value;
-            if (!string.IsNullOrWhiteSpace(info.Name)) ApplicantName = info.Name.Trim();
-            if (!string.IsNullOrWhiteSpace(info.IdCard)) ApplicantIdCard = info.IdCard.Trim();
-
-            _logger.LogBusiness("低收入认定-身份证扫描",
-                ("HasName", !string.IsNullOrWhiteSpace(info.Name)),
-                ("HasIdCard", !string.IsNullOrWhiteSpace(info.IdCard)));
+            _logger.LogBusiness("低收入认定-证件扫描",
+                ("Applied", applied.ToString()));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "低收入认定身份证扫描失败");
+            _logger.LogError(ex, "低收入认定证件扫描失败");
             await _serviceProvider.GetRequiredService<IDialogService>()
                 .DisplayAlertAsync("提示", "扫描失败，请重试或手动录入", "确定");
         }

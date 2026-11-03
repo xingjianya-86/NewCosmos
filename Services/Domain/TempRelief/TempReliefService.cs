@@ -5,6 +5,7 @@ using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.System;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace NewCosmos.Services.Domain.TempRelief;
@@ -590,8 +591,13 @@ public class TempReliefService : BaseService, ITempReliefService
     #region 默认值检索（政策救助/家庭成员状态）
 
     /// <summary>
-    /// 按身份证检索其已享受/在申的救助政策清单（遍历 6 张白名单来源表精确匹配）
+    /// 按身份证检索其已享受/在申的救助政策清单（遍历白名单来源表精确匹配）
     /// 返回值如：["享受农村最低生活保障", "正在申请最低生活保障"]
+    /// 2026-11 性能收口：原 7 表逐表 SELECT 1（选人后自动填充路径 = 7 次串行往返）→
+    /// ① 表存在性批量检查（information_schema ANY + 进程缓存，首查后免查）；
+    /// ② 存在的台账表合成一条 UNION ALL 批查；③ nc_biz_applications 的存在性检查冗余
+    ///    （下方分类查询本身按活跃状态过滤，无活跃行时同样不产出文本），直接单查分类。
+    /// 稳态往返：7~8 → 2。
     /// </summary>
     public async Task<Result<List<string>>> GetPolicySnapshotAsync(string idCard, CancellationToken ct = default)
     {
@@ -599,56 +605,96 @@ public class TempReliefService : BaseService, ITempReliefService
             return Result.Success(new List<string>());
 
         var result = new List<string>();
-        foreach (var table in TempReliefConstants.AllowedSourceTables)
+        try
         {
-            try
+            // 台账表（除 nc_biz_applications 外）批量存在性检查 + UNION ALL 批查。
+            // [SQL 白名单背书] 表名全部取自 TempReliefConstants.AllowedSourceTables 硬编码常量
+            // （check_standards SQL1 豁免 table），无外部输入。
+            var ledgerTables = TempReliefConstants.AllowedSourceTables
+                .Where(t => t != "nc_biz_applications").ToArray();
+            var existingTables = new List<string>();
+            foreach (var table in ledgerTables)
             {
-                var sql = "SELECT 1 FROM " + table + " WHERE applicant_id_card = $1 LIMIT 1";
-                var exists = await _db.ExecuteScalarAsync<long>(sql, ct, idCard);
-                if (exists.IsFailure || exists.Value <= 0) continue;
+                if (await TableExistsCachedAsync(table, ct))
+                    existingTables.Add(table);
+            }
 
-                if (table == "nc_biz_applications")
+            if (existingTables.Count > 0)
+            {
+                var unionParts = existingTables
+                    .Select(t => $"SELECT '{t}' AS tbl FROM {t} WHERE applicant_id_card = $1 LIMIT 1");
+                // [SQL 白名单背书] unionSql 仅由上方硬编码白名单表名生成（见方法注释）
+                var unionSql = string.Join(" UNION ALL ", unionParts);
+                var matched = await _db.QueryAsync<string>(unionSql, ct, idCard);
+                if (matched.IsSuccess && matched.Value != null)
                 {
-                    // 当前库申请：取最新一条"在申/在享"记录（Approved/Completed 优先，其次 Draft/Submitted）。
-                    // 停保/不予受理/收入超标等历史记录不算"正在申请"；
-                    // 已审批的档案应显示"享受{分类}"，不能一律显示"正在申请"（仲立亮 app95 实测错例）。
-                    var classSql = @"SELECT status, COALESCE(classification_result,'') AS classification_result
-                                     FROM nc_biz_applications
-                                     WHERE applicant_id_card = $1 AND deleted_at IS NULL
-                                       AND status = ANY($2::text[])
-                                     ORDER BY CASE status
-                                                  WHEN 'Approved' THEN 0
-                                                  WHEN 'Completed' THEN 0
-                                                  WHEN 'Submitted' THEN 1
-                                                  ELSE 2
-                                              END,
-                                              created_at DESC, id DESC
-                                     LIMIT 1";
-                    var activeStatuses = new[]
+                    foreach (var tbl in matched.Value)
+                        result.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(tbl));
+                }
+                else if (matched.IsFailure)
+                {
+                    // 批查失败（如存量库缺某表）：回退逐表路径，保持原容错语义
+                    LogWarn($"政策清单批查失败，回退逐表: {matched.Message}");
+                    result.Clear();
+                    foreach (var table in existingTables)
                     {
-                        ApplicationStatusCodes.DRAFT, ApplicationStatusCodes.SUBMITTED,
-                        ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.COMPLETED
-                    };
-                    var cls = await _db.QuerySingleAsync<PolicyClassRow>(classSql, ct, idCard, activeStatuses);
-                    if (cls.IsSuccess && cls.Value != null && !string.IsNullOrWhiteSpace(cls.Value.ClassificationResult))
-                    {
-                        var isEnjoying = cls.Value.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
-                        var name = ClassificationConstants.ConvertFromCode(cls.Value.ClassificationResult);
-                        result.Add((isEnjoying ? "享受" : "正在申请") + name);
+                        var exists = await _db.ExecuteScalarAsync<long>(
+                            "SELECT 1 FROM " + table + " WHERE applicant_id_card = $1 LIMIT 1", ct, idCard);
+                        if (exists.IsSuccess && exists.Value > 0)
+                            result.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(table));
                     }
                 }
-                else
-                {
-                    result.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(table));
-                }
             }
-            catch (Exception ex)
+
+            // 当前库申请：取最新一条"在申/在享"记录（Approved/Completed 优先，其次 Draft/Submitted）。
+            // 停保/不予受理/收入超标等历史记录不算"正在申请"；
+            // 已审批的档案应显示"享受{分类}"，不能一律显示"正在申请"（仲立亮 app95 实测错例）。
+            var classSql = @"SELECT status, COALESCE(classification_result,'') AS classification_result
+                             FROM nc_biz_applications
+                             WHERE applicant_id_card = $1 AND deleted_at IS NULL
+                               AND status = ANY($2::text[])
+                             ORDER BY CASE status
+                                          WHEN 'Approved' THEN 0
+                                          WHEN 'Completed' THEN 0
+                                          WHEN 'Submitted' THEN 1
+                                          ELSE 2
+                                      END,
+                                      created_at DESC, id DESC
+                             LIMIT 1";
+            var activeStatuses = new[]
             {
-                LogException(ex, $"检索政策救助情况失败（{table}）");
+                ApplicationStatusCodes.DRAFT, ApplicationStatusCodes.SUBMITTED,
+                ApplicationStatusCodes.APPROVED, ApplicationStatusCodes.COMPLETED
+            };
+            var cls = await _db.QuerySingleAsync<PolicyClassRow>(classSql, ct, idCard, activeStatuses);
+            if (cls.IsSuccess && cls.Value != null && !string.IsNullOrWhiteSpace(cls.Value.ClassificationResult))
+            {
+                var isEnjoying = cls.Value.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
+                var name = ClassificationConstants.ConvertFromCode(cls.Value.ClassificationResult);
+                result.Add((isEnjoying ? "享受" : "正在申请") + name);
             }
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "检索政策救助情况失败");
         }
 
         return Result.Success(result);
+    }
+
+    /// <summary>表存在性进程内缓存（同 ElderlyCategoryService 模式；表不会运行时消失，首查后免往返）</summary>
+    private static readonly ConcurrentDictionary<string, bool> SourceTableExistsCache = new(StringComparer.Ordinal);
+
+    private async Task<bool> TableExistsCachedAsync(string table, CancellationToken ct)
+    {
+        if (SourceTableExistsCache.TryGetValue(table, out var cached))
+            return cached;
+
+        var result = await _db.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = $1", ct, table);
+        var exists = result.IsSuccess && result.Value > 0;
+        SourceTableExistsCache[table] = exists;
+        return exists;
     }
 
     /// <summary>
@@ -767,7 +813,7 @@ public class TempReliefService : BaseService, ITempReliefService
     public async Task<Result<TempReliefApplication>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"按ID查询: {id}");
-        var sql = "SELECT * FROM nc_biz_temp_relief_applications WHERE id = $1 AND deleted_at IS NULL";
+        var sql = "SELECT " + WideTableColumns.TempReliefApplicationsColumns + " FROM nc_biz_temp_relief_applications WHERE id = $1 AND deleted_at IS NULL";
         return await _db.QuerySingleAsync<TempReliefApplication>(sql, ct, id);
     }
 
@@ -837,7 +883,7 @@ public class TempReliefService : BaseService, ITempReliefService
             return Result.Failure<PagedResult<TempReliefApplication>>(countResult.ErrorCode!, countResult.Message!);
 
         var offset = (pageIndex - 1) * pageSize;
-        var querySql = $"SELECT * FROM nc_biz_temp_relief_applications{where}" +
+        var querySql = $"SELECT {WideTableColumns.TempReliefApplicationsColumns} FROM nc_biz_temp_relief_applications{where}" +
             $" ORDER BY created_at DESC LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
         var pageParams = new List<object?>(conditions.GetParameters()) { pageSize, offset };
 
@@ -864,7 +910,7 @@ public class TempReliefService : BaseService, ITempReliefService
             return Result.Failure<PagedResult<TempReliefApplication>>(countResult.ErrorCode!, countResult.Message!);
 
         var offset = (pageIndex - 1) * pageSize;
-        var querySql = $"SELECT * FROM nc_biz_temp_relief_applications{where}" +
+        var querySql = $"SELECT {WideTableColumns.TempReliefApplicationsColumns} FROM nc_biz_temp_relief_applications{where}" +
             $" ORDER BY updated_at DESC LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
         var pageParams = new List<object?>(conditions.GetParameters()) { pageSize, offset };
 
@@ -896,7 +942,7 @@ public class TempReliefService : BaseService, ITempReliefService
             return Result.Failure<PagedResult<TempReliefApplication>>(countResult.ErrorCode!, countResult.Message!);
 
         var offset = (pageIndex - 1) * pageSize;
-        var querySql = $"SELECT * FROM nc_biz_temp_relief_applications{where}" +
+        var querySql = $"SELECT {WideTableColumns.TempReliefApplicationsColumns} FROM nc_biz_temp_relief_applications{where}" +
             $" ORDER BY updated_at DESC LIMIT ${conditions.ParamCount + 1} OFFSET ${conditions.ParamCount + 2}";
         var pageParams = new List<object?>(conditions.GetParameters()) { pageSize, offset };
 

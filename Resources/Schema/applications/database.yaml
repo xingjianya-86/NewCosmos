@@ -455,3 +455,12 @@ tables:
         columns: [original_application_id]
       - name: idx_applications_first_approved_at
         columns: [first_approved_at]
+      # 2026-11 性能收口：工作流 Tab2（草稿 status='Draft' AND current_step<5）/
+      # Tab4（已完结 current_step=6）是档案量最大子集，原无 step 维度索引只能顺序扫描 + updated_at 排序。
+      # 部分索引只覆盖各自活跃子集，写放大可忽略。
+      - name: idx_applications_draft_step_updated
+        columns: [updated_at DESC]
+        where: "status = 'Draft' AND current_step < 5 AND deleted_at IS NULL"
+      - name: idx_applications_archived_step_updated
+        columns: [updated_at DESC]
+        where: "current_step = 6 AND deleted_at IS NULL"

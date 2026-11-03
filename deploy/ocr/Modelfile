@@ -1,0 +1,6 @@
+FROM longwayxu/xiaomi-ocr-0:bf16
+
+# 图像 token 预算：2048 长边图片 ≈3072 视觉 token（16px patch / 2x2 merge）
+# + KIE/文本输出预算 + 提示词 → num_ctx 8192 覆盖文本模式 4096 输出预算。
+# Ollama 默认 num_ctx 过小会直接报 context 超限。
+PARAMETER num_ctx 8192

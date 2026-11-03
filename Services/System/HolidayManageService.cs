@@ -1,10 +1,10 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
 using NewCosmos.Services.Utilities;
-using System.Text.Json;
 
 namespace NewCosmos.Services.System;
 
@@ -274,18 +274,111 @@ public class HolidayManageService : BaseService, IHolidayManageService
 
     #region 接口下载
 
-    // timor.tech 响应 DTO（字段名按接口原文，保持小写）
-    private sealed class TimorResponse
+    /// <summary>单次数据源请求的结果分类（用于主备链路的降级判定）</summary>
+    private enum FetchStatus
     {
-        public int code { get; set; }
-        public Dictionary<string, TimorHolidayDay>? holiday { get; set; }
+        /// <summary>拿到该年度有效数据</summary>
+        Success,
+        /// <summary>响应正常但该年度无数据（安排尚未发布）</summary>
+        EmptyYear,
+        /// <summary>响应结构无法识别（字段损坏 / 非预期 code）</summary>
+        Malformed,
+        /// <summary>网络不可达 / 超时 / 非 2xx</summary>
+        Unreachable
     }
 
-    private sealed class TimorHolidayDay
+    private sealed class FetchOutcome
     {
-        public bool holiday { get; set; }
-        public string name { get; set; } = string.Empty;
-        public string date { get; set; } = string.Empty;
+        public FetchStatus Status { get; init; }
+        public List<HolidayApiParser.HolidayRow>? Rows { get; init; }
+        /// <summary>备用源携带的国务院公文链接（审计线索）</summary>
+        public string? PaperUrl { get; init; }
+    }
+
+    /// <summary>
+    /// 请求单个数据源并解析。请求失败只降级为 Unreachable，不抛出（主备链路需要继续尝试下一个源）。
+    /// 用户主动取消（ct 触发）例外，原样上抛以免被误判为"网络不可达"。
+    /// </summary>
+    private async Task<FetchOutcome> TryFetchAsync(string url,
+        Func<string, HolidayApiParser.ParseResult> parse, CancellationToken ct)
+    {
+        string json;
+        try
+        {
+            using var response = await _httpClient.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
+            json = await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // 用户取消，不是网络故障
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"节假日数据源请求失败: {url} - {ex.Message}");
+            return new FetchOutcome { Status = FetchStatus.Unreachable };
+        }
+
+        var parsed = parse(json);
+        if (parsed.IsMalformed)
+        {
+            LogWarn($"节假日数据源响应格式异常: {url}");
+            return new FetchOutcome { Status = FetchStatus.Malformed };
+        }
+
+        if (parsed.IsEmptyYear || parsed.Rows.Count == 0)
+        {
+            LogInfo($"数据源无该年度数据（安排尚未发布）: {url}");
+            return new FetchOutcome { Status = FetchStatus.EmptyYear };
+        }
+
+        return new FetchOutcome
+        {
+            Status = FetchStatus.Success,
+            Rows = parsed.Rows,
+            PaperUrl = parsed.PaperUrl
+        };
+    }
+
+    /// <summary>
+    /// 构造候选数据源序列：主接口在前，备用接口在后。
+    /// 备用地址可在设置表覆盖（holiday_fallback_api_url），未配置时使用 jsdelivr + GitHub raw 双地址互备
+    /// （jsdelivr 在国内多数环境可用，raw 在 jsdelivr 抽风时兜底）。
+    /// </summary>
+    private async Task<List<(string Url, bool IsFallback, Func<string, HolidayApiParser.ParseResult> Parse)>>
+        BuildSourcesAsync(int year, CancellationToken ct)
+    {
+        var sources = new List<(string Url, bool IsFallback, Func<string, HolidayApiParser.ParseResult> Parse)>();
+
+        // 主源（默认 timor.tech，设置表可改）
+        var primarySetting = await GetSettingValueAsync(DutyConstants.SettingKeys.HOLIDAY_API_URL, ct);
+        var primaryTemplate = primarySetting.IsSuccess && !string.IsNullOrWhiteSpace(primarySetting.Value)
+            ? primarySetting.Value
+            : DutyConstants.DefaultHolidayApiUrl;
+        sources.Add((primaryTemplate.Replace("{year}", year.ToString()), IsFallback: false,
+            HolidayApiParser.ParseTimor));
+
+        // 备用源（holiday-cn，跟踪国务院办公厅公报）
+        var fallbackSetting = await GetSettingValueAsync(DutyConstants.SettingKeys.HOLIDAY_FALLBACK_API_URL, ct);
+        if (fallbackSetting.IsSuccess && !string.IsNullOrWhiteSpace(fallbackSetting.Value))
+        {
+            var url = fallbackSetting.Value.Replace("{year}", year.ToString());
+            sources.Add((url, IsFallback: true, json => HolidayApiParser.ParseHolidayCn(json, year)));
+        }
+        else
+        {
+            foreach (var template in new[]
+                     {
+                         DutyConstants.DefaultHolidayFallbackApiUrl,
+                         DutyConstants.DefaultHolidayFallbackApiUrlAlt
+                     })
+            {
+                sources.Add((template.Replace("{year}", year.ToString()), IsFallback: true,
+                    json => HolidayApiParser.ParseHolidayCn(json, year)));
+            }
+        }
+
+        return sources;
     }
 
     public async Task<Result<HolidayDownloadSummary>> DownloadYearAsync(int year, CancellationToken ct = default)
@@ -297,62 +390,58 @@ public class HolidayManageService : BaseService, IHolidayManageService
         if (ensureResult.IsFailure)
             return Result.Failure<HolidayDownloadSummary>(ensureResult.ErrorCode!, ensureResult.Message!);
 
-        // 1. 解析接口地址（设置表可改，缺省用内置地址）
-        var urlSetting = await GetSettingValueAsync(DutyConstants.SettingKeys.HOLIDAY_API_URL, ct);
-        var urlTemplate = urlSetting.IsSuccess && !string.IsNullOrWhiteSpace(urlSetting.Value)
-            ? urlSetting.Value
-            : DutyConstants.DefaultHolidayApiUrl;
-        var requestUrl = urlTemplate.Replace("{year}", year.ToString());
+        // 1. 依次尝试主、备数据源，首个成功者胜出
+        LogInfo($"开始下载 {year} 年节假日数据");
+        var sources = await BuildSourcesAsync(year, ct);
 
-        LogInfo($"开始下载 {year} 年节假日数据: {requestUrl}");
+        List<HolidayApiParser.HolidayRow>? rows = null;
+        string? usedUrl = null;
+        bool isFromFallback = false;
+        string? paperUrl = null;
+        // 降级判定：拿到数据 > 至少一个源明确回答"尚未发布" > 至少一个源格式异常 > 全部不可达
+        bool anyEmptyYear = false;
+        bool anyMalformed = false;
 
-        // 2. 请求接口
-        string json;
-        try
+        foreach (var (url, isFallback, parse) in sources)
         {
-            using var response = await _httpClient.GetAsync(requestUrl, ct);
-            response.EnsureSuccessStatusCode();
-            json = await response.Content.ReadAsStringAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            LogError($"节假日接口请求失败: {ex.Message}");
-            return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_API_UNREACHABLE, $"请求失败: {ex.Message}");
-        }
-
-        // 3. 解析响应
-        List<(DateTime Date, string DateType, string Name)> rows;
-        try
-        {
-            var payload = JsonSerializer.Deserialize<TimorResponse>(json);
-            if (payload == null || payload.code != 0 || payload.holiday == null || payload.holiday.Count == 0)
+            var outcome = await TryFetchAsync(url, parse, ct);
+            if (outcome.Status == FetchStatus.Success)
             {
-                LogWarn($"节假日接口返回数据无效（可能尚未发布 {year} 年安排）");
-                return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_DATA_INVALID, "接口无有效数据（当年安排可能尚未发布）");
+                rows = outcome.Rows;
+                usedUrl = url;
+                isFromFallback = isFallback;
+                paperUrl = outcome.PaperUrl;
+                break;
             }
 
-            rows = new List<(DateTime, string, string)>();
-            foreach (var day in payload.holiday.Values)
-            {
-                if (!DateTime.TryParse(day.date, out var date)) continue;
-                var dateType = day.holiday
-                    ? DutyConstants.HolidayRowTypes.HOLIDAY
-                    : DutyConstants.HolidayRowTypes.MAKEUP;
-                rows.Add((date.Date, dateType, day.name?.Trim() ?? string.Empty));
-            }
-
-            if (rows.Count == 0)
-            {
-                return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_DATA_INVALID, "接口数据解析为空");
-            }
+            anyEmptyYear |= outcome.Status == FetchStatus.EmptyYear;
+            anyMalformed |= outcome.Status == FetchStatus.Malformed;
         }
-        catch (JsonException ex)
+
+        if (rows == null || rows.Count == 0)
         {
-            LogError($"节假日接口数据解析失败: {ex.Message}");
-            return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_DATA_INVALID, ex.Message);
+            if (anyEmptyYear)
+            {
+                LogWarn($"{year} 年放假安排尚未发布（所有数据源均无该年度数据）");
+                return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_YEAR_NOT_PUBLISHED,
+                    "主、备数据源均未收录该年度放假安排");
+            }
+
+            if (anyMalformed)
+            {
+                LogError($"{year} 年节假日数据解析失败（数据源返回格式异常）");
+                return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_DATA_INVALID,
+                    "主、备数据源响应均无法解析");
+            }
+
+            LogError($"{year} 年节假日数据源全部不可达");
+            return Result.Failure<HolidayDownloadSummary>(ErrorCodes.HOLIDAY_API_UNREACHABLE,
+                "主、备数据源均请求失败，请检查网络");
         }
 
-        // 4. 事务落库：该年份的旧 API 数据整体替换（MANUAL/SEED 数据保留，逐行 ON CONFLICT 覆盖）
+        LogInfo($"节假日数据已获取: {usedUrl}（{(isFromFallback ? "备用源" : "主源")}）");
+
+        // 2. 事务落库：该年份的旧 API 数据整体替换（MANUAL/SEED 数据保留，逐行 ON CONFLICT 覆盖）
         var holidayCount = rows.Count(r => r.DateType == DutyConstants.HolidayRowTypes.HOLIDAY);
         var makeupCount = rows.Count - holidayCount;
 
@@ -368,7 +457,7 @@ public class HolidayManageService : BaseService, IHolidayManageService
             }
 
             // 逐行参数化 upsert（接口返回的外部数据，严禁内插）
-            foreach (var (date, dateType, name) in rows)
+            foreach (var row in rows)
             {
                 var upsertResult = await _dbService.ExecuteNonQueryAsync(@"
                     INSERT INTO nc_sys_holidays (holiday_date, date_type, name, year, source, updated_at)
@@ -379,7 +468,7 @@ public class HolidayManageService : BaseService, IHolidayManageService
                                  year = EXCLUDED.year,
                                  source = EXCLUDED.source,
                                  updated_at = NOW()", ct,
-                    date, dateType, name, year, DutyConstants.Sources.API);
+                    row.Date.ToDateTime(TimeOnly.MinValue), row.DateType, row.Name, year, DutyConstants.Sources.API);
                 if (upsertResult.IsFailure)
                 {
                     await tx.RollbackAsync(ct);
@@ -396,12 +485,18 @@ public class HolidayManageService : BaseService, IHolidayManageService
             return Result.FromException<HolidayDownloadSummary>(ex);
         }
 
+        // 公文链接仅作审计线索记日志（不落业务表，避免给 schema 加列）
+        if (!string.IsNullOrWhiteSpace(paperUrl))
+            LogInfo($"节假日数据公文来源: {paperUrl}");
+
         Logger.LogBusiness("下载节假日数据",
             ("Year", year),
             ("HolidayCount", holidayCount),
-            ("MakeupCount", makeupCount));
+            ("MakeupCount", makeupCount),
+            ("SourceUrl", usedUrl ?? string.Empty),
+            ("IsFromFallback", isFromFallback));
 
-        // 5. 刷新内存快照（失败不回滚落库结果，仅提示）
+        // 3. 刷新内存快照（失败不回滚落库结果，仅提示）
         var refreshResult = await RefreshCacheAsync(ct);
         if (refreshResult.IsFailure)
         {
@@ -412,7 +507,10 @@ public class HolidayManageService : BaseService, IHolidayManageService
         {
             Year = year,
             HolidayCount = holidayCount,
-            MakeupCount = makeupCount
+            MakeupCount = makeupCount,
+            IsFromFallback = isFromFallback,
+            PaperUrl = paperUrl,
+            SourceDisplayName = isFromFallback ? "备用源" : "主源"
         });
     }
 

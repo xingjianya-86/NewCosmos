@@ -32,7 +32,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly ITemplateService _templateService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IIdentityReader _identityReader;
 
     private string _batchId = string.Empty;
     private int? _operatorTownId;
@@ -115,8 +114,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         IDialogService dialogService,
         ILoggerService logger,
         ITemplateService templateService,
-        IServiceProvider serviceProvider,
-        IIdentityReader identityReader)
+        IServiceProvider serviceProvider)
     {
         _verificationService = verificationService;
         _userService = userService;
@@ -128,7 +126,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         _logger = logger;
         _templateService = templateService;
         _serviceProvider = serviceProvider;
-        _identityReader = identityReader;
 
         Title = "快速资产核查";
     }
@@ -241,7 +238,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "加载经办人信息失败（乡镇配置降级）");
             IsTownConfigured = false;
         }
     }
@@ -267,7 +264,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "加载乡镇列表失败");
         }
     }
 
@@ -313,7 +310,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "加载关系字典失败");
             Relationships.Clear();
             NonHeadRelationships.Clear();
             _relationshipCodeMap.Clear();
@@ -354,7 +351,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "加载申请理由字典失败");
             ApplicationReasons.Clear();
             _applicationReasonCodeMap.Clear();
         }
@@ -400,7 +397,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "加载证件类型字典失败");
             IdTypes.Clear();
             _idTypeCodeMap.Clear();
             RestoreAgentIdType(previousType);
@@ -497,63 +494,34 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 扫描身份证（移动端专用）：跳转原生 Camera2 取景页（带实时对齐框）拍照 → 端侧离线 OCR
-    /// → 回填户主姓名/身份证号。相机页通过 <see cref="IdCardScanParameter.OnCompleted"/> 回传结果。
+    /// 扫描证件（Camera2 取景 + 类别识别）：跳转扫描页选拍证件 → 内网识别 → 分配页定向回填
+    /// （多张身份证 → 逐条选择户主/成员行/新增子女赡养人）。相机页经 <see cref="OcrScanParameter"/> 回传。
     /// </summary>
     [RelayCommand]
     private async Task ScanIdCardAsync()
     {
-        if (!_identityReader.IsSupported)
+        if (DeviceInfo.Platform != DevicePlatform.Android)
         {
-            await _dialogService.DisplayAlertAsync("提示", "当前设备不支持身份证扫描，请在手机端使用", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "扫描功能请在手机上使用；电脑端可在「照片采集」中选图识别", "确定");
             return;
         }
 
         try
         {
-            var completion = new TaskCompletionSource<Result<IdCardInfo>?>();
-            await NavigateToPageAsync<Pages.Mobile.MobileIdCardScanPage, IdCardScanParameter>(
-                new IdCardScanParameter(result => completion.TrySetResult(result)));
+            var completion = new TaskCompletionSource<int>();
+            await NavigateToPageAsync<Pages.Mobile.MobileOcrScanPage, OcrScanParameter>(
+                new OcrScanParameter(this, applied => completion.TrySetResult(applied)));
 
-            var scanResult = await completion.Task;
-            if (scanResult is null)
-                return; // 用户取消
-
-            if (scanResult.IsFailure || scanResult.Value is null)
+            var applied = await completion.Task;
+            if (applied > 0)
             {
-                await _dialogService.DisplayAlertAsync("识别失败", scanResult.Message ?? "未能识别身份证信息", "确定");
-                return;
+                await _dialogService.ShowSnackBarAsync($"已回填 {applied} 条识别结果", Components.SnackBarType.Success);
+                _logger.LogBusiness("身份证 OCR 识别完成", ("Applied", applied.ToString()));
             }
-
-            var info = scanResult.Value;
-            var target = Applicants.FirstOrDefault(a => a.IsHead) ?? Applicants.FirstOrDefault();
-            if (target is null)
-            {
-                await _dialogService.DisplayAlertAsync("提示", "请先添加授权人信息行后再扫描", "确定");
-                return;
-            }
-
-            if (!string.IsNullOrWhiteSpace(info.Name)) target.ApplicantName = info.Name;
-            if (!string.IsNullOrWhiteSpace(info.IdCard)) target.ApplicantIdCard = info.IdCard;
-
-            var rawText = info.RawLines.Count > 0 ? string.Join("\n", info.RawLines) : "（无）";
-            var checksumHint = !string.IsNullOrWhiteSpace(info.IdCard) && !info.IdCardChecksumValid
-                ? "\n（校验位不符，请人工核对身份证号）"
-                : string.Empty;
-            await _dialogService.DisplayAlertAsync("识别结果",
-                $"姓名：{(string.IsNullOrWhiteSpace(info.Name) ? "未识别" : info.Name)}\n" +
-                $"身份证号：{(string.IsNullOrWhiteSpace(info.IdCard) ? "未识别" : info.IdCard)}{checksumHint}\n\n" +
-                $"原始识别行：\n{rawText}",
-                "确定");
-
-            _logger.LogBusiness("身份证 OCR 识别完成",
-                ("Name", DataMasker.MaskName(info.Name)),
-                ("IdCard", DataMasker.MaskIdCard(info.IdCard)),
-                ("ChecksumValid", info.IdCardChecksumValid));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "身份证扫描失败");
+            _logger.LogError(ex, "证件扫描失败");
             await _dialogService.DisplayAlertAsync("错误", $"扫描失败：{ex.Message}", "确定");
         }
     }
@@ -572,7 +540,8 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
 
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(target.ApplicantIdCard.Trim(), null, target.ApplicantName));
+            new ArchivePhotoParameter(target.ApplicantIdCard.Trim(), null, target.ApplicantName,
+                AssignContext: this));
     }
 
     [RelayCommand]
@@ -702,10 +671,11 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (OperationCanceledException)
         {
+            // 取消即提前退出（用户关闭/新请求抢占），不视为错误
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "查询历史核查记录失败");
             await _dialogService.DisplayAlertAsync("错误", $"查询失败: {ex.Message}", "确定");
         }
         finally
@@ -750,6 +720,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             var duplicateResult = await _verificationService.CheckDuplicateAsync(
                 head.ApplicantIdCard, ApplicationDate.Year, ApplicationDate.Month);
 
+            var overwrite = false;
             if (duplicateResult.IsSuccess && duplicateResult.Value)
             {
                 var confirm = await _dialogService.DisplayAlertAsync(
@@ -758,15 +729,16 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                     "覆盖提交", "确定");
                 if (!confirm) return;
 
-                await _verificationService.DeleteByHeadIdCardAsync(
-                    head.ApplicantIdCard, ApplicationDate.Year, ApplicationDate.Month);
+                // 不再单独调用 DeleteByHeadIdCardAsync（旧实现"删旧+建新"分两事务，提交失败会丢当月数据）；
+                // 改为标记覆盖，删除并入 SubmitQuickVerificationAsync 同一事务。
+                overwrite = true;
             }
 
             IsBusy = true;
             LoadingMessage = "提交中...";
 
             var request = BuildSubmitRequest(validApplicants, operatorInfo);
-            var submitResult = await _verificationService.SubmitQuickVerificationAsync(request, CancellationToken);
+            var submitResult = await _verificationService.SubmitQuickVerificationAsync(request, overwrite, CancellationToken);
 
             // 先关闭蒙版，再显示对话框
             IsBusy = false;
@@ -795,7 +767,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "快速核查提交失败");
             await _dialogService.DisplayAlertAsync("错误", $"提交失败: {ex.Message}", "确定");
         }
         finally
@@ -1087,7 +1059,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             PrintNavigationData.BusinessId = null;
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承
             PrintNavigationData.ClearDocumentMode();
-            PrintNavigationData.BusinessType = "AssetVerification";
+            PrintNavigationData.BusinessType = PrintBusinessTypes.AssetVerification;
             PrintNavigationData.FieldData = fields;
             PrintNavigationData.TableData = tableRows;
             PrintNavigationData.Classification = ClassificationConstants.AssetVerification;
@@ -1096,7 +1068,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "失败");
+            _logger.LogError(ex, "提交后打开打印预览失败");
             await _dialogService.DisplayAlertAsync("提示",
                 $"申请已提交成功，但打开打印预览失败\n{ex.GetType().Name}: {ex.Message}", "确定");
             Reset();
@@ -1115,7 +1087,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             if (usersResult.IsFailure || usersResult.Value == null || usersResult.Value.Count == 0)
                 return "未配置";
 
-            var civilAssistant = usersResult.Value.FirstOrDefault(u => u.Position == "民政助理");
+            var civilAssistant = usersResult.Value.FirstOrDefault(u => u.Position == PositionTitles.CivilAssistant);
             return civilAssistant?.FullName ?? "未配置";
         }
         catch

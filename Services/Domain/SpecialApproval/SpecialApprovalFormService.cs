@@ -64,7 +64,7 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
 
     public async Task<SpecialApprovalForm?> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        var sql = "SELECT * FROM nc_biz_special_approval_forms WHERE application_id = $1 AND deleted_at IS NULL LIMIT 1";
+        var sql = "SELECT " + WideTableColumns.SpecialApprovalFormsColumns + " FROM nc_biz_special_approval_forms WHERE application_id = $1 AND deleted_at IS NULL LIMIT 1";
         var result = await _db.QuerySingleAsync<SpecialApprovalForm>(sql, ct, applicationId);
         return result.IsSuccess ? result.Value : null;
     }
@@ -372,7 +372,8 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
     /// </summary>
     private async Task<Dictionary<string, string>> BuildFieldDataAsync(ApplicationEntity app, SpecialApprovalForm form, CancellationToken ct)
     {
-        var fullAddress = $"{app.Town ?? ""}{app.Community ?? ""}{app.Address ?? ""}".Trim();
+        // 地址统一走文本级唯一入口（县+镇+村+门牌，已含则跳过；原 Town+Community+Address 裸拼会重复）
+        var fullAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
         var reportUnit = string.IsNullOrWhiteSpace(form.ReportUnit)
             ? await GetOperatorUnitNameAsync()
             : form.ReportUnit;

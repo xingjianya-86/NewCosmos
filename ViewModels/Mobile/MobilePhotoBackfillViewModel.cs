@@ -301,7 +301,7 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
 
                         var request = new PrintJobRequest
                         {
-                            BusinessType = "ArchivePhoto",
+                            BusinessType = PrintBusinessTypes.ArchivePhoto,
                             BusinessId = person.BusinessId,
                             Classification = PhotoCategoryConstants.GetDisplayName(photo.PhotoCategory),
                             ApplicantName = person.PersonName,

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -11,31 +11,14 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
 
         <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE898;', Android='&#x1F4CE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="渐退期管理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="进行中与已到期的渐退户统一管理，期满请及时复核处置" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE898;', Android='&#x1F4CE;'}"
+                                   Title="渐退期管理"
+                                   Subtitle="进行中与已到期的渐退户统一管理，期满请及时复核处置"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+        </components:PageHeaderView>
 
         <!-- 统计栏 -->
         <Grid Grid.Row="1" Padding="20,10" ColumnDefinitions="*,*,*,*" ColumnSpacing="12"
@@ -60,14 +43,14 @@
                 <Grid ColumnDefinitions="Auto, *, Auto">
                     <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
                            FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
-                           FontSize="14"
+                           FontSize="16"
                            TextColor="{StaticResource Gray500}"
                            VerticalOptions="Center"
                            Margin="0,0,8,0"/>
                     <Entry Grid.Column="1"
                            Placeholder="搜索申请人姓名、身份证号"
                            Text="{Binding SearchText}"
-                           FontSize="16"
+                           FontSize="18"
                            BackgroundColor="Transparent"
                            ReturnCommand="{Binding SearchCommand}"/>
                     <Button Grid.Column="2"
@@ -123,16 +106,16 @@
                                   Style="{StaticResource TableRowInteractive}"
                                   ColumnDefinitions="50, 1.2*, 1*, 1.8*, 1.5*, 1.2*, 1*, 1*, Auto">
 
-                                <Label Text="{Binding ApplicationId}" FontSize="15" VerticalOptions="Center"/>
-                                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="15" VerticalOptions="Center"/>
-                                <Label Grid.Column="2" Text="{Binding ApplicantName}" FontSize="15" VerticalOptions="Center"/>
-                                <Label Grid.Column="3" Text="{Binding ApplicantIdCard}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Text="{Binding ApplicationId}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding ApplicationNo}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="{Binding ApplicantName}" FontSize="17" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="{Binding ApplicantIdCard}" FontSize="17" VerticalOptions="Center"/>
                                 <Label Grid.Column="4"
                                        Text="{Binding GracePeriodMonths, StringFormat='{0} 个月'}"
-                                       FontSize="15" VerticalOptions="Center"/>
+                                       FontSize="17" VerticalOptions="Center"/>
                                 <Label Grid.Column="5"
                                        Text="{Binding StatusText}"
-                                       FontSize="15" VerticalOptions="Center">
+                                       FontSize="17" VerticalOptions="Center">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="True">
                                             <Setter Property="TextColor" Value="#16A34A"/>
@@ -144,7 +127,7 @@
                                 </Label>
                                 <Label Grid.Column="6"
                                        Text="{Binding DurationText}"
-                                       FontSize="15" VerticalOptions="Center">
+                                       FontSize="17" VerticalOptions="Center">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsActivePeriod}" Value="True">
                                             <Setter Property="TextColor" Value="#16A34A"/>
@@ -154,7 +137,7 @@
                                         </DataTrigger>
                                     </Label.Triggers>
                                 </Label>
-                                <Label Grid.Column="7" Text="{Binding OriginalClassification}" FontSize="15" VerticalOptions="Center"/>
+                                <Label Grid.Column="7" Text="{Binding OriginalClassification}" FontSize="17" VerticalOptions="Center"/>
 
                                 <Button Grid.Column="8"
                                         Text="重新核算"
@@ -181,12 +164,12 @@
                     </Border.Shadow>
                     <VerticalStackLayout Spacing="8">
                         <Label Text="家庭成员名单"
-                               FontSize="15"
+                               FontSize="17"
                                FontAttributes="Bold"
                                TextColor="{StaticResource TextPrimary}"/>
                         <Label Text="{Binding MemberLoadError}"
                                IsVisible="{Binding MemberLoadError, Converter={StaticResource StringNotEmptyConverter}}"
-                               FontSize="12"
+                               FontSize="14"
                                TextColor="{StaticResource Error}"/>
                         <CollectionView ItemsSource="{Binding MemberItems}" MaximumHeightRequest="240">
                             <CollectionView.Header>
@@ -205,17 +188,17 @@
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="ent:FamilyMember">
                                     <Grid Padding="12,8" ColumnDefinitions="1.2*,1*,0.6*,1.8*,1.2*">
-                                        <Label Text="{Binding Name}" FontSize="14" VerticalOptions="Center"/>
+                                        <Label Text="{Binding Name}" FontSize="16" VerticalOptions="Center"/>
                                         <Label Grid.Column="1"
                                                Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"
-                                               FontSize="14" VerticalOptions="Center"/>
+                                               FontSize="16" VerticalOptions="Center"/>
                                         <Label Grid.Column="2"
                                                Text="{Binding Age, StringFormat='{0} 岁'}"
-                                               FontSize="14" VerticalOptions="Center"/>
-                                        <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="14" VerticalOptions="Center"/>
+                                               FontSize="16" VerticalOptions="Center"/>
+                                        <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="16" VerticalOptions="Center"/>
                                         <Label Grid.Column="4"
                                                Text="{Binding AnnualIncome, StringFormat='{0:N2}'}"
-                                               FontSize="14" VerticalOptions="Center"/>
+                                               FontSize="16" VerticalOptions="Center"/>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>

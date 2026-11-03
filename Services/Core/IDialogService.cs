@@ -1,16 +1,19 @@
-﻿namespace NewCosmos.Services.Core;
+namespace NewCosmos.Services.Core;
 
 /// <summary>
 /// 对话服务接口
-/// 封装 MAUI 页面对话框操    /// </summary>
+/// 封装 MAUI 页面对话框操
+/// </summary>
 public interface IDialogService
 {
     /// <summary>
-    /// 显示提示对话    /// </summary>
+    /// 显示提示对话
+/// </summary>
     Task DisplayAlertAsync(string title, string message, string cancel);
 
     /// <summary>
-    /// 显示确认对话    /// </summary>
+    /// 显示确认对话
+/// </summary>
     /// <returns>用户是否点击确认按钮</returns>
     Task<bool> DisplayAlertAsync(string title, string message, string accept, string cancel);
 

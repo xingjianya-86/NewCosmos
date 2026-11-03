@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.AssetVerification.AssetVerificationHomePage"
@@ -13,41 +13,22 @@
             <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
 
                 <!-- 域色渐变头部横幅：标题 + 职责描述 + 模块统计栏 -->
-                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardOrangeGradient}">
-                    <VerticalStackLayout Spacing="16">
-
-                        <!-- 返回行 -->
-                        <Grid ColumnDefinitions="Auto,*">
-                            <HorizontalStackLayout Spacing="6">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                                <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
+                <!-- 统一页头（纸墨档案风报头 · Phase 6，统计胶囊迁入 Stats 插槽并转浅色变体） -->
+                <components:PageHeaderView
+                                           Glyph="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                                           Title="家庭经济状况核对"
+                                           Subtitle="居民家庭经济状况核对 · 授权报告上传与月度审核"
+                                           BackCommand="{Binding GoBackCommand}"
+                                           BackText="返回工作台">
+                    <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                            <components:StatCapsule IsLight="True"  Grid.Column="0"  Value="{Binding PendingReportCountText}" Caption="待上传（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="1"  Value="{Binding MonthlyCompletedText}" Caption="本月已完成（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="2"  Value="{Binding MonthlyNewText}" Caption="本月新增（户）"/>
+                            <components:StatCapsule IsLight="True"  Grid.Column="3"  Value="{Binding YearTotalText}" Caption="全年累计（户）"/>
                         </Grid>
-
-                        <!-- 标题与职责 -->
-                        <HorizontalStackLayout Spacing="14">
-                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                                <Label Text="家庭经济状况核对" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="居民家庭经济状况核对 · 授权报告上传与月度审核" Style="{StaticResource ModuleHeroSubtitle}"/>
-                            </VerticalStackLayout>
-                        </HorizontalStackLayout>
-
-                        <!-- 模块统计栏 -->
-                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                            <components:StatCapsule  Grid.Column="0"  Value="{Binding PendingReportCountText}" Caption="待上传（户）"/>
-                            <components:StatCapsule  Grid.Column="1"  Value="{Binding MonthlyCompletedText}" Caption="本月已完成（户）"/>
-                            <components:StatCapsule  Grid.Column="2"  Value="{Binding MonthlyNewText}" Caption="本月新增（户）"/>
-                            <components:StatCapsule  Grid.Column="3"  Value="{Binding YearTotalText}" Caption="全年累计（户）"/>
-                        </Grid>
-
-                    </VerticalStackLayout>
-                </Border>
+                    </components:PageHeaderView.Stats>
+                </components:PageHeaderView>
 
                 <!-- 子功能卡片区 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">

@@ -1,0 +1,13 @@
+# 死亡地点字典（固定 ID）
+# 分类 ID=96，字典项 ID 范围: 96001-96999；首项为表单默认值
+database: sys_dictionary
+version: 1.0
+
+tables:
+  - name: nc_dict_items
+    data:
+      - { id: 96001, category: "DeathPlaces", item_key: "家中", item_value: "家中", sort_order: 1, is_active: true }
+      - { id: 96002, category: "DeathPlaces", item_key: "医院", item_value: "医院", sort_order: 2, is_active: true }
+      - { id: 96003, category: "DeathPlaces", item_key: "养老机构（敬老院）", item_value: "养老机构（敬老院）", sort_order: 3, is_active: true }
+      - { id: 96004, category: "DeathPlaces", item_key: "路上", item_value: "路上", sort_order: 4, is_active: true }
+      - { id: 96005, category: "DeathPlaces", item_key: "其他", item_value: "其他", sort_order: 5, is_active: true }

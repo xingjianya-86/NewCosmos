@@ -34,6 +34,12 @@ public static class DictionaryTypeCodes
     public const string ChangeReasons = "ChangeReasons";
     public const string MemberAddReasons = "MemberAddReasons";
 
+    // 死亡情况说明表单选项（2026-10-30：默认值=字典首项，选项运营可维护，不进代码）
+    public const string DeathPlaces = "DeathPlaces";
+    public const string DeathSituations = "DeathSituations";
+    public const string DeathRemainsArrangements = "DeathRemainsArrangements";
+    public const string BusinessMatters = "BusinessMatters";
+
     public static readonly string[] All =
     {
         ClassificationCodes, HukouTypes, SupportModes, FamilyRelationships,
@@ -43,6 +49,7 @@ public static class DictionaryTypeCodes
         LandUsage, RigidExpenditureTypes, DeregisterReasons, SubsidyTypes,
         ApplicationReasons, Positions,
         InstitutionCategory, InstitutionType, IdTypes, CaregiverTypes,
-        SpecialApprovalTemplates, DeathReasons, ChangeReasons, MemberAddReasons
+        SpecialApprovalTemplates, DeathReasons, ChangeReasons, MemberAddReasons,
+        DeathPlaces, DeathSituations, DeathRemainsArrangements, BusinessMatters
     };
 }

@@ -46,16 +46,18 @@ public class DictCacheService : BaseService, IDictCacheService
     }
 
     /// <summary>
-    /// 按 TTL 惰性刷新：距上次全量刷新未超过 RefreshInterval 时直接返回，
+    /// 按 TTL 惰性刷新：距上次【成功】刷新未超过 RefreshInterval 时直接返回，
     /// 避免主页每次 OnAppearing 都全量重载字典（2 次 DB 查询 + 内存重建 3 份索引）。
     /// 多台部署机字典变更最多 RefreshInterval 后自动同步。
+    /// 2026-11 修复：时间戳在 RefreshAsync 成功后才推进——失败立即重试，
+    /// 不再出现"失败后 10 分钟降级窗口内字典陈旧被当成正常状态"。
     /// </summary>
     public async Task EnsureFreshAsync(CancellationToken ct = default)
     {
         if (DateTime.UtcNow - _lastRefreshUtc < RefreshInterval)
             return;
-        _lastRefreshUtc = DateTime.UtcNow;
-        await RefreshAsync(ct);
+        if (await RefreshAsync(ct))
+            _lastRefreshUtc = DateTime.UtcNow;
     }
 
     public string GetValue(string category, string key)
@@ -116,7 +118,7 @@ public class DictCacheService : BaseService, IDictCacheService
         }).ToList();
     }
 
-    public async Task RefreshAsync(CancellationToken ct = default)
+    public async Task<bool> RefreshAsync(CancellationToken ct = default)
     {
         try
         {
@@ -124,7 +126,7 @@ public class DictCacheService : BaseService, IDictCacheService
             if (!categories.IsSuccess || categories.Value == null)
             {
                 Logger.Warn("刷新字典缓存失败：无法获取分类列");
-                return;
+                return false;
             }
 
             // 一次查询取回全部字典项，内存中按分类分组，
@@ -133,7 +135,7 @@ public class DictCacheService : BaseService, IDictCacheService
             if (!allItems.IsSuccess || allItems.Value == null)
             {
                 Logger.Warn("刷新字典缓存失败：无法获取字典项列表");
-                return;
+                return false;
             }
 
             var itemsByCategory = allItems.Value
@@ -165,10 +167,12 @@ public class DictCacheService : BaseService, IDictCacheService
 
             _snapshot = new CacheSnapshot(newCache, newOrderedKeys, newValueToKey); // 原子替换
             DictDisplayHelper.UpdateFromCache(this);
+            return true;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "失败");
+            return false;
         }
     }
 }

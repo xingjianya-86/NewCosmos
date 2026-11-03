@@ -158,6 +158,54 @@ public class RecoveryRecordDto
     /// 自动计算分段明细（无则空）
     /// </summary>
     public List<RecoverySegment> Segments { get; set; } = new();
+
+    /// <summary>
+    /// 创建人（VM 传当前登录用户名；服务层不读 UI 静态上下文）
+    /// </summary>
+    public string? CreatedBy { get; set; }
+}
+
+/// <summary>
+/// 手工录入页按身份证查档结果（自动带出追缴分类 / 每月保障标准 / 停发原因用）。
+/// 取数单点在 <c>IRecoveryService.LookupArchiveByIdCardAsync</c>，排序口径：
+/// 停发记录优先 → 分类（低保系 &gt; 临时救助 &gt; 高龄）→ 最新创建，只取一条。
+/// </summary>
+public class RecoveryArchiveLookupDto
+{
+    /// <summary>
+    /// 来源类型：RuralSubsistence/UrbanSubsistence/RigidExpenditure/TempRelief/Elderly
+    /// </summary>
+    public string SourceType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 来源记录ID（申请 / 临时救助 / 高龄记录主键）
+    /// </summary>
+    public long SourceId { get; set; }
+
+    /// <summary>
+    /// 档案姓名
+    /// </summary>
+    public string PersonName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 档案身份证号
+    /// </summary>
+    public string? IdCard { get; set; }
+
+    /// <summary>
+    /// 月保障标准（列口径与 SearchStoppedPersonsAsync 一致）
+    /// </summary>
+    public decimal MonthlyAmount { get; set; }
+
+    /// <summary>
+    /// 档案停发原因（stop_reason；为空表示档案未记录，追缴原因留空由用户手填）
+    /// </summary>
+    public string? StopReason { get; set; }
+
+    /// <summary>
+    /// 该档案是否已停发（status=Stopped，带出提示文案用）
+    /// </summary>
+    public bool IsStopped { get; set; }
 }
 
 /// <summary>
@@ -229,4 +277,9 @@ public class ManualRecoveryRecordDto
     /// 自动计算分段明细（无则空）
     /// </summary>
     public List<RecoverySegment> Segments { get; set; } = new();
+
+    /// <summary>
+    /// 创建人（VM 传当前登录用户名；服务层不读 UI 静态上下文）
+    /// </summary>
+    public string? CreatedBy { get; set; }
 }

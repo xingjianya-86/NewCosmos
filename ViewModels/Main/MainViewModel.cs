@@ -1,6 +1,8 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
+using System.Collections.ObjectModel;
+using System.Windows.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
@@ -135,69 +137,106 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _canAccessReprint;
 
-    #region 首页仪表盘卡片动态排位（无权限卡片隐藏后其余卡片自动补位）
+    #region 首页仪表盘卡片分组（模型驱动：无权限卡片不入列、其余自动补位，空组整组隐藏）
 
-    public int SocialAssistanceRow { get; private set; }
-    public int SocialAssistanceCol { get; private set; }
-    public int ElderlyBenefitRow { get; private set; }
-    public int ElderlyBenefitCol { get; private set; }
-    public int AssetVerificationRow { get; private set; }
-    public int AssetVerificationCol { get; private set; }
-    public int ArchiveQueryRow { get; private set; }
-    public int ArchiveQueryCol { get; private set; }
-    public int DeathStatementRow { get; private set; }
-    public int DeathStatementCol { get; private set; }
-    public int DatabaseManagementRow { get; private set; }
-    public int DatabaseManagementCol { get; private set; }
-    public int UserManagementRow { get; private set; }
-    public int UserManagementCol { get; private set; }
-    public int LotteryRow { get; private set; }
-    public int LotteryCol { get; private set; }
-    public int ReprintCenterRow { get; private set; }
-    public int ReprintCenterCol { get; private set; }
-    public int Website1Row { get; private set; }
-    public int Website1Col { get; private set; }
-    public int Website2Row { get; private set; }
-    public int Website2Col { get; private set; }
-    public int DutyRow { get; private set; }
-    public int DutyCol { get; private set; }
+    /// <summary>首页模块分组（救助业务/管理工具/娱乐天地/快捷链接），权限加载后整体重建</summary>
+    public ObservableCollection<ModuleGroup> DashboardGroups { get; } = new();
 
     /// <summary>
-    /// 按固定顺序重排仪表盘卡片：无权限（不可见）卡片跳过，其余卡片按
-    /// 行=序号/3、列=序号%3 向前压实，避免 Grid 固定格位留下空洞。
+    /// 按卡片目录重建首页模块分组：无权限卡片跳过，组内卡片按
+    /// 行=序号/3、列=序号%3 向前压实，避免 Grid 固定格位留下空洞；
+    /// 整组无卡时不进 <see cref="DashboardGroups"/>，分组标题随之隐藏。
     /// </summary>
-    private void UpdateDashboardLayout()
+    private void RebuildDashboard()
     {
-        var i = 0;
-        (int Row, int Col) NextPos()
+        ModuleCardItem Card(string title, string subtitle, string description,
+            string iconGlyph, string iconBgColor, string iconColor,
+            string buttonText, ICommand command, object? parameter = null) => new()
         {
-            var p = (i / 3, i % 3);
-            i++;
-            return p;
-        }
+            Title = title,
+            Subtitle = subtitle,
+            Description = description,
+            IconGlyph = iconGlyph,
+            IconBgColor = iconBgColor,
+            IconColor = iconColor,
+            ButtonText = buttonText,
+            Command = command,
+            CommandParameter = parameter
+        };
 
-        void Place(bool visible, Action<int, int> assign, string rowProp, string colProp)
+        // 卡片目录：元组顺序 = 组内展示顺序，数组顺序 = 分组展示顺序。
+        // 图标色值与 Resources\Styles\Colors.xaml 的 Module* 色板保持一致（模型无法引用 XAML 资源）。
+        var catalog = new (string Title, List<(ModuleCardItem Card, bool Visible)> Items)[]
         {
-            if (!visible) return;
-            var p = NextPos();
-            assign(p.Row, p.Col);
-            OnPropertyChanged(rowProp);
-            OnPropertyChanged(colProp);
-        }
+            (ModuleCategoryConstants.BUSINESS, new()
+            {
+                (Card("低收入人口救助帮扶", "认定审核确认 · 动态管理",
+                    "覆盖救助申请、保障对象动态管理、临时救助、月报表与渐退期管理",
+                    "\uE765", "#EBF5FF", "#ab3227", "进入模块", NavigateCommand, "SocialAssistance"), CanAccessSocialAssistance),
+                (Card("高龄津贴发放", "申请登记 · 停发管理 · 类别复核",
+                    "覆盖高龄津贴申请登记、停发办理、类别复核与月度报表",
+                    "\uE7B8", "#F5F3FF", "#5a4a72", "进入模块", NavigateCommand, "Elderly"), CanAccessElderlyBenefit),
+                (Card("家庭经济状况核对", "经济核对 · 报告审核",
+                    "覆盖快速核对、报告上传月度审核与核对月报表",
+                    "\uE721", "#FFFBEB", "#96681c", "进入模块", NavigateCommand, "AssetVerification"), CanAccessAssetVerification),
+                (Card("救助档案管理", "历史档案检索查阅",
+                    "现存低收入人口历史档案查询",
+                    "\uE8F1", "#ECFDF5", "#2e4738", "进入模块", NavigateCommand, "Archive"), CanAccessArchiveQuery),
+                // 死亡情况说明：紧随救助档案管理，入口在中间业务模块（侧栏不放）
+                (Card("死亡情况说明", "死亡申报 · 身份聚合 · 文书出具",
+                    "覆盖村内死亡申报、在库身份聚合、数据提醒与情况说明出具",
+                    "\uE7BA", "#F1F0FB", "#6D28D9", "进入模块", NavigateCommand, "DeathStatement"), CanAccessArchiveQuery),
+                // 后补追缴：独立模块卡（权限 RECOVERY_VIEW，与侧栏同源门控），紧随死亡情况说明
+                (Card("后补追缴", "停止人员追缴 · 手工录入",
+                    "覆盖低保、刚性支出、临时救助与高龄停止人员的追缴办理与台账",
+                    "\uE8D1", "#FFF3E0", "#7a5315", "进入模块", NavigateCommand, "Recovery"), CanAccessRecovery)
+            }),
+            (ModuleCategoryConstants.TOOLS, new()
+            {
+                (Card("数据中心", "备份恢复 · 数据导入导出",
+                    "数据库管理、数据字典、标准配置、数据导入与区域数据维护",
+                    "\uE88E", "#F8FAFC", "#6d6354", "进入模块", NavigateCommand, "Database"), CanAccessDatabaseManagement),
+                (Card("用户与权限管理", "账户 · 角色 · 权限配置",
+                    "系统用户、角色权限与经办机构信息维护（经办机构亦可从左侧菜单进入）",
+                    "\uE77B", "#FDF2F8", "#7f231b", "进入模块", NavigateCommand, "User"), CanAccessUserManagement),
+                (Card("值班管理", "月度值班表 · 班务调整",
+                    "值班表轮转生成、请假/串班/代班调整、节假日维护与政务值班表导出",
+                    "\uE8C0", "#ECFDF5", "#2e4738", "进入模块", NavigateCommand, "Duty"), CanAccessDuty),
+                (Card("历史补打中心", "按人检索 · 批量补打",
+                    "跨域按人检索低保/临时救助/普惠高龄/资产核查/动态管理档案，支持留痕原样补打与按月批量打印",
+                    "\uE749", "#F0F9FF", "#6d6354", "进入模块", NavigateCommand, "ReprintCenter"), CanAccessReprint)
+            }),
+            (ModuleCategoryConstants.ENTERTAINMENT, new()
+            {
+                (Card("彩票助手", "机选 · 智能预测",
+                    "双色球/大乐透历史数据、号码统计分析与智能预测",
+                    "\uE734", "#FFF7ED", "#EA580C", "进入模块", NavigateCommand, "Lottery"), CanAccessLottery)
+            }),
+            (ModuleCategoryConstants.LINKS, new()
+            {
+                (Card("作者官网", "软件更新 · 通告",
+                    "用于软件更新以及通告",
+                    "\uE774", "#EBF5FF", "#ab3227", "访问网站", OpenWebsite1Command), true),
+                (Card("黑龙江民政官网", "黑龙江省民政厅",
+                    "访问黑龙江省民政厅网上办事大厅",
+                    "\uE774", "#ECFDF5", "#2e4738", "访问网站", OpenWebsite2Command), true)
+            })
+        };
 
-        Place(CanAccessSocialAssistance, (r, c) => { SocialAssistanceRow = r; SocialAssistanceCol = c; }, nameof(SocialAssistanceRow), nameof(SocialAssistanceCol));
-        Place(CanAccessElderlyBenefit, (r, c) => { ElderlyBenefitRow = r; ElderlyBenefitCol = c; }, nameof(ElderlyBenefitRow), nameof(ElderlyBenefitCol));
-        Place(CanAccessAssetVerification, (r, c) => { AssetVerificationRow = r; AssetVerificationCol = c; }, nameof(AssetVerificationRow), nameof(AssetVerificationCol));
-        Place(CanAccessArchiveQuery, (r, c) => { ArchiveQueryRow = r; ArchiveQueryCol = c; }, nameof(ArchiveQueryRow), nameof(ArchiveQueryCol));
-        // 死亡情况说明：紧随救助档案管理，入口在中间业务模块（侧栏不放）
-        Place(CanAccessArchiveQuery, (r, c) => { DeathStatementRow = r; DeathStatementCol = c; }, nameof(DeathStatementRow), nameof(DeathStatementCol));
-        Place(CanAccessDatabaseManagement, (r, c) => { DatabaseManagementRow = r; DatabaseManagementCol = c; }, nameof(DatabaseManagementRow), nameof(DatabaseManagementCol));
-        Place(CanAccessUserManagement, (r, c) => { UserManagementRow = r; UserManagementCol = c; }, nameof(UserManagementRow), nameof(UserManagementCol));
-        Place(CanAccessReprint, (r, c) => { ReprintCenterRow = r; ReprintCenterCol = c; }, nameof(ReprintCenterRow), nameof(ReprintCenterCol));
-        Place(CanAccessLottery, (r, c) => { LotteryRow = r; LotteryCol = c; }, nameof(LotteryRow), nameof(LotteryCol));
-        Place(true, (r, c) => { Website1Row = r; Website1Col = c; }, nameof(Website1Row), nameof(Website1Col));
-        Place(true, (r, c) => { Website2Row = r; Website2Col = c; }, nameof(Website2Row), nameof(Website2Col));
-        Place(CanAccessDuty, (r, c) => { DutyRow = r; DutyCol = c; }, nameof(DutyRow), nameof(DutyCol));
+        DashboardGroups.Clear();
+        foreach (var (title, items) in catalog)
+        {
+            var cards = items.Where(x => x.Visible).Select(x => x.Card).ToList();
+            if (cards.Count == 0) continue;
+
+            for (var i = 0; i < cards.Count; i++)
+            {
+                cards[i].Row = i / 3;
+                cards[i].Col = i % 3;
+            }
+
+            DashboardGroups.Add(new ModuleGroup { Title = title, Cards = cards });
+        }
     }
 
     #endregion
@@ -213,6 +252,10 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _userFullName = string.Empty;
+
+    /// <summary>顶栏显示名（优先真实姓名，无姓名时回退登录账号）</summary>
+    public string CurrentUserDisplayName =>
+        string.IsNullOrWhiteSpace(UserFullName) ? CurrentUserName : UserFullName;
 
     [ObservableProperty]
     private string _userPhone = string.Empty;
@@ -331,7 +374,7 @@ public partial class MainViewModel : ViewModelBase
 
     #region 死亡申报联动提醒
 
-    /// <summary>本村死亡申报中仍有未办关联流程的条数（口径见 DeathStatementService.GetPendingLinkageCountAsync）</summary>
+    /// <summary>本范围未办死亡联动待办数（口径见 DeathStatementService.GetLinkageTaskCountAsync，任务表实时判定）</summary>
     [ObservableProperty]
     private int _deathLinkagePendingCount;
 
@@ -339,11 +382,20 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showDeathLinkageReminder;
 
-    /// <summary>横幅文案（计数由单一 SQL 判定，与页面联动卡片同口径）</summary>
-    public string DeathLinkageBannerText =>
-        $"有 {DeathLinkagePendingCount} 条死亡申报仍有未办关联流程（高龄停发 / 档案变更等），请前往「死亡情况说明」处理";
+    /// <summary>
+    /// 当前用户是否具备任一联动手续承接权限（高龄停发/档案变更/大学生/追缴）。
+    /// true → 横幅引导「去办理」；false（如村级：只申报不办理）→ 横幅改「待镇级经办处理」。
+    /// </summary>
+    [ObservableProperty]
+    private bool _deathLinkageCanHandle;
+
+    /// <summary>横幅文案（按承接权限分流：有权限引导办理，无权限告知已入队待镇级处理）</summary>
+    public string DeathLinkageBannerText => !DeathLinkageCanHandle
+        ? $"已收到 {DeathLinkagePendingCount} 项死亡申报关联手续（高龄停发 / 档案变更等），本级无办理权限，待镇级经办处理"
+        : $"有 {DeathLinkagePendingCount} 项死亡申报关联手续待办（高龄停发 / 档案变更等），请前往「死亡情况说明」办理";
 
     partial void OnDeathLinkagePendingCountChanged(int value) => OnPropertyChanged(nameof(DeathLinkageBannerText));
+    partial void OnDeathLinkageCanHandleChanged(bool value) => OnPropertyChanged(nameof(DeathLinkageBannerText));
 
     #endregion
 
@@ -437,18 +489,14 @@ public partial class MainViewModel : ViewModelBase
         // COM/注册表探测为同步阻塞操作，放到线程池执行，避免卡住 UI 线程；
         // 结果进程内缓存一次，后续返回主页不再重复探测。
         // Android 端无 Office，跳过此检测（手机端打印走推送打印队列）。
-        var officeInstalled = await Task.Run(() => OfficeProviderDetector.IsOfficeInstalled());
-        if (!officeInstalled)
-        {
-            _logger.Error("Microsoft Office 未安装");
-            await _dialogService.DisplayAlertAsync(
-                "缺少必要组件",
-                "系统未检测到 Microsoft Office，\nPDF 文档导出功能需要 Microsoft Office 支持。\n\n请安装 Microsoft Office 365 后重试。",
-                "确定");
-            return;
-        }
-
-        _logger.Info("Office 检测通过");
+        //
+        // 未安装时【降级继续】而非中断：旧实现此处 return 会连带跳过权限/统计/字典加载，
+        // 导致整页空主页（侧栏卡片全隐藏、本会话无法恢复）。缺 Office 只影响打印/PDF，
+        // 打印执行时自有明确报错，不应拖垮主页初始化。
+        //
+        // 2026-11 并行化：Office 探测（100~500ms 注册表/COM）与下方权限播种互不依赖，
+        // 探测提前入后台跑，权限播种完再取结果弹窗——主页初始化总时长省一个探测段。
+        var officeTask = Task.Run(() => OfficeProviderDetector.IsOfficeInstalled());
 #endif
 
         InitializeUserInfo();
@@ -463,6 +511,23 @@ public partial class MainViewModel : ViewModelBase
         {
             _logger.LogError(ex, "默认权限同步失败（降级继续启动）");
         }
+
+#if WINDOWS
+        var officeInstalled = await officeTask;
+        if (!officeInstalled)
+        {
+            _logger.Warn("Microsoft Office 未安装：打印/PDF 导出不可用，主页按降级模式继续初始化");
+            await _dialogService.DisplayAlertAsync(
+                "缺少必要组件",
+                "系统未检测到 Microsoft Office，打印与 PDF 文档导出功能将不可用。\n\n" +
+                "其余功能可正常使用。如需打印/导出，请安装 Microsoft Office 365 后重启应用。",
+                "确定");
+        }
+        else
+        {
+            _logger.Info("Office 检测通过");
+        }
+#endif
 
         // 权限必须先加载完成（UI 按钮启用状态依赖权限门控）
         await LoadPermissionsAsync();
@@ -533,6 +598,7 @@ public partial class MainViewModel : ViewModelBase
         CurrentUserName = App.CurrentUserName ?? "用户";
         UserFullName = App.CurrentUserFullName ?? string.Empty;
         UserPhone = App.CurrentUserPhone ?? string.Empty;
+        OnPropertyChanged(nameof(CurrentUserDisplayName));
 
         _logger.Info($"用户信息初始化完成, UserId={CurrentUserId}");
     }
@@ -731,8 +797,8 @@ public partial class MainViewModel : ViewModelBase
                 || Has(PermissionCodes.ELDERLY_VIEW) || Has(PermissionCodes.ASSET_VIEW)
                 || Has(PermissionCodes.CHANGE_VIEW);
 
-            // 无权限卡片隐藏后其余卡片自动补位
-            UpdateDashboardLayout();
+            // 无权限卡片不入列、其余卡片自动补位（整组无卡则分组隐藏）
+            RebuildDashboard();
 
             _permissionsLoaded = true;
             _logger.Info($"权限加载完成: SocialAssistance={CanAccessSocialAssistance}");
@@ -864,18 +930,40 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// 加载死亡申报联动提醒（失败容忍：查询失败仅记日志、不显示横幅，
-    /// 账号未绑定村社区时服务返回 Success(0) 同样不亮横幅）
+    /// 账号未绑定村社区时服务返回 Success(0) 同样不亮横幅）。
+    /// 口径 = 任务表实时未办数（先按范围幂等补齐再计数）；文案按承接权限分流。
     /// </summary>
     private async Task LoadDeathLinkageReminderAsync()
     {
         try
         {
-            var result = await _deathStatementService.GetPendingLinkageCountAsync();
+            // 承接权限分流：任一域办理权限（高龄停发/档案变更/大学生/追缴）→ 引导办理；
+            // 全无（典型如村级：只申报不办理）→ 告知已入队待镇级经办处理
+            var handleCodes = DeathLinkageConstants.AllDomains
+                .Select(DeathLinkageConstants.GetRequiredPermission)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct()
+                .ToArray();
+            var userId = App.CurrentUserId ?? 0;
+            var perms = userId > 0
+                ? await _permissionService.CheckPermissionsAsync(userId, handleCodes)
+                : null;
+            DeathLinkageCanHandle = perms != null && handleCodes.Count(c => perms.TryGetValue(c, out var granted) && granted) > 0;
+
+            var scopeResult = await _deathStatementService.ResolveScopeAsync(CancellationToken);
+            if (scopeResult.IsFailure)
+            {
+                ShowDeathLinkageReminder = false;
+                _logger.Warn($"死亡申报联动计数跳过（范围解析失败）: {scopeResult.Message}");
+                return;
+            }
+
+            var result = await _deathStatementService.GetLinkageTaskCountAsync(scopeResult.Value, CancellationToken);
             if (result.IsSuccess)
             {
                 DeathLinkagePendingCount = result.Value;
                 ShowDeathLinkageReminder = result.Value > 0;
-                _logger.Info($"死亡申报联动提醒加载完成: 待联动 {DeathLinkagePendingCount} 条");
+                _logger.Info($"死亡申报联动提醒加载完成: 待办 {DeathLinkagePendingCount} 项，可承接={DeathLinkageCanHandle}");
             }
             else
             {
@@ -952,7 +1040,7 @@ public partial class MainViewModel : ViewModelBase
                     await NavigateToAsync<Pages.UserManagement.OrganizationPage>("经办机构管理");
                     break;
 
-                case "Settings":
+                case "Templates": // 侧栏文书模板管理入口（历史键名"Settings"与目标不符且与顶栏系统设置撞名，已改名）
                     if (!CanAccessTemplateManagement) { await ShowNoPermissionAlertAsync(); return; }
                     await NavigateToAsync<Pages.ArchiveManagement.TemplateManagementPage>("文书模板管理");
                     break;
@@ -1077,6 +1165,16 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task NavigateToCollegeStudentAsync()
     {
+        // 入口门控（2026-10-31 立码 COLLEGE_MANAGE：入口与承接同权，村级不再可达）
+        var userId = App.CurrentUserId ?? 0;
+        if (userId <= 0 ||
+            !await _permissionService.HasPermissionAsync(userId, PermissionCodes.COLLEGE_MANAGE, CancellationToken))
+        {
+            _logger.LogSecurity("大学生管理入口被拦截", ("UserId", userId), ("Reason", "NoPermission"));
+            await ShowNoPermissionAlertAsync();
+            return;
+        }
+
         _logger.LogBusiness("导航到大学生管理", ("Module", "CollegeStudent"));
         try
         {

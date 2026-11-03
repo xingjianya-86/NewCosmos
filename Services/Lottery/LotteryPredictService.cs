@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using NewCosmos.Constants;
 using NewCosmos.Models.Lottery;
@@ -187,8 +186,6 @@ public class LotteryPredictService : ILotteryPredictService
 
     #region 私有方法
 
-    private static readonly string PythonExe = Path.Combine(AppContext.BaseDirectory, "python-embed", "python.exe");
-
     /// <summary>
     /// LSTM 运行主目录（data/model/predict/logs；与 lstm_entry.py 的 _resolve_home 同口径）。
     /// 固定 AppData：安装目录只读时数据/模型仍可写。
@@ -214,76 +211,18 @@ public class LotteryPredictService : ILotteryPredictService
         }
     }
 
-    /// <summary>把数据库密码注入子进程环境变量 PGPASSWORD（避免明文出现在命令行）</summary>
-    private void TrySetDbPasswordEnv(ProcessStartInfo startInfo)
-    {
-        try
-        {
-            var pwd = _configService.GetDatabaseOptions().Password;
-            if (!string.IsNullOrEmpty(pwd))
-                startInfo.EnvironmentVariables["PGPASSWORD"] = pwd;
-        }
-        catch { }
-    }
-
+    /// <summary>
+    /// 执行 Python 脚本（单点实现于 PythonScriptRunner：代理透传 / PGPASSWORD 注入 / 超时 Kill）。
+    /// </summary>
     private async Task<(bool Success, string Output, string Error)> RunPythonScriptAsync(
         string args, CancellationToken ct, TimeSpan? timeout = null)
+        => await PythonScriptRunner.RunAsync(args, ScriptsDir, ct, timeout, GetDbPasswordSafe());
+
+    /// <summary>取数据库密码供子进程 PGPASSWORD 注入（失败返回 null，脚本侧自行报错）。</summary>
+    private string? GetDbPasswordSafe()
     {
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = PythonExe,
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = ScriptsDir
-            };
-
-            // 传递代理环境变量
-            var httpProxy = Environment.GetEnvironmentVariable("HTTP_PROXY") ?? Environment.GetEnvironmentVariable("http_proxy");
-            var httpsProxy = Environment.GetEnvironmentVariable("HTTPS_PROXY") ?? Environment.GetEnvironmentVariable("https_proxy");
-            if (!string.IsNullOrEmpty(httpProxy))
-                startInfo.EnvironmentVariables["HTTP_PROXY"] = httpProxy;
-            if (!string.IsNullOrEmpty(httpsProxy))
-                startInfo.EnvironmentVariables["HTTPS_PROXY"] = httpsProxy;
-
-            TrySetDbPasswordEnv(startInfo);
-
-            using var process = new Process { StartInfo = startInfo };
-            process.Start();
-
-            var outputTask = process.StandardOutput.ReadToEndAsync(ct);
-            var errorTask = process.StandardError.ReadToEndAsync(ct);
-
-            using var timeoutCts = timeout.HasValue
-                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
-                : null;
-            timeoutCts?.CancelAfter(timeout!.Value);
-
-            try
-            {
-                await process.WaitForExitAsync(timeoutCts?.Token ?? ct);
-            }
-            catch (OperationCanceledException) when (timeoutCts is { IsCancellationRequested: true } && !ct.IsCancellationRequested)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { }
-                var msg = $"执行超时（{timeout!.Value.TotalSeconds:F0} 秒），已终止";
-                _logger.Warn($"Python 脚本{msg}: {args}");
-                return (false, "", msg);
-            }
-
-            var output = await outputTask;
-            var error = await errorTask;
-
-            return (process.ExitCode == 0, output, error);
-        }
-        catch (Exception ex)
-        {
-            return (false, "", ex.Message);
-        }
+        try { return _configService.GetDatabaseOptions().Password; }
+        catch { return null; }
     }
 
     private Result<List<PredictionResult>> ParsePredictions(string output, LotteryType lotteryType, string algorithm, string algorithmName)

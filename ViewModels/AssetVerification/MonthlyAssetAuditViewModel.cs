@@ -1134,30 +1134,18 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                     : ALinePeriodHelper.GetYearPeriod(SelectedYear);
             var keyword = string.IsNullOrWhiteSpace(SearchKeyword) ? null : SearchKeyword.Trim();
 
-            // 分页拉全，避免超过 1000 户时静默截断
-            var allItems = new List<AssetVerificationTask>();
-            var pageIndex = 1;
-            const int pageSize = 500;
-            while (true)
+            // 分页拉全，避免超过 1000 户时静默截断（单点：PagedQueryHelper.FetchAllPagesAsync）
+            var fetchResult = await PagedQueryHelper.FetchAllPagesAsync<AssetVerificationTask>(
+                (page, size, tk) => _verificationService.SearchByDateRangePagedAsync(
+                    start, end, keyword, null, page, size, tk),
+                "待核查人员加载失败", token);
+            if (token.IsCancellationRequested) return;
+            if (fetchResult.IsFailure)
             {
-                var result = await _verificationService.SearchByDateRangePagedAsync(
-                    start, end, keyword, null, pageIndex, pageSize, token);
-                if (token.IsCancellationRequested) return;
-
-                if (result.IsFailure || result.Value == null)
-                {
-                    ErrorMessage = "待核查人员加载失败: " + (result.Message ?? "未知错误");
-                    return;
-                }
-
-                if (result.Value.Items.Count == 0)
-                    break;
-
-                allItems.AddRange(result.Value.Items);
-                if (allItems.Count >= result.Value.TotalCount)
-                    break;
-                pageIndex++;
+                ErrorMessage = fetchResult.Message;
+                return;
             }
+            var allItems = fetchResult.Value;
 
             // 按户主身份证号去重，只保留户主记录（优先 is_head，其次身份证=户主身份证）
             var headTasks = allItems

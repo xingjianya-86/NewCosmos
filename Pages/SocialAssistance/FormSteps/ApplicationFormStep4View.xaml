@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.FormSteps.ApplicationFormStep4View"
@@ -23,12 +23,12 @@
                 <!-- 补全模式：调查日期锁定为导入库纳入时间 -->
                 <Label Text="导入库建档补全：入户调查日期取纳入时间，不可修改"
                        IsVisible="{Binding IsSurveyDateLocked}"
-                       FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                       FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                 <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8" RowSpacing="8">
                     <Label Text="所属机构" Style="{StaticResource FormFieldLabelStyle}"/>
                     <Entry Grid.Column="1" Text="{Binding SurveyorOrganization}" Placeholder="民政机构名称" HeightRequest="38"/>
                     <Label Grid.Column="2" Text="受访人" Style="{StaticResource FormFieldLabelStyle}"/>
-                    <Label Grid.Column="3" Text="{Binding ApplicantName}" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
+                    <Label Grid.Column="3" Text="{Binding ApplicantName}" FontSize="18" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}"/>
                 </Grid>
             </VerticalStackLayout>
         </Border>
@@ -44,7 +44,7 @@
                 </Grid>
                 <Label Text="原因详情" Style="{StaticResource FormFieldLabelStyle}"/>
                 <Editor Text="{Binding ApplicationReasonDetail}" Placeholder="选择申请理由后自动填充模板，可编辑修改..." HeightRequest="200" MaxLength="500"/>
-                <Label HorizontalOptions="End" FontSize="12" TextColor="{StaticResource TextSecondary}">
+                <Label HorizontalOptions="End" FontSize="14" TextColor="{StaticResource TextSecondary}">
                     <Label.FormattedText>
                         <FormattedString>
                             <Span Text="已输入: "/>

@@ -2,12 +2,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
+using NewCosmos.Models.DeathStatement;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
+using NewCosmos.Models.NavigationData;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.ChangeManagement;
 using NewCosmos.Services.Domain.SocialAssistance;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 
@@ -25,6 +29,8 @@ public partial class ChangeViewModel : ViewModelBase
     private readonly IImportedArchiveService _importedArchiveService;
     private readonly IFamilyMemberService _familyMemberService;
     private readonly IDynamicManagementRecordService _dynamicRecordService;
+    private readonly IDeathStatementService _deathStatementService;
+    private readonly INewPermissionService _permissionService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
 
@@ -32,8 +38,120 @@ public partial class ChangeViewModel : ViewModelBase
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
 
-    /// <summary>页头统计栏对外初始化入口（Page.OnAppearing 触发）</summary>
-    public Task InitializeHeaderAsync() => LoadHeaderStatsAsync();
+    /// <summary>
+    /// 页头统计栏对外初始化入口（Page.OnAppearing 触发）——
+    /// 兼载死亡待变更任务（死亡联动待办承接面，2026-10-31 方案2；CHANGE_MANAGE 承接人可见）。
+    /// </summary>
+    public async Task InitializeHeaderAsync()
+    {
+        await LoadHeaderStatsAsync();
+        await LoadDeathChangeTasksAsync();
+    }
+
+    #endregion
+
+    #region 死亡待变更（死亡联动待办 ArchiveHead/ArchiveMember 域，2026-10-31 方案2 承接面）
+
+    [ObservableProperty]
+    private ObservableCollection<DeathLinkageTaskItem> _deathChangeTasks = new();
+
+    /// <summary>是否展示死亡待变更区块（权限 ∧ 有任务）</summary>
+    [ObservableProperty]
+    private bool _hasDeathChangeTasks;
+
+    [ObservableProperty]
+    private string _deathChangeCountText = "0";
+
+    /// <summary>加载死亡待变更任务（无 CHANGE_MANAGE → 区块隐藏；服务侧先补齐再实时判定）</summary>
+    private async Task LoadDeathChangeTasksAsync()
+    {
+        DeathChangeTasks.Clear();
+        HasDeathChangeTasks = false;
+        DeathChangeCountText = "0";
+
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId <= 0) return;
+            var permissions = await _permissionService.CheckPermissionsAsync(userId, new[] { PermissionCodes.CHANGE_MANAGE });
+            if (permissions == null || !permissions.TryGetValue(PermissionCodes.CHANGE_MANAGE, out var granted) || !granted)
+                return;
+
+            var scopeResult = await _deathStatementService.ResolveScopeAsync(CancellationToken);
+            if (scopeResult.IsFailure)
+            {
+                _logger.Warn($"死亡待变更加载跳过（范围解析失败）: {scopeResult.Message}");
+                return;
+            }
+
+            var tasks = await _deathStatementService.GetLinkageTasksAsync(
+                scopeResult.Value,
+                new[] { DeathLinkageConstants.DomainArchiveHead, DeathLinkageConstants.DomainArchiveMember },
+                CancellationToken);
+            if (tasks.IsFailure)
+            {
+                _logger.Warn($"死亡待变更加载失败: {tasks.Message}");
+                return;
+            }
+
+            foreach (var task in tasks.Value ?? new List<DeathLinkageTaskItem>())
+                DeathChangeTasks.Add(task);
+            DeathChangeCountText = DeathChangeTasks.Count.ToString("N0");
+            HasDeathChangeTasks = DeathChangeTasks.Count > 0;
+
+            _logger.LogBusiness("加载死亡待变更", ("Count", DeathChangeTasks.Count));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "死亡待变更加载异常");
+        }
+    }
+
+    /// <summary>
+    /// 办理死亡待变更：户主 → 户主死亡变更页（预填全套死亡要素）；
+    /// 成员 → 本页载入该档案（减员走本页既有流程）。提交侧另有 CHANGE_MANAGE 保存门控。
+    /// </summary>
+    [RelayCommand]
+    private async Task HandleDeathChangeAsync(DeathLinkageTaskItem? task)
+    {
+        if (task == null) return;
+
+        var userId = App.CurrentUserId ?? 0;
+        var canManage = userId > 0 &&
+            await _permissionService.HasPermissionAsync(userId, PermissionCodes.CHANGE_MANAGE, CancellationToken);
+        if (!canManage)
+        {
+            await ShowTipAsync("无权限办理档案变更，请联系管理员分配「办理信息变更」权限。");
+            return;
+        }
+
+        _logger.LogBusiness("死亡待变更-去办理",
+            ("Domain", task.TaskDomain),
+            ("Name", DataMasker.MaskName(task.DeceasedName)),
+            ("TaskId", task.Id));
+
+        if (string.Equals(task.TaskDomain, DeathLinkageConstants.DomainArchiveHead, StringComparison.Ordinal))
+        {
+            if (task.RefApplicationId is not { } headAppId)
+            {
+                await ShowTipAsync("任务缺少关联档案ID，请到死亡情况说明页处理。");
+                return;
+            }
+
+            DateTime? deathDate = DateTime.TryParse(task.DeathDateText, out var parsed) ? parsed : null;
+            await NavigateToPageAsync<Pages.ChangeManagement.HouseholdDeathChangePage, HouseholdDeathPrefill>(
+                new HouseholdDeathPrefill(headAppId, deathDate, task.DeathTimeText, task.DeathReason, task.DeathCertNo));
+            return;
+        }
+
+        // ArchiveMember：本页载入该档案，走既有成员减员（人员死亡）流程
+        if (task.RefApplicationId is not { } memberAppId)
+        {
+            await ShowTipAsync("任务缺少关联档案ID，请到死亡情况说明页处理。");
+            return;
+        }
+        await LoadApplicationInfoAsync(memberAppId);
+    }
 
     #endregion
 
@@ -88,6 +206,38 @@ public partial class ChangeViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isApplicationStopped;
+
+    #endregion
+
+    #region 变更入口可用性（智能化）
+
+    /// <summary>家庭成员变更入口是否可用（单人户无其他成员可增减 → 隐藏）</summary>
+    [ObservableProperty]
+    private bool _canChangeMember;
+
+    /// <summary>户主变更入口是否可用（单人户唯一成员即户主，无从变更 → 隐藏）</summary>
+    [ObservableProperty]
+    private bool _canChangeHead;
+
+    /// <summary>户主死亡变更副标题（单人户=整户停止无继承人；多人口=选新户主建新档）</summary>
+    [ObservableProperty]
+    private string _householdDeathSubtitle = "户主死亡，整户停止，选择新户主建立新档案";
+
+    /// <summary>本月已办：经济状况复核（FundChange + change_reason_type=经济复核）</summary>
+    [ObservableProperty]
+    private bool _isEconomicReviewDoneThisMonth;
+
+    /// <summary>本月已办：家庭成员变更（增员/减员/修改/成员死亡）</summary>
+    [ObservableProperty]
+    private bool _isMemberChangeDoneThisMonth;
+
+    /// <summary>本月已办：户主变更</summary>
+    [ObservableProperty]
+    private bool _isHeadChangeDoneThisMonth;
+
+    /// <summary>本月已办：户主死亡变更</summary>
+    [ObservableProperty]
+    private bool _isHeadDeathDoneThisMonth;
 
     #endregion
 
@@ -285,6 +435,9 @@ public partial class ChangeViewModel : ViewModelBase
             FamilySize = item.FamilySize;
             MemberNamesDisplay = $"{item.ApplicantName}（户主）";
         }
+
+        // 单人户智能化：重算变更入口可用性（导入库 IsApplicationStopped 恒 false）
+        RebuildChangeOptionAvailability();
     }
 
     /// <summary>
@@ -311,6 +464,8 @@ public partial class ChangeViewModel : ViewModelBase
         _selectedSearchItem = null;
         ChangeHistory.Clear();
         HasChangeHistory = false;
+        ResetMonthlyChangeFlags();
+        RebuildChangeOptionAvailability();
     }
 
     private async Task ShowTipAsync(string message)
@@ -437,7 +592,9 @@ public partial class ChangeViewModel : ViewModelBase
         Services.Domain.Reporting.IStatisticsService statisticsService,
         IGracePeriodService gracePeriodService,
         Services.Utilities.IBusinessTimelineService businessTimelineService,
-        IApplicationStatusService applicationStatusService)
+        IApplicationStatusService applicationStatusService,
+        IDeathStatementService deathStatementService,
+        INewPermissionService permissionService)
     {
         _applicationService = applicationService;
         _changeService = changeService;
@@ -450,6 +607,8 @@ public partial class ChangeViewModel : ViewModelBase
         _gracePeriodService = gracePeriodService;
         _businessTimelineService = businessTimelineService;
         _applicationStatusService = applicationStatusService;
+        _deathStatementService = deathStatementService;
+        _permissionService = permissionService;
         Title = "保障对象动态管理";
     }
 
@@ -557,8 +716,105 @@ public partial class ChangeViewModel : ViewModelBase
 
         FamilySize = householdMembers.Count + (hasHeadRecord ? 0 : 1);
         MemberNamesDisplay = string.Join("、", names);
+
+        // 单人户智能化：重算变更入口可用性
+        RebuildChangeOptionAvailability();
         return Result.Success();
     }
+
+    /// <summary>
+    /// 重算变更入口可用性（智能化）：单人户隐藏「家庭成员变更/户主变更」，户主死亡副标题随人口切换。
+    /// 在档案/成员加载完成、取消选择后调用，保证 FamilySize / IsApplicationStopped 变化即时反映到卡片显隐。
+    /// </summary>
+    private void RebuildChangeOptionAvailability()
+    {
+        var singlePerson = FamilySize <= 1;
+        CanChangeMember = !IsApplicationStopped && !singlePerson;
+        CanChangeHead = !IsApplicationStopped && !singlePerson;
+        HouseholdDeathSubtitle = singlePerson
+            ? "户主死亡，整户停止（单人户无继承人）"
+            : "户主死亡，整户停止，选择新户主建立新档案";
+    }
+
+    /// <summary>
+    /// 加载「本月已办」标记（防重复办理提示）：
+    /// 经济复核用 FundChange + change_reason_type='经济复核' 精确区分（不误报"保障金变更登记"）；
+    /// 成员变更/户主变更/户主死亡按 change_type 判定。链双列关联 + changed_at 月窗口下推 SQL。
+    /// </summary>
+    private async Task LoadMonthlyChangeFlagsAsync()
+    {
+        if (ApplicationId <= 0)
+        {
+            ResetMonthlyChangeFlags();
+            return;
+        }
+
+        try
+        {
+            var result = await _changeService.GetThisMonthChangeEntriesAsync(ApplicationId, CancellationToken);
+            if (result.IsFailure || result.Value == null)
+            {
+                _logger.Error($"加载本月变更标记失败: {result.Message}");
+                ResetMonthlyChangeFlags();
+                return;
+            }
+
+            var entries = result.Value;
+            IsEconomicReviewDoneThisMonth = entries.Any(e =>
+                e.ChangeType == DictionaryConstants.ChangeType.FUND_CHANGE
+                && e.ChangeReasonType == ChangeReasonTypeConstants.EconomicReview);
+            IsMemberChangeDoneThisMonth = entries.Any(e =>
+                e.ChangeType == DictionaryConstants.ChangeType.MEMBER_ADD
+                || e.ChangeType == DictionaryConstants.ChangeType.MEMBER_REMOVE
+                || e.ChangeType == DictionaryConstants.ChangeType.MEMBER_MODIFY
+                || e.ChangeType == DictionaryConstants.ChangeType.MEMBER_DEATH);
+            IsHeadChangeDoneThisMonth = entries.Any(e =>
+                e.ChangeType == DictionaryConstants.ChangeType.HOUSEHOLD_HEAD_CHANGE);
+            IsHeadDeathDoneThisMonth = entries.Any(e =>
+                e.ChangeType == DictionaryConstants.ChangeType.HOUSEHOLD_DEATH);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"加载本月变更标记异常: {ex.Message}");
+            ResetMonthlyChangeFlags();
+        }
+    }
+
+    /// <summary>复位「本月已办」标记（更换/取消档案时）</summary>
+    private void ResetMonthlyChangeFlags()
+    {
+        IsEconomicReviewDoneThisMonth = false;
+        IsMemberChangeDoneThisMonth = false;
+        IsHeadChangeDoneThisMonth = false;
+        IsHeadDeathDoneThisMonth = false;
+    }
+
+    #region 页面出现刷新（返回本页时刷新已选档案）
+
+    /// <summary>参数化加载后置位：抑制紧随其后的首次 OnAppearing 重复刷新（消费后复位）</summary>
+    private bool _suppressNextAppearRefresh;
+
+    /// <summary>由 Page.SetParameterAsync 调用：标记刚完成参数化加载，跳过紧随的首次 OnAppearing 刷新</summary>
+    public void SuppressNextAppearRefresh() => _suppressNextAppearRefresh = true;
+
+    /// <summary>
+    /// Page.OnAppearing 调用：从变更流程（如户主死亡整户停止）返回本页时刷新已选档案，
+    /// 使状态 / 家庭人口 / 入口可用性（单人户智能化）/ 本月已办标记随之更新。
+    /// 参数化加载后的首次出现被抑制，避免入口重复加载与 loading 闪烁。
+    /// </summary>
+    public void RefreshOnAppear()
+    {
+        if (_suppressNextAppearRefresh)
+        {
+            _suppressNextAppearRefresh = false;
+            return;
+        }
+
+        if (HasSelectedApplication && ApplicationId > 0)
+            _ = LoadApplicationInfoAsync(ApplicationId);
+    }
+
+    #endregion
 
     /// <summary>
     /// 加载档案信息
@@ -607,6 +863,9 @@ public partial class ChangeViewModel : ViewModelBase
             {
                 _logger.Error($"操作失败");
             }
+
+            // 加载「本月已办」标记
+            await LoadMonthlyChangeFlagsAsync();
 
             // 加载变更历史
             await LoadChangeHistoryAsync();

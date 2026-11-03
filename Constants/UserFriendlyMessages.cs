@@ -93,6 +93,12 @@ public static class UserFriendlyMessages
 
         [ErrorCodes.NETWORK_ERROR] = "网络连接失败，请检查网络后重试",
         [ErrorCodes.ZEROTIER_TOKEN_DENIED] = "ZeroTier 接入权限未授权（需要一次管理员授权，点击“接入网络”按提示继续）",
+        [ErrorCodes.OCR_SERVICE_UNREACHABLE] = "识别服务未连接（请确认内网/ZeroTier 在线或联系管理员启动识别服务），可跳过识别或手动录入",
+        [ErrorCodes.OCR_TIMEOUT] = "识别服务响应超时，请稍后重试",
+        [ErrorCodes.OCR_IMAGE_INVALID] = "图片无法解码，请重新拍摄或换一张图片",
+        [ErrorCodes.OCR_RECOGNIZE_FAILED] = "识别服务处理失败，请稍后重试",
+        [ErrorCodes.OCR_NO_FIELD] = "未识别出有效字段，请正对证件、保证光线充足后重拍，或手动录入",
+        [ErrorCodes.OCR_ASSIGN_INCOMPLETE] = "还有识别记录未选择去向，请逐条选择或标记不使用",
 
         #endregion
 
@@ -181,7 +187,8 @@ public static class UserFriendlyMessages
         #region 节假日
 
         [ErrorCodes.HOLIDAY_API_UNREACHABLE] = "节假日数据接口不可达，请检查网络或改用手工维护",
-        [ErrorCodes.HOLIDAY_DATA_INVALID] = "节假日接口返回数据无效，请稍后重试或手工维护",
+        [ErrorCodes.HOLIDAY_DATA_INVALID] = "节假日接口返回数据格式异常，请稍后重试或改用手工维护",
+        [ErrorCodes.HOLIDAY_YEAR_NOT_PUBLISHED] = "该年度放假安排尚未发布。国务院办公厅通常于 11 月上旬发布下一年度安排，届时重新下载即可；如需先行排班，可使用下方\"新增\"逐日手工维护",
         [ErrorCodes.HOLIDAY_DUPLICATE_DATE] = "该日期的节假日记录已存在",
 
         #endregion

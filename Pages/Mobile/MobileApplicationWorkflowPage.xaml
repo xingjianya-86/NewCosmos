@@ -20,22 +20,22 @@
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border IsVisible="{Binding ShowSingleRescue}" StrokeShape="RoundRectangle 6"
                                     BackgroundColor="#FEE2E2" StrokeThickness="0" Padding="6,1" VerticalOptions="Center">
-                                <Label Text="单人保" FontSize="11" TextColor="#DC2626"/>
+                                <Label Text="单人保" FontSize="12" TextColor="#DC2626"/>
                             </Border>
                             <Border IsVisible="{Binding HasGraceNote}" StrokeShape="RoundRectangle 6"
                                     BackgroundColor="#FEF3C7" StrokeThickness="0" Padding="6,1" VerticalOptions="Center">
-                                <Label Text="{Binding GraceNote}" FontSize="11" TextColor="#D97706"/>
+                                <Label Text="{Binding GraceNote}" FontSize="12" TextColor="#D97706"/>
                             </Border>
                         </HorizontalStackLayout>
                         <Border Grid.Column="1" StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource InfoSoft}"
                                 StrokeThickness="0" Padding="8,2" VerticalOptions="Center">
-                            <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource PrimaryDark}"/>
+                            <Label Text="{Binding StatusText}" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
                         </Border>
                     </Grid>
 
-                    <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                    <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
 
-                    <Label FontSize="13" TextColor="{StaticResource TextSecondary}" IsVisible="{Binding HasMeta}">
+                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}" IsVisible="{Binding HasMeta}">
                         <Label.FormattedText>
                             <FormattedString>
                                 <Span Text="{Binding MetaLabel}"/><Span Text="："/><Span Text="{Binding MetaValue}"/>
@@ -43,34 +43,34 @@
                         </Label.FormattedText>
                     </Label>
 
-                    <Label Text="{Binding Address}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                    <Label Text="{Binding Address}" FontSize="14" TextColor="{StaticResource TextSecondary}"
                            LineBreakMode="TailTruncation" IsVisible="{Binding HasAddress}"/>
 
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <Label Grid.Column="0" Text="{Binding Time, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
-                               FontSize="12" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
 
                         <!-- 资产核查两 Tab：建档 -->
-                        <Button Grid.Column="1" Text="建档" FontSize="12" Padding="12,0" HeightRequest="32"
+                        <Button Grid.Column="1" Text="建档" FontSize="14" Padding="12,0" HeightRequest="32"
                                 CornerRadius="8" BackgroundColor="{StaticResource Primary}" TextColor="White"
                                 IsVisible="{Binding ShowArchiveButton}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.SocialAssistance.ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
                                 CommandParameter="{Binding .}"/>
 
                         <!-- 已完结 Tab：查看档案（只读） -->
-                        <Button Grid.Column="1" Text="查看档案" FontSize="12" Padding="12,0" HeightRequest="32"
+                        <Button Grid.Column="1" Text="查看档案" FontSize="14" Padding="12,0" HeightRequest="32"
                                 CornerRadius="8" BackgroundColor="{StaticResource Primary}" TextColor="White"
                                 IsVisible="{Binding ShowViewArchiveButton}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.SocialAssistance.ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
                                 CommandParameter="{Binding .}"/>
 
                         <!-- 草稿 / 已建档 Tab：编辑 + 删除 -->
-                        <Button Grid.Column="1" Text="编辑" FontSize="12" Padding="12,0" HeightRequest="32"
+                        <Button Grid.Column="1" Text="编辑" FontSize="14" Padding="12,0" HeightRequest="32"
                                 CornerRadius="8" BackgroundColor="{StaticResource Primary}" TextColor="White"
                                 IsVisible="{Binding ShowEditButtons}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.SocialAssistance.ApplicationWorkflowViewModel}}, Path=EditDraftCommand}"
                                 CommandParameter="{Binding .}"/>
-                        <Button Grid.Column="2" Text="删除" FontSize="12" Padding="12,0" HeightRequest="32"
+                        <Button Grid.Column="2" Text="删除" FontSize="14" Padding="12,0" HeightRequest="32"
                                 CornerRadius="8" BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
                                 IsVisible="{Binding ShowEditButtons}"
                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ViewModels.SocialAssistance.ApplicationWorkflowViewModel}}, Path=DeleteDraftCommand}"
@@ -84,19 +84,13 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 蓝色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardBlueGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="业务申请工作流" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="资产核查转建档 · 草稿续办 · 档案编辑" FontSize="13" TextColor="#E6FFFFFF"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="业务申请工作流"
+                                   Subtitle="资产核查转建档 · 草稿续办 · 档案编辑"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <!-- Tab 胶囊 -->
         <ScrollView Grid.Row="1" Orientation="Horizontal" BackgroundColor="White" HorizontalScrollBarVisibility="Never">
@@ -105,9 +99,9 @@
                         StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="14,7">
                     <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="0"/></Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="已提交" FontSize="13" VerticalOptions="Center"
+                        <Label Text="已提交" FontSize="14" VerticalOptions="Center"
                                TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                        <Label Text="{Binding SubmittedCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                        <Label Text="{Binding SubmittedCount}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                                TextColor="{Binding IsTab0Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                     </HorizontalStackLayout>
                 </Border>
@@ -116,9 +110,9 @@
                         StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="14,7">
                     <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="1"/></Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="有报告" FontSize="13" VerticalOptions="Center"
+                        <Label Text="有报告" FontSize="14" VerticalOptions="Center"
                                TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                        <Label Text="{Binding HasReportCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                        <Label Text="{Binding HasReportCount}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                                TextColor="{Binding IsTab1Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                     </HorizontalStackLayout>
                 </Border>
@@ -127,9 +121,9 @@
                         StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="14,7">
                     <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="2"/></Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="草稿" FontSize="13" VerticalOptions="Center"
+                        <Label Text="草稿" FontSize="14" VerticalOptions="Center"
                                TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                        <Label Text="{Binding DraftCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                        <Label Text="{Binding DraftCount}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                                TextColor="{Binding IsTab2Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                     </HorizontalStackLayout>
                 </Border>
@@ -138,9 +132,9 @@
                         StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="14,7">
                     <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="3"/></Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="已建档" FontSize="13" VerticalOptions="Center"
+                        <Label Text="已建档" FontSize="14" VerticalOptions="Center"
                                TextColor="{Binding IsTab3Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                        <Label Text="{Binding ArchiveBuiltCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                        <Label Text="{Binding ArchiveBuiltCount}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                                TextColor="{Binding IsTab3Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                     </HorizontalStackLayout>
                 </Border>
@@ -149,9 +143,9 @@
                         StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="14,7">
                     <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding SwitchTabCommand}" CommandParameter="4"/></Border.GestureRecognizers>
                     <HorizontalStackLayout Spacing="6">
-                        <Label Text="已完结" FontSize="13" VerticalOptions="Center"
+                        <Label Text="已完结" FontSize="14" VerticalOptions="Center"
                                TextColor="{Binding IsTab4Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
-                        <Label Text="{Binding ArchiveCompletedCount}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
+                        <Label Text="{Binding ArchiveCompletedCount}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center"
                                TextColor="{Binding IsTab4Selected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#1a73e8'}"/>
                     </HorizontalStackLayout>
                 </Border>
@@ -161,8 +155,8 @@
         <!-- 搜索栏 -->
         <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,6" BackgroundColor="White">
             <Entry Grid.Column="0" Placeholder="搜索姓名/身份证号" Text="{Binding SearchText}"
-                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchCommand}"/>
-            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="40"
+                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding SearchCommand}"/>
+            <Button Grid.Column="1" Text="搜索" FontSize="14" Padding="14,0" HeightRequest="40"
                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                     Command="{Binding SearchCommand}"/>
         </Grid>
@@ -204,12 +198,12 @@
         <!-- 分页 -->
         <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
-                <Button Text="上一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                <Button Text="上一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                <Label Text="{Binding PageStatusText}" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Button Text="下一页" FontSize="13" Padding="14,0" HeightRequest="38" CornerRadius="8"
+                <Label Text="{Binding PageStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
@@ -221,7 +215,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

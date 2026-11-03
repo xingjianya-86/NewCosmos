@@ -13,23 +13,23 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <VerticalStackLayout Spacing="2">
                         <HorizontalStackLayout Spacing="8">
-                            <Label Text="{Binding ApplicantName}" FontSize="15" FontAttributes="Bold"
+                            <Label Text="{Binding ApplicantName}" FontSize="16" FontAttributes="Bold"
                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                             <Border BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center"
                                     IsVisible="{Binding IsFromCurrentLibrary}">
-                                <Label Text="{Binding SourceDisplay}" FontSize="11" TextColor="{StaticResource PrimaryDark}"/>
+                                <Label Text="{Binding SourceDisplay}" FontSize="12" TextColor="{StaticResource PrimaryDark}"/>
                             </Border>
                             <Border BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="6,1" VerticalOptions="Center"
                                     IsVisible="{Binding IsFromImportedLibrary}">
-                                <Label Text="{Binding SourceDisplay}" FontSize="11" TextColor="{StaticResource WarningDark}"/>
+                                <Label Text="{Binding SourceDisplay}" FontSize="12" TextColor="{StaticResource WarningDark}"/>
                             </Border>
                         </HorizontalStackLayout>
-                        <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding Address}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
-                        <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                        <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding Address}" FontSize="14" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                        <Label Text="{Binding MatchedPersonInfo}" FontSize="14" TextColor="{StaticResource WarningDark}"
                                IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="选择" FontSize="12" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                    <Button Grid.Column="1" Text="选择" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
                             BackgroundColor="Transparent" TextColor="{StaticResource Primary}"
                             BorderColor="{StaticResource Primary}" BorderWidth="1" VerticalOptions="Center"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ChangeViewModel}}, Path=SelectApplicationCommand}"
@@ -42,10 +42,10 @@
             <Border StrokeShape="RoundRectangle 10" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" Padding="12" Margin="0,4">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="{Binding ChangeTypeDisplay}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label Text="{Binding ChangeReason}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding ChangeTypeDisplay}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ChangeReason}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
-                    <Label Grid.Column="1" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="12"
+                    <Label Grid.Column="1" Text="{Binding ChangeDate, StringFormat='{0:yyyy-MM-dd}'}" FontSize="14"
                            TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                 </Grid>
             </Border>
@@ -55,24 +55,49 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="0">
 
         <!-- 绿色英雄头部 -->
-        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="10">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="保障对象动态管理" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                <Label Text="户主变更、成员增减、死亡减员" FontSize="13" TextColor="#E6FFFFFF"/>
-                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                    <components:StatCapsule Grid.Column="0" Value="{Binding ActiveCountText}" Caption="在享（户）"/>
-                    <components:StatCapsule Grid.Column="1" Value="{Binding MonthlyChangesText}" Caption="本月变更（笔）"/>
-                    <components:StatCapsule Grid.Column="2" Value="{Binding GraceExpiringText}" Caption="渐退临期（户）"/>
-                </Grid>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="保障对象动态管理"
+                                   Subtitle="户主变更、成员增减、死亡减员"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+            <components:PageHeaderView.Stats>
+                <VerticalStackLayout Spacing="10">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding ActiveCountText}" Caption="在享（户）"/>
+                                <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding MonthlyChangesText}" Caption="本月变更（笔）"/>
+                                <components:StatCapsule IsLight="True" Grid.Column="2" Value="{Binding GraceExpiringText}" Caption="渐退临期（户）"/>
+                            </Grid>
+            <VerticalStackLayout Spacing="8" IsVisible="{Binding HasDeathChangeTasks}">
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="死亡待变更" FontSize="14" FontAttributes="Bold" TextColor="#FFFFFF"/>
+                                    <Label Text="{Binding DeathChangeCountText, StringFormat='（{0} 项）'}" FontSize="14" FontAttributes="Bold" TextColor="#FFE4E4"/>
+                                </HorizontalStackLayout>
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding DeathChangeTasks}" Spacing="4">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="DeathLinkageTaskItem">
+                                            <Border StrokeShape="RoundRectangle 8" BackgroundColor="{StaticResource Paper3}" Padding="10,8">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                    <VerticalStackLayout Spacing="2">
+                                                        <HorizontalStackLayout Spacing="6">
+                                                            <Label Text="{Binding DeceasedName, StringFormat='死者：{0}'}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Ink}"/>
+                                                            <Label Text="{Binding TaskDomainName}" FontSize="12" TextColor="#FFE4E4" VerticalOptions="Center"/>
+                                                        </HorizontalStackLayout>
+                                                        <Label Text="{Binding DeceasedIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                    </VerticalStackLayout>
+                                                    <Button Grid.Column="1" Text="去办理" FontSize="14" Padding="10,0" HeightRequest="32" CornerRadius="8"
+                                                            BackgroundColor="White" TextColor="{StaticResource Primary}" VerticalOptions="Center"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ChangeViewModel}}, Path=HandleDeathChangeCommand}"
+                                                            CommandParameter="{Binding .}"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                </VerticalStackLayout>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="12" Spacing="12">
@@ -83,8 +108,8 @@
                         <Label Text="选择档案" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <Entry Grid.Column="0" Placeholder="输入姓名或身份证号搜索档案" Text="{Binding SearchKeyword}"
-                                   MinimumHeightRequest="48" FontSize="14" ReturnCommand="{Binding SearchApplicationsCommand}"/>
-                            <Button Grid.Column="1" Text="搜索" FontSize="13" Padding="14,0" HeightRequest="42"
+                                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding SearchApplicationsCommand}"/>
+                            <Button Grid.Column="1" Text="搜索" FontSize="14" Padding="14,0" HeightRequest="42"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
                                     Command="{Binding SearchApplicationsCommand}"/>
                         </Grid>
@@ -100,36 +125,36 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <VerticalStackLayout Grid.Column="0" Spacing="2">
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             </VerticalStackLayout>
                             <Border Grid.Column="1" BackgroundColor="#E8F0FE" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="8,4" VerticalOptions="Center">
-                                <Label Text="{Binding CurrentClassificationName}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
+                                <Label Text="{Binding CurrentClassificationName}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource PrimaryDark}"/>
                             </Border>
                         </Grid>
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="10">
                             <VerticalStackLayout Spacing="2">
-                                <Label Text="保障金额" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding CurrentAmount, StringFormat='{0:F2} 元/月'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="保障金额" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding CurrentAmount, StringFormat='{0:F2} 元/月'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                <Label Text="家庭人数" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding FamilySize, StringFormat='{0} 人'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="家庭人数" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding FamilySize, StringFormat='{0} 人'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Spacing="2">
-                                <Label Text="人均年收入" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding PerCapitaIncomeAnnual, StringFormat='{0:F2} 元'}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="人均年收入" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding PerCapitaIncomeAnnual, StringFormat='{0:F2} 元'}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
-                                <Label Text="户口类型" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
-                                <Label Text="{Binding HukouType}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="户口类型" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding HukouType}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                             </VerticalStackLayout>
                         </Grid>
                         <Border Padding="10,8" BackgroundColor="{StaticResource Gray50}" StrokeThickness="0" StrokeShape="RoundRectangle 6">
-                            <Label Text="{Binding MemberNamesDisplay}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                            <Label Text="{Binding MemberNamesDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"
                                    LineBreakMode="WordWrap" IsVisible="{Binding MemberNamesDisplay, Converter={StaticResource StringNotEmptyConverter}}"/>
                         </Border>
-                        <Button Text="更换档案" FontSize="13" HeightRequest="38" CornerRadius="8"
+                        <Button Text="更换档案" FontSize="14" HeightRequest="38" CornerRadius="8"
                                 BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                                 BorderColor="{StaticResource Gray200}" BorderWidth="1"
                                 Command="{Binding DeselectApplicationCommand}"/>
@@ -139,8 +164,8 @@
                 <!-- 未选档案引导 -->
                 <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsNoArchiveHintVisible}">
                     <VerticalStackLayout Spacing="4">
-                        <Label Text="请先搜索并选择档案" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="选择档案后，可进行经济复核、家庭成员变更、户主变更等操作" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                        <Label Text="请先搜索并选择档案" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="选择档案后，可进行经济复核、家庭成员变更、户主变更等操作" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                     </VerticalStackLayout>
                 </Border>
 
@@ -155,13 +180,13 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource SuccessSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="🔄" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="🔄" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="恢复保障" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="档案已停保，恢复为在保后可继续办理变更" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="恢复保障" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="档案已停保，恢复为在保后可继续办理变更" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
@@ -172,13 +197,15 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource InfoSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="📊" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="📊" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="经济状况复核" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="家庭经济发生变化时，重新评估分类" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="经济状况复核" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="家庭经济发生变化时，重新评估分类" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="本月已办理" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding IsEconomicReviewDoneThisMonth}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
@@ -188,13 +215,13 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource WarningSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="✏️" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="✏️" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="家庭信息修正" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="修正成员信息并重新认定（仅限本月周期）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="家庭信息修正" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="修正成员信息并重新认定（仅限本月周期）" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
@@ -204,29 +231,31 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource PrimarySoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="📝" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="📝" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="编辑家庭信息" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="编辑成员详细信息（户主姓名/身份证锁定）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="编辑家庭信息" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="编辑成员详细信息（户主姓名/身份证锁定）" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
                     <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
-                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
+                            IsVisible="{Binding CanChangeMember}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToMemberChangeCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource SuccessSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="👥" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="👥" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="家庭成员变更" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="增加或减少成员，重新认定保障资格" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="家庭成员变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="增加或减少成员，重新认定保障资格" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="本月已办理" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding IsMemberChangeDoneThisMonth}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
@@ -236,29 +265,33 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource DangerSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="⚰️" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="⚰️" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="户主死亡变更" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="户主死亡，整户停止，选择新户主建新档" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="户主死亡变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding HouseholdDeathSubtitle}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="本月已办理" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding IsHeadDeathDoneThisMonth}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
 
                     <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
-                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
+                            IsVisible="{Binding CanChangeHead}">
                         <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding NavigateToHeadChangeCommand}"/></Border.GestureRecognizers>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <Border BackgroundColor="{StaticResource WarningSoft}" WidthRequest="46" HeightRequest="46"
                                     StrokeShape="RoundRectangle 12" StrokeThickness="0">
-                                <Label Text="🔁" FontSize="22" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                <Label Text="🔁" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                <Label Text="户主变更" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="仅变更户主，其他信息不变" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="户主变更" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="仅变更户主，其他信息不变" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="本月已办理" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                       IsVisible="{Binding IsHeadChangeDoneThisMonth}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="2" Text="›" FontSize="22" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
                 </VerticalStackLayout>
@@ -277,7 +310,7 @@
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

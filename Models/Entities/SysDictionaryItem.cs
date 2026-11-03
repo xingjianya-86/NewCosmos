@@ -1,7 +1,8 @@
-﻿namespace NewCosmos.Models.Entities;
+namespace NewCosmos.Models.Entities;
 
 /// <summary>
-/// 字典项实体（种子数据    /// ID 为固定值，非自    /// </summary>
+/// 字典项实体（种子数据    /// ID 为固定值，非自
+/// </summary>
 public class SysDictionaryItem
 {
     /// <summary>

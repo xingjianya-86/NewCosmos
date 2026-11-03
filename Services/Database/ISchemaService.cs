@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Results;
+using NewCosmos.Models.Results;
 using NewCosmos.Models.Schema;
 
 namespace NewCosmos.Services.Database;
@@ -50,15 +50,18 @@ public interface ISchemaService
     Task<Result<bool>> TableExistsAsync(string tableName, CancellationToken ct = default);
 
     /// <summary>
-    /// 确保表存在（不存在则创建    /// </summary>
+    /// 确保表存在（不存在则创建
+/// </summary>
     Task<Result> EnsureTablesExistAsync(string databaseName, CancellationToken ct = default);
 
     /// <summary>
-    /// 执行多条 SQL 语句（用于创建视图等    /// </summary>
+    /// 执行多条 SQL 语句（用于创建视图等
+/// </summary>
     Task<Result> ExecuteMultipleSqlAsync(string[] sqlStatements, CancellationToken ct = default);
 
     /// <summary>
-    /// 验证所有 Schema 与数据库的一致    /// </summary>
+    /// 验证所有 Schema 与数据库的一致
+/// </summary>
     Task<Result<SchemaValidationResult>> ValidateAllSchemasAsync(CancellationToken ct = default);
 
     /// <summary>

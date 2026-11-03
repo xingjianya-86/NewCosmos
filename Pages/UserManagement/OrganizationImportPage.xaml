@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.UserManagement.OrganizationImportPage"
@@ -14,45 +14,26 @@
     <Grid RowDefinitions="Auto,*">
 
         <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <!-- 操作按钮 -->
-                    <Button Grid.Column="2"
+        <!-- 统一页头（纸墨档案风报头 · Phase 6，操作按钮映射到 HeaderActions 插槽） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}"
+                                   Title="组织数据导入"
+                                   Subtitle="从Excel文件批量导入组织数据"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.HeaderActions>
+<Button Grid.Column="2"
                             Text="{OnPlatform WinUI='&#xE72C; 清空', Android='&#x1F5D1;&#xFE0F; 清空'}"
                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            BackgroundColor="#33FFFFFF"
-                            TextColor="White"
-                            FontSize="14"
+                            BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
+                            TextColor="{StaticResource Ink}"
+                            FontSize="16"
                             Command="{Binding SelectFileCommand}"
                             VerticalOptions="Center"
                             Padding="16,10"
-                            CornerRadius="20"/>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="组织数据导入" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="从Excel文件批量导入组织数据" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+                            CornerRadius="{StaticResource CornerRadiusMedium}"/>
+            </components:PageHeaderView.HeaderActions>
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1" BackgroundColor="{StaticResource Background}">
             <VerticalStackLayout Padding="20" Spacing="20">
@@ -68,15 +49,15 @@
                         </Grid>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                         <Label Text="支持 .xlsx / .xls / .csv 格式，需包含「名称」列"
-                               FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                               FontSize="16" TextColor="{StaticResource TextTertiary}"/>
 
                         <Grid IsVisible="{Binding HasSelectedFile}" Margin="0,4,0,0">
                             <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="12,8" StrokeShape="RoundRectangle 8">
                                 <HorizontalStackLayout Spacing="8">
                                     <Label Text="{OnPlatform WinUI='&#xE8B5;', Android='&#x1F4E5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                                           FontSize="18" TextColor="{StaticResource Primary}"
+                                           FontSize="20" TextColor="{StaticResource Primary}"
                                            VerticalOptions="Center"/>
-                                    <Label Text="{Binding SelectedFileName}" FontSize="16"
+                                    <Label Text="{Binding SelectedFileName}" FontSize="18"
                                            TextColor="{StaticResource TextPrimary}"
                                            VerticalOptions="Center"/>
                                 </HorizontalStackLayout>
@@ -110,17 +91,17 @@
                                         <Grid ColumnDefinitions="Auto,*,*,*,*,*" ColumnSpacing="8"
                                               Padding="8,6" Style="{StaticResource TableRowInteractive}">
                                             <Label Grid.Column="0" Text="{Binding RowNumber}"
-                                                   FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextSecondary}"/>
                                             <Label Grid.Column="1" Text="{Binding Name}"
-                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="2" Text="{Binding Abbreviation}"
-                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="3" Text="{Binding Principal}"
-                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="4" Text="{Binding Phone}"
-                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
                                             <Label Grid.Column="5" Text="{Binding Region}"
-                                                   FontSize="15" TextColor="{StaticResource TextPrimary}"/>
+                                                   FontSize="17" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
@@ -128,7 +109,7 @@
                         </Grid>
 
                         <Label Text="{Binding TotalCount, StringFormat='共 {0} 条数据'}"
-                               FontSize="15" TextColor="{StaticResource TextTertiary}"
+                               FontSize="17" TextColor="{StaticResource TextTertiary}"
                                HorizontalOptions="End"/>
                     </VerticalStackLayout>
                 </Border>
@@ -142,24 +123,24 @@
                             <Border Grid.Column="0" BackgroundColor="{StaticResource SuccessSoft}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="成功" FontSize="14" TextColor="#166534"/>
-                                    <Label Text="{Binding SuccessCount}" FontSize="28"
+                                    <Label Text="成功" FontSize="16" TextColor="#166534"/>
+                                    <Label Text="{Binding SuccessCount}" FontSize="30"
                                            FontAttributes="Bold" TextColor="#166534"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="1" BackgroundColor="{StaticResource DangerSoft}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="失败" FontSize="14" TextColor="#991B1B"/>
-                                    <Label Text="{Binding FailureCount}" FontSize="28"
+                                    <Label Text="失败" FontSize="16" TextColor="#991B1B"/>
+                                    <Label Text="{Binding FailureCount}" FontSize="30"
                                            FontAttributes="Bold" TextColor="#991B1B"/>
                                 </VerticalStackLayout>
                             </Border>
                             <Border Grid.Column="2" BackgroundColor="{StaticResource CardOptionBackground}" Padding="12,8"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout>
-                                    <Label Text="总计" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                    <Label Text="{Binding TotalCount}" FontSize="28"
+                                    <Label Text="总计" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding TotalCount}" FontSize="30"
                                            FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 </VerticalStackLayout>
                             </Border>
@@ -167,11 +148,11 @@
 
                         <!-- 失败明细：只有计数无法定位是哪一行（原实现明细只进日志，界面看不到） -->
                         <VerticalStackLayout IsVisible="{Binding HasImportErrors}" Spacing="6">
-                            <Label Text="失败明细" FontSize="15" FontAttributes="Bold" TextColor="#991B1B"/>
+                            <Label Text="失败明细" FontSize="17" FontAttributes="Bold" TextColor="#991B1B"/>
                             <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding ImportErrors}">
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Label Text="{Binding .}" FontSize="14" TextColor="#991B1B"/>
+                                        <Label Text="{Binding .}" FontSize="16" TextColor="#991B1B"/>
                                     </DataTemplate>
                                 </BindableLayout.ItemTemplate>
                             </VerticalStackLayout>

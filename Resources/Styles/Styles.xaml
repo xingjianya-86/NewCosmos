@@ -3,79 +3,123 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/maui/global"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- 字体大小 -->
-    <x:Double x:Key="FontSizeSmall">14</x:Double>
-    <x:Double x:Key="FontSizeBody">16</x:Double>
-    <x:Double x:Key="FontSizeSubtitle">18</x:Double>
-    <x:Double x:Key="FontSizeTitle">20</x:Double>
-    <x:Double x:Key="FontSizeHeading">26</x:Double>
-    <x:Double x:Key="FontSizeDisplay">34</x:Double>
-    
+    <!-- 字体大小（全界面统一：比原值 +2 提升可读性，用户 2026-10-31 要求）
+         2026-11-02 手机端分档：令牌本身是 x:Double 无法按平台取值，故各 setter 用
+         {OnPlatform WinUI={令牌}, Android=手机值} 写法——桌面沿用令牌，手机降档（正文14/小字12，
+         用户 2026-11-02 确认）。Android 分支值以各 setter 处为准，本表仅列桌面基准。 -->
+    <x:Double x:Key="FontSizeSmall">16</x:Double>
+    <x:Double x:Key="FontSizeBody">18</x:Double>
+    <x:Double x:Key="FontSizeSubtitle">20</x:Double>
+    <x:Double x:Key="FontSizeTitle">22</x:Double>
+    <x:Double x:Key="FontSizeHeading">28</x:Double>
+    <x:Double x:Key="FontSizeDisplay">36</x:Double>
+
     <!-- 间距 -->
     <x:Double x:Key="SpacingTiny">4</x:Double>
     <x:Double x:Key="SpacingSmall">8</x:Double>
     <x:Double x:Key="SpacingMedium">16</x:Double>
     <x:Double x:Key="SpacingLarge">24</x:Double>
     <x:Double x:Key="SpacingXLarge">32</x:Double>
-    
-    <!-- 圆角 -->
-    <x:Double x:Key="CornerRadiusSmall">4</x:Double>
-    <x:Double x:Key="CornerRadiusMedium">8</x:Double>
-    <x:Double x:Key="CornerRadiusLarge">12</x:Double>
-    <x:Double x:Key="CornerRadiusXLarge">16</x:Double>
 
-    <!-- 圆角形状（Border.StrokeShape 资源；Frame 已于 .NET 9 废弃，样式统一迁移到 Border） -->
+    <!-- 圆角（纸墨档案风：近直角，靠细线而非圆角分隔）
+         Android 固定小圆角易与系统字体缩放冲突，故保留 OnPlatform 分支 -->
+    <x:Double x:Key="CornerRadiusSmall">1</x:Double>
+    <x:Double x:Key="CornerRadiusMedium">2</x:Double>
+    <x:Double x:Key="CornerRadiusLarge">2</x:Double>
+    <x:Double x:Key="CornerRadiusXLarge">3</x:Double>
+
+    <!-- ═══ 字体令牌说明（纸墨档案风） ═══
+         正文 Noto Sans SC / 标题 Noto Serif SC / 数字 DM Mono。
+         注意：本项目 MauiXamlInflator=SourceGen 不支持资源字典里的 <OnPlatform.Platforms> 对象形式
+         （会报 MAUIX2002 "No accessible property ... Platforms"），故字体在各样式处内联
+         {OnPlatform WinUI='...', Android='...'} 标记扩展（与全库既有写法一致）。
+         WinUI 用字体族名（族内含 Regular+Bold，FontAttributes=Bold 自动选字重）；
+         Android 用文件名（小写规范，Resources\Fonts\*.ttf），Bold 走系统合成加粗。 -->
+
+    <!-- 圆角形状（Border.StrokeShape 资源；Frame 已于 .NET 9 废弃，样式统一迁移到 Border）
+         纸墨档案风：全部收敛为近直角，靠发丝线分隔而非圆角 -->
     <RoundRectangle x:Key="ShapeSmall" CornerRadius="{StaticResource CornerRadiusSmall}"/>
     <RoundRectangle x:Key="ShapeMedium" CornerRadius="{StaticResource CornerRadiusMedium}"/>
     <RoundRectangle x:Key="ShapeLarge" CornerRadius="{StaticResource CornerRadiusLarge}"/>
     <RoundRectangle x:Key="ShapeXLarge" CornerRadius="{StaticResource CornerRadiusXLarge}"/>
-    <RoundRectangle x:Key="ShapeBadge" CornerRadius="12"/>
-    <RoundRectangle x:Key="ShapeFormField" CornerRadius="8"/>
+    <RoundRectangle x:Key="ShapeBadge" CornerRadius="1"/>
+    <RoundRectangle x:Key="ShapeFormField" CornerRadius="1"/>
 
-    <!-- 基础标签样式 -->
+    <!-- ═══ 基础标签样式（正文 = 思源黑体，全界面统一加粗 + 字号见顶部令牌） ═══ -->
     <Style TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 标题样式 -->
+    <!-- ═══ 标题样式（大标题 = 思源宋体，纸墨档案风的灵魂） ═══ -->
     <Style x:Key="LabelDisplay" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeDisplay}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeDisplay}, Android=26, Default={StaticResource FontSizeDisplay}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CharacterSpacing" Value="0.5"/>
     </Style>
 
     <Style x:Key="LabelHeading" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeHeading}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeHeading}, Android=22, Default={StaticResource FontSizeHeading}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CharacterSpacing" Value="0.3"/>
     </Style>
 
     <Style x:Key="LabelTitle" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeTitle}, Android=18, Default={StaticResource FontSizeTitle}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <Style x:Key="LabelSubtitle" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSubtitle}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeSubtitle}, Android=16, Default={StaticResource FontSizeSubtitle}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <Style x:Key="LabelSmall" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeSmall}, Android=12, Default={StaticResource FontSizeSmall}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <!-- ═══ 等宽数字/编号（DM Mono：序号、身份证、金额、日期） ═══ -->
+    <Style x:Key="LabelMono" TargetType="Label">
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+    </Style>
+
+    <Style x:Key="LabelMonoSmall" TargetType="Label" BasedOn="{StaticResource LabelMono}">
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=16, Android=13, Default=16}"/>
+        <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
+    </Style>
+
+    <!-- ═══ 英文小字副标题（大写 + 宽字距，报头/页头用） ═══ -->
+    <Style x:Key="LabelKicker" TargetType="Label">
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=15, Android=12, Default=15}"/>
+        <Setter Property="TextColor" Value="{StaticResource Muted}"/>
+        <Setter Property="CharacterSpacing" Value="2.4"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <!-- 输入框样式
          Android：固定 HeightRequest 会把输入文字裁掉一半（中文字形/系统字体缩放下必现，手机端全页输入框故障根因），
          改为「最小高度 + 不锁死高度」；WinUI 保持 48 以维持桌面版式。 -->
     <Style TargetType="Entry">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
-        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="HeightRequest" Value="{OnPlatform WinUI=48, Default=-1}"/>
         <Setter Property="MinimumHeightRequest" Value="48"/>
         <Setter Property="VerticalTextAlignment" Value="Center"/>
@@ -89,10 +133,11 @@
         <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
     </Style>
 
-    <!-- 按钮样式（设计系统 v2：全部带 PointerOver/Pressed/Disabled 视觉状态） -->
+    <!-- 按钮样式（设计系统 v2：全部带 PointerOver/Pressed/Disabled 视觉状态；全界面统一加粗） -->
     <Style TargetType="Button">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
         <Setter Property="Padding" Value="16,0"/>
@@ -101,7 +146,7 @@
     <Style x:Key="ButtonPrimary" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
@@ -138,7 +183,7 @@
     <Style x:Key="ButtonSecondary" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Secondary}"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
@@ -172,7 +217,7 @@
         <Setter Property="TextColor" Value="{StaticResource Primary}"/>
         <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
         <Setter Property="BorderWidth" Value="1"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
         <Setter Property="Padding" Value="16,0"/>
@@ -198,12 +243,13 @@
                 </VisualStateGroup>
             </VisualStateGroupList>
         </Setter>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <Style x:Key="ButtonDanger" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Error}"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
@@ -235,7 +281,7 @@
     <Style x:Key="ButtonSuccess" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Success}"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
@@ -267,7 +313,7 @@
     <Style x:Key="WarningButton" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Warning}"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="HeightRequest" Value="44"/>
@@ -275,42 +321,35 @@
     </Style>
 
     <Style x:Key="ButtonSmall" TargetType="Button">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeSmall}, Android=12, Default={StaticResource FontSizeSmall}}"/>
         <Setter Property="HeightRequest" Value="36"/>
         <Setter Property="Padding" Value="12,0"/>
         <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusSmall}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 卡片样式 -->
+    <!-- 卡片样式（纸墨档案风：直角 + 发丝线） -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-        <Setter Property="Stroke" Value="Transparent"/>
-        <Setter Property="StrokeShape" Value="{StaticResource ShapeLarge}"/>
+        <Setter Property="Stroke" Value="{StaticResource Line}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
-        <Setter Property="Shadow">
-            <Setter.Value>
-                <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.08"/>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <Style x:Key="CardElevated" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-        <Setter Property="Stroke" Value="Transparent"/>
-        <Setter Property="StrokeShape" Value="{StaticResource ShapeXLarge}"/>
+        <Setter Property="Stroke" Value="{StaticResource LineStrong}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="{StaticResource SpacingLarge}"/>
-        <Setter Property="Shadow">
-            <Setter.Value>
-                <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.12"/>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <Style x:Key="CardHoverable" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+        <Setter Property="Stroke" Value="{StaticResource Line}"/>
         <Setter Property="StrokeThickness" Value="1"/>
-        <Setter Property="StrokeShape" Value="{StaticResource ShapeLarge}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
     </Style>
 
@@ -321,11 +360,12 @@
         <Setter Property="Margin" Value="0,8"/>
     </Style>
 
-    <!-- 搜索框 -->
+    <!-- 搜索框（纸墨档案风：纸底 + 底部墨线） -->
     <Style x:Key="SearchBar" TargetType="Border">
-        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
-        <Setter Property="Stroke" Value="Transparent"/>
-        <Setter Property="StrokeShape" Value="{StaticResource ShapeXLarge}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+        <Setter Property="Stroke" Value="{StaticResource LineStrong}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="16,8"/>
     </Style>
 
@@ -358,17 +398,16 @@
         <Setter Property="Padding" Value="12,4"/>
     </Style>
 
-    <!-- 表格样式 -->
+    <!-- 表格样式（纸墨档案风：墨黑表头反白 + 暖纸斑马纹） -->
     <Style x:Key="TableHeader" TargetType="Grid">
-        <Setter Property="BackgroundColor" Value="{StaticResource Gray100}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource Ink}"/>
     </Style>
-
     <Style x:Key="TableRow" TargetType="Grid">
-        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource Paper}"/>
     </Style>
 
     <Style x:Key="TableRowAlternate" TargetType="Grid">
-        <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
+        <Setter Property="BackgroundColor" Value="#EDE6D9"/>
     </Style>
 
     <!-- 侧边栏导航按钮样式 -->
@@ -382,20 +421,20 @@
         <Setter Property="BackgroundColor" Value="{StaticResource SidebarItemSelected}"/>
     </Style>
 
-    <!-- 统计卡片样式 -->
+    <!-- 统计卡片样式（纸墨档案风：直角） -->
     <Style x:Key="StatCard" TargetType="Border">
         <Setter Property="Padding" Value="20"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="StrokeThickness" Value="0"/>
     </Style>
 
-    <!-- 功能模块卡片样式 -->
+    <!-- 功能模块卡片样式（纸墨档案风：直角发丝线） -->
     <Style x:Key="ModuleCard" TargetType="Border">
         <Setter Property="Padding" Value="20"/>
-        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="StrokeThickness" Value="1"/>
-        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+        <Setter Property="Stroke" Value="{StaticResource Line}"/>
     </Style>
 
     <!-- 顶部状态栏样式 -->
@@ -421,8 +460,8 @@
     <!-- 功能按钮组样式 -->
     <Style x:Key="FunctionButton" TargetType="Button">
         <Setter Property="HeightRequest" Value="44"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
@@ -441,9 +480,9 @@
     <!-- Tab 切换按钮 -->
     <Style x:Key="ButtonTab" TargetType="Button">
         <Setter Property="HeightRequest" Value="40"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CornerRadiusMedium}"/>
         <Setter Property="BackgroundColor" Value="Transparent"/>
         <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
         <Setter Property="BorderWidth" Value="1"/>
@@ -468,7 +507,7 @@
                     </VisualState>
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="#F0F4FF"/>
+                            <Setter Property="BackgroundColor" Value="#F1E9DA"/>
                             <Setter Property="TextColor" Value="{StaticResource Primary}"/>
                         </VisualState.Setters>
                     </VisualState>
@@ -481,29 +520,24 @@
     <!-- 表单字段样式 -->
     <!-- ═══════════════════════════════════════════════════════════ -->
 
-    <!-- 表单字段样式 - 默认状态 -->
+    <!-- 表单字段样式 - 默认状态（纸墨档案风：纸底 + 发丝线） -->
     <Style x:Key="FormFieldDefaultStyle" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource Gray50}"/>
         <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
-        <Setter Property="Stroke" Value="{StaticResource Gray300}"/>
+        <Setter Property="Stroke" Value="{StaticResource LineStrong}"/>
         <Setter Property="StrokeThickness" Value="1"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="HeightRequest" Value="44"/>
     </Style>
 
-    <!-- 表单字段样式 - 获得焦点 -->
+    <!-- 表单字段样式 - 获得焦点（朱砂描边） -->
     <Style x:Key="FormFieldFocusedStyle" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
         <Setter Property="StrokeShape" Value="{StaticResource ShapeFormField}"/>
-        <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+        <Setter Property="Stroke" Value="{StaticResource Seal}"/>
         <Setter Property="StrokeThickness" Value="1"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="HeightRequest" Value="44"/>
-        <Setter Property="Shadow">
-            <Setter.Value>
-                <Shadow Brush="Black" Offset="0,1" Radius="4" Opacity="0.08"/>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <!-- 表单字段样式 - 验证失败 -->
@@ -528,15 +562,16 @@
 
     <!-- 表单标签样式 -->
     <Style x:Key="FormFieldLabelStyle" TargetType="Label">
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=16, Android=12, Default=16}"/>
         <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
         <Setter Property="VerticalOptions" Value="Center"/>
         <Setter Property="HorizontalOptions" Value="Start"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <!-- 表单输入框样式（Android 不锁死高度，见隐式 Entry 样式注释） -->
     <Style x:Key="FormFieldEntryStyle" TargetType="Entry">
-        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=18, Android=14, Default=18}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
         <Setter Property="BackgroundColor" Value="Transparent"/>
@@ -548,7 +583,7 @@
 
     <!-- 表单选择器样式 -->
     <Style x:Key="FormFieldPickerStyle" TargetType="Picker">
-        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=18, Android=14, Default=18}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="BackgroundColor" Value="Transparent"/>
         <Setter Property="HeightRequest" Value="{OnPlatform WinUI=48, Default=-1}"/>
@@ -562,44 +597,45 @@
 
     <!-- 输入控件统一排版（隐式：全局生效） -->
     <Style TargetType="Picker">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="TitleColor" Value="{StaticResource Gray500}"/>
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="MinimumHeightRequest" Value="48"/>
     </Style>
 
     <Style TargetType="Editor">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}"/>
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <Style TargetType="DatePicker">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
-        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Microsoft YaHei UI', Android=''}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 现代卡片（Border 版，替代废弃的 Frame；页面迁移时用这些） -->
+    <!-- 现代卡片（Border 版，替代废弃的 Frame；页面迁移时用这些）
+         纸墨档案风：直角 + 发丝线描边，不用阴影/圆角 -->
     <Style x:Key="CardBorder" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-        <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+        <Setter Property="Stroke" Value="{StaticResource Line}"/>
         <Setter Property="StrokeThickness" Value="1"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="{StaticResource SpacingMedium}"/>
     </Style>
 
     <Style x:Key="CardBorderElevated" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-        <Setter Property="Stroke" Value="Transparent"/>
-        <Setter Property="StrokeThickness" Value="0"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="Stroke" Value="{StaticResource LineStrong}"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeMedium}"/>
         <Setter Property="Padding" Value="{StaticResource SpacingLarge}"/>
-        <Setter Property="Shadow">
-            <Shadow Brush="{StaticResource Black}" Opacity="0.08" Radius="16" Offset="0,2"/>
-        </Setter>
     </Style>
 
     <Style x:Key="CardBorderInteractive" TargetType="Border" BasedOn="{StaticResource CardBorder}">
@@ -609,13 +645,13 @@
                     <VisualState x:Name="Normal">
                         <VisualState.Setters>
                             <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-                            <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+                            <Setter Property="Stroke" Value="{StaticResource Line}"/>
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
-                            <Setter Property="Stroke" Value="{StaticResource FocusRing}"/>
+                            <Setter Property="BackgroundColor" Value="#F1E9DA"/>
+                            <Setter Property="Stroke" Value="{StaticResource Seal}"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -648,40 +684,45 @@
     </Style>
 
     <Style x:Key="ChipSuccessText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
     <Style x:Key="ChipWarningText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
     <Style x:Key="ChipDangerText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource Error}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
     <Style x:Key="ChipInfoText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource PrimaryDark}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
     <Style x:Key="ChipNeutralText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 表格行（交互态悬停高亮） -->
+    <!-- 表格行（交互态悬停高亮：纸墨风用朱砂淡底 + 左侧朱砂描边感） -->
     <Style x:Key="TableRowInteractive" TargetType="Grid">
-        <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource Paper}"/>
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">
                     <VisualState x:Name="Normal">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="{StaticResource White}"/>
+                            <Setter Property="BackgroundColor" Value="{StaticResource Paper}"/>
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
+                            <Setter Property="BackgroundColor" Value="#EFE2D2"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -690,22 +731,24 @@
     </Style>
 
     <Style x:Key="TableHeaderLabel" TargetType="Label">
-        <Setter Property="FontSize" Value="13"/>
-        <Setter Property="FontAttributes" Value="Bold"/>
-        <Setter Property="TextColor" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="CharacterSpacing" Value="1.2"/>
+        <Setter Property="TextColor" Value="{StaticResource Paper2}"/>
         <Setter Property="VerticalOptions" Value="Center"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <!-- 页头与区块标题 -->
     <Style x:Key="PageTitleLabel" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeTitle}, Android=18, Default={StaticResource FontSizeTitle}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="VerticalOptions" Value="Center"/>
     </Style>
 
     <Style x:Key="SectionTitleLabel" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSubtitle}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeSubtitle}, Android=16, Default={StaticResource FontSizeSubtitle}}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         <Setter Property="Margin" Value="0,0,0,8"/>
@@ -713,11 +756,12 @@
 
     <!-- 空状态 -->
     <Style x:Key="EmptyStateLabel" TargetType="Label">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI={StaticResource FontSizeBody}, Android=14, Default={StaticResource FontSizeBody}}"/>
         <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
         <Setter Property="HorizontalOptions" Value="Center"/>
         <Setter Property="VerticalOptions" Value="Center"/>
         <Setter Property="Margin" Value="0,32"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
@@ -726,48 +770,58 @@
 
     <!-- 侧边栏分组标题 -->
     <Style x:Key="NavGroupHeader" TargetType="Label">
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="FontAttributes" Value="Bold"/>
-        <Setter Property="TextColor" Value="#64748B"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=13, Android=12, Default=13}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"/>
+        <Setter Property="TextColor" Value="#8b7f6c"/>
         <Setter Property="CharacterSpacing" Value="2"/>
         <Setter Property="Margin" Value="16,14,0,4"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 模块首页头部横幅（域色渐变背景由使用处指定 Background） -->
+    <!-- 模块首页头部横幅（纸墨档案风：纸底 + 顶部朱砂细条 + 发丝线描边，直角）
+         域色不再用渐变，改由使用处指定 BackgroundColor 的淡色 -->
     <Style x:Key="ModuleHeroHeader" TargetType="Border">
-        <Setter Property="StrokeThickness" Value="0"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 16"/>
+        <Setter Property="StrokeThickness" Value="1"/>
+        <Setter Property="Stroke" Value="{StaticResource LineStrong}"/>
+        <Setter Property="StrokeShape" Value="{StaticResource ShapeXLarge}"/>
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
         <Setter Property="Padding" Value="24,20"/>
         <Setter Property="Margin" Value="20,20,20,0"/>
     </Style>
 
-    <!-- 头部横幅内标题文字（白色粗体） -->
+    <!-- 头部横幅内标题文字（宋体反白：横幅恒为深色渐变底，62 处使用处全自带 Background=） -->
     <Style x:Key="ModuleHeroTitle" TargetType="Label">
-        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=24, Android=20, Default=24}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
-        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="TextColor" Value="{StaticResource Paper}"/>
     </Style>
 
-    <!-- 头部横幅内描述文字（白色半透明） -->
+    <!-- 头部横幅内描述文字（暖纸浅字，13px 需 ≥4.5:1 故用 Paper2 而非更暗的 Muted） -->
     <Style x:Key="ModuleHeroSubtitle" TargetType="Label">
-        <Setter Property="FontSize" Value="13"/>
-        <Setter Property="TextColor" Value="#E6FFFFFF"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=15, Android=13, Default=15}"/>
+        <Setter Property="TextColor" Value="{StaticResource Paper2}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 统计卡数值（白色大号粗体） -->
+    <!-- 统计卡数值（宋体大号反白；宿主 StatCapsule 为 #26FFFFFF 半透明白嵌深渐变） -->
     <Style x:Key="StatValueText" TargetType="Label">
-        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=30, Android=24, Default=30}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="TextColor" Value="{StaticResource White}"/>
     </Style>
 
-    <!-- 统计卡标签（白色小字） -->
+    <!-- 统计卡标签（11px 小字必须反白才达 4.5:1；层级靠字号而非压暗颜色） -->
     <Style x:Key="StatLabelText" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
-        <Setter Property="TextColor" Value="#CCFFFFFF"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=13, Android=12, Default=13}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Sans SC', Android='notosansregular', Default='Noto Sans SC'}"/>
+        <Setter Property="CharacterSpacing" Value="1.4"/>
+        <Setter Property="TextColor" Value="{StaticResource White}"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
-    <!-- 子功能卡片（白底圆角 + 悬停描边高亮；点击区域由 TapGesture 在使用处附加） -->
+    <!-- 子功能卡片（纸墨档案风：直角发丝线 + 悬停朱砂描边；点击区域由 TapGesture 在使用处附加） -->
     <Style x:Key="FeatureCard" TargetType="Border" BasedOn="{StaticResource CardBorder}">
         <Setter Property="Padding" Value="18,16"/>
         <Setter Property="VisualStateManager.VisualStateGroups">
@@ -776,13 +830,13 @@
                     <VisualState x:Name="Normal">
                         <VisualState.Setters>
                             <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}"/>
-                            <Setter Property="Stroke" Value="{StaticResource Gray200}"/>
+                            <Setter Property="Stroke" Value="{StaticResource Line}"/>
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Property="BackgroundColor" Value="{StaticResource HoverOverlay}"/>
-                            <Setter Property="Stroke" Value="{StaticResource FocusRing}"/>
+                            <Setter Property="BackgroundColor" Value="#F1E9DA"/>
+                            <Setter Property="Stroke" Value="{StaticResource Seal}"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -790,18 +844,20 @@
         </Setter>
     </Style>
 
-    <!-- 子功能卡名称 -->
+    <!-- 子功能卡名称（宋体） -->
     <Style x:Key="FeatureCardTitle" TargetType="Label">
-        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=17, Android=15, Default=17}"/>
+        <Setter Property="FontFamily" Value="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"/>
         <Setter Property="FontAttributes" Value="Bold"/>
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
     </Style>
 
     <!-- 子功能卡说明 -->
     <Style x:Key="FeatureCardDesc" TargetType="Label">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{OnPlatform WinUI=14, Android=12, Default=14}"/>
         <Setter Property="TextColor" Value="{StaticResource TextTertiary}"/>
         <Setter Property="LineBreakMode" Value="WordWrap"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
     </Style>
 
 </ResourceDictionary>

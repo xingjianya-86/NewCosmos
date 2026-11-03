@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:components="clr-namespace:NewCosmos.Components"
@@ -48,36 +48,22 @@
             <VerticalStackLayout Spacing="0" Padding="0,0,0,20">
 
                 <!-- 渐变头部 -->
-                <Border Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardPurpleGradient}">
-                    <VerticalStackLayout Spacing="16">
-                        <Grid ColumnDefinitions="Auto,*">
-                            <HorizontalStackLayout Spacing="6">
-                                <HorizontalStackLayout.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                                </HorizontalStackLayout.GestureRecognizers>
-                                <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                                <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
+                <!-- 统一页头（纸墨档案风报头 · Phase 6，统计胶囊迁入 Stats 插槽并转浅色变体） -->
+                <components:PageHeaderView
+                                           Glyph="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}"
+                                           Title="中奖结果"
+                                           Subtitle="我的购彩记录 · 命中与奖金明细"
+                                           BackCommand="{Binding GoBackCommand}"
+                                           BackText="返回">
+                    <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                            <components:StatCapsule IsLight="True" Grid.Row="0" Grid.Column="0" Value="{Binding TotalCountText}" Caption="累计注数"/>
+                            <components:StatCapsule IsLight="True" Grid.Row="0" Grid.Column="1" Value="{Binding HitCountText}" Caption="已中奖"/>
+                            <components:StatCapsule IsLight="True" Grid.Row="1" Grid.Column="0" Value="{Binding PrizeTotalText}" Caption="中奖金额"/>
+                            <components:StatCapsule IsLight="True" Grid.Row="1" Grid.Column="1" Value="{Binding PendingCountText}" Caption="待开奖"/>
                         </Grid>
-                        <HorizontalStackLayout Spacing="14">
-                            <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                                <Label Text="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                            </Border>
-                            <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                                <Label Text="中奖结果" Style="{StaticResource ModuleHeroTitle}"/>
-                                <Label Text="我的购彩记录 · 命中与奖金明细" Style="{StaticResource ModuleHeroSubtitle}"/>
-                            </VerticalStackLayout>
-                        </HorizontalStackLayout>
-
-                        <!-- 汇总统计 -->
-                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
-                            <components:StatCapsule Grid.Row="0" Grid.Column="0" Value="{Binding TotalCountText}" Caption="累计注数"/>
-                            <components:StatCapsule Grid.Row="0" Grid.Column="1" Value="{Binding HitCountText}" Caption="已中奖"/>
-                            <components:StatCapsule Grid.Row="1" Grid.Column="0" Value="{Binding PrizeTotalText}" Caption="中奖金额"/>
-                            <components:StatCapsule Grid.Row="1" Grid.Column="1" Value="{Binding PendingCountText}" Caption="待开奖"/>
-                        </Grid>
-                    </VerticalStackLayout>
-                </Border>
+                    </components:PageHeaderView.Stats>
+                </components:PageHeaderView>
 
                 <!-- 筛选与操作 -->
                 <Border Style="{StaticResource CardBorder}" Margin="20,20,20,0" Padding="16">
@@ -87,7 +73,7 @@
                         <HorizontalStackLayout Spacing="10">
                             <Border WidthRequest="32" HeightRequest="32" StrokeShape="RoundRectangle 16"
                                     BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                <Label Text="{OnPlatform WinUI='&#xE71C;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="15"
+                                <Label Text="{OnPlatform WinUI='&#xE71C;', Android='&#x1F50D;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="17"
                                        TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center"/>
                             </Border>
                             <Label Text="筛选条件" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
@@ -95,7 +81,7 @@
 
                         <!-- 彩种 + 立即验证 -->
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Text="彩种" FontSize="13" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            <Label Text="彩种" FontSize="15" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <Border Grid.Column="1" Style="{StaticResource FilterPickerBorder}">
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                                     <Label Text="{OnPlatform WinUI='&#xE8D4;', Android='&#x2B50;'}" Style="{StaticResource FilterPickerGlyph}"/>
@@ -129,7 +115,7 @@
                                     IsEnabled="{Binding CanGoNextPage}"/>
                         </Grid>
 
-                        <Label Text="{Binding TotalCount, StringFormat='共 {0} 注'}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
+                        <Label Text="{Binding TotalCount, StringFormat='共 {0} 注'}" TextColor="{StaticResource TextTertiary}" FontSize="14"/>
                     </VerticalStackLayout>
                 </Border>
 
@@ -153,7 +139,7 @@
                                                             StrokeShape="RoundRectangle 12"
                                                             WidthRequest="26" HeightRequest="26" Padding="0">
                                                         <Label Text="{Binding Text}" TextColor="{Binding TextColor}"
-                                                               FontSize="12" FontAttributes="Bold"
+                                                               FontSize="14" FontAttributes="Bold"
                                                                HorizontalOptions="Center" VerticalOptions="Center"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -161,18 +147,18 @@
                                         </HorizontalStackLayout>
                                         <Border Grid.Column="1" BackgroundColor="{Binding StatusBackgroundColor}" StrokeThickness="0"
                                                 StrokeShape="RoundRectangle 8" Padding="10,3">
-                                            <Label Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}" FontSize="11" FontAttributes="Bold"/>
+                                            <Label Text="{Binding StatusText}" TextColor="{Binding StatusTextColor}" FontSize="13" FontAttributes="Bold"/>
                                         </Border>
 
                                         <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="12">
-                                            <Label Text="{Binding Algorithm}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
-                                            <Label Text="{Binding PurchaseDate, StringFormat='{0:yyyy-MM-dd}'}" TextColor="{StaticResource TextTertiary}" FontSize="12"/>
+                                            <Label Text="{Binding Algorithm}" TextColor="{StaticResource TextTertiary}" FontSize="14"/>
+                                            <Label Text="{Binding PurchaseDate, StringFormat='{0:yyyy-MM-dd}'}" TextColor="{StaticResource TextTertiary}" FontSize="14"/>
                                         </HorizontalStackLayout>
 
                                         <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                                            <Label Text="{Binding DrawNumber, StringFormat='期号 {0}'}" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
-                                            <Label Text="{Binding HitSummaryText}" Grid.Column="1" TextColor="{StaticResource TextSecondary}" FontSize="12"/>
-                                            <Label Text="{Binding PrizeLevelText}" Grid.Column="2" TextColor="#B45309" FontSize="12" HorizontalOptions="End"/>
+                                            <Label Text="{Binding DrawNumber, StringFormat='期号 {0}'}" TextColor="{StaticResource TextSecondary}" FontSize="14"/>
+                                            <Label Text="{Binding HitSummaryText}" Grid.Column="1" TextColor="{StaticResource TextSecondary}" FontSize="14"/>
+                                            <Label Text="{Binding PrizeLevelText}" Grid.Column="2" TextColor="#B45309" FontSize="14" HorizontalOptions="End"/>
                                         </Grid>
                                     </Grid>
                                 </Border>

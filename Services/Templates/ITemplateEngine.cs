@@ -120,7 +120,8 @@ public interface ITemplateEngine : IDisposable
 }
 
 /// <summary>
-/// 模板字段映射项（ConfigJson 中的结构    /// </summary>
+/// 模板字段映射项（ConfigJson 中的结构
+/// </summary>
 public class TemplateFieldMapping
 {
     /// <summary>
@@ -182,7 +183,8 @@ public class TemplateFieldMapping
 }
 
 /// <summary>
-/// 模板表格列映射项（ConfigJson 中的结构    /// </summary>
+/// 模板表格列映射项（ConfigJson 中的结构
+/// </summary>
 public class TemplateTableMapping
 {
     /// <summary>

@@ -184,6 +184,7 @@ public partial class MonthlyReportService
                          WHERE COALESCE(p.total_classified_amount, 0) = 0
                            AND p.birth_date IS NOT NULL
                            AND EXTRACT(MONTH FROM p.birth_date) = $1::int
+                           -- [索引豁免] 出生月筛选无对应列；月报名单为月度低频、台账行数有限
                          UNION
                          SELECT DISTINCT p.family_id
                          FROM nc_biz_urban_subsistence_persons p
@@ -191,6 +192,7 @@ public partial class MonthlyReportService
                          WHERE COALESCE(p.total_classified_amount, 0) = 0
                            AND p.birth_date IS NOT NULL
                            AND EXTRACT(MONTH FROM p.birth_date) = $1::int
+                           -- [索引豁免] 出生月筛选无对应列；月报名单为月度低频、台账行数有限
                      )
                      SELECT '最低生活保障对象' AS category,
                             f.applicant_name, f.applicant_id_card, f.phone, f.family_size,

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ArchiveManagement.ArchiveQueryPage"
@@ -14,65 +14,44 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="0">
 
         <!-- 渐变英雄头部（蓝色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <!-- 照片查询/导出（桌面端） -->
-                    <Button Grid.Column="2"
-                            Text="{OnPlatform WinUI='&#xE8B9; 照片查询', Android='&#x1F5BC; 照片查询'}"
-                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            BackgroundColor="#33FFFFFF"
-                            TextColor="White"
-                            FontSize="13"
-                            Command="{Binding OpenPhotoQueryCommand}"
-                            VerticalOptions="Center"
-                            Padding="14,8"
-                            CornerRadius="18"
-                            Margin="0,0,8,0"/>
-
-                    <!-- 每月公示文档输出按钮 -->
-                    <Button Grid.Column="3"
-                            Text="{OnPlatform WinUI='&#xE7B5; 每月公示文档输出', Android='&#x1F4C4; 每月公示文档输出'}"
-                            FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            BackgroundColor="White"
-                            TextColor="{StaticResource Primary}"
-                            FontSize="14"
-                            FontAttributes="Bold"
-                            Command="{Binding OpenPublicityOutputCommand}"
-                            VerticalOptions="Center"
-                            Padding="16,10"
-                            CornerRadius="20"/>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="救助档案管理" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="低收入人口历史档案检索查阅" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 特殊页：业务信息迁入 Stats 插槽） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8F1;', Android='&#x1F5C2;&#xFE0F;'}"
+                                   Title="救助档案管理"
+                                   Subtitle="低收入人口历史档案检索查阅"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.HeaderActions>
+                <HorizontalStackLayout Spacing="8">
+                    <Button Text="{OnPlatform WinUI='&#xE8B9; 照片查询', Android='&#x1F5BC; 照片查询'}"
+                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                    BackgroundColor="#33FFFFFF"
+                    TextColor="White"
+                    FontSize="15"
+                    Command="{Binding OpenPhotoQueryCommand}"
+                    VerticalOptions="Center"
+                    Padding="14,8"
+                    CornerRadius="18"
+                    Margin="0,0,8,0"/>
+                    <Button Text="{OnPlatform WinUI='&#xE7B5; 每月公示文档输出', Android='&#x1F4C4; 每月公示文档输出'}"
+                    FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                    BackgroundColor="White"
+                    TextColor="{StaticResource Primary}"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    Command="{Binding OpenPublicityOutputCommand}"
+                    VerticalOptions="Center"
+                    Padding="16,10"
+                    CornerRadius="20"/>
                 </HorizontalStackLayout>
-
-                <!-- 统计栏 -->
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                    <components:StatCapsule Grid.Column="0" Value="{Binding TotalArchivesText}" Caption="归档总数（件）"/>
-                    <components:StatCapsule Grid.Column="1" Value="{Binding MonthlyArchivesText}" Caption="当月归档（件）"/>
+            </components:PageHeaderView.HeaderActions>
+            <components:PageHeaderView.Stats>
+<Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding TotalArchivesText}" Caption="归档总数（件）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding MonthlyArchivesText}" Caption="当月归档（件）"/>
                 </Grid>
-
-            </VerticalStackLayout>
-        </Border>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
 
         <Grid Grid.Row="1" ColumnDefinitions="440,*" ColumnSpacing="0">
 
@@ -109,12 +88,12 @@
                                                             IsVisible="{Binding IsFromImportedLibrary}">
                                                         <Label Text="{Binding SourceDisplay}" Style="{StaticResource ChipWarningText}"/>
                                                     </Border>
-                                                    <Label Grid.Column="1" Text="{Binding ApplicantName}" FontSize="15" FontAttributes="Bold"
+                                                    <Label Grid.Column="1" Text="{Binding ApplicantName}" FontSize="17" FontAttributes="Bold"
                                                            TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                                 </Grid>
-                                                <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                                                <Label Text="{Binding Address}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
-                                                <Label Text="{Binding MatchedPersonInfo}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                                                <Label Text="{Binding ApplicantIdCard}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding Address}" FontSize="14" TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation"/>
+                                                <Label Text="{Binding MatchedPersonInfo}" FontSize="14" TextColor="{StaticResource WarningDark}"
                                                        IsVisible="{Binding HasMatchedPersonInfo}" LineBreakMode="TailTruncation"/>
                                             </VerticalStackLayout>
                                             <Button Grid.Column="1" Text="选择" Style="{StaticResource ButtonOutline}"
@@ -132,12 +111,12 @@
                     <Border Style="{StaticResource CardBorderElevated}" IsVisible="{Binding HasSelectedArchive}">
                         <VerticalStackLayout Spacing="12">
                             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28"
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="30"
                                        TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                    <Label Text="{Binding ApplicantName}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                    <Label Text="{Binding ApplicantIdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                                    <Label Text="{Binding SourceDisplay}" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                    <Label Text="{Binding ApplicantName}" FontSize="19" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="{Binding ApplicantIdCard}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                    <Label Text="{Binding SourceDisplay}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                 </VerticalStackLayout>
                                 <Border Grid.Column="2" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                     <Label Text="{Binding ClassificationName}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>
@@ -153,15 +132,15 @@
 
                             <!-- 历史库：按人群生成的数据摘要 -->
                             <VerticalStackLayout Spacing="8" IsVisible="{Binding IsImportedLibrary}">
-                                <Label Text="数据摘要（历史库）" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="数据摘要（历史库）" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 <VerticalStackLayout Spacing="6"
                                                      BindableLayout.ItemsSource="{Binding SummaryFields}"
                                                      IsVisible="{Binding HasImportedDetail}">
                                     <BindableLayout.ItemTemplate>
                                         <DataTemplate x:DataType="SummaryFieldItem">
                                             <Grid ColumnDefinitions="120,*" ColumnSpacing="8">
-                                                <Label Text="{Binding Label}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
-                                                <Label Grid.Column="1" Text="{Binding Value}" FontSize="13" FontAttributes="Bold"
+                                                <Label Text="{Binding Label}" FontSize="15" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Grid.Column="1" Text="{Binding Value}" FontSize="15" FontAttributes="Bold"
                                                        TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
                                             </Grid>
                                         </DataTemplate>
@@ -169,7 +148,7 @@
                                 </VerticalStackLayout>
 
                                 <!-- 家庭成员 -->
-                                <Label Text="家庭成员" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
+                                <Label Text="家庭成员" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"
                                        Margin="0,8,0,0" IsVisible="{Binding HasImportedDetail}"/>
                                 <CollectionView ItemsSource="{Binding MemberItems}"
                                                 IsVisible="{Binding HasImportedDetail}"
@@ -187,21 +166,21 @@
                                     <CollectionView.ItemTemplate>
                                         <DataTemplate x:DataType="ImportedMemberDisplayItem">
                                             <Grid ColumnDefinitions="*,110,70,100,100" Padding="10,6" Style="{StaticResource TableRowInteractive}">
-                                                <Label Text="{Binding Name}" FontSize="13" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
-                                                <Label Grid.Column="1" Text="{Binding Relationship, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                                <Label Grid.Column="2" Text="{Binding Age}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                                <Label Grid.Column="3" Text="{Binding AnnualIncomeDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                                <Label Grid.Column="4" Text="{Binding ClassifiedSubsidyDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Text="{Binding Name}" FontSize="15" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                                <Label Grid.Column="1" Text="{Binding Relationship, Converter={StaticResource RelationshipDisplayConverter}}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Grid.Column="2" Text="{Binding Age}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Grid.Column="3" Text="{Binding AnnualIncomeDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                                <Label Grid.Column="4" Text="{Binding ClassifiedSubsidyDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                             </Grid>
                                         </DataTemplate>
                                     </CollectionView.ItemTemplate>
                                     <CollectionView.EmptyView>
-                                        <Label Text="该家庭无成员明细" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,10"/>
+                                        <Label Text="该家庭无成员明细" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,10"/>
                                     </CollectionView.EmptyView>
                                 </CollectionView>
                             </VerticalStackLayout>
 
-                            <Label Text="正在加载档案数据..." FontSize="13" TextColor="{StaticResource TextTertiary}"
+                            <Label Text="正在加载档案数据..." FontSize="15" TextColor="{StaticResource TextTertiary}"
                                    IsVisible="{Binding IsLoadingDetail}" HorizontalOptions="Center"/>
                         </VerticalStackLayout>
                     </Border>
@@ -215,7 +194,7 @@
                                         Command="{Binding ManageUnitTemplatesCommand}"/>
                             </Grid>
 
-                            <Label Text="证明文件模板（通配模板手填目标单位 / 单位专属模板）" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="证明文件模板（通配模板手填目标单位 / 单位专属模板）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                             <Picker ItemsSource="{Binding ProofTemplateOptions}"
                                     SelectedItem="{Binding SelectedProofTemplateOption}"
                                     ItemDisplayBinding="{Binding DisplayName, x:DataType=ProofTemplateOption}"
@@ -223,40 +202,40 @@
 
                             <!-- 通配模板：手填目标证明单位 -->
                             <VerticalStackLayout Spacing="6" IsVisible="{Binding IsGenericTemplateSelected}">
-                                <Label Text="目标证明单位（必填）" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="目标证明单位（必填）" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 <Entry Text="{Binding TargetUnitName}" Placeholder="如：XX市民政局 / XX街道办事处"
-                                       FontSize="14"/>
+                                       FontSize="16"/>
                             </VerticalStackLayout>
 
                             <!-- 单位专属模板：单位名只读 -->
                             <VerticalStackLayout Spacing="6" IsVisible="{Binding IsUnitTemplateSelected}">
-                                <Label Text="接收单位" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="接收单位" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
                                 <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
                                         StrokeShape="RoundRectangle 6" Padding="12,8">
-                                    <Label Text="{Binding SelectedProofTemplateOption.UnitName}" FontSize="14"
+                                    <Label Text="{Binding SelectedProofTemplateOption.UnitName}" FontSize="16"
                                            TextColor="{StaticResource TextPrimary}"/>
                                 </Border>
                             </VerticalStackLayout>
 
-                            <Label Text="{Binding SelectedTemplateName, StringFormat='模板: {0}'}" FontSize="12" TextColor="{StaticResource Primary}"
+                            <Label Text="{Binding SelectedTemplateName, StringFormat='模板: {0}'}" FontSize="14" TextColor="{StaticResource Primary}"
                                    IsVisible="{Binding SelectedTemplateName, Converter={StaticResource StringNotEmptyConverter}}"/>
-                            <Label Text="{Binding NoGenericTemplateHint}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                            <Label Text="{Binding NoGenericTemplateHint}" FontSize="14" TextColor="{StaticResource WarningDark}"
                                    IsVisible="{Binding NoGenericTemplateHint, Converter={StaticResource StringNotEmptyConverter}}"/>
-                            <Label Text="{Binding NoUnitTemplatesHint}" FontSize="12" TextColor="{StaticResource WarningDark}"
+                            <Label Text="{Binding NoUnitTemplatesHint}" FontSize="14" TextColor="{StaticResource WarningDark}"
                                    IsVisible="{Binding NoUnitTemplatesHint, Converter={StaticResource StringNotEmptyConverter}}"/>
 
                             <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
-                                <Label Grid.Row="0" Text="打印机" FontSize="14" VerticalOptions="Center"/>
+                                <Label Grid.Row="0" Text="打印机" FontSize="16" VerticalOptions="Center"/>
                                 <Picker Grid.Row="0" Grid.Column="1"
                                         ItemsSource="{Binding PrinterNames}"
                                         SelectedItem="{Binding SelectedPrinter}"/>
-                                <Label Grid.Row="1" Text="份数" FontSize="14" VerticalOptions="Center"/>
+                                <Label Grid.Row="1" Text="份数" FontSize="16" VerticalOptions="Center"/>
                                 <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
                                     <Button Text="&#x2212;" Command="{Binding DecreaseCopiesCommand}"
                                             WidthRequest="36" HeightRequest="36"
-                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            FontSize="20" FontAttributes="Bold" Padding="0"
                                             BackgroundColor="{StaticResource Gray200}"
                                             TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
                                     <Entry Text="{Binding Copies}" Keyboard="Numeric"
@@ -264,11 +243,11 @@
                                            HorizontalTextAlignment="Center" VerticalOptions="Center"/>
                                     <Button Text="+" Command="{Binding IncreaseCopiesCommand}"
                                             WidthRequest="36" HeightRequest="36"
-                                            FontSize="18" FontAttributes="Bold" Padding="0"
+                                            FontSize="20" FontAttributes="Bold" Padding="0"
                                             BackgroundColor="{StaticResource Gray200}"
                                             TextColor="{StaticResource TextPrimary}" CornerRadius="4"/>
                                 </HorizontalStackLayout>
-                                <Label Grid.Row="2" Text="双面打印" FontSize="14" VerticalOptions="Center"/>
+                                <Label Grid.Row="2" Text="双面打印" FontSize="16" VerticalOptions="Center"/>
                                 <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"
                                         HorizontalOptions="Start" VerticalOptions="Center"/>
                             </Grid>
@@ -286,7 +265,7 @@
                             </Grid>
                             <Button Text="{Binding OpenOutputFolderActionText}" Style="{StaticResource ButtonOutline}"
                                     Command="{Binding OpenOutputFolderCommand}"
-                                    FontSize="13" HeightRequest="34"/>
+                                    FontSize="15" HeightRequest="34"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -306,21 +285,21 @@
                                                 StrokeThickness="0" StrokeShape="RoundRectangle 6">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                                 <VerticalStackLayout Grid.Column="0" Spacing="1">
-                                                    <Label Text="{Binding TemplateName}" FontSize="13" FontAttributes="Bold"
+                                                    <Label Text="{Binding TemplateName}" FontSize="15" FontAttributes="Bold"
                                                            TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
-                                                    <Label Text="{Binding PrinterName, StringFormat='打印机: {0}'}" FontSize="11"
+                                                    <Label Text="{Binding PrinterName, StringFormat='打印机: {0}'}" FontSize="13"
                                                            TextColor="{StaticResource TextTertiary}" LineBreakMode="TailTruncation"/>
                                                 </VerticalStackLayout>
                                                 <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
-                                                    <Label Text="{Binding DisplayTime}" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
-                                                    <Label Text="{Binding OperatorName}" FontSize="12" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                                    <Label Text="{Binding DisplayTime}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
+                                                    <Label Text="{Binding OperatorName}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="End"/>
                                                 </VerticalStackLayout>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
                                 <CollectionView.EmptyView>
-                                    <Label Text="该档案暂无证明开具记录" Style="{StaticResource EmptyStateLabel}" FontSize="12" Margin="0,8"/>
+                                    <Label Text="该档案暂无证明开具记录" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,8"/>
                                 </CollectionView.EmptyView>
                             </CollectionView>
                         </VerticalStackLayout>
@@ -338,8 +317,8 @@
                                              HorizontalOptions="Fill"/>
                     <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="16"
                                          IsVisible="{Binding HasPdf, Converter={StaticResource BoolToInverseConverter}}">
-                        <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="48" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                        <Label Text="选择左侧档案并点击预览" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="14"/>
+                        <Label Text="{OnPlatform WinUI='&#xE894;', Android='&#x1F441;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                        <Label Text="选择左侧档案并点击预览" Style="{StaticResource EmptyStateLabel}" Margin="0" FontSize="16"/>
                     </VerticalStackLayout>
                 </Grid>
             </Border>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 最小单元测试项目（2026-11 引入，经 AGENTS §6 约定变更批准）：
+       只测【纯逻辑、无 DB、无 UI】的核心口径（金额公式/分段计算/校验器/状态机/常量映射），
+       防止结构精简时改坏业务口径。集成/DB/UI 仍靠编译 + 冒烟（AGENTS §0）。
+       运行：dotnet test NewCosmos.Tests\NewCosmos.Tests.csproj -f net10.0-windows10.0.19041.0 -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseMaui>true</UseMaui>
+    <OutputType>Library</OutputType>
+    <RootNamespace>NewCosmos.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 与主项目版本对齐（避免 UseMaui 隐式 10.0.20 与 NewCosmos 10.0.90 的 NU1605 降级冲突） -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewCosmos.csproj" />
+  </ItemGroup>
+
+</Project>

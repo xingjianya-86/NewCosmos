@@ -3,11 +3,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
+using NewCosmos.Models.DeathStatement;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Navigation;
+using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.SocialAssistance;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 
 namespace NewCosmos.ViewModels.SocialAssistance;
@@ -19,12 +22,29 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
 {
     private readonly ICollegeStudentService _collegeStudentService;
     private readonly IDialogService _dialogService;
+    private readonly IDeathStatementService _deathStatementService;
+    private readonly INewPermissionService _permissionService;
 
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ILoggerService _logger;
+
+    #region 死亡待退出（死亡联动待办 College 域，2026-10-31 方案2 承接面）
+
+    /// <summary>死亡待退出任务（死亡申报触发；COLLEGE_MANAGE 承接人可见）</summary>
+    [ObservableProperty]
+    private ObservableCollection<DeathLinkageTaskItem> _deathCollegeTasks = new();
+
+    /// <summary>是否有死亡待退出任务（区块显隐：权限 ∧ 有任务，二者合一避免空壳区块）</summary>
+    [ObservableProperty]
+    private bool _hasDeathCollegeTasks;
+
+    [ObservableProperty]
+    private string _deathCollegeCountText = "0";
+
+    #endregion
 
     #region Tab 状态
 
@@ -180,12 +200,16 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         ILoggerService logger,
         ICollegeStudentService collegeStudentService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IDeathStatementService deathStatementService,
+        INewPermissionService permissionService)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _collegeStudentService = collegeStudentService;
         _dialogService = dialogService;
+        _deathStatementService = deathStatementService;
+        _permissionService = permissionService;
     }
 
     /// <inheritdoc/>
@@ -193,6 +217,8 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
     {
         // 首次进入即全量加载：原只载当前 Tab，其余三个 Tab 徽标计数停留初始值 "0"（不刷新）
         await LoadAllTabsAsync();
+        // 死亡待退出承接面（方案2）：先权限过滤再按范围幂等补齐加载
+        await LoadDeathCollegeAsync();
         await base.OnAppearingAsync();
     }
 
@@ -373,15 +399,22 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
     [RelayCommand]
     private async Task NavigateToChangeManagementAsync(CollegeStudent? student)
     {
+        await PushChangePageWithIdCardAsync(student?.IdCard);
+    }
+
+    /// <summary>
+    /// 跳保障对象动态管理（变更页）并预填身份证触发一次搜索——今年毕业与死亡待退出共用出口
+    /// （大学生退出登记走变更流程，与既有「今年毕业 → 去变更」同一路径）。
+    /// </summary>
+    private async Task PushChangePageWithIdCardAsync(string? idCard)
+    {
         try
         {
             var page = _serviceProvider.GetRequiredService<Pages.ChangeManagement.ChangePage>();
 
-            // 从"今年毕业"跳转：自动预填该大学生身份证并触发一次档案搜索
-            if (!string.IsNullOrWhiteSpace(student?.IdCard)
-                && page.BindingContext is NewCosmos.ViewModels.ChangeManagement.ChangeViewModel vm)
+            if (!string.IsNullOrWhiteSpace(idCard) && page.BindingContext is NewCosmos.ViewModels.ChangeManagement.ChangeViewModel vm)
             {
-                vm.SearchKeyword = student.IdCard.Trim();
+                vm.SearchKeyword = idCard.Trim();
                 if (vm.SearchApplicationsCommand.CanExecute(null))
                     await vm.SearchApplicationsCommand.ExecuteAsync(null);
             }
@@ -395,6 +428,79 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
             Logger.LogError(ex, "跳转保障对象动态管理失败");
             await _dialogService.DisplayAlertAsync("跳转失败", "未找到保障对象动态管理页面", "确定");
         }
+    }
+
+    #endregion
+
+    #region 死亡待退出（死亡联动待办承接，2026-10-31 方案2）
+
+    /// <summary>
+    /// 加载死亡待退出任务（College 域）。无 COLLEGE_MANAGE → 区块隐藏；
+    /// 服务侧先按范围幂等补齐再实时判定办结，仅返回未办任务。
+    /// </summary>
+    private async Task LoadDeathCollegeAsync()
+    {
+        DeathCollegeTasks.Clear();
+        HasDeathCollegeTasks = false;
+        DeathCollegeCountText = "0";
+
+        try
+        {
+            var userId = App.CurrentUserId ?? 0;
+            if (userId <= 0) return;
+            var permissions = await _permissionService.CheckPermissionsAsync(userId, new[] { PermissionCodes.COLLEGE_MANAGE });
+            if (permissions == null || !permissions.TryGetValue(PermissionCodes.COLLEGE_MANAGE, out var granted) || !granted)
+                return;
+
+            var scopeResult = await _deathStatementService.ResolveScopeAsync(CancellationToken);
+            if (scopeResult.IsFailure)
+            {
+                Logger.Warn($"死亡待退出加载跳过（范围解析失败）: {scopeResult.Message}");
+                return;
+            }
+
+            var tasks = await _deathStatementService.GetLinkageTasksAsync(
+                scopeResult.Value, new[] { DeathLinkageConstants.DomainCollege }, CancellationToken);
+            if (tasks.IsFailure)
+            {
+                Logger.Warn($"死亡待退出加载失败: {tasks.Message}");
+                return;
+            }
+
+            foreach (var task in tasks.Value ?? new List<DeathLinkageTaskItem>())
+                DeathCollegeTasks.Add(task);
+            DeathCollegeCountText = DeathCollegeTasks.Count.ToString("N0");
+            HasDeathCollegeTasks = DeathCollegeTasks.Count > 0;
+
+            Logger.LogBusiness("加载死亡待退出", ("Count", DeathCollegeTasks.Count));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "死亡待退出加载异常");
+        }
+    }
+
+    /// <summary>死亡待退出：跳变更页预填死者身份证（退出登记走既有变更流程；权限在区块可见性已过滤，此处复核兜底）</summary>
+    [RelayCommand]
+    private async Task HandleDeathCollegeAsync(DeathLinkageTaskItem? task)
+    {
+        if (task == null) return;
+
+        var userId = App.CurrentUserId ?? 0;
+        var canManage = userId > 0 &&
+            await _permissionService.HasPermissionAsync(userId, PermissionCodes.COLLEGE_MANAGE, CancellationToken);
+        if (!canManage)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "无权限办理大学生退出，请联系管理员分配「大学生管理」权限。", "确定");
+            return;
+        }
+
+        Logger.LogBusiness("死亡待退出-去办理",
+            ("Name", DataMasker.MaskName(task.DeceasedName)),
+            ("IdCard", DataMasker.MaskIdCard(task.DeceasedIdCard)),
+            ("TaskId", task.Id));
+
+        await PushChangePageWithIdCardAsync(task.DeceasedIdCard);
     }
 
     #endregion

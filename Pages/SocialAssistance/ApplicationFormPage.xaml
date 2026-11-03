@@ -34,17 +34,17 @@
                 <!-- 放弃申请：第一步原本无任何退出途径，此处为全程可用的带确认退出入口 -->
                 <components:BackButton Grid.Column="0" Command="{Binding AbandonCommand}" IconColor="White" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="1" Spacing="16" VerticalOptions="Center">
-                    <Label Text="{OnPlatform WinUI='&#xE8A5;', Android='&#x1F9FE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="32" TextColor="{StaticResource White}"/>
+                    <Label Text="{OnPlatform WinUI='&#xE8A5;', Android='&#x1F9FE;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="34" TextColor="{StaticResource White}"/>
                     <VerticalStackLayout Spacing="2">
-                        <Label Text="低收入人口认定申请" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource White}"/>
-                        <Label Text="家庭申请 · 信息录入 · 分类认定" FontSize="16" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
+                        <Label Text="低收入人口认定申请" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource White}"/>
+                        <Label Text="家庭申请 · 信息录入 · 分类认定" FontSize="18" TextColor="{StaticResource PrimarySoft}" Opacity="0.9"/>
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
                 <!-- 模式提醒徽章（仅补全/复核等特殊模式显示） -->
                 <Border Grid.Column="1" BackgroundColor="{StaticResource White}" Opacity="0.95"
                         StrokeThickness="0" StrokeShape="RoundRectangle 6" Padding="12,6"
                         VerticalOptions="Center" IsVisible="{Binding IsModeBannerVisible}" MaximumWidthRequest="360">
-                    <Label Text="{Binding ModeBannerText}" FontSize="12" FontAttributes="Bold"
+                    <Label Text="{Binding ModeBannerText}" FontSize="14" FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" VerticalOptions="Center"
                            LineBreakMode="WordWrap"/>
                 </Border>
@@ -69,9 +69,9 @@
                         <TapGestureRecognizer Command="{Binding NavigateToStepCommand}" CommandParameter="1"/>
                     </Border.GestureRecognizers>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                        <Label Text="1" FontSize="16" FontAttributes="Bold" 
+                        <Label Text="1" FontSize="18" FontAttributes="Bold" 
                                TextColor="{Binding Step1TextColor}" HorizontalOptions="Center"/>
-                        <Label Text="基本信息" FontSize="16" 
+                        <Label Text="基本信息" FontSize="18" 
                                TextColor="{Binding Step1TextColor}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
@@ -89,9 +89,9 @@
                         <TapGestureRecognizer Command="{Binding NavigateToStepCommand}" CommandParameter="2"/>
                     </Border.GestureRecognizers>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                        <Label Text="2" FontSize="16" FontAttributes="Bold" 
+                        <Label Text="2" FontSize="18" FontAttributes="Bold" 
                                TextColor="{Binding Step2TextColor}" HorizontalOptions="Center"/>
-                        <Label Text="家庭成员" FontSize="16" 
+                        <Label Text="家庭成员" FontSize="18" 
                                TextColor="{Binding Step2TextColor}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
@@ -109,9 +109,9 @@
                         <TapGestureRecognizer Command="{Binding NavigateToStepCommand}" CommandParameter="3"/>
                     </Border.GestureRecognizers>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                        <Label Text="3" FontSize="16" FontAttributes="Bold" 
+                        <Label Text="3" FontSize="18" FontAttributes="Bold" 
                                TextColor="{Binding Step3TextColor}" HorizontalOptions="Center"/>
-                        <Label Text="经济状况" FontSize="16" 
+                        <Label Text="经济状况" FontSize="18" 
                                TextColor="{Binding Step3TextColor}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
@@ -129,9 +129,9 @@
                         <TapGestureRecognizer Command="{Binding NavigateToStepCommand}" CommandParameter="4"/>
                     </Border.GestureRecognizers>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                        <Label Text="4" FontSize="16" FontAttributes="Bold" 
+                        <Label Text="4" FontSize="18" FontAttributes="Bold" 
                                TextColor="{Binding Step4TextColor}" HorizontalOptions="Center"/>
-                        <Label Text="入户调查" FontSize="16" 
+                        <Label Text="入户调查" FontSize="18" 
                                TextColor="{Binding Step4TextColor}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
@@ -149,9 +149,9 @@
                         <TapGestureRecognizer Command="{Binding NavigateToStepCommand}" CommandParameter="5"/>
                     </Border.GestureRecognizers>
                     <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
-                        <Label Text="5" FontSize="16" FontAttributes="Bold" 
+                        <Label Text="5" FontSize="18" FontAttributes="Bold" 
                                TextColor="{Binding Step5TextColor}" HorizontalOptions="Center"/>
-                        <Label Text="分类认定" FontSize="16" 
+                        <Label Text="分类认定" FontSize="18" 
                                TextColor="{Binding Step5TextColor}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                 </Border>
@@ -173,7 +173,7 @@
                     Style="{StaticResource CardBorder}" Margin="16,8,16,0" Padding="12">
                 <VerticalStackLayout Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <Label Grid.Column="0" Text="{Binding VisitStatusText}" FontSize="14" FontAttributes="Bold"
+                        <Label Grid.Column="0" Text="{Binding VisitStatusText}" FontSize="16" FontAttributes="Bold"
                                TextColor="{StaticResource TextPrimary}" VerticalOptions="Center">
                             <Label.Triggers>
                                 <DataTrigger TargetType="Label" Binding="{Binding VisitStatusIsWarning}" Value="True">
@@ -181,7 +181,7 @@
                                 </DataTrigger>
                             </Label.Triggers>
                         </Label>
-                        <Button Grid.Column="1" Text="补录回访" HeightRequest="32" FontSize="13"
+                        <Button Grid.Column="1" Text="补录回访" HeightRequest="32" FontSize="15"
                                 Command="{Binding ToggleVisitPanelCommand}" Style="{StaticResource ButtonOutline}"/>
                     </Grid>
 
@@ -204,11 +204,11 @@
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="entities:VisitRecord">
                                     <Grid Padding="0,5" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-                                        <Label Grid.Column="0" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                                        <Label Grid.Column="0" FontSize="15" TextColor="{StaticResource TextSecondary}"
                                                Text="{Binding VisitAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"/>
-                                        <Label Grid.Column="1" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                        <Label Grid.Column="1" FontSize="15" TextColor="{StaticResource TextPrimary}"
                                                Text="{Binding VisitBy}"/>
-                                        <Label Grid.Column="2" FontSize="13" TextColor="{StaticResource TextPrimary}">
+                                        <Label Grid.Column="2" FontSize="15" TextColor="{StaticResource TextPrimary}">
                                             <Label.FormattedText>
                                                 <FormattedString>
                                                     <Span Text="{Binding VisitResult}"/>
@@ -236,42 +236,42 @@
                     <!-- 第一行：收入项横向排列 -->
                     <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
                         <HorizontalStackLayout Spacing="14">
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="务工(月) "/><Span Text="{Binding WorkIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="经营(月) "/><Span Text="{Binding BusinessIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="财产(月) "/><Span Text="{Binding PropertyIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="转移(月) "/><Span Text="{Binding TransferIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="其他(月) "/><Span Text="{Binding OtherIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="赡养(月) "/><Span Text="{Binding AlimonyIncome, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
-                                    <Span Text="补贴(年) "/><Span Text="{Binding SubsidyTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/><Span Text="{Binding SubsidyRatioNote}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                    <Span Text="补贴(年) "/><Span Text="{Binding SubsidyTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/><Span Text="{Binding SubsidyRatioNote}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource TextSecondary}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource TextSecondary}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="土地(年) "/><Span Text="{Binding LandIncomeTotal, StringFormat='{0:N2}'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                 </FormattedString></Label.FormattedText>
@@ -282,27 +282,27 @@
                     <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray100}"/>
                     <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
                         <HorizontalStackLayout Spacing="14">
-                            <Label FontSize="16" TextColor="{StaticResource Error}">
+                            <Label FontSize="18" TextColor="{StaticResource Error}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="医疗(月) "/><Span Text="{Binding MedicalExpenditure, StringFormat='{0:N2}'}" FontAttributes="Bold"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource Error}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource Error}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource Error}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource Error}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="教育(月) "/><Span Text="{Binding EducationExpenditure, StringFormat='{0:N2}'}" FontAttributes="Bold"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource Error}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource Error}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource Error}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource Error}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="康复(月) "/><Span Text="{Binding DisabilityRehabExpenditure, StringFormat='{0:N2}'}" FontAttributes="Bold"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource Error}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource Error}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource Error}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource Error}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="生活(月) "/><Span Text="{Binding LivingExpenditure, StringFormat='{0:N2}'}" FontAttributes="Bold"/>
                                 </FormattedString></Label.FormattedText>
-                            </Label><Label FontSize="16" TextColor="{StaticResource Error}" Text="|"/>
-                            <Label FontSize="16" TextColor="{StaticResource Error}">
+                            </Label><Label FontSize="18" TextColor="{StaticResource Error}" Text="|"/>
+                            <Label FontSize="18" TextColor="{StaticResource Error}">
                                 <Label.FormattedText><FormattedString>
                                     <Span Text="合计(月) "/><Span Text="{Binding RigidExpenditure, StringFormat='{0:N2}'}" FontAttributes="Bold"/>
                                 </FormattedString></Label.FormattedText>
@@ -312,24 +312,24 @@
                     <!-- 第三行：汇总结果 -->
                     <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                     <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="16">
-                        <Label FontSize="16" TextColor="{StaticResource TextPrimary}">
+                        <Label FontSize="18" TextColor="{StaticResource TextPrimary}">
                             <Label.FormattedText><FormattedString>
                                 <Span Text="收入小计(年): " FontAttributes="Bold"/>
                                 <Span Text="{Binding IncomeSubtotal, StringFormat='{0:N2} 元'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                             </FormattedString></Label.FormattedText>
                         </Label>
-                        <Label Grid.Column="1" FontSize="16" TextColor="{StaticResource TextPrimary}">
+                        <Label Grid.Column="1" FontSize="18" TextColor="{StaticResource TextPrimary}">
                             <Label.FormattedText><FormattedString>
                                 <Span Text="总收入(年): " FontAttributes="Bold"/>
                                 <Span Text="{Binding TotalFamilyIncomeAnnual, StringFormat='{0:N2} 元'}" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                             </FormattedString></Label.FormattedText>
                         </Label>
-                        <Label Grid.Column="2" FontSize="16" TextColor="{StaticResource TextPrimary}">
+                        <Label Grid.Column="2" FontSize="18" TextColor="{StaticResource TextPrimary}">
                             <Label.FormattedText><FormattedString>
                                 <Span Text="人口: "/><Span Text="{Binding FamilySize}"/><Span Text="人"/>
                             </FormattedString></Label.FormattedText>
                         </Label>
-                        <Label Grid.Column="3" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource Primary}">
+                        <Label Grid.Column="3" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource Primary}">
                             <Label.FormattedText><FormattedString>
                                 <Span Text="人均年收入: "/><Span Text="{Binding PerCapitaIncomeAnnual, StringFormat='{0:N2} 元'}"/>
                             </FormattedString></Label.FormattedText>
@@ -364,8 +364,8 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
-                        <Label Grid.Column="1" Text="来源数据" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
+                        <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="来源数据" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" Margin="8,0,0,0"/>
                     </Grid>
 
                     <BoxView Grid.Row="0" HeightRequest="1" BackgroundColor="{StaticResource Gray200}" VerticalOptions="End"/>
@@ -381,24 +381,24 @@
                                     <!-- 字段名 + 值 -->
                                     <VerticalStackLayout Grid.Column="1" Spacing="2">
                                         <HorizontalStackLayout Spacing="6">
-                                            <Label Text="{Binding DisplayName}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                            <Label Text="{Binding Source}" FontSize="10" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            <Label Text="{Binding DisplayName}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                            <Label Text="{Binding Source}" FontSize="12" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                                         </HorizontalStackLayout>
-                                        <Label Text="{Binding Value}" FontSize="14" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
-                                        <Label Text="{Binding MissingText}" FontSize="11" TextColor="{StaticResource WarningDark}"
+                                        <Label Text="{Binding Value}" FontSize="16" TextColor="{StaticResource TextPrimary}" LineBreakMode="TailTruncation"/>
+                                        <Label Text="{Binding MissingText}" FontSize="13" TextColor="{StaticResource WarningDark}"
                                                IsVisible="{Binding IsMissing}"/>
                                     </VerticalStackLayout>
 
                                     <!-- 填充按钮（有值）；无值时改为“去填写”跳转对应步骤 -->
                                     <Button Grid.Column="2" Text="填充"
-                                            FontSize="12" Padding="8,4" HeightRequest="28"
+                                            FontSize="14" Padding="8,4" HeightRequest="28"
                                             BackgroundColor="{StaticResource Primary}" TextColor="White"
                                             CornerRadius="4"
                                             IsVisible="{Binding HasValue}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationFormViewModel}}, Path=FillFieldCommand}"
                                             CommandParameter="{Binding .}"/>
                                     <Button Grid.Column="2" Text="去填写"
-                                            FontSize="12" Padding="8,4" HeightRequest="28"
+                                            FontSize="14" Padding="8,4" HeightRequest="28"
                                             BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
                                             CornerRadius="4"
                                             IsVisible="{Binding IsMissing}"
@@ -409,8 +409,8 @@
                         </CollectionView.ItemTemplate>
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,40">
-                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                                <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,8,0,0"/>
+                                <Label Text="{OnPlatform WinUI='&#xE8C8;', Android='&#x1F5C3;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="38" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="暂无来源数据" Style="{StaticResource EmptyStateLabel}" FontSize="16" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                     </CollectionView>
@@ -420,7 +420,7 @@
                         <Button Text="全选" Command="{Binding SelectAllFieldsCommand}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
                         <Button Text="填充选中" Command="{Binding FillSelectedFieldsCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="36"/>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
-                        <Label Text="家庭成员" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" Margin="0,4,0,0"/>
+                        <Label Text="家庭成员" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" Margin="0,4,0,0"/>
                         <Button Text="导入全部家庭成员" Command="{Binding ImportAllFamilyMembersCommand}" Style="{StaticResource ButtonPrimary}" HeightRequest="36"/>
                     </VerticalStackLayout>
                 </Grid>
@@ -450,10 +450,10 @@
                 <VerticalStackLayout Spacing="0">
                     <!-- 标题栏 -->
                     <Grid Padding="20,16" ColumnDefinitions="*,Auto" BackgroundColor="{StaticResource Primary}">
-                        <Label Text="搜索结果" FontSize="16"
+                        <Label Text="搜索结果" FontSize="18"
                                TextColor="White" FontAttributes="Bold" VerticalOptions="Center"/>
                         <Button Grid.Column="1" Text="✕"
-                                FontSize="18" FontAttributes="Bold"
+                                FontSize="20" FontAttributes="Bold"
                                 TextColor="White" BackgroundColor="Transparent"
                                 WidthRequest="32" HeightRequest="32" Padding="0"
                                 CornerRadius="16"
@@ -461,7 +461,7 @@
                     </Grid>
 
                     <!-- 搜索结果数量提示 -->
-                    <Label Padding="20,12,20,4" FontSize="15" TextColor="{StaticResource TextSecondary}"
+                    <Label Padding="20,12,20,4" FontSize="17" TextColor="{StaticResource TextSecondary}"
                            Text="{Binding SearchResults.Count, StringFormat='找到 {0} 条记录，请选择一条'}"/>
 
                     <!-- 结果列表 -->
@@ -481,14 +481,14 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                         <Border WidthRequest="36" HeightRequest="36" StrokeShape="RoundRectangle 18"
                                                 BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
-                                            <Label Text="👤" FontSize="16"
+                                            <Label Text="👤" FontSize="18"
                                                    TextColor="{StaticResource Primary}"
                                                    HorizontalOptions="Center" VerticalOptions="Center"/>
                                         </Border>
                                         <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold"
+                                            <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
                                                    TextColor="{StaticResource TextPrimary}"/>
-                                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
+                                            <Label FontSize="18" TextColor="{StaticResource TextSecondary}">
                                                 <Label.FormattedText>
                                                     <FormattedString>
                                                         <Span Text="身份证: "/>
@@ -496,7 +496,7 @@
                                                     </FormattedString>
                                                 </Label.FormattedText>
                                             </Label>
-                                            <Label FontSize="16" TextColor="{StaticResource TextTertiary}">
+                                            <Label FontSize="18" TextColor="{StaticResource TextTertiary}">
                                                 <Label.FormattedText>
                                                     <FormattedString>
                                                         <Span Text="{Binding SourceDisplay}"/>
@@ -514,7 +514,7 @@
                         </CollectionView.ItemTemplate>
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="40">
-                                <Label Text="🔍" FontSize="48"
+                                <Label Text="🔍" FontSize="50"
                                        TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
                                 <Label Text="未找到匹配的记录" Style="{StaticResource EmptyStateLabel}"
                                        Margin="0,12,0,0"/>
@@ -555,10 +555,10 @@
                 <VerticalStackLayout Spacing="0">
                     <!-- 标题栏 -->
                     <Grid Padding="20,16" ColumnDefinitions="*,Auto" BackgroundColor="{StaticResource Primary}">
-                        <Label Text="选择要导入的家庭成员" FontSize="16"
+                        <Label Text="选择要导入的家庭成员" FontSize="18"
                                TextColor="White" FontAttributes="Bold" VerticalOptions="Center"/>
                         <Button Grid.Column="1" Text="✕"
-                                FontSize="18" FontAttributes="Bold"
+                                FontSize="20" FontAttributes="Bold"
                                 TextColor="White" BackgroundColor="Transparent"
                                 WidthRequest="32" HeightRequest="32" Padding="0"
                                 CornerRadius="16"
@@ -566,7 +566,7 @@
                     </Grid>
 
                     <!-- 提示信息 -->
-                    <Label Padding="20,12,20,4" FontSize="15" TextColor="{StaticResource TextSecondary}">
+                    <Label Padding="20,12,20,4" FontSize="17" TextColor="{StaticResource TextSecondary}">
                         <Label.FormattedText>
                             <FormattedString>
                                 <Span Text="找到 "/>
@@ -582,8 +582,8 @@
                                     Margin="16,0">
                         <CollectionView.EmptyView>
                             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="20,40">
-                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="36" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                                <Label Text="暂无家庭成员数据" Style="{StaticResource EmptyStateLabel}" FontSize="14" Margin="0,8,0,0"/>
+                                <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="38" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
+                                <Label Text="暂无家庭成员数据" Style="{StaticResource EmptyStateLabel}" FontSize="16" Margin="0,8,0,0"/>
                             </VerticalStackLayout>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
@@ -593,14 +593,14 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                         <CheckBox IsChecked="{Binding IsSelected}" VerticalOptions="Center"/>
                                         <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                            <Label FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}">
+                                            <Label FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}">
                                                 <Label.FormattedText>
                                                     <FormattedString>
                                                         <Span Text="{Binding Name}"/>
                                                     </FormattedString>
                                                 </Label.FormattedText>
                                             </Label>
-                                            <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                                            <Label FontSize="16" TextColor="{StaticResource TextSecondary}">
                                                 <Label.FormattedText>
                                                     <FormattedString>
                                                         <Span Text="身份证: "/>
@@ -608,7 +608,7 @@
                                                     </FormattedString>
                                                 </Label.FormattedText>
                                             </Label>
-                                            <Label FontSize="14" TextColor="{StaticResource TextTertiary}">
+                                            <Label FontSize="16" TextColor="{StaticResource TextTertiary}">
                                                 <Label.FormattedText>
                                                     <FormattedString>
                                                         <Span Text="关系: "/>
@@ -665,7 +665,7 @@
             <Border.Shadow>
                 <Shadow Brush="{StaticResource Black}" Offset="0,-2" Radius="4" Opacity="0.1"/>
             </Border.Shadow>
-            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
+            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12" RowDefinitions="Auto,*" RowSpacing="6">
                 <Button Grid.Column="0" Text="放弃申请" Style="{StaticResource ButtonOutline}"
                         Command="{Binding AbandonCommand}"
                         IsVisible="{Binding IsEditable}" TextColor="{StaticResource Error}"/>
@@ -679,6 +679,11 @@
                 <Button Grid.Column="4" Text="提交" Style="{StaticResource ButtonSuccess}"
                         Command="{Binding SaveCommand}" IsVisible="{Binding IsSubmitVisible}"
                         IsEnabled="{Binding IsClassificationDone}" MinimumWidthRequest="100"/>
+                <!-- 灰禁原因提示：提交按钮不可用时给出可操作文案（原灰禁无说明，用户不知所措） -->
+                <Label Grid.Row="1" Grid.ColumnSpan="5"
+                       Text="{Binding SubmitDisabledReason}"
+                       FontSize="13" TextColor="{StaticResource WarningDark}"
+                       HorizontalTextAlignment="Center"/>
             </Grid>
         </Border>
 

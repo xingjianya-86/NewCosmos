@@ -1,10 +1,11 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using NewCosmos.Constants;
 
 namespace NewCosmos.Models.Results;
 
 /// <summary>
-/// 操作结果基类 - 不包含返回    /// </summary>
+/// 操作结果基类——不含返回值（带值版本见 Result&lt;T&gt;）
+/// </summary>
 public class Result
 {
     public bool IsSuccess { get; }
@@ -27,6 +28,12 @@ public class Result
     public static Result Success() => new(true, null, null, null);
 
     /// <summary>
+    /// 创建成功结果（带警告文案）：主操作已提交但后续联动步骤失败时使用，
+    /// UI 应展示 Message 提示用户可重试联动（如高龄停发的导入台账联动标记）。
+    /// </summary>
+    public static Result SuccessWithWarning(string warning) => new(true, null, warning, null);
+
+    /// <summary>
     /// 创建失败结果
     /// </summary>
     public static Result Failure(string errorCode, string message, params string[] errors) =>
@@ -44,7 +51,8 @@ public class Result
         Result<T>.Failure(errorCode, message, errors);
 
     /// <summary>
-    /// 从异常创建失败结    /// </summary>
+    /// 从异常创建失败结
+/// </summary>
     public static Result FromException(Exception ex, string errorCode = null)
     {
         var code = errorCode ?? GetErrorCodeFromException(ex);
@@ -52,7 +60,8 @@ public class Result
     }
 
     /// <summary>
-    /// 从异常创建失败结    /// </summary>
+    /// 从异常创建失败结
+/// </summary>
     public static Result<T> FromException<T>(Exception ex, string errorCode = null)
     {
         var code = errorCode ?? GetErrorCodeFromException(ex);
@@ -106,7 +115,8 @@ public class Result
 }
 
 /// <summary>
-/// 操作结果泛型- 包含返回    /// </summary>
+/// 操作结果泛型- 包含返回
+/// </summary>
 public class Result<T> : Result
 {
     public T Value { get; }
@@ -149,7 +159,8 @@ public class Result<T> : Result
     }
 
     /// <summary>
-    /// 获取值或默认    /// </summary>
+    /// 获取值或默认
+/// </summary>
     public T? GetValueOrDefault(T? defaultValue = default) => IsSuccess ? Value : defaultValue;
 
     /// <summary>
@@ -204,7 +215,8 @@ public class BusinessException : Exception
     }
 
     /// <summary>
-    /// 添加上下文信息（支持链式调用    /// </summary>
+    /// 添加上下文信息（支持链式调用
+/// </summary>
     public BusinessException AddContext(string key, object value)
     {
         Context[key] = value;

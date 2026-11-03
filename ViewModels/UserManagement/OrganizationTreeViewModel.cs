@@ -708,7 +708,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
 
     /// <summary>
     /// 选省 → 重载市（按省筛）并清掉市及以下选择。
-    /// 回显期由 <see cref="_suppressProvinceCascade"/> 抑制：回显按全量市定位，只有用户主动切省才筛。
+    /// 回显期由 <see cref="_isRestoringRegion"/> 抑制：回显按全量市定位，只有用户主动切省才筛。
     /// </summary>
     partial void OnSelectedProvinceNameChanged(string value)
     {

@@ -8,13 +8,13 @@
 
     <ContentView.Resources>
         <Style x:Key="MobileSubSectionTitle" TargetType="Label">
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontAttributes" Value="Bold"/>
             <Setter Property="TextColor" Value="{StaticResource TextPrimary}"/>
         </Style>
         <Style x:Key="MobileDeleteButton" TargetType="Button">
             <Setter Property="Text" Value="×"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value="15"/>
             <Setter Property="FontAttributes" Value="Bold"/>
             <Setter Property="WidthRequest" Value="30"/>
             <Setter Property="HeightRequest" Value="30"/>
@@ -32,7 +32,7 @@
         <Border Padding="14,12" StrokeShape="RoundRectangle 8"
                 BackgroundColor="{StaticResource WarningSoft}" Stroke="{StaticResource Warning}" StrokeThickness="1"
                 IsVisible="{Binding IsSingleRescueApplication}">
-            <Label Text="⚠️ 单人保申请 - 经济状况已锁定，不可编辑" FontSize="14"
+            <Label Text="⚠️ 单人保申请 - 经济状况已锁定，不可编辑" FontSize="15"
                    FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
         </Border>
 
@@ -255,7 +255,7 @@
                                                     CommandParameter="{Binding .}"
                                                     IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                         </Grid>
-                                        <Label Text="{Binding TotalArea, StringFormat='面积: {0:F2}亩'}" FontSize="14"
+                                        <Label Text="{Binding TotalArea, StringFormat='面积: {0:F2}亩'}" FontSize="15"
                                                TextColor="{StaticResource Warning}" FontAttributes="Bold"/>
                                         <BoxView HeightRequest="1" Color="{StaticResource WarningLight}"/>
 
@@ -268,17 +268,17 @@
                                                     IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                         </Grid>
                                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
-                                            <Button Grid.Column="0" Text="全自种" FontSize="13" HeightRequest="34" Padding="4,0"
+                                            <Button Grid.Column="0" Text="全自种" FontSize="14" HeightRequest="34" Padding="4,0"
                                                     BackgroundColor="{StaticResource Success}" TextColor="White"
                                                     Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
                                                     CommandParameter="自行种植"
                                                     IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="1" Text="全转包" FontSize="13" HeightRequest="34" Padding="4,0"
+                                            <Button Grid.Column="1" Text="全转包" FontSize="14" HeightRequest="34" Padding="4,0"
                                                     BackgroundColor="{StaticResource Info}" TextColor="White"
                                                     Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
                                                     CommandParameter="转包他人"
                                                     IsVisible="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
-                                            <Button Grid.Column="2" Text="全承包" FontSize="13" HeightRequest="34" Padding="4,0"
+                                            <Button Grid.Column="2" Text="全承包" FontSize="14" HeightRequest="34" Padding="4,0"
                                                     BackgroundColor="{StaticResource WarningDark}" TextColor="White"
                                                     Command="{Binding BindingContext.BatchSetLandUsageCommand, Source={x:Reference StepRoot}}"
                                                     CommandParameter="承包土地"
@@ -312,7 +312,7 @@
                                                                        Style="{StaticResource FormFieldEntryStyle}"
                                                                        IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                                                 <Label Grid.Column="1" Text="元/亩" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                                <Label Grid.Column="2" Text="{Binding LandValue, StringFormat='= ¥{0:N0}'}" FontSize="15"
+                                                                <Label Grid.Column="2" Text="{Binding LandValue, StringFormat='= ¥{0:N0}'}" FontSize="16"
                                                                        TextColor="{StaticResource Primary}" FontAttributes="Bold" VerticalOptions="Center"/>
                                                             </Grid>
                                                         </VerticalStackLayout>
@@ -383,47 +383,47 @@
                     <Border Stroke="{StaticResource Warning}" StrokeThickness="1" BackgroundColor="{StaticResource WarningLight}"
                             Padding="12" StrokeShape="RoundRectangle 8">
                         <VerticalStackLayout Spacing="6">
-                            <Label Text="家庭土地面积汇总" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" FontSize="15" HorizontalOptions="Center"/>
-                            <Label Text="{Binding LandCalculationFormula}" FontSize="14" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
+                            <Label Text="家庭土地面积汇总" FontAttributes="Bold" TextColor="{StaticResource WarningDark}" FontSize="16" HorizontalOptions="Center"/>
+                            <Label Text="{Binding LandCalculationFormula}" FontSize="15" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center"/>
                             <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*" ColumnSpacing="8" RowSpacing="8">
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="0">
-                                    <Label Text="总面积" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding TotalConfirmedLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="总面积" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalConfirmedLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="1">
-                                    <Label Text="总份数" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding TotalLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="总份数" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Warning}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="2">
-                                    <Label Text="家庭土地" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding FamilyLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Info}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="家庭土地" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandArea, StringFormat='{0:F2}亩'}" FontAttributes="Bold" TextColor="{StaticResource Info}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="1" Grid.Column="0">
-                                    <Label Text="家庭份数" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding FamilyLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="家庭份数" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandShares, StringFormat='{0:F1}份'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="1" Grid.Column="1">
-                                    <Label Text="家庭人数" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding FamilyLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="家庭人数" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding FamilyLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Success}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="1" Grid.Column="2">
-                                    <Label Text="总人数" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding TotalLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Gray400}" FontSize="15" HorizontalOptions="Center"/>
+                                    <Label Text="总人数" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding TotalLandPersonCount, StringFormat='{0}人'}" FontAttributes="Bold" TextColor="{StaticResource Gray400}" FontSize="16" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                             </Grid>
                             <BoxView HeightRequest="1" Color="{StaticResource WarningLight}"/>
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" RowSpacing="4">
                                 <VerticalStackLayout Grid.Column="0">
-                                    <Label Text="自种收入" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding SelfFarmedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                    <Label Text="自种收入" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding SelfFarmedLandArea, StringFormat='{0:F2}亩'}" FontSize="15" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1">
-                                    <Label Text="转包收入" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding SubleasedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                    <Label Text="转包收入" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding SubleasedLandArea, StringFormat='{0:F2}亩'}" FontSize="15" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="2">
-                                    <Label Text="承包收入" TextColor="{StaticResource TextSecondary}" FontSize="13" HorizontalOptions="Center"/>
-                                    <Label Text="{Binding ContractedLandArea, StringFormat='{0:F2}亩'}" FontSize="14" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
+                                    <Label Text="承包收入" TextColor="{StaticResource TextSecondary}" FontSize="14" HorizontalOptions="Center"/>
+                                    <Label Text="{Binding ContractedLandArea, StringFormat='{0:F2}亩'}" FontSize="15" TextColor="{StaticResource Warning}" HorizontalOptions="Center"/>
                                 </VerticalStackLayout>
                             </Grid>
                             <Label Text="{Binding LandIncomeTotal, StringFormat='土地收入合计: ¥{0:N2}'}" FontSize="16" FontAttributes="Bold"
@@ -455,9 +455,9 @@
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <VerticalStackLayout Spacing="0" VerticalOptions="Center">
                             <Label Text="{Binding SubsidyShareRatioPercent, StringFormat='计算比例: {0:F2}%'}"
-                                   FontSize="15" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
+                                   FontSize="16" FontAttributes="Bold" TextColor="{StaticResource WarningDark}"/>
                             <Label Text="{Binding FamilyLandShares, StringFormat='家庭 {0:F1} 份 ÷ 总份数（见上方土地面积汇总）'}"
-                                   FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                   FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <Button Grid.Column="1" Text="更新计算比例" Style="{StaticResource ButtonOutline}" HeightRequest="34" Padding="12,0"
                                 Command="{Binding UpdateSubsidyRatioCommand}"
@@ -491,7 +491,7 @@
                                                    IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                             <Label Grid.Column="3" Text="元/亩" Style="{StaticResource FormFieldLabelStyle}"/>
                                         </Grid>
-                                        <Label Text="{Binding AmountFormula}" FontSize="15"
+                                        <Label Text="{Binding AmountFormula}" FontSize="16"
                                                TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
                                     </VerticalStackLayout>
                                 </Border>
@@ -808,7 +808,7 @@
                                         </Grid>
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
                                             <Label Text="年赡养费:" Style="{StaticResource FormFieldLabelStyle}"/>
-                                            <Label Grid.Column="1" Text="{Binding AnnualSupportFee, StringFormat='{0:F2}'}" FontSize="15"
+                                            <Label Grid.Column="1" Text="{Binding AnnualSupportFee, StringFormat='{0:F2}'}" FontSize="16"
                                                    TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                             <Label Grid.Column="2" Text="元/年" Style="{StaticResource FormFieldLabelStyle}"/>
                                         </Grid>

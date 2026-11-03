@@ -21,9 +21,9 @@
                     Style="{StaticResource ButtonSmall}"
                     Command="{Binding PreviousPageCommand}"
                     IsEnabled="{Binding CanGoPrevious}"/>
-            <Label Text="{Binding PageIndex}" FontSize="16" VerticalOptions="Center" Margin="8,0"/>
-            <Label Text="/" FontSize="16" VerticalOptions="Center"/>
-            <Label Text="{Binding TotalPages}" FontSize="16" VerticalOptions="Center" Margin="0,0,8,0"/>
+            <Label Text="{Binding PageIndex}" FontSize="{OnPlatform WinUI=18, Android=14, Default=18}" VerticalOptions="Center" Margin="8,0"/>
+            <Label Text="/" FontSize="{OnPlatform WinUI=18, Android=14, Default=18}" VerticalOptions="Center"/>
+            <Label Text="{Binding TotalPages}" FontSize="{OnPlatform WinUI=18, Android=14, Default=18}" VerticalOptions="Center" Margin="0,0,8,0"/>
             <Button Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}"
                     FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}"
                     Style="{StaticResource ButtonSmall}"

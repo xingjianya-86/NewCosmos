@@ -9,18 +9,12 @@
 
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
-        <Border Grid.Row="0" Background="{StaticResource StatCardGreenGradient}" Padding="16,16,16,14">
-            <VerticalStackLayout Spacing="8">
-                <HorizontalStackLayout Spacing="6">
-                    <HorizontalStackLayout.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                    </HorizontalStackLayout.GestureRecognizers>
-                    <Label Text="‹" FontSize="22" TextColor="#E6FFFFFF" VerticalOptions="Center" FontAttributes="Bold"/>
-                    <Label Text="返回" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-                <Label Text="手工录入追缴" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="手工录入追缴"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="12" Spacing="12">
@@ -32,7 +26,12 @@
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="4">
                             <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Entry Text="{Binding IdCard}" Style="{StaticResource FormFieldEntryStyle}"/>
+                            <Entry Text="{Binding IdCard}" Placeholder="身份证号（满18位自动带出）"
+                                   TextChanged="OnIdCardChanged"
+                                   Style="{StaticResource FormFieldEntryStyle}"/>
+                            <Label Text="{Binding LookupStatusText}" FontSize="12"
+                                   IsVisible="{Binding LookupStatusText, Converter={StaticResource StringNotEmptyConverter}}"
+                                   TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Spacing="4">
                             <Label Text="追缴分类 *" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -72,10 +71,10 @@
                                 <Entry Text="{Binding RecoveryAmount}" Keyboard="Numeric" Placeholder="自动计算或手工填写" Style="{StaticResource FormFieldEntryStyle}"/>
                             </VerticalStackLayout>
                         </Grid>
-                        <Label Text="{Binding AmountSourceDisplay, StringFormat='金额来源：{0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="{Binding AutoReferenceText}" IsVisible="{Binding HasAutoDifference}" FontSize="12" TextColor="{StaticResource Warning}"/>
+                        <Label Text="{Binding AmountSourceDisplay, StringFormat='金额来源：{0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding AutoReferenceText}" IsVisible="{Binding HasAutoDifference}" FontSize="14" TextColor="{StaticResource Warning}"/>
                         <Border IsVisible="{Binding IsCannotAuto}" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
-                            <Label Text="{Binding CannotAutoReason}" FontSize="12" TextColor="{StaticResource Warning}"/>
+                            <Label Text="{Binding CannotAutoReason}" FontSize="14" TextColor="{StaticResource Warning}"/>
                         </Border>
                         <VerticalStackLayout Spacing="4" IsVisible="{Binding IsManualAmount}">
                             <Label Text="手工填写原因（必填）" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -90,7 +89,7 @@
                             <Editor Text="{Binding RecoveryReason}" HeightRequest="80" Placeholder="追缴理由说明..."/>
                         </VerticalStackLayout>
                         <Border BackgroundColor="{StaticResource InfoSoft}" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="12,8">
-                            <Label Text="手机端请使用「保存并推送打印」，任务将在电脑端自动打印。" FontSize="12" TextColor="{StaticResource PrimaryDark}"/>
+                            <Label Text="手机端请使用「保存并推送打印」，任务将在电脑端自动打印。" FontSize="14" TextColor="{StaticResource PrimaryDark}"/>
                         </Border>
                     </VerticalStackLayout>
                 </Border>
@@ -99,14 +98,14 @@
 
         <Border Grid.Row="2" BackgroundColor="White" Padding="12,10,12,16" StrokeThickness="0">
             <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
-                <Button Grid.Row="0" Grid.Column="0" Text="保存草稿" HeightRequest="46" CornerRadius="10" FontSize="14"
+                <Button Grid.Row="0" Grid.Column="0" Text="保存草稿" HeightRequest="46" CornerRadius="10" FontSize="15"
                         BackgroundColor="{StaticResource WarningSoft}" TextColor="{StaticResource WarningDark}"
                         Command="{Binding SaveDraftCommand}"/>
-                <Button Grid.Row="0" Grid.Column="1" Text="保存并打印" HeightRequest="46" CornerRadius="10" FontSize="14"
+                <Button Grid.Row="0" Grid.Column="1" Text="保存并打印" HeightRequest="46" CornerRadius="10" FontSize="15"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
                         BorderColor="{StaticResource Gray200}" BorderWidth="1"
                         Command="{Binding SaveAndPrintCommand}"/>
-                <Button Grid.Row="1" Grid.ColumnSpan="2" Text="保存并推送打印" HeightRequest="46" CornerRadius="10" FontSize="15" FontAttributes="Bold"
+                <Button Grid.Row="1" Grid.ColumnSpan="2" Text="保存并推送打印" HeightRequest="46" CornerRadius="10" FontSize="16" FontAttributes="Bold"
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         Command="{Binding SaveAndPushPrintCommand}"/>
             </Grid>
@@ -115,7 +114,7 @@
         <Border Grid.Row="0" Grid.RowSpan="3" BackgroundColor="#80000000" IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
-                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="14" HorizontalOptions="Center"
+                <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>

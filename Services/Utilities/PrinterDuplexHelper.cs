@@ -129,8 +129,10 @@ internal static class PrinterDuplexHelper
 
             SetPrinter(hPrinter, 2, pPrinterInfo, 0);
         }
-        catch
+        catch (Exception ex)
         {
+            // 双面属性设置失败降级单面打印（WPS/驱动差异常见）；留痕供排障，不向上抛
+            Serilog.Log.Warning(ex, "[PrinterDuplexHelper] 设置打印机双面属性失败，降级单面");
         }
         finally
         {

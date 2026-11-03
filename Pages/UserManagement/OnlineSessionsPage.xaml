@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.UserManagement.OnlineSessionsPage"
@@ -14,57 +14,39 @@
     <Grid RowDefinitions="Auto,Auto,*" BackgroundColor="#F1F5F9">
 
         <!-- 英雄头部 -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardBlueGradient}">
-            <VerticalStackLayout Spacing="16">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding GoBackCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}"
-                               FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                               FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回用户管理" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-
-                    <Button Grid.Column="2"
+        <!-- 统一页头（纸墨档案风报头 · Phase 6，操作按钮映射到 HeaderActions 插槽） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE7F4;', Android='&#x1F4F1;'}"
+                                   Title="在线会话"
+                                   Subtitle="查看桌面端/移动端在线情况，必要时强制下线"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回用户管理">
+            <components:PageHeaderView.HeaderActions>
+<Button Grid.Column="2"
                             Text="{OnPlatform WinUI='&#xE72C; 刷新', Android='&#x21BB; 刷新'}"
                             FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                            BackgroundColor="#33FFFFFF"
-                            TextColor="White"
-                            FontSize="14"
+                            BackgroundColor="Transparent" BorderColor="{StaticResource LineStrong}" BorderWidth="1"
+                            TextColor="{StaticResource Ink}"
+                            FontSize="16"
                             Command="{Binding LoadCommand}"
                             VerticalOptions="Center"
                             Padding="16,10"
-                            CornerRadius="20"/>
-                </Grid>
-
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE7F4;', Android='&#x1F4F1;'}"
-                               FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
-                               FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="在线会话" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="查看桌面端/移动端在线情况，必要时强制下线" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
-        </Border>
+                            CornerRadius="{StaticResource CornerRadiusMedium}"/>
+            </components:PageHeaderView.HeaderActions>
+        </components:PageHeaderView>
 
         <!-- 统计与批量操作 -->
         <Border Grid.Row="1" BackgroundColor="White" Padding="20,12" Margin="0,1,0,0">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                 <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                    <Label Text="{Binding StatusMessage}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                    <Label Text="{Binding StatusMessage}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                     <Label Text="说明：被强制下线的设备会在下一次心跳（约 45 秒内）自动退出登录。"
-                           FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                           FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                 </VerticalStackLayout>
 
                 <Button Grid.Column="1"
                         Text="全部下线"
-                        FontSize="13"
+                        FontSize="15"
                         BackgroundColor="{StaticResource Error}"
                         TextColor="White"
                         CornerRadius="18"
@@ -75,7 +57,7 @@
 
                 <Button Grid.Column="2"
                         Text="刷新"
-                        FontSize="13"
+                        FontSize="15"
                         BackgroundColor="{StaticResource Secondary}"
                         TextColor="White"
                         CornerRadius="18"
@@ -88,14 +70,14 @@
         <Grid Grid.Row="2" Padding="20" RowDefinitions="Auto,*" RowSpacing="0">
             <Grid Grid.Row="0" ColumnDefinitions="2.2*,1.4*,1.2*,1.4*,1.4*,1.4*,0.8*,Auto"
                   Padding="16,10" BackgroundColor="#E2E8F0" ColumnSpacing="8">
-                <Label Text="用户" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="1" Text="组织机构" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="2" Text="端" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="3" Text="设备" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="4" Text="登录时间" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="5" Text="最后活跃" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="6" Text="状态" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
-                <Label Grid.Column="7" Text="操作" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Text="用户" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="1" Text="组织机构" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="2" Text="端" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="3" Text="设备" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="4" Text="登录时间" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="5" Text="最后活跃" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="6" Text="状态" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
+                <Label Grid.Column="7" Text="操作" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextSecondary}"/>
             </Grid>
 
             <CollectionView Grid.Row="1"
@@ -103,8 +85,8 @@
                             BackgroundColor="White">
                 <CollectionView.EmptyView>
                     <VerticalStackLayout Padding="40" Spacing="8" VerticalOptions="Center">
-                        <Label Text="当前没有活动会话" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
-                        <Label Text="各端登录后会自动出现在这里" FontSize="13" TextColor="{StaticResource TextTertiary}" HorizontalTextAlignment="Center"/>
+                        <Label Text="当前没有活动会话" FontSize="18" TextColor="{StaticResource TextSecondary}" HorizontalTextAlignment="Center"/>
+                        <Label Text="各端登录后会自动出现在这里" FontSize="15" TextColor="{StaticResource TextTertiary}" HorizontalTextAlignment="Center"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
 
@@ -112,29 +94,29 @@
                     <DataTemplate x:DataType="OnlineSessionItem">
                         <Grid ColumnDefinitions="2.2*,1.4*,1.2*,1.4*,1.4*,1.4*,0.8*,Auto"
                               Padding="16,12" ColumnSpacing="8" BackgroundColor="White">
-                            <Label Text="{Binding UserText}" FontSize="14" TextColor="{StaticResource TextPrimary}"
+                            <Label Text="{Binding UserText}" FontSize="16" TextColor="{StaticResource TextPrimary}"
                                    LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-                            <Label Grid.Column="1" Text="{Binding OrganizationName}" FontSize="13"
+                            <Label Grid.Column="1" Text="{Binding OrganizationName}" FontSize="15"
                                    TextColor="{StaticResource TextSecondary}" LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-                            <Label Grid.Column="2" Text="{Binding DeviceKindText}" FontSize="13"
+                            <Label Grid.Column="2" Text="{Binding DeviceKindText}" FontSize="15"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="3" Spacing="1" VerticalOptions="Center">
-                                <Label Text="{Binding DeviceName}" FontSize="13" TextColor="{StaticResource TextPrimary}"
+                                <Label Text="{Binding DeviceName}" FontSize="15" TextColor="{StaticResource TextPrimary}"
                                        LineBreakMode="TailTruncation"/>
-                                <Label Text="{Binding AppVersion}" FontSize="11" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding AppVersion}" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
                             </VerticalStackLayout>
-                            <Label Grid.Column="4" Text="{Binding LoginAtText}" FontSize="13"
+                            <Label Grid.Column="4" Text="{Binding LoginAtText}" FontSize="15"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                            <Label Grid.Column="5" Text="{Binding LastSeenText}" FontSize="13"
+                            <Label Grid.Column="5" Text="{Binding LastSeenText}" FontSize="15"
                                    TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                             <Border Grid.Column="6" Padding="8,3" StrokeShape="RoundRectangle 10"
                                     BackgroundColor="{Binding IsOnline, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#10B981|#94A3B8'}"
                                     VerticalOptions="Center" HorizontalOptions="Center">
-                                <Label Text="{Binding OnlineText}" FontSize="11" FontAttributes="Bold" TextColor="White"/>
+                                <Label Text="{Binding OnlineText}" FontSize="13" FontAttributes="Bold" TextColor="White"/>
                             </Border>
                             <Button Grid.Column="7"
                                     Text="下线"
-                                    FontSize="12"
+                                    FontSize="14"
                                     BackgroundColor="{StaticResource Error}"
                                     TextColor="White"
                                     CornerRadius="6"

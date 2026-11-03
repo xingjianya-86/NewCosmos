@@ -4,33 +4,87 @@
              x:Class="NewCosmos.Components.PageHeaderView"
              x:Name="Root">
 
-    <!-- 全库统一页面页头：
-         <components:PageHeaderView Glyph="&#xE88E;" Title="数据中心"
+    <!-- ═══════════════════════════════════════════════════════════════
+         全库统一页面页头（纸墨档案风 · 报头样式）
+         结构：[朱砂竖条] [返回 + 图标 + 宋体标题 + 英文小字] [右侧动作]
+               底部双线（3px 墨线 + 1px 细线，code.html 报头签名）
+
+         用法：
+         <components:PageHeaderView Title="数据中心" Kicker="Data Center"
+                                    Subtitle="全库数据一览"
                                     BackCommand="{Binding GoBackCommand}">
              <components:PageHeaderView.HeaderActions>
                  <Button Text="清空" .../>
              </components:PageHeaderView.HeaderActions>
+             （可选 · 统计行「模块主页统计胶囊」，位于标题下方、双线之上）：
+             <components:PageHeaderView.Stats>
+                 <HorizontalStackLayout Spacing="10">
+                     <components:StatCapsule Value="..." Caption="..." IsLight="True"/>
+                 </HorizontalStackLayout>
+             </components:PageHeaderView.Stats>
          </components:PageHeaderView>
-         深色页头：IsDark="True"；双行垂排：Subtitle 非空；单行附加小字：TrailingText。 -->
-    <Border x:Name="HostBorder" Padding="20,16" StrokeThickness="0">
-        <Border.Shadow>
-            <Shadow Brush="#000000" Offset="0,2" Radius="4" Opacity="0.05"/>
-        </Border.Shadow>
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
-            <components:BackButton x:Name="BackBtn" VerticalOptions="Center"/>
-            <Label x:Name="GlyphLabel" Grid.Column="1" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24"
-                   VerticalOptions="Center" IsVisible="False"/>
-            <Grid x:Name="TitleHost" Grid.Column="2" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
-                <Label x:Name="TitleLabel" Style="{StaticResource PageTitleLabel}" VerticalOptions="Center"/>
-                <VerticalStackLayout x:Name="DualRowLayout" Grid.Column="0" Grid.ColumnSpan="3" Spacing="0"
-                                     IsVisible="False">
-                    <Label x:Name="DualTitleLabel" Style="{StaticResource PageTitleLabel}"/>
-                    <Label x:Name="SubTitleLabel" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+
+         注意：ContentProperty 指向 HeaderActions，故默认内容即动作区；
+               Stats 必须用上面的显式属性元素语法。Stats 为 null 时该行自动隐藏。
+               ⚠ XAML 属性元素的内容必须是【单个根元素】——Stats 里若有多段内容
+                 （如统计 Grid + 信息 VerticalStackLayout），必须用一个容器包起来，
+                 否则报 MAUIX2002 "No accessible property ... for Stats"。
+         属性兼容旧版：Glyph / Title / Subtitle / TrailingText / IsDark /
+                       IconColor / BackCommand / BackText / HeaderActions
+         新增：Kicker（英文等宽小字，大写宽字距）、AccentColor（竖条色，默认朱砂）、
+               Stats（统计插槽）
+         ═══════════════════════════════════════════════════════════════ -->
+    <VerticalStackLayout Spacing="0">
+
+        <!-- 主体：朱砂竖条 + 内容 + 动作（第二行为可选统计插槽，竖条延伸覆盖） -->
+        <Grid x:Name="BodyGrid" ColumnDefinitions="5,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="0"
+              ColumnSpacing="0">
+
+            <!-- 左侧朱砂竖条（code.html .tab-strip）；RowSpan=2 让竖条贯穿标题行与统计行 -->
+            <BoxView x:Name="TabStrip" Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                     WidthRequest="5" Color="{StaticResource Seal}"/>
+
+            <!-- 内容区（标题行） -->
+            <Grid x:Name="ContentGrid" Grid.Row="0" Grid.Column="1" Padding="20,16,16,14"
+                  ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+
+                <!-- 返回按钮（统一内置） -->
+                <components:BackButton x:Name="BackBtn" Grid.Column="0" VerticalOptions="Center"/>
+
+                <!-- 图标（可选）；必须显式指定 Segoe Fluent Icons——
+                     全局 Label 样式是 Noto Sans SC，无私有区图标字符会渲染成豆腐块 -->
+                <Label x:Name="GlyphLabel" Grid.Column="1" FontSize="{OnPlatform WinUI=24, Android=20, Default=24}"
+                       FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                       VerticalOptions="Center" IsVisible="False"/>
+
+                <!-- 文字区：英文小字 + 标题（宋体） + 副标题 -->
+                <VerticalStackLayout x:Name="TitleHost" Grid.Column="2" Spacing="2" VerticalOptions="Center">
+                    <Label x:Name="KickerLabel" Style="{StaticResource LabelKicker}" IsVisible="False"/>
+                    <Label x:Name="TitleLabel" Style="{StaticResource PageTitleLabel}"/>
+                    <Label x:Name="SubTitleLabel" FontSize="{OnPlatform WinUI=15, Android=13, Default=15}" TextColor="{StaticResource Muted}" IsVisible="False"/>
+                    <Label x:Name="TrailingLabel" FontSize="{OnPlatform WinUI=14, Android=12, Default=14}" TextColor="{StaticResource Muted}" IsVisible="False"/>
                 </VerticalStackLayout>
-                <Label x:Name="TrailingLabel" Grid.Column="1" FontSize="14"
-                       TextColor="{StaticResource TextTertiary}" VerticalOptions="Center" IsVisible="False"/>
+
+                <!-- 右侧动作插槽（Content 由 HeaderActions 属性变化时代码后置赋值，
+                     不用 XAML Binding——SourceGen 下 {x:Reference Root} 绑定到 ContentPresenter 会失效 → Content 恒 null） -->
+                <ContentPresenter x:Name="ActionsPresenter" Grid.Column="3"
+                                  VerticalOptions="Center"/>
             </Grid>
-            <ContentPresenter Grid.Column="3" Content="{Binding HeaderActions, Source={x:Reference Root}}"/>
+
+            <!-- 统计插槽（模块主页的统计胶囊行；Content 由 Stats 属性变化时代码后置赋值）。
+                 ⚠ ContentPresenter 必须 VerticalOptions=Start（参与测量）——默认 Fill 在 Grid 中
+                 不贡献尺寸，父 Grid 高度会锁死为 0（统计行整行消失，只剩 padding 12px）。 -->
+            <Grid x:Name="StatsHost" Grid.Row="1" Grid.Column="1" IsVisible="False"
+                  Padding="20,0,16,12">
+                <ContentPresenter x:Name="StatsPresenter"
+                                  HorizontalOptions="Fill"
+                                  VerticalOptions="Start"/>
+            </Grid>
         </Grid>
-    </Border>
+
+        <!-- 底部双线（code.html 报头：3px 墨线 + 间距 + 1px 细线） -->
+        <BoxView x:Name="RuleStrong" HeightRequest="3" Color="{StaticResource Ink}"/>
+        <BoxView HeightRequest="4" Color="Transparent"/>
+        <BoxView x:Name="RuleThin" HeightRequest="1" Color="{StaticResource LineStrong}"/>
+    </VerticalStackLayout>
 </ContentView>

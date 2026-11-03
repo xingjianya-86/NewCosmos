@@ -35,7 +35,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private readonly IPdfVerificationService _pdfVerificationService = null!;
     private readonly IBusinessTimelineService _timelineService = null!;
     private readonly IAssetVerificationService _assetVerificationService = null!;
-    private readonly IChangeService _changeService = null!;
+    private readonly IChangeDocumentApplicabilityService _changeDocApplicability = null!;
 
     /// <summary>
     /// 由 Page 注入：WebView2 打印 PDF 的回调（pdfPath → Task）。用于核查报告等非 Office/WPS 格式打印。
@@ -45,6 +45,15 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private byte[] _currentPdfData = null!;
     private string _batchNo = string.Empty;
     private string _currentTempPreviewPath = string.Empty;
+
+    /// <summary>
+    /// 初始化上下文指纹（2026-11 性能收口）：与上次成功初始化一致时跳过重建。
+    /// OnAppearing 在「push 预览/打印子页后返回」时重复触发 InitializeAsync → 全量重建模板清单
+    /// （20~30 条模板 + 事实查询），纯浪费且会丢失用户已勾选状态。
+    /// VM 为 Transient：同实例重复 OnAppearing 只发生在子页返回（上下文必相同）；
+    /// 跨记录/跨入口必是新实例或上下文变化（指纹含 BusinessId 与文书模式四字段），照常重建。
+    /// </summary>
+    private string _lastInitContextKey = string.Empty;
 
     /// <summary>
     /// InitializeAsync 单飞闸：补打中心「选中记录准备」与「输出分类切换」两条入口可能并发触发重建，
@@ -64,7 +73,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         IPdfVerificationService pdfVerificationService,
         IBusinessTimelineService timelineService,
         IAssetVerificationService assetVerificationService,
-        IChangeService changeService)
+        IChangeDocumentApplicabilityService changeDocApplicability)
     {
         _serviceProvider = serviceProvider;
         _templateService = templateService;
@@ -77,7 +86,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         _pdfVerificationService = pdfVerificationService;
         _timelineService = timelineService;
         _assetVerificationService = assetVerificationService;
-        _changeService = changeService;
+        _changeDocApplicability = changeDocApplicability;
     }
 
     #region 基础实现
@@ -237,51 +246,6 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 判定该档案是否为"复核/成员变更收入超标停保"（CategoryStop 且 triggered_stop=true 且新分类为停保类）。
-    /// 记录挂在旧档案上：既按 application_id 匹配（经济复核输出旧档案），
-    /// 也按 new_application_id 匹配（成员变更输出停旧建新后的新档案）。
-    /// new_classification ∈ 停保类 是护栏：跨类转入/历史误标（triggered_stop=true）不会误发告知书。
-    /// 用于决定是否追加《档案_变更告知书》模板，避免户主死亡/降档误生成。
-    /// </summary>
-    private async Task<bool> IsIncomeStopChangeAsync(long? applicationId)
-    {
-        if (applicationId is not > 0) return false;
-        try
-        {
-            var result = await _changeService.HasTriggeredCategoryStopAsync(
-                applicationId.Value, ClassificationConstants.StopCategoryCodes, CancellationToken);
-            return result.IsSuccess && result.Value;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "判定停保变更失败");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 判定该档案是否需出"待遇调整"告知（链上有"保障金变更登记"记录）。
-    /// 动态管理三分支（经济复核/家庭成员变更/户主死亡变更）停旧建新后，旧/新同属低保群体且
-    /// 户月保障金差 ≥ 阈值时服务端写入登记记录；本判定据此追加《档案_变更告知书》（待遇调整场景），
-    /// 与停保场景并列——有停保时按停保文案装配（字段装配端已按场景分支）。
-    /// </summary>
-    private async Task<bool> HasFundChangeRegistrationAsync(long? applicationId)
-    {
-        if (applicationId is not > 0) return false;
-        try
-        {
-            var result = await _changeService.HasFundChangeRegistrationAsync(
-                applicationId.Value, CancellationToken);
-            return result.IsSuccess && result.Value;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "判定保障金变更登记失败");
-            return false;
-        }
-    }
-
-    /// <summary>
     /// 加载模板清单（单飞串行，见 <see cref="_initializeGate"/>）。
     /// </summary>
     public async Task InitializeAsync()
@@ -289,13 +253,33 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         await _initializeGate.WaitAsync();
         try
         {
+            // 上下文指纹守卫（2026-11 性能收口）：子页（预览/打印）返回本页时 OnAppearing 重复触发，
+            // 上下文未变则跳过全量重建（20~30 模板 + 事实查询）；跨记录/文书模式切换指纹必变，照常重建。
+            var contextKey = BuildInitContextKey();
+            if (contextKey == _lastInitContextKey && Templates.Count > 0)
+            {
+                _logger.Debug("档案输出初始化跳过（上下文未变）");
+                return;
+            }
+
             await InitializeCoreAsync();
+            _lastInitContextKey = contextKey;
         }
         finally
         {
             _initializeGate.Release();
         }
     }
+
+    /// <summary>
+    /// 初始化上下文指纹 = 影响模板清单/预勾选/适用性的全部输入（与 InitializeCoreAsync 快照字段同集）。
+    /// 含 FAMILY_LAND_AREA（模板 17/18 二选一依据）与赡养人表条数（赡养费承诺书适用性依据）。
+    /// </summary>
+    private static string BuildInitContextKey() =>
+        $"{PrintNavigationData.BusinessType}|{PrintNavigationData.BusinessId}|{PrintNavigationData.Classification}|" +
+        $"{PrintNavigationData.Status}|{PrintNavigationData.FieldData?.Count}|{PrintNavigationData.FieldData?.GetValueOrDefault(FieldKeys.FAMILY_LAND_AREA)}|" +
+        $"{PrintNavigationData.SupporterTableData?.Count}|{string.Join(';', PrintNavigationData.OutputCategories ?? [])}|" +
+        $"{PrintNavigationData.OperationOverride}|{PrintNavigationData.TemplateFilter?.Length}|{PrintNavigationData.PrefilterTemplateNames?.Length}";
 
     private async Task InitializeCoreAsync()
     {
@@ -346,6 +330,44 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             IsBusy = true;
             StatusText = "正在加载模板...";
 
+            // 变动文书事实快照（低收入人口域）：清单过滤与告知书追加门共用同一口径
+            //（ChangeDocumentApplicabilityService 单点，与申请表预勾选同源）。
+            // 查询失败 → docFacts=null → 清单不做过滤（宁多打不漏打）、告知书不追加（沿用原失败降级语义）。
+            var factsBusinessId = businessId.GetValueOrDefault();
+            ChangeDocumentFacts? docFacts = null;
+            if (businessType is "FamilyApplication" or "EconomicReview" && factsBusinessId > 0)
+            {
+                var factsResult = await _changeDocApplicability.GetFactsAsync(factsBusinessId, classification, CancellationToken);
+                if (factsResult.IsSuccess)
+                {
+                    docFacts = factsResult.Value;
+                    // 可观测（2026-11）：事实快照一次性入 biz 日志——"变动文书缺某张模板"从此可直接查证
+                    _logger.LogBusiness("变动文书事实快照",
+                        ("ApplicationId", factsBusinessId),
+                        ("Classification", docFacts.Classification ?? "(null)"),
+                        ("NoticeApplicable", docFacts.NoticeApplicable),
+                        ("IncomeStop", docFacts.IsIncomeStopChange),
+                        ("FundChangeRegistration", docFacts.HasFundChangeRegistration),
+                        ("ArchiveRefusedStop", docFacts.IsArchiveRefusedStop),
+                        ("HouseholdDeathStop", docFacts.IsHouseholdDeathStop),
+                        ("MemberChange", docFacts.HasMemberChange),
+                        ("GracePeriod", docFacts.HasActiveGracePeriod),
+                        ("GrantReduce", docFacts.HasGrantReduce),
+                        ("EconomicReview", docFacts.HasEconomicReviewRecord),
+                        ("DeathStoppedArchive", docFacts.IsDeathStoppedArchive));
+                }
+                else
+                {
+                    _logger.Warn($"变动文书事实查询失败（清单不做过滤）: BusinessId={factsBusinessId}, {factsResult.ErrorCode} {factsResult.Message}");
+                }
+            }
+            else if (businessType is "FamilyApplication" or "EconomicReview")
+            {
+                // 静默分支改告警（2026-11 缺陷：BusinessId 为空时事实全不判 → 告知书等变动文书
+                // 静默不追加、日志零痕迹，曾导致"变动文书没有告知书打印"排查无从下手）
+                _logger.Warn($"变动文书事实查询被跳过（BusinessId 为空）: BusinessType={businessType}, Classification={classification}");
+            }
+
             // 近亲属备案独立输出（列表页"输出档案"入口）：无申请分类可依据，按模板名直取两张表
             List<Template> templates;
             if (string.Equals(businessType, NearRelativeConstants.BusinessType, StringComparison.OrdinalIgnoreCase))
@@ -372,7 +394,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 if (IsTemplateFilterMode && !templateFilter!.Contains(t.Name, StringComparer.Ordinal))
                     continue;
 
-                var config = await LoadTemplateConfigAsync(t.Id, classification);
+                var config = ResolveTemplateConfig(t.ConfigJson, classification);
                 var item = new TemplateSelectItem
                 {
                     TemplateId = t.Id,
@@ -382,7 +404,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     BaseCopies = config.Copies,
                     IsDirectoryTemplate = config.IsDirectory,
                     DirectoryDateField = config.DirectoryDateField,
-                    IsCoverTemplate = t.Name.Contains("封面"),
+                    IsCoverTemplate = Constants.DocumentTemplateNames.IsCover(t.Name),
                     SortOrder = t.SortOrder
                 };
 
@@ -430,6 +452,17 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     }
                 }
 
+                // 变动文书按人员属性/变动事实过滤：无渐退期不出渐退审批表、无减发不出保障金减少、
+                // 无成员变动不出增减员表、无停保/资金变更事实不出告知书等（单点口径见
+                // ChangeDocumentApplicabilityService；docFacts=null=事实查询失败，全放行不误杀）。
+                // 补打与正常输出共用本清单加载，即共用本过滤（原补打侧无预勾选名单致全量默认打印）。
+                if (docFacts != null && !IsTemplateFilterMode
+                    && !_changeDocApplicability.IsTemplateApplicable(t.Categories, docFacts))
+                {
+                    item.IsApplicable = false;
+                    item.IsSelected = false;
+                }
+
                 Templates.Add(item);
             }
 
@@ -437,16 +470,18 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 而「档案_入户调查表」「档案_特困入户调查表_特困人员」挂的是 12 个档案分类码 → 变动文书清单取不到。
             // 取数走 GetByCategoriesAsync([classification])：低保/边缘/刚性 → 档案_入户调查表，特困 → 特困版，
             // 选哪张由模板 categories 决定（跟档案类型挂钩），不硬编码模板名映射。仅列出处供下方预勾选强制勾选。
+            // 死亡停保旧档（绝户/停旧建新旧档）不补挂：家庭已不存在，无从入户调查（与变动文书过滤同口径）。
             var addedSurveyNames = new List<string>();
             if (!IsTemplateFilterMode && isDocumentMode
                 && businessType is "FamilyApplication" or "EconomicReview"
-                && !string.IsNullOrEmpty(classification))
+                && !string.IsNullOrEmpty(classification)
+                && !(docFacts?.IsDeathStoppedArchive ?? false))
             {
                 var byClassification = await _templateService.GetByCategoriesAsync(new[] { classification }, CancellationToken);
                 foreach (var t in byClassification)
                 {
                     if (!t.Name.Contains("入户调查") || Templates.Any(x => x.TemplateId == t.Id)) continue;
-                    var surveyConfig = await LoadTemplateConfigAsync(t.Id, classification);
+                    var surveyConfig = ResolveTemplateConfig(t.ConfigJson, classification);
                     Templates.Add(new TemplateSelectItem
                     {
                         TemplateId = t.Id,
@@ -456,7 +491,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                         BaseCopies = surveyConfig.Copies,
                         IsDirectoryTemplate = surveyConfig.IsDirectory,
                         DirectoryDateField = surveyConfig.DirectoryDateField,
-                        IsCoverTemplate = t.Name.Contains("封面"),
+                        IsCoverTemplate = Constants.DocumentTemplateNames.IsCover(t.Name),
                         SortOrder = t.SortOrder
                     });
                     addedSurveyNames.Add(t.Name);
@@ -474,7 +509,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             foreach (var t in otherTemplates) Templates.Add(t);
 
             // 检查赡养费承诺书模板是否适用（无赡养人时跳过）
-            var supporterTemplate = Templates.FirstOrDefault(t => t.Name.Contains("赡养费承诺书"));
+            var supporterTemplate = Templates.FirstOrDefault(t => Constants.DocumentTemplateNames.IsSupporterPledge(t.Name));
             if (supporterTemplate != null)
             {
                 var hasSupporters = supporterData != null && supporterData.Count > 0;
@@ -512,32 +547,51 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 }
             }
 
-            // 停保/停保变更档案（含经济复核/成员变更停保流）：额外加载"档案_变更告知书"模板（其 categories 仅含停发/不符合分类码）
-            // 仅"实际停保"（复核/成员变更收入超标）追加，排除户主死亡与降档；
-            // 不按加载档案的 Status 判断：成员变更输出的是停旧建新后的 Draft 新档案，停保事实由变更记录承载
-            // 单人保不产生停保，排除其变更告知书
-            // 仅出文书模式：告知书若在白名单内则无条件追加（用户主动选择，不走停保三重门）
+            // 《档案_变更告知书》：**模板全库唯一（nc_biz_templates 241），"停保 / 不予认定 / 终止 / 待遇调整"
+            // 都是同一个模板的不同方向设定**——方向由装配端 ArchiveProductionViewModel 按事实分支填 NOTICE_*
+            //（死亡停止 → 停保·不予认定(含归档终结拒保兜底) → 待遇调整 → 三者皆空即空白告知书）。
+            // 本页只决定"这个模板出不出现在清单里"，不碰方向。
+            // 出处两条：① 基础分类命中（模板挂变动叶子「档案_变更告知书」后由 GetByCategoriesAsync 带出，
+            //   再由 IsTemplateApplicable 按 NoticeApplicable 过滤）；② 按名追加（下方门，仅基础清单未命中时补）。
             var noticeAllowed = !IsTemplateFilterMode
                 || templateFilter!.Contains(DocumentTemplateNames.ChangeNotice, StringComparer.Ordinal);
-            // 两个场景共用《档案_变更告知书》模板（模板不改，按记录分支填字段）：
-            //   ① 停保场景：复核/成员变更收入超标停保（triggered_stop）——原有逻辑；
-            //   ② 待遇调整场景：链上有"保障金变更登记"记录（旧/新同属低保且户月差 ≥ 阈值）且无停保——
-            //      人员增减、经济状况变化导致保障金调整但仍在享受待遇时，同样需要告知书。
-            // 单人保不适用停保告知；其为非低保群体不会写登记记录，故无需为场景②单独放行。
-            if (noticeAllowed
+            // 适用事实（与装配端方向一一对应，单点权威 = ChangeDocumentFacts.NoticeApplicable）：
+            //   ① 户主死亡整户停止 → IsHouseholdDeathStop（整户已死，须告知终止；
+            //      **不受"单人保排除"限制**——死亡是客观事件，无论原分类是否单人保都应告知）；
+            //   ② 停保/不予认定 → IsIncomeStopChange（复核/成员变更收入超标 triggered_stop），
+            //      或归档终结拒保兜底 IsArchiveRefusedStop（只置 Stopped、无变更记录，app95 同型）；
+            //   ③ 待遇调整 → HasFundChangeRegistration（链上有"保障金变更登记"，旧/新同属低保且
+            //      户月保障金差 ≥ 阈值，仍在享受待遇时同样需要告知书）。
+            // 单人保不产生停保、也不写保障金变更登记 → ②③ 受单人保排除，无需单独放行。
+            // 快照查询失败/未取到 → 各事实按 false，等价原 catch→false 降级，仅白名单模式照常放行。
+            // 判定提为局部变量：两分支各记一条 biz 日志，把"静默不成立"变成可观测（2026-11）。
+            // 口径单点化：事实分支一律取 ChangeDocumentFacts.NoticeApplicable（含归档终结拒保兜底、
+            // 死亡整户停、停保/待遇调整 + 单人保排除），此处只叠加"白名单模式下用户主动选择即放行"——
+            // 与原三元 OR 表达式逐案等价（N || (白名单 && 非单人保)），改事实口径只须改 NoticeApplicable 一处。
+            var appendChangeNotice = noticeAllowed
                 && businessType is "FamilyApplication" or "EconomicReview"
-                && !ClassificationConstants.IsCodeSingleRescue(classification)
-                && (IsTemplateFilterMode
-                    || await IsIncomeStopChangeAsync(businessId)
-                    || await HasFundChangeRegistrationAsync(businessId)))
+                && ((docFacts?.NoticeApplicable ?? false)
+                    || (IsTemplateFilterMode
+                        && !ClassificationConstants.IsCodeSingleRescue(classification)));
+            if (appendChangeNotice)
             {
                 var changeNoticeResult = await _templateService.GetByNameAsync(DocumentTemplateNames.ChangeNotice);
                 if (changeNoticeResult.IsFailure)
                     throw new BusinessException(changeNoticeResult.ErrorCode!, changeNoticeResult.Message!);
                 var changeNotice = changeNoticeResult.Value;
-                if (changeNotice != null && !Templates.Any(t => t.TemplateId == changeNotice.Id))
+                if (changeNotice == null)
                 {
-                    var config = await LoadTemplateConfigAsync(changeNotice.Id, classification);
+                    _logger.Warn($"模板不存在，告知书无法追加: {DocumentTemplateNames.ChangeNotice}");
+                }
+                else if (Templates.Any(t => t.TemplateId == changeNotice.Id))
+                {
+                    // 基础分类已命中（模板挂了变动叶子「档案_变更告知书」）→ 去重跳过，非异常
+                    _logger.LogBusiness("告知书已在输出清单（基础分类命中，无需追加）",
+                        ("ApplicationId", factsBusinessId));
+                }
+                else
+                {
+                    var config = ResolveTemplateConfig(changeNotice.ConfigJson, classification);
                     Templates.Add(new TemplateSelectItem
                     {
                         TemplateId = changeNotice.Id,
@@ -547,7 +601,24 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                         BaseCopies = config.Copies,
                         SortOrder = 800
                     });
+                    _logger.LogBusiness("告知书已追加入输出清单",
+                        ("ApplicationId", factsBusinessId),
+                        ("Mode", IsTemplateFilterMode ? "白名单" : "事实门"));
                 }
+            }
+            else if (businessType is "FamilyApplication" or "EconomicReview")
+            {
+                // 仅低收入人口域记（其余域本就不产告知书，避免每次输出刷一条噪音）
+                _logger.LogBusiness("告知书未追加（清单门未成立）",
+                    ("ApplicationId", factsBusinessId),
+                    ("NoticeAllowed", noticeAllowed),
+                    ("FactsLoaded", docFacts != null),
+                    ("IncomeStop", docFacts?.IsIncomeStopChange ?? false),
+                    ("FundChangeRegistration", docFacts?.HasFundChangeRegistration ?? false),
+                    ("ArchiveRefusedStop", docFacts?.IsArchiveRefusedStop ?? false),
+                    ("HouseholdDeathStop", docFacts?.IsHouseholdDeathStop ?? false),
+                    ("TemplateFilterMode", IsTemplateFilterMode),
+                    ("Classification", classification));
             }
 
             // 白名单外的模板（核查报告等）一律剔除
@@ -613,27 +684,22 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
     }
 
-    private async Task<(int Copies, bool IsDirectory, string DirectoryDateField)> LoadTemplateConfigAsync(long templateId, string classification)
+    /// <summary>
+    /// 从已取回的 config_json 解析模板配置（无 DB 往返）。
+    /// 起因：GetByCategoriesAsync/GetAllAsync/GetByNameAsync 的 SELECT 已含 config_json，
+    /// 而旧实现逐模板 GetByIdAsync 回查 = 每次进输出页 20~30 条纯浪费 N+1（2026-11 性能收口）。
+    /// 非法/损坏 config_json 一律回退默认值 (1, false, "")，不向外抛异常。
+    /// </summary>
+    private static (int Copies, bool IsDirectory, string DirectoryDateField) ResolveTemplateConfig(string? configJson, string classification)
     {
-        try
-        {
-            var templateResult = await _templateService.GetByIdAsync(templateId);
-            if (templateResult.IsFailure)
-                throw new BusinessException(templateResult.ErrorCode!, templateResult.Message!);
-            var template = templateResult.Value;
-            if (template == null || string.IsNullOrEmpty(template.ConfigJson))
-                return (1, false, string.Empty);
-
-            var config = NewCosmos.Services.Templates.TemplateConfig.FromJson(template.ConfigJson);
-
-            // 份数口径唯一来源：分类映射 copiesByClassification → 模板级默认 copies → 1
-            //（TemplateConfig.ResolveCopies，与手机推送打印同源；见 Helpers\TemplateCopiesResolver）
-            return (config.ResolveCopies(classification), config.IsDirectoryTemplate, config.DirectoryDateField ?? string.Empty);
-        }
-        catch
-        {
+        if (string.IsNullOrEmpty(configJson))
             return (1, false, string.Empty);
-        }
+
+        var config = NewCosmos.Services.Templates.TemplateConfig.FromJson(configJson);
+
+        // 份数口径唯一来源：分类映射 copiesByClassification → 模板级默认 copies → 1
+        //（TemplateConfig.ResolveCopies，与手机推送打印同源；见 Helpers\TemplateCopiesResolver）
+        return (config.ResolveCopies(classification), config.IsDirectoryTemplate, config.DirectoryDateField ?? string.Empty);
     }
 
     /// <summary>
@@ -718,7 +784,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (SelectedPreviewTemplate.Name.Contains("赡养费承诺书"))
+            else if (Constants.DocumentTemplateNames.IsSupporterPledge(SelectedPreviewTemplate.Name))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }
@@ -823,7 +889,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
 
         // 封面模板打印前确认：需先插入牛皮纸（批量静默模式与「保存」跳过——保存不调打印机）
-        if (interactive && printToPrinter && template.Name.Contains("封面"))
+        if (interactive && printToPrinter && Constants.DocumentTemplateNames.IsCover(template.Name))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -849,7 +915,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (template.Name.Contains("赡养费承诺书"))
+            else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }

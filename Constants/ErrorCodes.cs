@@ -202,6 +202,13 @@ public static class ErrorCodes
     /// <summary>节假日接口返回数据无效</summary>
     public const string HOLIDAY_DATA_INVALID = "HOLIDAY_DATA_INVALID";
 
+    /// <summary>
+    /// 该年度放假安排尚未发布（主、备接口均返回空数据）。
+    /// 与 HOLIDAY_DATA_INVALID 区分：后者是"有数据但格式坏了"，本码是"数据还没出来"。
+    /// 国务院办公厅通常于 11 月上旬发布下一年度安排。
+    /// </summary>
+    public const string HOLIDAY_YEAR_NOT_PUBLISHED = "HOLIDAY_YEAR_NOT_PUBLISHED";
+
     /// <summary>节假日日期已存在</summary>
     public const string HOLIDAY_DUPLICATE_DATE = "HOLIDAY_DUPLICATE_DATE";
 
@@ -288,6 +295,28 @@ public static class ErrorCodes
 
     /// <summary>ZeroTier 管理令牌无读权限（需一次性管理员授权）</summary>
     public const string ZEROTIER_TOKEN_DENIED = "ZEROTIER_TOKEN_DENIED";
+
+    #endregion
+
+    #region 证件 OCR 识别 (OCR_xxx)
+
+    /// <summary>OCR 识别服务不可达（内网服务未启动或地址未配置）</summary>
+    public const string OCR_SERVICE_UNREACHABLE = "OCR_SERVICE_UNREACHABLE";
+
+    /// <summary>OCR 识别超时（服务繁忙或模型冷启动）</summary>
+    public const string OCR_TIMEOUT = "OCR_TIMEOUT";
+
+    /// <summary>图片解码失败（损坏或格式不支持）</summary>
+    public const string OCR_IMAGE_INVALID = "OCR_IMAGE_INVALID";
+
+    /// <summary>服务端识别失败（模型异常）</summary>
+    public const string OCR_RECOGNIZE_FAILED = "OCR_RECOGNIZE_FAILED";
+
+    /// <summary>未识别出有效字段（图片模糊/版式不符，需重拍或手动录入）</summary>
+    public const string OCR_NO_FIELD = "OCR_NO_FIELD";
+
+    /// <summary>识别结果分配未确认（存在未选择目标的记录）</summary>
+    public const string OCR_ASSIGN_INCOMPLETE = "OCR_ASSIGN_INCOMPLETE";
 
     #endregion
 

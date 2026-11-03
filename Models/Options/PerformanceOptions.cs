@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Exceptions;
+using NewCosmos.Models.Exceptions;
 
 namespace NewCosmos.Models.Options;
 
@@ -8,7 +8,8 @@ namespace NewCosmos.Models.Options;
 public class PerformanceOptions
 {
     /// <summary>
-    /// 最大重试次数    /// </summary>
+    /// 最大重试次数
+/// </summary>
     public int MaxRetries { get; set; }
 
     /// <summary>
@@ -17,7 +18,8 @@ public class PerformanceOptions
     public int RetryDelayMilliseconds { get; set; }
 
     /// <summary>
-    /// 是否使用指数退避    /// </summary>
+    /// 是否使用指数退避
+/// </summary>
     public bool ExponentialBackoff { get; set; }
 
     /// <summary>

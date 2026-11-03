@@ -201,7 +201,7 @@
                                     </VerticalStackLayout>
                                     <HorizontalStackLayout Spacing="8">
                                         <CheckBox IsChecked="{Binding IsLaborExempt}" VerticalOptions="Center"/>
-                                        <Label Text="因照顾重病重残亲属，免于劳动力判定" FontSize="13"
+                                        <Label Text="因照顾重病重残亲属，免于劳动力判定" FontSize="14"
                                                TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                     </HorizontalStackLayout>
 

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ChangeManagement.MemberChangeReasonPopup"
@@ -9,33 +9,14 @@
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
         <!-- 渐变英雄头部（绿色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
-            <VerticalStackLayout Spacing="12">
-
-                <!-- 返回行 -->
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <HorizontalStackLayout Spacing="6">
-                        <HorizontalStackLayout.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding CancelCommand}"/>
-                        </HorizontalStackLayout.GestureRecognizers>
-                        <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                        <Label Text="返回" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </Grid>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="44" HeightRequest="44" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 12">
-                        <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="{Binding Title}" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="{Binding Subtitle}" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 特殊页：业务信息迁入 Stats 插槽） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE716;', Android='&#x2139;&#xFE0F;'}"
+                                   Title="{Binding Title}"
+                                   Subtitle="{Binding Subtitle}"
+                                   BackCommand="{Binding CancelCommand}"
+                                   BackText="返回">
+        </components:PageHeaderView>
 
         <!-- 内容区域 -->
         <ScrollView Grid.Row="1">
@@ -46,10 +27,10 @@
                     <VerticalStackLayout Spacing="12">
                         <Label Text="成员信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                            <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="34" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                <Label Text="{Binding MemberName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                                <Label Text="{Binding MemberIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberName}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding MemberIdCard}" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
                             </VerticalStackLayout>
                             <Border Grid.Column="2" Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
                                 <Label Text="{Binding MemberRelationship}" Style="{StaticResource ChipNeutralText}"/>
@@ -57,16 +38,16 @@
                         </Grid>
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
                             <VerticalStackLayout Spacing="2">
-                                <Label Text="年龄" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberAge, StringFormat='{0}岁'}" FontSize="14" FontAttributes="Bold"/>
+                                <Label Text="年龄" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberAge, StringFormat='{0}岁'}" FontSize="16" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="2">
-                                <Label Text="性别" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberGender}" FontSize="14" FontAttributes="Bold"/>
+                                <Label Text="性别" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberGender}" FontSize="16" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="2" Spacing="2">
-                                <Label Text="健康状况" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
-                                <Label Text="{Binding MemberHealthStatus}" FontSize="14" FontAttributes="Bold"/>
+                                <Label Text="健康状况" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding MemberHealthStatus}" FontSize="16" FontAttributes="Bold"/>
                             </VerticalStackLayout>
                         </Grid>
                     </VerticalStackLayout>
@@ -84,8 +65,8 @@
                                             BackgroundColor="{StaticResource Gray50}"
                                             Padding="12" Margin="0,4">
                                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                                            <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="16" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
-                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{OnPlatform WinUI='&#xE73E;', Android='&#x2713;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="18" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            <Label Grid.Column="1" Text="{Binding Name}" FontSize="16" TextColor="{StaticResource TextPrimary}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -94,19 +75,18 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- 事由日期 -->
-                <Border Style="{StaticResource CardBorder}">
+                <!-- 事由日期（非死亡减员/增员；死亡模式下被下方整块日期时刻取代） -->
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsEventDateVisible}">
                     <VerticalStackLayout Spacing="12">
                         <Label Text="事由日期" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                        <DatePicker Date="{Binding EventDate}"/>
+                        <DatePicker Date="{Binding EventDate}" Format="yyyy-MM-dd"/>
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- 事由时刻（仅减员原因=人员死亡；死亡确切时间必填，落 nc_biz_death_records.death_time） -->
+                <!-- 死亡日期与时刻（仅减员原因=人员死亡；必填，落 nc_biz_death_records.death_date/death_time） -->
                 <Border Style="{StaticResource CardBorder}" IsVisible="{Binding IsDeathTimeVisible}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Text="死亡确切时间（必填）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
-                        <TimePicker Time="{Binding EventTime}" Format="HH:mm"/>
+                        <components:DateTimeEntryView Title="死亡日期与时间" IsRequired="True" Value="{Binding DeathDateTime}"/>
                     </VerticalStackLayout>
                 </Border>
 
@@ -121,21 +101,25 @@
                 <!-- 提示 -->
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}" Stroke="Transparent">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
-                        <Label Grid.Column="1" Text="{Binding HintText}" FontSize="12" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
+                        <Label Grid.Column="1" Text="{Binding HintText}" FontSize="14" TextColor="{StaticResource WarningDark}" VerticalOptions="Center"/>
                     </Grid>
                 </Border>
 
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- 底部按钮栏 -->
-        <Border Grid.Row="2" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                <Button Grid.Column="1" Text="确认" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmCommand}" MinimumWidthRequest="100"/>
-                <Button Grid.Column="2" Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelCommand}" MinimumWidthRequest="100"/>
-            </Grid>
-        </Border>
+        <!-- 底部按钮栏（上方显示死亡日期时刻行内校验提示） -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto">
+            <Label Grid.Row="0" Text="{Binding ValidationMessage}" FontSize="14" TextColor="{StaticResource Error}"
+                   Margin="20,0,20,4" IsVisible="{Binding ValidationMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+            <Border Grid.Row="1" BackgroundColor="White" Padding="20,12" StrokeThickness="0">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <Button Grid.Column="1" Text="确认" Style="{StaticResource ButtonPrimary}" Command="{Binding ConfirmCommand}" MinimumWidthRequest="100"/>
+                    <Button Grid.Column="2" Text="取消" Style="{StaticResource ButtonOutline}" Command="{Binding CancelCommand}" MinimumWidthRequest="100"/>
+                </Grid>
+            </Border>
+        </Grid>
 
     </Grid>
 

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
@@ -13,11 +13,11 @@
             <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="White">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Primary}"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource Primary}"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
-                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                        <Label Text="{Binding Name}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                             <Label.FormattedText>
                                 <FormattedString>
                                     <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
@@ -29,7 +29,7 @@
                             </Label.FormattedText>
                         </Label>
                     </VerticalStackLayout>
-                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -37,11 +37,11 @@
             <Border Style="{StaticResource CardBorder}" Margin="0,4" BackgroundColor="#F8F9FA">
                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border BackgroundColor="{StaticResource PrimarySoft}" Padding="8" StrokeThickness="0" StrokeShape="RoundRectangle 8">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Primary}"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="22" TextColor="{StaticResource Primary}"/>
                     </Border>
                     <VerticalStackLayout Grid.Column="1" Spacing="4">
-                        <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                        <Label FontSize="12" TextColor="{StaticResource TextSecondary}">
+                        <Label Text="{Binding Name}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                        <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
                             <Label.FormattedText>
                                 <FormattedString>
                                     <Span Text="{Binding RelationshipToHead, Converter={StaticResource RelationshipDisplayConverter}}"/>
@@ -53,7 +53,7 @@
                             </Label.FormattedText>
                         </Label>
                     </VerticalStackLayout>
-                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="2" Text="{Binding HealthStatusDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -65,28 +65,12 @@
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
 
         <!-- 渐变英雄头部（绿色） -->
-        <Border Grid.Row="0" Style="{StaticResource ModuleHeroHeader}" Background="{StaticResource StatCardGreenGradient}">
-            <VerticalStackLayout Spacing="16">
-
-                <!-- 返回行 -->
-                <HorizontalStackLayout Spacing="6">
-                    <Label Text="{OnPlatform WinUI='&#xE72B;', Android='&#x2190;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="14" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                    <Label Text="返回工作台" FontSize="13" TextColor="#E6FFFFFF" VerticalOptions="Center"/>
-                </HorizontalStackLayout>
-
-                <!-- 标题与副标题 -->
-                <HorizontalStackLayout Spacing="14">
-                    <Border WidthRequest="52" HeightRequest="52" BackgroundColor="#33FFFFFF" StrokeShape="RoundRectangle 14">
-                        <Label Text="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="28" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
-                    </Border>
-                    <VerticalStackLayout VerticalOptions="Center" Spacing="2">
-                        <Label Text="户主变更" Style="{StaticResource ModuleHeroTitle}"/>
-                        <Label Text="仅变更户主，其他信息不变" Style="{StaticResource ModuleHeroSubtitle}"/>
-                    </VerticalStackLayout>
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </Border>
+        <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8AB;', Android='&#x1F4C5;'}"
+                                   Title="户主变更"
+                                   Subtitle="仅变更户主，其他信息不变">
+        </components:PageHeaderView>
 
         <!-- 内容区域 -->
         <ScrollView Grid.Row="1">
@@ -97,10 +81,10 @@
 
                 <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource Gray50}">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="32" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                        <Label Text="{OnPlatform WinUI='&#xE77B;', Android='&#x1F464;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="34" TextColor="{StaticResource Primary}" VerticalOptions="Center"/>
                         <VerticalStackLayout Grid.Column="1" Spacing="4">
-                            <Label Text="{Binding CurrentHeadName}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Label Text="{Binding CurrentHeadIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                            <Label Text="{Binding CurrentHeadName}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                            <Label Text="{Binding CurrentHeadIdCard}" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <Border Grid.Column="2" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                             <Label Text="{Binding CurrentClassificationName}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold"/>

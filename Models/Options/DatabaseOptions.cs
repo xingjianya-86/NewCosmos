@@ -1,4 +1,4 @@
-﻿using NewCosmos.Models.Exceptions;
+using NewCosmos.Models.Exceptions;
 
 namespace NewCosmos.Models.Options;
 
@@ -8,7 +8,8 @@ namespace NewCosmos.Models.Options;
 public class DatabaseOptions
 {
     /// <summary>
-    /// 数据库类型    /// </summary>
+    /// 数据库类型
+/// </summary>
     public string Type { get; set; } = string.Empty;
 
     /// <summary>
@@ -22,11 +23,13 @@ public class DatabaseOptions
     public int Port { get; set; }
 
     /// <summary>
-    /// 数据库名称    /// </summary>
+    /// 数据库名称
+/// </summary>
     public string DatabaseName { get; set; } = string.Empty;
 
     /// <summary>
-    /// 用户名    /// </summary>
+    /// 用户名
+/// </summary>
     public string Username { get; set; } = string.Empty;
 
     /// <summary>
@@ -40,11 +43,13 @@ public class DatabaseOptions
     public string PgDumpPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// 连接超时时间（秒）    /// </summary>
+    /// 连接超时时间（秒）
+/// </summary>
     public int ConnectionTimeout { get; set; }
 
     /// <summary>
-    /// 命令超时时间（秒）    /// </summary>
+    /// 命令超时时间（秒）
+/// </summary>
     public int CommandTimeout { get; set; }
 
     /// <summary>
@@ -58,7 +63,8 @@ public class DatabaseOptions
     public int MinPoolSize { get; set; }
 
     /// <summary>
-    /// 是否为生产环境    /// </summary>
+    /// 是否为生产环境
+/// </summary>
     public bool IsProduction { get; set; }
 
     /// <summary>
@@ -72,7 +78,8 @@ public class DatabaseOptions
     public string SslMode { get; set; } = string.Empty;
 
     /// <summary>
-    /// 是否信任服务器证书    /// </summary>
+    /// 是否信任服务器证书
+/// </summary>
     public bool TrustServerCertificate { get; set; }
 
     /// <summary>

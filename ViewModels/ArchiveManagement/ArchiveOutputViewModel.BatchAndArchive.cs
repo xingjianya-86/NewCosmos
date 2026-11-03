@@ -106,8 +106,8 @@ public partial class ArchiveOutputViewModel
         }
 
         // 封面单独队列：必须先打印封面，只有封面成功后才能打印后续页面
-        var coverTemplate = selectedTemplates.FirstOrDefault(t => t.Name.Contains("封面"));
-        var restTemplates = selectedTemplates.Where(t => !t.Name.Contains("封面")).ToList();
+        var coverTemplate = selectedTemplates.FirstOrDefault(t => Constants.DocumentTemplateNames.IsCover(t.Name));
+        var restTemplates = selectedTemplates.Where(t => !Constants.DocumentTemplateNames.IsCover(t.Name)).ToList();
 
         try
         {
@@ -248,7 +248,7 @@ public partial class ArchiveOutputViewModel
             tableRows = BuildDirectoryRows(tl.MeetingDate);
         }
         // 赡养费承诺书：使用赡养人数据
-        else if (template.Name.Contains("赡养费承诺书"))
+        else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
         {
             tableRows = PrintNavigationData.SupporterTableData ?? new();
         }
@@ -368,7 +368,7 @@ public partial class ArchiveOutputViewModel
         }
 
         // 封面模板打印前确认：需先插入牛皮纸（保存不调打印机，跳过）
-        if (printToPrinter && file.TemplateName.Contains("封面"))
+        if (printToPrinter && Constants.DocumentTemplateNames.IsCover(file.TemplateName))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -394,7 +394,7 @@ public partial class ArchiveOutputViewModel
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (file.TemplateName.Contains("赡养费承诺书"))
+            else if (Constants.DocumentTemplateNames.IsSupporterPledge(file.TemplateName))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }
@@ -508,8 +508,9 @@ public partial class ArchiveOutputViewModel
             var navigation = Helpers.WindowNavigator.CurrentNavigation;
             if (navigation != null)
             {
-                await navigation.PopToRootAsync();
-                // PopToRoot 直接回到主首页，必须恢复窗口标题（历史 BUG：标题残留档案输出页）
+                // 优先回工作流列表（页内 OnAppearing 自动刷新）；栈中无列表页才退回主首页
+                await Helpers.WindowNavigator.PopToPageAsync(typeof(Pages.SocialAssistance.ApplicationWorkflowPage));
+                // 返回后按栈顶页面恢复窗口标题（历史 BUG：标题残留档案输出页）
                 RestoreWindowTitleFromNavigation();
             }
         }
@@ -650,8 +651,11 @@ public partial class ArchiveOutputViewModel
         var navigation = Helpers.WindowNavigator.CurrentNavigation;
         if (navigation != null)
         {
-            await navigation.PopToRootAsync();
-            // PopToRoot 直接回到主首页，必须恢复窗口标题（历史 BUG：标题残留档案输出页）
+            // 回工作流列表页（页内 OnAppearing 自动刷新徽章与列表）；栈中无列表页才退回主首页。
+            // 原 PopToRoot 一律打回主首页：批量办理每户都要重新导航两层 + 重查计数（2026-11 优化）
+            await Helpers.WindowNavigator.PopToPageAsync(
+                typeof(Pages.SocialAssistance.ApplicationWorkflowPage));
+            // 返回后按栈顶页面恢复窗口标题（历史 BUG：标题残留档案输出页）
             RestoreWindowTitleFromNavigation();
         }
     }

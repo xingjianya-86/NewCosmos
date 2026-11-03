@@ -56,9 +56,10 @@ public partial class StatCapsule : ContentView
         }
         else
         {
+            // 深色 Hero：底恒为深色渐变 → 反白字（与 StatValueText/StatLabelText 样式一致，避免切换后回落旧色）
             v.HostBorder.BackgroundColor = Color.FromArgb("#26FFFFFF");
             v.ValueLabel.TextColor = ResolveColor("White", Colors.White);
-            v.CaptionLabel.TextColor = Color.FromArgb("#CCFFFFFF");
+            v.CaptionLabel.TextColor = ResolveColor("White", Colors.White);
         }
     }
 

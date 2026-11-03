@@ -83,21 +83,34 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private MemberChangeReasonOption? _selectedReason;
 
-    /// <summary>事由日期（默认当天；永久减员记入死亡日期，其余为减员/增员生效日期）</summary>
+    /// <summary>事由日期（默认当天；非死亡减员/增员的生效日期，默认当天合理）</summary>
     [ObservableProperty]
     private DateTime _eventDate = DateTime.Today;
 
-    /// <summary>事由时刻（减员原因为「人员死亡」时显示并必填，落 nc_biz_death_records.death_time）</summary>
+    /// <summary>
+    /// 死亡日期与时刻（仅减员原因=人员死亡时显示并必填，落 nc_biz_death_records.death_date/death_time）。
+    /// 组件 DateTimeEntryView 绑定本属性：未确认选择前保持 null，
+    /// 「必填」由 Confirm 的 null 拦截真实把关（替代旧 TimePicker 默认 12:00 的假必填）。
+    /// 确认时拆回 EventDate（日期部分）+ EventTime（时刻部分），结果记录契约不变。
+    /// </summary>
     [ObservableProperty]
-    private TimeSpan _eventTime = new(12, 0, 0);
+    private DateTime? _deathDateTime;
 
-    /// <summary>是否显示「死亡确切时间」（仅减员原因为人员死亡时）</summary>
+    /// <summary>是否显示「死亡日期与时刻」（仅减员原因为人员死亡时）</summary>
     [ObservableProperty]
     private bool _isDeathTimeVisible;
+
+    /// <summary>是否显示独立「事由日期」（死亡模式下被整块日期时刻取代，隐藏）</summary>
+    public bool IsEventDateVisible => !IsDeathTimeVisible;
+
+    partial void OnIsDeathTimeVisibleChanged(bool value) => OnPropertyChanged(nameof(IsEventDateVisible));
 
     partial void OnSelectedReasonChanged(MemberChangeReasonOption? value)
     {
         IsDeathTimeVisible = IsRemoveMode && value != null && MemberChangeReasonConstants.IsDeath(value.Code);
+        // 切换原因即作废此前的死亡时刻选择与行内校验提示（不同原因的时间语义不同）
+        DeathDateTime = null;
+        ValidationMessage = string.Empty;
     }
 
     [ObservableProperty]
@@ -138,21 +151,44 @@ public partial class MemberChangeReasonPopupViewModel : ObservableObject
         SelectedReason = null;
         IsDeathTimeVisible = false;
         EventDate = DateTime.Today;
-        EventTime = new TimeSpan(12, 0, 0);
+        DeathDateTime = null;
+        ValidationMessage = string.Empty;
     }
 
-    /// <summary>确认（未选择原因时按钮不可用）</summary>
+    /// <summary>行内校验提示（死亡日期时刻未选/未来时显示，红色，位于按钮栏上方）</summary>
+    [ObservableProperty]
+    private string _validationMessage = string.Empty;
+
+    /// <summary>确认（未选择原因时按钮不可用；死亡减员必须已选日期与时刻）</summary>
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()
     {
         if (SelectedReason == null) return;
 
+        // 死亡减员：日期与时刻必填（组件未选择前 DeathDateTime 恒为 null，此处为真实把关；
+        // 服务侧 ChangeService.RebuildAndReview 另有 EventTime 空值兜底拦截）
+        if (IsDeathTimeVisible)
+        {
+            if (DeathDateTime is null)
+            {
+                ValidationMessage = "请选择死亡日期与时间";
+                return;
+            }
+            if (DeathDateTime.Value > DateTime.Now)
+            {
+                ValidationMessage = "死亡时间不能晚于当前时间";
+                return;
+            }
+        }
+
+        ValidationMessage = string.Empty;
         _tcs.TrySetResult(new MemberChangeReasonResult(
             SelectedReason.Code,
             SelectedReason.Name,
-            EventDate,
+            // 死亡减员：事由日期取所选日期部分（原独立「事由日期」在死亡模式下被整块日期时刻取代）
+            IsDeathTimeVisible ? DeathDateTime!.Value.Date : EventDate,
             Remark ?? string.Empty,
-            IsDeathTimeVisible ? EventTime : null));
+            IsDeathTimeVisible ? DeathDateTime!.Value.TimeOfDay : null));
     }
 
     private bool CanConfirm() => SelectedReason != null;
