@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261104</ApplicationDisplayVersion>
-		<ApplicationVersion>20261104</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261105</ApplicationDisplayVersion>
+		<ApplicationVersion>20261105</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
