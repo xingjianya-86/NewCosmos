@@ -180,6 +180,10 @@
 		<AndroidAsset Include="config\document_output.yaml" Link="document_output.yaml" />
 		<AndroidAsset Include="config\print_settings.yaml" Link="print_settings.yaml" />
 		<AndroidAsset Include="config\timeline_config.yaml" Link="timeline_config.yaml" />
+		<!-- ICD-10 疾病编码字典（1.6MB）：上面的 None+CopyToOutputDirectory 只复制到主机输出目录、
+		     不进 APK assets，导致安卓端 Icd10Catalog 读不到字典、疾病编码无法回填疾病名称。
+		     必须以 AndroidAsset 打进 APK，由 Icd10Catalog 用 OpenAppPackageFileAsync 读取。 -->
+		<AndroidAsset Include="Resources\Icd10\**\*.json" Link="icd10\%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
 	<!-- Android AOT：NPOI.Core/OOXML 的元数据引用 SkiaSharp，但该传递依赖未进入 Android
