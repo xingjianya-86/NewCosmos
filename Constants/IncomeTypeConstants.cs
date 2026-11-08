@@ -13,19 +13,6 @@ public static class IncomeTypeConstants
     }
 
     /// <summary>
-    /// 收入类型中文显示名（用于 ActionSheet）
-    /// </summary>
-    public static class DisplayNames
-    {
-        public const string LABOR = "务工收入";
-        public const string BUSINESS = "经营收入";
-        public const string PROPERTY = "财产收入";
-        public const string TRANSFER = "转移收入";
-        public const string OTHER = "其他收入";
-        public static readonly string[] All = { LABOR, BUSINESS, PROPERTY, TRANSFER, OTHER };
-    }
-
-    /// <summary>
     /// 务工收入子类型
     /// </summary>
     public static class LaborSubType
@@ -44,16 +31,6 @@ public static class IncomeTypeConstants
         public const string AGRICULTURE = "农业经营";
         public const string COMMERCE = "商业经营";
         public static readonly string[] All = { AGRICULTURE, COMMERCE };
-    }
-
-    /// <summary>
-    /// 财产收入子类型
-    /// </summary>
-    public static class PropertySubType
-    {
-        public const string RENT = "租金";
-        public const string INTEREST = "利息";
-        public static readonly string[] All = { RENT, INTEREST };
     }
 
     /// <summary>

@@ -36,6 +36,7 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
     ///   （张微：89 档案 812/815 已软删 + 818 Support 存活）。若只认存活行，则只剩 Support → EXISTS 恒 False，
     ///   本过滤对「旧档共同生活成员→新档赡养人」整类静默失效。此处按"历史上曾是保障对象"取证，须保留软删行。
     /// 消费方：今年毕业过滤、GetAllAsync 的 is_household_stopped 计算列（已关联/已退出分栏）。
+    /// 「在保/在途」半边抽到 ActiveHouseholdExpr 单点实现（与本方法、其他困难人员排除共用）。
     /// </summary>
     private static string HouseholdStoppedExpr(string idCardExpr) => $@"
 (
@@ -43,11 +44,33 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
             JOIN nc_biz_applications a ON a.id = m.application_id
             WHERE m.id_card = {idCardExpr} AND a.deleted_at IS NULL AND a.status = 'Stopped'
               AND (m.member_category IS NULL OR m.member_category <> 'Support'))
-    AND NOT EXISTS (SELECT 1 FROM nc_biz_family_members m2
-            JOIN nc_biz_applications a2 ON a2.id = m2.application_id
-            WHERE m2.id_card = {idCardExpr} AND a2.deleted_at IS NULL
-              AND a2.status IN ('Draft','Submitted','Approved','Completed')
-              AND (m2.member_category IS NULL OR m2.member_category <> 'Support'))
+    AND NOT {ActiveHouseholdExpr(idCardExpr)}
+)";
+
+    /// <summary>
+    /// 「当前在保/在途」判定子查询表达式（关联列 = 传入的身份证列表达式）：
+    /// 存在未删除且状态为 Draft/Submitted/Approved/Completed 的档案，其成员是保障对象（非赡养抚养扶养人）。
+    /// 状态字面量与成员身份口径同 HouseholdStoppedExpr（2026-10-12 张微实测），单点实现避免两处抄写漂移。
+    /// </summary>
+    private static string ActiveHouseholdExpr(string idCardExpr) => $@"
+EXISTS (SELECT 1 FROM nc_biz_family_members m
+        JOIN nc_biz_applications a ON a.id = m.application_id
+        WHERE m.id_card = {idCardExpr} AND a.deleted_at IS NULL
+          AND a.status IN ('Draft','Submitted','Approved','Completed')
+          AND (m.member_category IS NULL OR m.member_category <> 'Support'))";
+
+    /// <summary>
+    /// 「不属于其他困难人员」过滤表达式（可关联搜索专用，关联列 = 传入的身份证列表达式）：
+    /// 身份证不在其他困难人员台账 nc_biz_other_difficulty_persons 中，**或**该身份证当前已有在保/在途档案。
+    /// 即「在台账中 且 当前无在保/在途档案 → 排除」。
+    /// 台账行转出后原行保留不删（转出事实另记 nc_biz_other_difficulty_stops），故必须带在保豁免，
+    /// 否则后来重新纳入低保的人会被永久误伤；「该户仍在保/在途即不属本类」与
+    /// OtherDifficultyLedgerService 停保转入门槛同口径。
+    /// </summary>
+    private static string NotOtherDifficultyExpr(string idCardExpr) => $@"
+(
+    NOT EXISTS (SELECT 1 FROM nc_biz_other_difficulty_persons p WHERE p.id_card = {idCardExpr})
+    OR {ActiveHouseholdExpr(idCardExpr)}
 )";
 
     /// <inheritdoc/>
@@ -109,6 +132,9 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
             LogInfo($"搜索可关联的18-23岁家庭成员: keywordLength={(kw ?? string.Empty).Length}");
 
             // 从已归档档案的 family_members + 6 张导入台账的 persons 中搜索18-23岁成员
+            // （6 张 = 农村/城市低保、低保边缘、特困、刚性支出困难家庭；其他困难人员**不在此列**）
+            // 其他困难人员不属本页范围（2026-11-08 业务确认）：既不从其台账取人，
+            // 也对全部候选（含 family_members 来源）按 NotOtherDifficultyExpr 统一排除。
             // 统一用身份证第7-14位提取出生日期计算周岁（family_members.birth_date 大量为 NULL）
             // 增加户主姓名、联系方式、所在村屯字段
             // 导入台账人员通过 head_id_card 关联家庭表获取户主信息
@@ -190,16 +216,6 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                       AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
                       -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
                           TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
-                    UNION ALL
-                    SELECT p.id, p.name, p.id_card, p.gender,
-                           NULL::date, NULL::bigint, NULL::text, NULL::text, NULL::text,
-                           p.head_id_card, 'import'
-                    FROM nc_biz_other_difficulty_persons p
-                    WHERE p.id_card ~ '^[0-9]{17}[0-9X]$'
-                      AND SUBSTRING(p.id_card FROM 7 FOR 8) ~ '^[0-9]{8}$'
-                      AND EXTRACT(YEAR FROM AGE(CURRENT_DATE,
-                      -- [索引豁免] 身份证内嵌生日计算列，无法纯列比较；毕业扫描为低频批量场景
-                          TO_DATE(SUBSTRING(p.id_card FROM 7 FOR 8), 'YYYYMMDD'))) BETWEEN $2 AND $3
                 ),
                 all_families AS (
                     SELECT applicant_id_card, applicant_name, phone,
@@ -231,11 +247,6 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                            COALESCE(district, '') || COALESCE(street, '') || COALESCE(community, ''),
                            'rigid_expenditure'
                     FROM nc_biz_rigid_expenditure_families
-                    UNION ALL
-                    SELECT applicant_id_card, applicant_name, phone,
-                           COALESCE(district, '') || COALESCE(street, '') || COALESCE(community, ''),
-                           'other_difficulty'
-                    FROM nc_biz_other_difficulty_families
                 ),
                 all_candidates AS (
                     SELECT * FROM family_members
@@ -261,6 +272,8 @@ public class CollegeStudentService : BaseService, ICollegeStudentService
                     WHERE cs.id_card = d.id_card AND cs.deleted_at IS NULL
                 )
                   AND ($1::text IS NULL OR d.name LIKE '%' || $1 || '%' OR d.id_card = $1)
+                  -- 排除「当前属于其他困难人员」的成员（口径与豁免见 NotOtherDifficultyExpr）
+                " + NotOtherDifficultyExpr("d.id_card") + @"
                 ORDER BY d.name
                 LIMIT 100";
 

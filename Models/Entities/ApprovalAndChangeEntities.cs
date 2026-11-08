@@ -49,29 +49,3 @@ public class SpecialApprovalForm
     public DateTime UpdatedAt { get; set; }
     public DateTime DeletedAt { get; set; }
 }
-
-/// <summary>
-/// 变更快照实体（纯 POCO，对对应 nc_biz_change_snapshots 表）
-/// </summary>
-public class ChangeSnapshot
-{
-    public long Id { get; set; }
-    public long ChangeId { get; set; }
-    public string SnapshotType { get; set; } = string.Empty;
-    public string SnapshotData { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}
-
-/// <summary>
-/// 变更明细实体（纯 POCO，对对应 nc_biz_change_details 表）
-/// </summary>
-public class ChangeDetail
-{
-    public long Id { get; set; }
-    public long ChangeId { get; set; }
-    public string FieldName { get; set; } = string.Empty;
-    public string FieldLabel { get; set; } = string.Empty;
-    public string OldValue { get; set; } = string.Empty;
-    public string NewValue { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-}

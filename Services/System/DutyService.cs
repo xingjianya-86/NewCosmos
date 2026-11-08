@@ -69,6 +69,12 @@ public interface IDutyService
     /// </summary>
     Task<Result<int>> GenerateMissingMonthsAsync(IReadOnlyList<string> months, CancellationToken ct = default);
 
+    /// <summary>
+    /// 按时间升序强制重生成给定月份（yyyy-MM 列表；未生成月跳过，已生成月 force 覆盖）。
+    /// 用于"本月轮转变化后下游一键重排"：逐月接续推演，串班/代班随生成自动重放。返回实际重排月份数。
+    /// </summary>
+    Task<Result<int>> RegenerateMonthsAsync(IReadOnlyList<string> months, CancellationToken ct = default);
+
     /// <summary>批量导入成员预览：解析 Excel + 行级校验 + 新增/更新计数（同名=更新）</summary>
     Task<Result<DutyMemberImportPreview>> PreviewMemberImportAsync(string filePath, CancellationToken ct = default);
 
@@ -85,7 +91,10 @@ public interface IDutyService
     /// <summary>获取月度值班表（未生成月份仅返回日期类型判定）</summary>
     Task<Result<DutyMonthSchedule>> GetMonthScheduleAsync(int year, int month, CancellationToken ct = default);
 
-    /// <summary>按月生成值班表（force=true 时删除该月既有班次重新生成，游标继续消耗）</summary>
+    /// <summary>
+    /// 按月生成值班表（force=true 时删除该月既有班次重新生成）。
+    /// 起点取"目标月之前最近一条真实班次"，与生成顺序无关；结果返回下游已生成月份供一键重排。
+    /// </summary>
     Task<Result<DutyGenerationSummary>> GenerateMonthAsync(int year, int month, bool force, CancellationToken ct = default);
 
     /// <summary>删除该月全部班次（便于重新生成）</summary>
@@ -586,7 +595,7 @@ public partial class DutyService : BaseService, IDutyService
             ("MemberId", leave.MemberId),
             ("Range", $"{leave.StartDate:yyyy-MM-dd}~{leave.EndDate:yyyy-MM-dd}"));
 
-        // 请假改变轮转消耗（跨月接续以上月最后消耗人为准），受影响月份旧数据不再有效：
+        // 请假改变轮转消耗（跨月接续以"目标月之前最近一条真实班次"为准），受影响月份旧数据不再有效：
         // 删除（不自动重新生成，由值班表页人工生成或界面选择"立即重新生成"）
         return await DeleteAffectedGeneratedMonthsAsync(leave.StartDate.Date, ct);
     }
@@ -616,7 +625,7 @@ public partial class DutyService : BaseService, IDutyService
 
     /// <summary>
     /// 删除请假增删影响范围内的已生成月份班次：从请假开始月到"最后已生成月"，逐月整月删除，**不自动重新生成**。
-    /// 生成算法以"上月最后消耗人"跨月接续（GetLastScheduleMemberAsync），请假改变轮转消耗后
+    /// 生成算法以"目标月之前最近一条真实班次"跨月接续（LoadPreviousRotationFactsAsync），请假改变轮转消耗后
     /// 受影响月份旧数据不再有效；删除后由用户在值班表页按需重新生成。
     /// </summary>
     private async Task<Result<List<string>>> DeleteAffectedGeneratedMonthsAsync(DateTime leaveStart, CancellationToken ct)
@@ -728,6 +737,51 @@ public partial class DutyService : BaseService, IDutyService
             LogInfo($"跨月串班/代班补齐：{m:yyyy-MM} 值班表已生成");
         }
         return Result.Success(generatedCount);
+    }
+
+    public async Task<Result<int>> RegenerateMonthsAsync(
+        IReadOnlyList<string> months, CancellationToken ct = default)
+    {
+        if (months is null || months.Count == 0)
+            return Result.Success(0);
+
+        var ensureResult = await EnsureTablesExistAsync(ct);
+        if (ensureResult.IsFailure)
+            return Result.Failure<int>(ensureResult.ErrorCode!, ensureResult.Message!);
+
+        // 解析、去重并按时间升序（必须升序：每月起点取自前一月最近班次，乱序会断链）
+        var monthSet = new SortedSet<(int Year, int Month)>();
+        foreach (var raw in months)
+        {
+            var parts = (raw ?? string.Empty).Split('-');
+            if (parts.Length != 2
+                || !int.TryParse(parts[0], out var y) || y < 2000 || y > 2100
+                || !int.TryParse(parts[1], out var m) || m < 1 || m > 12)
+            {
+                return Result.Failure<int>(ErrorCodes.VALIDATION_FAILED, $"月份格式无效：{raw}");
+            }
+            monthSet.Add((y, m));
+        }
+
+        var regeneratedCount = 0;
+        foreach (var (y, m) in monthSet)
+        {
+            var countResult = await _dbService.ExecuteScalarAsync<long>(
+                "SELECT COUNT(*) FROM nc_duty_schedules WHERE year = $1 AND month = $2", ct, y, m);
+            if (countResult.IsFailure)
+                return Result.Failure<int>(countResult.ErrorCode!, countResult.Message!);
+            if (countResult.Value == 0)
+                continue;   // 未生成月跳过（不凭空补出用户没要的月份）
+
+            var genResult = await GenerateMonthAsync(y, m, force: true, ct);
+            if (genResult.IsFailure)
+                return Result.Failure<int>(genResult.ErrorCode!,
+                    $"重排 {y}-{m:D2} 失败（已重排 {regeneratedCount} 个月）：{genResult.Message}");
+
+            regeneratedCount++;
+            LogInfo($"下游一键重排：{y}-{m:D2} 值班表已强制重生成");
+        }
+        return Result.Success(regeneratedCount);
     }
 
     /// <summary>

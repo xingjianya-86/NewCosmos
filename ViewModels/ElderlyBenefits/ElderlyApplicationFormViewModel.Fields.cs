@@ -38,7 +38,7 @@ public partial class ElderlyApplicationFormViewModel
     public bool IsSavable => OperationMode != FormOperationMode.View;
 
     /// <summary>是否显示模式横幅（补全模式：停发联动 / 复核前置补全）</summary>
-    public bool IsModeBannerVisible => NavigateToStopAfterSave || ReturnToReview;
+    public bool IsModeBannerVisible => IsCompletionMode;
 
     /// <summary>模式横幅文案</summary>
     public string ModeBannerText => NavigateToStopAfterSave
@@ -46,6 +46,12 @@ public partial class ElderlyApplicationFormViewModel
         : ReturnToReview
             ? "数据补全模式\n补全完成缺失信息，保存后返回复核页继续办理"
             : string.Empty;
+
+    /// <summary>保存草稿按钮（补全模式隐藏：该模式档案已确认，改显示"保存并继续"）</summary>
+    public bool IsDraftSaveVisible => IsSavable && !IsCompletionMode;
+
+    /// <summary>补全模式主按钮（保存并按入口继续：进入停发 / 返回复核；已确认档保存后不再重复确认）</summary>
+    public bool IsCompletionSaveVisible => IsSavable && IsCompletionMode;
 
     #endregion
 
@@ -64,8 +70,8 @@ public partial class ElderlyApplicationFormViewModel
     /// <summary>下一页可用（非最后一个 Tab，XAML IsEnabled 绑定用）</summary>
     public bool CanGoNext => SelectedSection < 2;
 
-    /// <summary>保存并确认仅在最后一个 Tab（判定认证）显示</summary>
-    public bool IsSaveAndConfirmVisible => IsSavable && IsSection2Selected;
+    /// <summary>保存并确认仅在最后一个 Tab（判定认证）显示；补全模式走"保存并继续"，不显示确认</summary>
+    public bool IsSaveAndConfirmVisible => IsSavable && !IsCompletionMode && IsSection2Selected;
 
     partial void OnSelectedSectionChanged(int value)
     {
@@ -205,8 +211,19 @@ public partial class ElderlyApplicationFormViewModel
             if (string.IsNullOrWhiteSpace(preferred)) preferred = DefaultValuesConstants.HOME_PROVINCE;
             if (!string.IsNullOrEmpty(preferred) && HukouProvinceOptions.Contains(preferred))
             {
-                SelectedHukouProvince = preferred;
-                SelectedFamilyProvince = preferred;
+                // 抑制 Setter 的 fire-and-forget 级联：调用方随后会显式加载城市，
+                // 否则默认值设置会与显式加载交错（旧请求晚到覆盖新结果）。
+                var previousSuppress = _suppressRegionCascade;
+                _suppressRegionCascade = true;
+                try
+                {
+                    SelectedHukouProvince = preferred;
+                    SelectedFamilyProvince = preferred;
+                }
+                finally
+                {
+                    _suppressRegionCascade = previousSuppress;
+                }
             }
         }
         else
@@ -276,6 +293,25 @@ public partial class ElderlyApplicationFormViewModel
         SafeFireAndForget(async () => await LoadHukouVillagesAsync());
     }
 
+    /// <summary>
+    /// 选项集合整体替换。调用方必须在同一同步块内随后恢复/重设选中值：
+    /// Picker 的 SelectedItem 是 TwoWay 绑定，选项被清空时会把空值回写进 VM，
+    /// 所以"清空后不重设"就会把用户已选的乡镇/村抹掉（2026-11-05 缺陷根因之一）。
+    /// </summary>
+    private static void ReplaceOptions(ObservableCollection<string> target, IEnumerable<string> values)
+    {
+        target.Clear();
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrEmpty(value)) target.Add(value);
+        }
+    }
+
+    /// <summary>
+    /// 加载户籍城市（按选中省筛市 + 管辖范围过滤）。
+    /// 铁律（2026-11-05）：**先查库、成功后再替换选项**——查询失败保留旧选项与旧选中值；
+    /// 替换后同步恢复选中值并继续加载下一级，不再出现"选项已清空、旧值被 Picker 回写成空"的中间态。
+    /// </summary>
     private async Task LoadHukouCitiesAsync()
     {
         // 2026-10-27：按选中省筛市（省已可选全国）+ 户籍按管辖范围过滤
@@ -286,91 +322,258 @@ public partial class ElderlyApplicationFormViewModel
         var result = provinceId > 0
             ? await _regionService.GetCitiesByProvinceIdAsync(provinceId, CancellationToken)
             : await _regionService.GetCitiesAsync(CancellationToken);
-        if (result.IsFailure || result.Value == null) return;
-        HukouCityOptions.Clear();
-        foreach (var c in result.Value)
+        if (result.IsFailure || result.Value == null)
         {
-            if (AllowHukouCity(c.CityName)) HukouCityOptions.Add(c.CityName);
+            _logger.Warn($"户籍城市加载失败（保留原选项与已选值）: {result.Message}");
+            return;
         }
-        if (string.IsNullOrEmpty(SelectedHukouCity) && HukouCityOptions.Count > 0)
+
+        var allowed = result.Value
+            .Where(c => AllowHukouCity(c.CityName))
+            .Select(c => c.CityName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
         {
-            SelectedHukouCity = HukouCityOptions[0];
+            ReplaceOptions(HukouCityOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedHukouCity) || !allowed.Contains(SelectedHukouCity))
+                SelectedHukouCity = PickDefaultHukouCity(allowed);
+
+            await LoadHukouCountiesAsync();
         }
-        // 户籍锁定时（账号绑到市级及以下）预选本单位市
-        if (_addressScope is { IsCityLocked: true } && !string.IsNullOrEmpty(_addressScope.CityName)
-            && HukouCityOptions.Contains(_addressScope.CityName))
+        finally
         {
-            SelectedHukouCity = _addressScope.CityName;
+            _suppressRegionCascade = previousSuppress;
         }
     }
 
     private async Task LoadHukouCountiesAsync()
     {
-        HukouCountyOptions.Clear();
-        HukouTownOptions.Clear();
-        HukouVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedHukouCity)) return;
-        var result = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
-        if (result.IsFailure || result.Value == null) return;
-        foreach (var c in result.Value)
+        if (string.IsNullOrEmpty(SelectedHukouCity))
         {
-            if (AllowHukouCounty(c.CountyName)) HukouCountyOptions.Add(c.CountyName);   // 管辖范围内
+            var resetSuppress = _suppressRegionCascade;
+            _suppressRegionCascade = true;
+            try
+            {
+                ReplaceOptions(HukouCountyOptions, Array.Empty<string>());
+                SelectedHukouCounty = string.Empty;
+                ClearHukouTownsAndBelow();
+            }
+            finally
+            {
+                _suppressRegionCascade = resetSuppress;
+            }
+            return;
         }
-        if (HukouCountyOptions.Count > 0) SelectedHukouCounty = HukouCountyOptions[0];
-        if (_addressScope is { IsCountyLocked: true } && !string.IsNullOrEmpty(_addressScope.CountyName)
-            && HukouCountyOptions.Contains(_addressScope.CountyName))
+
+        var result = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
+        if (result.IsFailure || result.Value == null)
         {
-            SelectedHukouCounty = _addressScope.CountyName;
+            _logger.Warn($"户籍区县加载失败（保留原选项与已选值）: {result.Message}");
+            return;
+        }
+
+        var allowed = result.Value
+            .Where(c => AllowHukouCounty(c.CountyName))
+            .Select(c => c.CountyName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(HukouCountyOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedHukouCounty) || !allowed.Contains(SelectedHukouCounty))
+                SelectedHukouCounty = PickDefaultHukouCounty(allowed);
+
+            await LoadHukouTownsAsync();
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
         }
     }
 
     private async Task LoadHukouTownsAsync()
     {
-        HukouTownOptions.Clear();
-        HukouVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedHukouCity) || string.IsNullOrEmpty(SelectedHukouCounty)) return;
-        var counties = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
-        if (counties.IsFailure || counties.Value == null) return;
-        var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedHukouCounty);
-        if (county == null) return;
-        var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
-        if (towns.IsFailure || towns.Value == null) return;
-        foreach (var t in towns.Value)
+        if (string.IsNullOrEmpty(SelectedHukouCity) || string.IsNullOrEmpty(SelectedHukouCounty))
         {
-            if (AllowHukouTown(t.TownName)) HukouTownOptions.Add(t.TownName);   // 管辖范围内
+            ClearHukouTownsAndBelow();
+            return;
         }
-        if (HukouTownOptions.Count > 0) SelectedHukouTown = HukouTownOptions[0];
-        if (_addressScope is { IsTownLocked: true } && !string.IsNullOrEmpty(_addressScope.TownName)
-            && HukouTownOptions.Contains(_addressScope.TownName))
+
+        var counties = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
+        if (counties.IsFailure || counties.Value == null)
         {
-            SelectedHukouTown = _addressScope.TownName;
+            _logger.Warn($"户籍县区校验失败（保留原选项与已选值）: {counties.Message}");
+            return;
+        }
+
+        var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedHukouCounty);
+        if (county == null)
+        {
+            // 父级已切换且新县下查无此名：旧乡镇必然失效，属确定性清空（不是查询失败）
+            ClearHukouTownsAndBelow();
+            return;
+        }
+
+        var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
+        if (towns.IsFailure || towns.Value == null)
+        {
+            _logger.Warn($"户籍乡镇加载失败（保留原选项与已选值）: {towns.Message}");
+            return;
+        }
+
+        var allowed = towns.Value
+            .Where(t => AllowHukouTown(t.TownName))
+            .Select(t => t.TownName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(HukouTownOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedHukouTown) || !allowed.Contains(SelectedHukouTown))
+                SelectedHukouTown = PickDefaultHukouTown(allowed);
+
+            await LoadHukouVillagesAsync();
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
         }
     }
 
     private async Task LoadHukouVillagesAsync()
     {
-        HukouVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedHukouCity) || string.IsNullOrEmpty(SelectedHukouCounty)) return;
-        var counties = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
-        if (counties.IsFailure || counties.Value == null) return;
-        var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedHukouCounty);
-        if (county == null) return;
-        var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
-        if (towns.IsFailure || towns.Value == null) return;
-        var town = towns.Value.FirstOrDefault(t => t.TownName == SelectedHukouTown);
-        if (town == null) return;
-        var villages = await _regionService.GetVillagesByTownIdAsync(town.Id, CancellationToken);
-        if (villages.IsFailure || villages.Value == null) return;
-        foreach (var v in villages.Value)
+        if (string.IsNullOrEmpty(SelectedHukouCity) || string.IsNullOrEmpty(SelectedHukouCounty)
+            || string.IsNullOrEmpty(SelectedHukouTown))
         {
-            if (AllowHukouVillage(v.VillageName)) HukouVillageOptions.Add(v.VillageName);   // 管辖范围内
+            ClearHukouVillages();
+            return;
         }
-        if (HukouVillageOptions.Count > 0) SelectedHukouVillage = HukouVillageOptions[0];
-        // 账号绑到村 → 村下拉只剩本村一项（=「其他全部禁用」）
-        if (_addressScope is { IsVillageLocked: true } && !string.IsNullOrEmpty(_addressScope.VillageName)
-            && HukouVillageOptions.Contains(_addressScope.VillageName))
+
+        var counties = await _regionService.GetCountiesByCityAsync(SelectedHukouCity, CancellationToken);
+        if (counties.IsFailure || counties.Value == null)
         {
-            SelectedHukouVillage = _addressScope.VillageName;
+            _logger.Warn($"户籍县区校验失败（村/社区保留原选项）: {counties.Message}");
+            return;
+        }
+
+        var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedHukouCounty);
+        if (county == null)
+        {
+            ClearHukouVillages();
+            return;
+        }
+
+        var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
+        if (towns.IsFailure || towns.Value == null)
+        {
+            _logger.Warn($"户籍乡镇校验失败（村/社区保留原选项）: {towns.Message}");
+            return;
+        }
+
+        var town = towns.Value.FirstOrDefault(t => t.TownName == SelectedHukouTown);
+        if (town == null)
+        {
+            ClearHukouVillages();
+            return;
+        }
+
+        var villages = await _regionService.GetVillagesByTownIdAsync(town.Id, CancellationToken);
+        if (villages.IsFailure || villages.Value == null)
+        {
+            _logger.Warn($"村/社区加载失败（保留原选项与已选值）: {villages.Message}");
+            return;
+        }
+
+        var allowed = villages.Value
+            .Where(v => AllowHukouVillage(v.VillageName))
+            .Select(v => v.VillageName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(HukouVillageOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedHukouVillage) || !allowed.Contains(SelectedHukouVillage))
+                SelectedHukouVillage = PickDefaultHukouVillage(allowed);
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
+    }
+
+    /// <summary>户籍锁定（账号绑到市级及以下）时预选本单位市</summary>
+    private string PickDefaultHukouCity(IReadOnlyList<string> allowed)
+        => _addressScope is { IsCityLocked: true } && !string.IsNullOrEmpty(_addressScope.CityName)
+           && allowed.Contains(_addressScope.CityName)
+            ? _addressScope.CityName
+            : allowed.Count > 0 ? allowed[0] : string.Empty;
+
+    private string PickDefaultHukouCounty(IReadOnlyList<string> allowed)
+        => _addressScope is { IsCountyLocked: true } && !string.IsNullOrEmpty(_addressScope.CountyName)
+           && allowed.Contains(_addressScope.CountyName)
+            ? _addressScope.CountyName
+            : allowed.Count > 0 ? allowed[0] : string.Empty;
+
+    private string PickDefaultHukouTown(IReadOnlyList<string> allowed)
+        => _addressScope is { IsTownLocked: true } && !string.IsNullOrEmpty(_addressScope.TownName)
+           && allowed.Contains(_addressScope.TownName)
+            ? _addressScope.TownName
+            : allowed.Count > 0 ? allowed[0] : string.Empty;
+
+    /// <summary>账号绑到村 → 村下拉只剩本村一项（=「其他全部禁用」）</summary>
+    private string PickDefaultHukouVillage(IReadOnlyList<string> allowed)
+        => _addressScope is { IsVillageLocked: true } && !string.IsNullOrEmpty(_addressScope.VillageName)
+           && allowed.Contains(_addressScope.VillageName)
+            ? _addressScope.VillageName
+            : allowed.Count > 0 ? allowed[0] : string.Empty;
+
+    /// <summary>父级失效：确定性清空乡镇与村（不是查询失败，不能保留旧值）</summary>
+    private void ClearHukouTownsAndBelow()
+    {
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(HukouTownOptions, Array.Empty<string>());
+            SelectedHukouTown = string.Empty;
+            ReplaceOptions(HukouVillageOptions, Array.Empty<string>());
+            SelectedHukouVillage = string.Empty;
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
+    }
+
+    private void ClearHukouVillages()
+    {
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(HukouVillageOptions, Array.Empty<string>());
+            SelectedHukouVillage = string.Empty;
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
         }
     }
 
@@ -405,15 +608,30 @@ public partial class ElderlyApplicationFormViewModel
     [ObservableProperty]
     private string _detailAddress = string.Empty;
 
-    partial void OnSelectedFamilyCityChanged(string value) => SafeFireAndForget(async () => await LoadFamilyCountiesAsync());
+    partial void OnSelectedFamilyCityChanged(string value)
+    {
+        if (_suppressRegionCascade) return;
+        SafeFireAndForget(async () => await LoadFamilyCountiesAsync());
+    }
 
-    partial void OnSelectedFamilyCountyChanged(string value) => SafeFireAndForget(async () => await LoadFamilyTownsAsync());
+    partial void OnSelectedFamilyCountyChanged(string value)
+    {
+        if (_suppressRegionCascade) return;
+        SafeFireAndForget(async () => await LoadFamilyTownsAsync());
+    }
 
-    partial void OnSelectedFamilyTownChanged(string value) => SafeFireAndForget(async () => await LoadFamilyVillagesAsync());
+    partial void OnSelectedFamilyTownChanged(string value)
+    {
+        if (_suppressRegionCascade) return;
+        SafeFireAndForget(async () => await LoadFamilyVillagesAsync());
+    }
 
+    /// <summary>
+    /// 加载家庭城市（家庭住址=居住地：**全国可选、不限范围**，只按选中省筛市）。
+    /// 与户籍同一铁律：先查库、成功后再替换选项，失败保留旧值。
+    /// </summary>
     private async Task LoadFamilyCitiesAsync()
     {
-        // 家庭住址=居住地：**全国可选、不限范围**，只按选中省筛市
         var provinceId = 0;
         if (!string.IsNullOrEmpty(SelectedFamilyProvince))
             _provinceIdMap.TryGetValue(SelectedFamilyProvince, out provinceId);
@@ -421,58 +639,228 @@ public partial class ElderlyApplicationFormViewModel
         var result = provinceId > 0
             ? await _regionService.GetCitiesByProvinceIdAsync(provinceId, CancellationToken)
             : await _regionService.GetCitiesAsync(CancellationToken);
-        if (result.IsFailure || result.Value == null) return;
-        FamilyCityOptions.Clear();
-        foreach (var c in result.Value) FamilyCityOptions.Add(c.CityName);
-        if (string.IsNullOrEmpty(SelectedFamilyCity) && FamilyCityOptions.Count > 0)
+        if (result.IsFailure || result.Value == null)
         {
-            SelectedFamilyCity = FamilyCityOptions[0];
+            _logger.Warn($"家庭城市加载失败（保留原选项与已选值）: {result.Message}");
+            return;
+        }
+
+        var allowed = result.Value
+            .Select(c => c.CityName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyCityOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedFamilyCity) || !allowed.Contains(SelectedFamilyCity))
+                SelectedFamilyCity = allowed.Count > 0 ? allowed[0] : string.Empty;
+
+            await LoadFamilyCountiesAsync();
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
         }
     }
 
     private async Task LoadFamilyCountiesAsync()
     {
-        FamilyCountyOptions.Clear();
-        FamilyTownOptions.Clear();
-        FamilyVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedFamilyCity)) return;
+        if (string.IsNullOrEmpty(SelectedFamilyCity))
+        {
+            var resetSuppress = _suppressRegionCascade;
+            _suppressRegionCascade = true;
+            try
+            {
+                ReplaceOptions(FamilyCountyOptions, Array.Empty<string>());
+                SelectedFamilyCounty = string.Empty;
+                ClearFamilyTownsAndBelow();
+            }
+            finally
+            {
+                _suppressRegionCascade = resetSuppress;
+            }
+            return;
+        }
+
         var result = await _regionService.GetCountiesByCityAsync(SelectedFamilyCity, CancellationToken);
-        if (result.IsFailure || result.Value == null) return;
-        foreach (var c in result.Value) FamilyCountyOptions.Add(c.CountyName);
-        if (FamilyCountyOptions.Count > 0) SelectedFamilyCounty = FamilyCountyOptions[0];
+        if (result.IsFailure || result.Value == null)
+        {
+            _logger.Warn($"家庭区县加载失败（保留原选项与已选值）: {result.Message}");
+            return;
+        }
+
+        var allowed = result.Value
+            .Select(c => c.CountyName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyCountyOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedFamilyCounty) || !allowed.Contains(SelectedFamilyCounty))
+                SelectedFamilyCounty = allowed.Count > 0 ? allowed[0] : string.Empty;
+
+            await LoadFamilyTownsAsync();
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
     }
 
     private async Task LoadFamilyTownsAsync()
     {
-        FamilyTownOptions.Clear();
-        FamilyVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedFamilyCity) || string.IsNullOrEmpty(SelectedFamilyCounty)) return;
+        if (string.IsNullOrEmpty(SelectedFamilyCity) || string.IsNullOrEmpty(SelectedFamilyCounty))
+        {
+            ClearFamilyTownsAndBelow();
+            return;
+        }
+
         var counties = await _regionService.GetCountiesByCityAsync(SelectedFamilyCity, CancellationToken);
-        if (counties.IsFailure || counties.Value == null) return;
+        if (counties.IsFailure || counties.Value == null)
+        {
+            _logger.Warn($"家庭县区校验失败（保留原选项与已选值）: {counties.Message}");
+            return;
+        }
+
         var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedFamilyCounty);
-        if (county == null) return;
+        if (county == null)
+        {
+            ClearFamilyTownsAndBelow();
+            return;
+        }
+
         var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
-        if (towns.IsFailure || towns.Value == null) return;
-        foreach (var t in towns.Value) FamilyTownOptions.Add(t.TownName);
-        if (FamilyTownOptions.Count > 0) SelectedFamilyTown = FamilyTownOptions[0];
+        if (towns.IsFailure || towns.Value == null)
+        {
+            _logger.Warn($"家庭乡镇加载失败（保留原选项与已选值）: {towns.Message}");
+            return;
+        }
+
+        var allowed = towns.Value
+            .Select(t => t.TownName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyTownOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedFamilyTown) || !allowed.Contains(SelectedFamilyTown))
+                SelectedFamilyTown = allowed.Count > 0 ? allowed[0] : string.Empty;
+
+            await LoadFamilyVillagesAsync();
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
     }
 
     private async Task LoadFamilyVillagesAsync()
     {
-        FamilyVillageOptions.Clear();
-        if (string.IsNullOrEmpty(SelectedFamilyCity) || string.IsNullOrEmpty(SelectedFamilyCounty)) return;
+        if (string.IsNullOrEmpty(SelectedFamilyCity) || string.IsNullOrEmpty(SelectedFamilyCounty)
+            || string.IsNullOrEmpty(SelectedFamilyTown))
+        {
+            ClearFamilyVillages();
+            return;
+        }
+
         var counties = await _regionService.GetCountiesByCityAsync(SelectedFamilyCity, CancellationToken);
-        if (counties.IsFailure || counties.Value == null) return;
+        if (counties.IsFailure || counties.Value == null)
+        {
+            _logger.Warn($"家庭县区校验失败（村/社区保留原选项）: {counties.Message}");
+            return;
+        }
+
         var county = counties.Value.FirstOrDefault(c => c.CountyName == SelectedFamilyCounty);
-        if (county == null) return;
+        if (county == null)
+        {
+            ClearFamilyVillages();
+            return;
+        }
+
         var towns = await _regionService.GetTownsByCountyIdAsync(county.Id, CancellationToken);
-        if (towns.IsFailure || towns.Value == null) return;
+        if (towns.IsFailure || towns.Value == null)
+        {
+            _logger.Warn($"家庭乡镇校验失败（村/社区保留原选项）: {towns.Message}");
+            return;
+        }
+
         var town = towns.Value.FirstOrDefault(t => t.TownName == SelectedFamilyTown);
-        if (town == null) return;
+        if (town == null)
+        {
+            ClearFamilyVillages();
+            return;
+        }
+
         var villages = await _regionService.GetVillagesByTownIdAsync(town.Id, CancellationToken);
-        if (villages.IsFailure || villages.Value == null) return;
-        foreach (var v in villages.Value) FamilyVillageOptions.Add(v.VillageName);
-        if (FamilyVillageOptions.Count > 0) SelectedFamilyVillage = FamilyVillageOptions[0];
+        if (villages.IsFailure || villages.Value == null)
+        {
+            _logger.Warn($"家庭村/社区加载失败（保留原选项与已选值）: {villages.Message}");
+            return;
+        }
+
+        var allowed = villages.Value
+            .Select(v => v.VillageName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyVillageOptions, allowed);
+
+            if (string.IsNullOrEmpty(SelectedFamilyVillage) || !allowed.Contains(SelectedFamilyVillage))
+                SelectedFamilyVillage = allowed.Count > 0 ? allowed[0] : string.Empty;
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
+    }
+
+    /// <summary>父级失效：确定性清空乡镇与村（不是查询失败，不能保留旧值）</summary>
+    private void ClearFamilyTownsAndBelow()
+    {
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyTownOptions, Array.Empty<string>());
+            SelectedFamilyTown = string.Empty;
+            ReplaceOptions(FamilyVillageOptions, Array.Empty<string>());
+            SelectedFamilyVillage = string.Empty;
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
+    }
+
+    private void ClearFamilyVillages()
+    {
+        var previousSuppress = _suppressRegionCascade;
+        _suppressRegionCascade = true;
+        try
+        {
+            ReplaceOptions(FamilyVillageOptions, Array.Empty<string>());
+            SelectedFamilyVillage = string.Empty;
+        }
+        finally
+        {
+            _suppressRegionCascade = previousSuppress;
+        }
     }
 
     #endregion
@@ -687,6 +1075,8 @@ public partial class ElderlyApplicationFormViewModel
         OnPropertyChanged(nameof(IsEditable));
         OnPropertyChanged(nameof(IsSavable));
         OnPropertyChanged(nameof(IsSaveAndConfirmVisible));
+        OnPropertyChanged(nameof(IsDraftSaveVisible));
+        OnPropertyChanged(nameof(IsCompletionSaveVisible));
     }
 
     /// <summary>
@@ -884,16 +1274,52 @@ public partial class ElderlyApplicationFormViewModel
                 }
             }
 
-            var confirmResult = await _applicationService.ConfirmAsync(_id, App.CurrentUserName, CancellationToken);
-            if (!confirmResult.IsSuccess)
+            // 保存后的确认分流（补全模式必读）：停发/复核的补全入口加载的档案已是 Confirmed
+            // （导入建档 MigrateFromHistoryAsync、复核补建 BackfillHistoryArchiveAsync 均落 Confirmed）。
+            // 此时再调 ConfirmAsync 会撞"仅草稿可确认"守卫并把 confirmed_at/confirmed_by 覆盖为本次操作，
+            // 因此已确认档只保存、不重复确认；已停发档直接拦截；仅草稿才确认生效。
+            // 状态以库中当前值为准（加载快照可能已被他处改动）。
+            var statusToConfirm = ElderlyBenefitConstants.StatusDraft;
+            if (OperationMode != FormOperationMode.Create)
             {
-                _logger.Error($"普惠高龄登记确认失败: {confirmResult.Message}");
-                await _dialogService.DisplayAlertAsync("确认失败", confirmResult.Message ?? "确认失败，请重试", "确定");
-                return confirmResult;
+                var statusResult = await _applicationService.GetByIdAsync(_id, CancellationToken);
+                if (statusResult.IsSuccess && statusResult.Value != null)
+                {
+                    statusToConfirm = statusResult.Value.Status ?? string.Empty;
+                    _loadedStatus = statusToConfirm;
+                }
+                else
+                {
+                    // 读状态失败不阻断（保存已提交）：退回加载时快照判断
+                    _logger.Warn($"普惠高龄登记保存后读取档案状态失败，按加载时状态判断: id={_id}, {statusResult.Message}");
+                    statusToConfirm = _loadedStatus;
+                }
             }
 
-            _logger.LogBusiness("普惠高龄登记保存并确认成功", ("ApplicationId", _id));
-            await _dialogService.ShowSnackBarAsync("保存并确认成功");
+            if (statusToConfirm == ElderlyBenefitConstants.StatusStopped)
+            {
+                const string stoppedMessage = "该档案已停发，不能保存并确认；如需恢复请走新增登记流程。";
+                _logger.Error($"普惠高龄登记确认失败(已停发): id={_id}");
+                await _dialogService.DisplayAlertAsync("确认失败", stoppedMessage, "确定");
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED, stoppedMessage);
+            }
+
+            var alreadyConfirmed = statusToConfirm == ElderlyBenefitConstants.StatusConfirmed;
+            if (!alreadyConfirmed)
+            {
+                var confirmResult = await _applicationService.ConfirmAsync(_id, App.CurrentUserName, CancellationToken);
+                if (!confirmResult.IsSuccess)
+                {
+                    _logger.Error($"普惠高龄登记确认失败: {confirmResult.Message}");
+                    await _dialogService.DisplayAlertAsync("确认失败", confirmResult.Message ?? "确认失败，请重试", "确定");
+                    return confirmResult;
+                }
+                _loadedStatus = ElderlyBenefitConstants.StatusConfirmed;
+            }
+
+            _logger.LogBusiness(alreadyConfirmed ? "普惠高龄登记补全保存成功（已确认档，不重复确认）" : "普惠高龄登记保存并确认成功",
+                ("ApplicationId", _id));
+            await _dialogService.ShowSnackBarAsync(alreadyConfirmed ? "保存成功" : "保存并确认成功");
 
             // 数据补全并写入数据库后：标记名册行已并入当前库（Active→Stopped，保留历史发放金额）
             await MarkImportedHistoryMigratedIfNeededAsync();

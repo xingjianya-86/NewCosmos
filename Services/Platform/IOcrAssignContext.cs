@@ -20,6 +20,15 @@ public interface IOcrAssignContext
     /// 内部自行处理：身份证校验码核验、残疾证联动解析、金额不落库（§9）等。
     /// </summary>
     Task<bool> ApplyAsync(OcrRecognizedRecord record, OcrAssignmentTarget target);
+
+    /// <summary>
+    /// 回填过程中产生的用户可读提示（例：地址未回填的原因）。
+    /// 分配页在确认后汇总展示，避免"回填成功 0 条却不知道哪里没填"；默认无提示。
+    /// </summary>
+    IReadOnlyList<string> Warnings => Array.Empty<string>();
+
+    /// <summary>清空提示（分配页开始新一轮回填前调用）；默认无实现。</summary>
+    void ClearWarnings() { }
 }
 
 /// <summary>回填目标（分配页下拉项）</summary>

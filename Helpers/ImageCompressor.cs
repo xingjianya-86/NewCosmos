@@ -93,6 +93,36 @@ public static class ImageCompressor
     /// <summary>是否为 WebP 字节。</summary>
     public static bool IsWebP(byte[]? data) => data != null && ImageTranscoder.IsWebP(data);
 
+    /// <summary>
+    /// 生成识别结果卡片用的小缩略图（长边 ≤maxEdge）。
+    /// 默认 WebP（移动端体积小）；jpeg=true 时输出 JPEG（WinUI 对 WebP 支持不稳定，桌面列表缩略图用）。
+    /// 解码失败返回 null（卡片回退不显示缩略图，不阻断主流程）。
+    /// </summary>
+    public static byte[]? CreateThumbnail(byte[]? source, int maxEdge = 240, bool jpeg = false)
+    {
+        if (source == null || source.Length == 0) return null;
+        try
+        {
+            using var original = DecodeBitmap(source);
+            if (original == null) return null;
+
+            var (w, h) = FitWithin(original.Width, original.Height, maxEdge);
+            using var resized = (w != original.Width || h != original.Height)
+                ? original.Resize(new SKImageInfo(w, h),
+                    new SKSamplingOptions(SKCubicResampler.Mitchell))
+                : null;
+            var bitmap = resized ?? original;
+            using var data = bitmap.Encode(
+                jpeg ? SKEncodedImageFormat.Jpeg : SKEncodedImageFormat.Webp,
+                jpeg ? 85 : 75);
+            return data != null && data.Size > 0 ? data.ToArray() : null;
+        }
+        catch
+        {
+            return null; // 缩略图失败不阻断主流程
+        }
+    }
+
     /// <summary>解码为位图：优先 SkiaSharp；失败时用平台解码器（兼容 HEIC/HEIF）转 PNG 再交给 SkiaSharp。</summary>
     private static SKBitmap? DecodeBitmap(byte[] source)
     {

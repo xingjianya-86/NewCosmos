@@ -144,4 +144,75 @@ public class AddressResolverTests
     [InlineData("林口县", "林口县")]
     public void CleanLevel_横杠与空视为无值(string? input, string expected)
         => Assert.Equal(expected, AddressResolver.CleanLevel(input));
+
+    // ── 「XX镇本级」：镇直/无村社区，不是村级名称 ──────────────────
+    // 临时救助 family_address 统一（2026-11-05）实测 2 行存了「柳树镇本级」，
+    // 不清会拼出「林口县柳树镇柳树镇本级290号」。
+
+    [Theory]
+    [InlineData("290号", "林口县柳树镇290号")]
+    [InlineData("-", "林口县柳树镇")]
+    [InlineData("", "林口县柳树镇")]
+    public void 村名是镇本级_按无村拼装(string detail, string expected)
+    {
+        var result = AddressResolver.BuildAddressFromText("林口县", "柳树镇", "柳树镇本级", detail);
+        Assert.Equal(expected, result);
+    }
+
+    // ── 临时救助存量样本（nc_biz_temp_relief_applications，2026-11-05 统一）──
+    // family_address 由来源台账原文（省全量 / 只到村 / 「镇直」五花八门）改为按分列拼装。
+
+    [Theory]
+    [InlineData("柳宝村村民委员会", "22号", "林口县柳树镇柳宝村22号")]        // id=22
+    [InlineData("三道村村民委员会", "丰谷屯61号", "林口县柳树镇三道村丰谷屯61号")] // id=21
+    [InlineData("柳西村委会", "-", "林口县柳树镇柳西村")]                     // id=23（detail 占位横杠）
+    [InlineData("土甸子村村民委员会", "257号", "林口县柳树镇土甸子村257号")]   // id=24（原「林口县柳树镇镇直」）
+    public void 临时救助家庭住址_统一为县镇村门牌(string village, string detail, string expected)
+    {
+        var result = AddressResolver.BuildAddressFromText("林口县", "柳树镇", village, detail);
+        Assert.Equal(expected, result);
+    }
+
+    // ── StripLeadingRegion：身份证背面住址剥省/市前缀 ───────────────
+    // 身份证住址是「省+市+县+镇+村+门牌」全量形态，原样当详细地址会把省市带进
+    // family_address，与其余行的「县+镇+村+门牌」口径不一致。
+
+    [Theory]
+    [InlineData("黑龙江省牡丹江市林口县柳树镇三道村丰谷屯61号", "林口县柳树镇三道村丰谷屯61号")]
+    [InlineData("牡丹江市林口县柳树镇三道村61号", "林口县柳树镇三道村61号")]   // 无省前缀 → 只剥市
+    [InlineData("林口县柳树镇三道村61号", "林口县柳树镇三道村61号")]           // 已无省市 → 原样
+    [InlineData("丰谷屯61号", "丰谷屯61号")]                                    // 本就是门牌 → 原样
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void StripLeadingRegion_只剥开头省市区级(string? input, string expected)
+        => Assert.Equal(expected, AddressResolver.StripLeadingRegion(input, "黑龙江省", "牡丹江市"));
+
+    [Fact]
+    public void OCR身份证住址_剥省市后拼装_与其余行同口径()
+    {
+        var detail = AddressResolver.StripLeadingRegion(
+            "黑龙江省牡丹江市林口县柳树镇三道村丰谷屯61号", "黑龙江省", "牡丹江市");
+
+        Assert.Equal("林口县柳树镇三道村丰谷屯61号",
+            AddressResolver.BuildAddressFromText("林口县", "柳树镇", "三道村村民委员会", detail));
+    }
+
+    // ── 家庭经济状况核对存量样本（nc_biz_asset_checks，2026-11-05 统一）──
+    // 写入口 QuickAssetVerificationViewModel.FamilyAddress 与存量迁移同走此拼装。
+
+    [Theory]
+    // 镇直：区划名「柳树镇镇直第一居民委员会」自带镇前缀——不剥会每次重存再插一个「柳树镇」
+    [InlineData("柳树镇镇直第一居民委员会", "205号", "林口县柳树镇镇直第一社区205号")]
+    [InlineData("柳树镇镇直第一居民委员会", "林口县柳树镇镇直第一社区205号", "林口县柳树镇镇直第一社区205号")] // 迁移后回填幂等
+    // 下拉村与文本村不一致（老行编码错挂柳树村）→ 文本为准，不叠加
+    [InlineData("柳树村委会", "林口县柳树镇土甸子村石青屯", "林口县柳树镇土甸子村石青屯")]
+    // detail 自带「村」字样（荣华村57号）→ 按已含吸收、不插下拉村（与迁移口径一致）
+    [InlineData("柞木村委会", "荣华村57号", "林口县柳树镇荣华村57号")]
+    [InlineData("柞木村委会", "林口县柳树镇柞木村荣华屯", "林口县柳树镇柞木村荣华屯")] // 迁移后回填幂等
+    [InlineData("柳树村委会", "161号", "林口县柳树镇柳树村161号")]                    // 裸门牌行补三级
+    public void 资产核查地址_统一为县镇村门牌(string village, string detail, string expected)
+    {
+        var result = AddressResolver.BuildAddressFromText("林口县", "柳树镇", village, detail);
+        Assert.Equal(expected, result);
+    }
 }

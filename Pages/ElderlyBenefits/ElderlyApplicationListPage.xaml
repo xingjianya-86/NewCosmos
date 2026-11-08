@@ -32,6 +32,10 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="确认" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Success}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=ConfirmCommand}"
@@ -84,6 +88,10 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="确认" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Success}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=ConfirmCommand}"
@@ -141,6 +149,14 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=ViewDetailCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="停发" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=StopCommand}"
@@ -185,6 +201,14 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=ViewDetailCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="停发" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyApplicationListViewModel}}, Path=StopCommand}"
@@ -319,6 +343,15 @@
                             Padding="16,10"
                             CornerRadius="{StaticResource CornerRadiusMedium}"/>
             </components:PageHeaderView.HeaderActions>
+            <!-- 统计胶囊（Phase 6 迁移时漏迁，20261105 补回；浅色变体适配纸底页头） -->
+            <components:PageHeaderView.Stats>
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding ActiveCountText}" Caption="在享领取（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding MonthlyNewText}" Caption="本月新增登记（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="2" Value="{Binding DraftCount}" Caption="草稿（件）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="3" Value="{Binding StoppedCount}" Caption="已停发（人）"/>
+                </Grid>
+            </components:PageHeaderView.Stats>
         </components:PageHeaderView>
 
         <!-- Tab 栏：草稿 / 已确认 / 已停发 -->

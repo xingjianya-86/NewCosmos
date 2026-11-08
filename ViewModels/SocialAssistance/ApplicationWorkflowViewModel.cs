@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.AssetVerification;
@@ -400,6 +401,18 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         {
             await _dialogService.DisplayAlertAsync("错误", "查看档案失败: " + ex.Message, "确定");
         }
+    }
+
+    /// <summary>打开该申请人的档案照片（查询 / 预览 / 勾选批量导出），预填身份证并自动检索。</summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync(WorkflowCardItem? item)
+    {
+        var idCard = item?.IdCard;
+        if (string.IsNullOrWhiteSpace(idCard)) return;
+
+        _logger.LogBusiness("业务工作流-档案照片", ("IdCard", DataMasker.MaskIdCard(idCard)));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(idCard));
     }
 
     /// <summary>

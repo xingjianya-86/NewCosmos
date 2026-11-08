@@ -22,21 +22,6 @@ public class HouseholdSurvey
 }
 
 /// <summary>
-/// 林地实体（纯 POCO，对对应 nc_biz_forest_lands 表）
-/// </summary>
-public class ForestLand
-{
-    public long Id { get; set; }
-    public long ApplicationId { get; set; }
-    public string TreeSpecies { get; set; } = string.Empty;
-    public decimal Area { get; set; }
-    public string GrowthCycle { get; set; } = string.Empty;
-    public bool IsMature { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime DeletedAt { get; set; }
-}
-
-/// <summary>
 /// 养殖收入实体（纯 POCO，对对应 nc_biz_breeding_incomes 表）
 /// </summary>
 public class BreedingIncome
@@ -46,21 +31,6 @@ public class BreedingIncome
     public string BreedingType { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public decimal AnnualIncome { get; set; }
-    public string Remark { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime DeletedAt { get; set; }
-}
-
-/// <summary>
-/// 就业成本实体（纯 POCO，对对应 nc_biz_employment_costs 表）
-/// </summary>
-public class EmploymentCost
-{
-    public long Id { get; set; }
-    public long ApplicationId { get; set; }
-    public long MemberId { get; set; }
-    public string CostType { get; set; } = string.Empty;
-    public decimal AnnualAmount { get; set; }
     public string Remark { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime DeletedAt { get; set; }

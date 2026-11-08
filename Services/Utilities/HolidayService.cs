@@ -1,10 +1,11 @@
+using NewCosmos.Constants;
 using NewCosmos.Services.Core;
 
 namespace NewCosmos.Services.Utilities;
 
 /// <summary>
 /// 节假日服务：判定法定节假日 / 调休补班日 / 工作日。
-/// 数据源为内存不可变快照（默认内置 2026 种子兜底），由
+/// 数据源为内存不可变快照（默认内置 2026–2027 种子兜底，见 HolidaySeedConstants），由
 /// HolidayManageService.RefreshCacheAsync 从 nc_sys_holidays 表加载后整体替换；
 /// 快照为空时退化为"周末=假日"判定（与历史行为一致）。
 /// 注意：本服务的同步 API 签名被 BusinessTimelineService 等多处消费方依赖，禁止改为异步。
@@ -106,44 +107,28 @@ public class HolidayService : BaseService, IHolidayService
 
     #endregion
 
-    #region 内置种子兜底（2026 年，数据来源 timor.tech / 国务院办公厅安排）
+    #region 内置种子兜底（2026–2027 年，来源 HolidaySeedConstants）
 
     /// <summary>
-    /// 内置 2026 年法定节假日（快照为空时兜底，语义与历史硬编码一致）。
+    /// 内置法定节假日/补班日快照（数据库快照加载前兜底，与 HolidayManageService 种子同源）。
     /// </summary>
-    private static readonly DateOnly[] FallbackHolidays2026 =
+    private static HolidaySnapshot BuildFallbackSnapshot()
     {
-        // 元旦
-        new(2026, 1, 1), new(2026, 1, 2), new(2026, 1, 3),
-        // 春节（2/15-2/23）
-        new(2026, 2, 15), new(2026, 2, 16), new(2026, 2, 17), new(2026, 2, 18),
-        new(2026, 2, 19), new(2026, 2, 20), new(2026, 2, 21), new(2026, 2, 22), new(2026, 2, 23),
-        // 清明节（4/4-4/6）
-        new(2026, 4, 4), new(2026, 4, 5), new(2026, 4, 6),
-        // 劳动节（5/1-5/5）
-        new(2026, 5, 1), new(2026, 5, 2), new(2026, 5, 3), new(2026, 5, 4), new(2026, 5, 5),
-        // 端午节（6/19-6/21）
-        new(2026, 6, 19), new(2026, 6, 20), new(2026, 6, 21),
-        // 中秋节（9/25-9/27）
-        new(2026, 9, 25), new(2026, 9, 26), new(2026, 9, 27),
-        // 国庆节（10/1-10/7）
-        new(2026, 10, 1), new(2026, 10, 2), new(2026, 10, 3),
-        new(2026, 10, 4), new(2026, 10, 5), new(2026, 10, 6), new(2026, 10, 7),
-    };
-
-    /// <summary>内置 2026 年调休补班日（周末上班）</summary>
-    private static readonly DateOnly[] FallbackMakeupWorkdays2026 =
-    {
-        new(2026, 1, 4),   // 元旦后补班
-        new(2026, 2, 14),  // 春节前补班
-        new(2026, 2, 28),  // 春节后补班
-        new(2026, 5, 9),   // 劳动节后补班
-        new(2026, 9, 20),  // 中秋节前补班
-        new(2026, 10, 10), // 国庆节后补班
-    };
-
-    private static HolidaySnapshot BuildFallbackSnapshot() =>
-        new(FallbackHolidays2026, FallbackMakeupWorkdays2026, legalHolidayNames: null, isFallback: true);
+        var rows = HolidaySeedConstants.All;
+        var legalHolidays = rows
+            .Where(r => r.DateType == DutyConstants.HolidayRowTypes.HOLIDAY)
+            .Select(r => r.Date)
+            .ToArray();
+        var makeupWorkdays = rows
+            .Where(r => r.DateType == DutyConstants.HolidayRowTypes.MAKEUP)
+            .Select(r => r.Date)
+            .ToArray();
+        var names = rows
+            .Where(r => r.DateType == DutyConstants.HolidayRowTypes.HOLIDAY)
+            .GroupBy(r => r.Date)
+            .ToDictionary(g => g.Key, g => g.First().Name);
+        return new HolidaySnapshot(legalHolidays, makeupWorkdays, names, isFallback: true);
+    }
 
     #endregion
 

@@ -61,7 +61,8 @@ PROMPT_TEXT = "Extract the text in the image."
 # 类别 → KIE 字段 schema（客户端 Constants\OcrFieldKeys.cs 必须与此一致）。
 # 空列表 = 全文文本模式（lines）；不在表内 = 拒绝（如 PERSON_PHOTO 纯照片）。
 CATEGORY_FIELDS: dict[str, list[str]] = {
-    "ID_CARD": ["name", "id_card"],
+    # 身份证：正面姓名/证号 + 背面住址（2026-11-05 增加 address，客户端 OcrFieldKeys 同步）
+    "ID_CARD": ["name", "id_card", "address"],
     "HOUSEHOLD_REGISTER": ["head_name", "hukou_address"],
     "BANK_CARD": ["bank_name", "card_number"],
     "MEDICAL_RECORD": ["diagnosis", "hospital", "date"],

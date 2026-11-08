@@ -97,11 +97,12 @@ NewCosmos/
 │   Directory.Build.props（NoWarn 白名单：警告不作错误处理，新警告按"真问题修 / 误报入白名单"）
 ├── Components/     共享 XAML 组件（LoadingOverlay 遮罩、SnackBarView 轻提示、ProgressPopupView 进度、
 │                   PaginationBarView 分页、PageHeaderView 页头、FeatureCard、StatCapsule、BackButton、
-│                   NavigationViewItem、SchemaValidationResultPopupView、MobileStepperBar）
+│                   StepFlowBar/MobileStepperBar 步骤条、DateTimeEntryView/DateTimePickerPopupView 日期时刻、
+│                   SignaturePopupView 签名、FamilyMemberCardView、IncomeRowView 等）
 ├── Constants/      常量单一来源，改业务逻辑前先查这里，禁止散落魔法值
 │                   （如 ErrorCodes、UserFriendlyMessages、PermissionCodes、FieldKeys、
 │                     ClassificationConstants、IncomeTypeConstants、UIConstants…）
-├── Controls/       自定义控件 PdfPreviewView（WebView2 + PdfJs）
+├── Controls/       自定义控件 PdfPreviewView（WebView2 + PdfJs）、SignatureCaptureView（手写签名）、CameraPreviewView
 ├── Converters/     值转换器（经 `converters:` 前缀在 XAML 引用，不在 App.xaml 注册）
 ├── Helpers/        校验与拼装助手：IdCardValidator、TableNameValidator（动态表名白名单唯一维护点）、
 │                   PinyinConverter、DictDisplayHelper、ImportedDataMapper、PagedQueryHelper、
@@ -143,7 +144,7 @@ NewCosmos/
 │                   产出 Resources\AppIcon\appicon.png、installer\appicon.ico、Resources\Images\mascot_icon.png、newcosmos_character.png）；
 │                   脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
 ├── python-embed/   嵌入式 Python（彩票训练/预测用，不入库）
-├── Templates_NEW/   模板资源（入库 7 文件）；公文字体/、keystore/ 为本机资产，**不入库**（§2）
+├── 公文字体/、keystore/ 为本机资产，**不入库**（§2）
 ├── publish/        发布产物（不入库）
 ├── docs/           业务文档 + migrations/（权威事实来源索引见 §14）
 └── AGENTS.md（本文件）、AGENTS.local.md（本机凭据，不入库）、opencode.json（instructions 指回本文件）、

@@ -1,65 +1,8 @@
 [
   {
-    "name": "证明_死亡情况说明",
-    "file": "Templates_NEW/证明_死亡情况说明.docx",
-    "configFile": "Templates_NEW/证明_死亡情况说明.config.json",
-    "categories": ["证明文件"],
-    "sortOrder": 0,
-    "note": "死亡情况核实说明·三联出具（村留存/镇政府/卫生院，推送单位三份不同）；模板内 {印章} 已改为 (印章) 纯文本不参与替换"
-  },
-  {
-    "name": "特困供养人员取消备案表",
-    "file": "Templates_NEW/特困供养人员取消备案表.xlsx",
-    "configFile": "Templates_NEW/特困供养人员取消备案表.config.json",
-    "categories": ["档案_特困取消备案表", "停止"],
-    "sortOrder": 0,
-    "note": "特困供养人员退出/停发时专用（取消（停止）情况表）；退出直出经 TemplateFilter 强白名单命中，categories 唯一叶子+停止位"
-  },
-  {
-    "name": "档案_定期复核审批表",
-    "file": "Templates_NEW/档案_定期复核审批表.xlsx",
-    "configFile": "Templates_NEW/档案_定期复核审批表.config.json",
-    "categories": ["经济复核", "档案_定期复核审批表"],
-    "sortOrder": 0
-  },
-  {
-    "name": "档案_增员减员调整表",
-    "file": "Templates_NEW/档案_增员减员调整表.xlsx",
-    "configFile": "Templates_NEW/档案_增员减员调整表.config.json",
-    "categories": ["档案_增员减员调整表"],
-    "sortOrder": 0
-  },
-  {
-    "name": "普惠高龄津贴调整备案表",
-    "file": "Templates_NEW/普惠高龄津贴调整备案表.xlsx",
-    "categories": ["普惠高龄/变更"],
-    "sortOrder": 0
-  },
-  {
-    "name": "临时救助_小额救助_审核审批表",
-    "file": "Templates_NEW/临时救助_小额救助_审核审批表.xlsx",
-    "configFile": "Templates_NEW/临时救助_小额救助_审核审批表.config.json",
-    "categories": ["临时救助/小额"],
-    "sortOrder": 234
-  },
-  {
     "name": "模板_政务值班表",
     "file": "Resources/Templates/模板_政务值班表.xlsx",
     "categories": ["值班管理"],
     "sortOrder": 0
-  },
-  {
-    "name": "04申请社会救助对象不予确认告知书",
-    "file": "Templates_NEW/04申请社会救助对象不予确认告知书.docx",
-    "categories": [],
-    "sortOrder": 0,
-    "note": "库中无同名模板；导入前请按实际填写 categories"
-  },
-  {
-    "name": "07社会救助调整（终止）告知书",
-    "file": "Templates_NEW/07社会救助调整（终止）告知书.docx",
-    "categories": [],
-    "sortOrder": 0,
-    "note": "库中无同名模板；导入前请按实际填写 categories"
   }
 ]

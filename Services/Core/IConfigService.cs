@@ -23,11 +23,6 @@ public interface IConfigService
     StorageOptions GetStorageOptions();
 
     /// <summary>
-    /// 获取UI配置
-    /// </summary>
-    UIOptions GetUIOptions();
-
-    /// <summary>
     /// 获取性能配置
     /// </summary>
     PerformanceOptions GetPerformanceOptions();

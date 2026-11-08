@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:NewCosmos.Converters"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.Mobile.MobileElderlyApplicationFormPage"
              x:DataType="ElderlyApplicationFormViewModel"
              Title="高龄津贴申请登记"
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="{StaticResource Background}">
+
+    <!-- 局部声明兜底（与桌面页对齐）：判定认证分区类别列表用；
+         App.xaml 已全局注册同名键，此处局部优先、互不冲突 -->
+    <ContentPage.Resources>
+        <converters:BoolToFontAttributeConverter x:Key="BoolToFontAttributeConverter"/>
+    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
 

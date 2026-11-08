@@ -480,30 +480,4 @@ public static class ClassificationConstants
 
         public static readonly string[] All = { LIVING_ENTITLED, DECEASED_INHERITANCE, NO_LAND_RIGHT, EXTERNAL_LAND };
     }
-
-    /// <summary>
-    /// 健康状况扩展
-    /// </summary>
-    public static class HealthStatusExtended
-    {
-        public const string HEALTHY = "Healthy";
-        public const string WEAK = "Weak";
-        public const string SEVERE_DISEASE_AND_DISABILITY = "SevereIllnessAndDisability";
-
-        /// <summary>
-        /// 根据健康状况推断劳动能力
-        /// </summary>
-        public static string InferLaborAbility(string healthStatus)
-        {
-            return healthStatus switch
-            {
-                HEALTHY => DictionaryConstants.LaborAbility.HAS_ABILITY,
-                WEAK => DictionaryConstants.LaborAbility.PARTIAL_ABILITY,
-                HealthStatus.SEVERE_DISEASE => DictionaryConstants.LaborAbility.NO_ABILITY,
-                HealthStatus.SEVERE_DISABILITY => DictionaryConstants.LaborAbility.NO_ABILITY,
-                SEVERE_DISEASE_AND_DISABILITY => DictionaryConstants.LaborAbility.NO_ABILITY,
-                _ => string.Empty
-            };
-        }
-    }
 }

@@ -19,6 +19,9 @@
             <converters:NullToInverseBoolConverter x:Key="NullToInverseBoolConverter"/>
             <converters:BoolToTextConverter x:Key="BoolToTextConverter"/>
             <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <!-- 全局兜底：移动端表单页（MobileElderlyApplicationFormPage 等）判定认证分区列表用；
+                 桌面页若有同名局部声明则局部优先，不冲突 -->
+            <converters:BoolToFontAttributeConverter x:Key="BoolToFontAttributeConverter"/>
     <converters:StringToColorConverter x:Key="StringToColorConverter"/>
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
             <converters:TemplateTypeToColorConverter x:Key="TemplateTypeToColorConverter"/>

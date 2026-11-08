@@ -794,7 +794,8 @@ public partial class DutyService
         if (queues.Values.Sum(q => q.Count) == 0)
             return Result.Failure<DutyGenerationSummary>(ErrorCodes.DUTY_NO_MEMBERS, "没有可用的值班成员");
 
-        // 加载轮转游标（仅作"上月无班次"时的兜底起点：首月/锚点月校准；后续月份以班次事实接续）
+        // 加载轮转游标（仅作"该轮转线在目标月之外没有任何班次"时的兜底起点：首次上线/全清后重建；
+        // 正常月份一律以目标月之前最近一条真实班次接续，见 LoadPreviousRotationFactsAsync）
         var rotationResult = await _dbService.QueryAsync<DutyRotationState>(
             "SELECT id, group_code, date_type, last_member_id, updated_at FROM nc_duty_rotation_state", ct);
         if (!rotationResult.IsSuccess)
@@ -818,8 +819,11 @@ public partial class DutyService
         var rotationUpdates = new Dictionary<(string Group, string DateType), long>();
         // 该线本月是否已初始化游标（首日取快照起点，之后走逐日推进的内存游标）
         var initializedLines = new HashSet<(string Group, string DateType)>();
+        // 是否出现"只有更晚班次、无前序班次"的回溯补生成（起点回退名单头，需提示用户）
+        var backfillFallbackUsed = false;
 
         var days = DateTime.DaysInMonth(year, month);
+        var monthStart = new DateTime(year, month, 1);
         var startDay = 1;
         var isAnchorMonth = false;
 
@@ -835,6 +839,20 @@ public partial class DutyService
             summary.AnchorDay = startDay;
             LogInfo($"轮转锚点生效：{year}-{month:D2} 从 {startDay} 日起生成");
         }
+
+        // 锚点取数（本次生成只查一次，逐日推演全部走内存值）：
+        // ① 目标月之前各轮转线最近一次真实班次——唯一权威起点，不限于"上月"，
+        //    删除中间月份、某线连续数月无班次（如无法定节假日的月份）、跨年都恒定接续；
+        // ② 目标月之后已有的轮转线——回溯补生成时用于判定"该线是否全无任何班次"（只有此时才允许用全局游标）。
+        var factsResult = await LoadPreviousRotationFactsAsync(monthStart, ct);
+        if (!factsResult.IsSuccess)
+            return Result.Failure<DutyGenerationSummary>(factsResult.ErrorCode!, factsResult.Message!);
+        var previousFacts = factsResult.Value;
+
+        var futureResult = await LoadFutureRotationLinesAsync(monthStart.AddMonths(1), ct);
+        if (!futureResult.IsSuccess)
+            return Result.Failure<DutyGenerationSummary>(futureResult.ErrorCode!, futureResult.Message!);
+        var futureLines = futureResult.Value;
 
         for (var day = startDay; day <= days; day++)
         {
@@ -890,20 +908,31 @@ public partial class DutyService
 
                 // 从起点人之后取第一位；同日已选者冲突顺延（被跳过者视为已消耗轮次）
                 // 起点语义（该线本月首次选人，四级回退）：
-                //   ① 上月该线最后值班人（班次事实，直接查班次表——跨月无缝接续，重生成结果天然确定）
-                //   ② 锚点月校准起点（nc_duty_settings 锚点校准值；仅锚点月且上月无班次时命中）
-                //   ③ 轮转游标（上月无班次且无锚点校准的兜底：系统首月）
-                //   ④ 名单头（游标为空）
+                //   ① 目标月之前最近一条真实班次（班次事实，跨月/跨年/跨断档恒定接续，重生成结果天然确定）
+                //   ② 锚点月校准起点（nc_duty_settings 锚点校准值；仅锚点月且无前序班次时命中）
+                //   ③ 轮转游标（仅该线在目标月之外没有任何班次时使用：首次上线/全清后重建）
+                //   ④ 名单头（游标为空；或回溯补生成更早月份时无未来依据）
                 // 后续日期 → 使用逐日推进后的内存游标
                 var lineKey = (group, dateType);
                 long? lastMemberId;
                 if (initializedLines.Add(lineKey))
                 {
-                    lastMemberId = await GetLastScheduleMemberAsync(year, month, group, dateType, ct);
+                    lastMemberId = previousFacts.TryGetValue(lineKey, out var prevFactId) ? prevFactId : null;
                     if (!lastMemberId.HasValue && isAnchorMonth)
                         lastMemberId = await GetAnchorStartMemberAsync(group, dateType, ct);
                     if (!lastMemberId.HasValue)
-                        rotationMap.TryGetValue(lineKey, out lastMemberId);
+                    {
+                        if (futureLines.Contains(lineKey))
+                        {
+                            // 只有更晚的班次（回溯补生成）：无法从未来反推，按名单头开始
+                            backfillFallbackUsed = true;
+                            LogWarn($"回溯补生成 {year}-{month:D2}：{group}/{dateType} 线无前序班次，按名单头开始");
+                        }
+                        else
+                        {
+                            rotationMap.TryGetValue(lineKey, out lastMemberId);
+                        }
+                    }
                     rotationMap[lineKey] = lastMemberId;             // 初始化内存游标，供后续日期推进
                 }
                 else
@@ -957,14 +986,41 @@ public partial class DutyService
             }
         }
 
+        if (backfillFallbackUsed)
+        {
+            summary.Warnings.Add(
+                $"{year}-{month:D2} 早于已有班次（前序月份缺失），部分轮转线无接续依据，已按名单头开始；建议按时间顺序生成月份");
+        }
+
         if (pendingSchedules.Count == 0)
             return Result.Failure<DutyGenerationSummary>(ErrorCodes.DUTY_NO_MEMBERS, "未生成任何班次，请检查各组成员配置");
 
         // 事务落库
         var replay = new ShiftReplayOutcome();
+        // force 重生成前快照的本月原有轮转事实（事务外用于判定结果是否变化）
+        Dictionary<(DateTime Date, string Group), long>? previousRotation = null;
         await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
+            if (force)
+            {
+                // 快照本月原有轮转事实（rotation_member_id，调班不覆盖），用于判定结果是否变化
+                var oldResult = await _dbService.QueryAsync<DutySchedule>(@"
+                    SELECT duty_date, group_code, COALESCE(rotation_member_id, member_id) AS rotation_member_id
+                    FROM nc_duty_schedules
+                    WHERE year = $1 AND month = $2
+                      AND (rotation_member_id IS NOT NULL OR member_id IS NOT NULL)", ct, year, month);
+                if (oldResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<DutyGenerationSummary>(oldResult.ErrorCode!, oldResult.Message!);
+                }
+                previousRotation = (oldResult.Value ?? new List<DutySchedule>())
+                    .Where(s => s.RotationMemberId.HasValue)
+                    .GroupBy(s => (s.DutyDate.Date, s.GroupCode))
+                    .ToDictionary(g => g.Key, g => g.First().RotationMemberId!.Value);
+            }
+
             if (force)
             {
                 var deleteResult = await _dbService.ExecuteNonQueryAsync(
@@ -1030,6 +1086,21 @@ public partial class DutyService
             return Result.FromException<DutyGenerationSummary>(ex);
         }
 
+        // 本月轮转结果是否变化（null=本月原本无数据；false=与原班次完全一致 → 无需提示下游重排）
+        if (previousRotation is { Count: > 0 })
+        {
+            var currentRotation = pendingSchedules
+                .GroupBy(s => (s.Date.Date, s.Group))
+                .ToDictionary(g => g.Key, g => g.First().MemberId);
+            summary.RotationChanged = !(previousRotation.Count == currentRotation.Count
+                && previousRotation.All(kv => currentRotation.TryGetValue(kv.Key, out var v) && v == kv.Value));
+        }
+
+        // 下游已生成月份（供"一键重排"：本月轮转变化后，后续月份需按新链条重排才一致）
+        var downstreamResult = await LoadDownstreamGeneratedMonthsAsync(year, month, ct);
+        if (downstreamResult.IsSuccess)
+            summary.DownstreamMonths.AddRange(downstreamResult.Value);
+
         summary.ScheduleCount = pendingSchedules.Count;
         replay.MissingMonths.Sort(StringComparer.Ordinal);
         summary.ReplayedChangeCount = replay.AppliedCount;
@@ -1053,29 +1124,72 @@ public partial class DutyService
     }
 
     /// <summary>
-    /// 查询上月该轮转线的最后消耗人（跨月无缝接续的事实依据）；上月无班次返回 null。
+    /// 加载目标月之前各轮转线最近一次真实消耗人（跨月、跨年、跨断档的唯一接续依据）。
+    /// 不限于"上月"：删除中间月份、某线连续数月无班次（如无法定节假日的月份）、补生成更早月份时，
+    /// 起点仍恒定落在"真实发生的上一班"，重生成结果与生成顺序无关。
     /// 读 rotation_member_id（轮转消耗事实，不随串班/代班变化；旧数据为空回退 member_id）。
-    /// 跨年：1 月的上月 = 上一年 12 月。按 ID 定位（与姓名无关，不受改名/重名影响）。
+    /// 按 ID 定位（与姓名无关，不受改名/重名影响）。
     /// </summary>
-    private async Task<long?> GetLastScheduleMemberAsync(int year, int month, string groupCode, string dateType, CancellationToken ct)
+    private async Task<Result<Dictionary<(string Group, string DateType), long?>>> LoadPreviousRotationFactsAsync(
+        DateTime monthStart, CancellationToken ct)
     {
-        var (prevYear, prevMonth) = month == 1 ? (year - 1, 12) : (year, month - 1);
-        var result = await _dbService.ExecuteScalarAsync<long?>(
-            @"SELECT COALESCE(rotation_member_id, member_id) FROM nc_duty_schedules
-              WHERE year = $1 AND month = $2 AND group_code = $3 AND date_type = $4 AND member_id IS NOT NULL
-              ORDER BY duty_date DESC LIMIT 1",
-            ct, prevYear, prevMonth, groupCode, dateType);
+        var sql = @"
+            SELECT DISTINCT ON (group_code, date_type)
+                   group_code, date_type, COALESCE(rotation_member_id, member_id) AS last_member_id
+            FROM nc_duty_schedules
+            WHERE duty_date < $1::date AND member_id IS NOT NULL
+            ORDER BY group_code, date_type, duty_date DESC";
+        var result = await _dbService.QueryAsync<DutyRotationState>(sql, ct, monthStart);
         if (!result.IsSuccess)
         {
-            LogWarn($"查询上月末值班人失败（{prevYear}-{prevMonth:D2} {groupCode}/{dateType}），该线回退轮转游标：{result.Message}");
-            return null;
+            LogWarn($"查询本月前最近班次失败（{monthStart:yyyy-MM}）：{result.Message}");
+            return Result.Failure<Dictionary<(string, string), long?>>(result.ErrorCode!, result.Message!);
         }
-        return result.Value;
+
+        var facts = (result.Value ?? new List<DutyRotationState>())
+            .Where(r => r.LastMemberId.HasValue)
+            .GroupBy(r => (r.GroupCode, r.DateType))
+            .ToDictionary(g => g.Key, g => g.First().LastMemberId);
+        return Result.Success(facts);
+    }
+
+    /// <summary>
+    /// 目标月之后是否已有各轮转线的班次（回溯补生成判定用）：
+    /// 只有"该线在目标月之外没有任何班次"时才允许用全局游标；只有更晚班次时按名单头开始。
+    /// </summary>
+    private async Task<Result<HashSet<(string Group, string DateType)>>> LoadFutureRotationLinesAsync(
+        DateTime nextMonthStart, CancellationToken ct)
+    {
+        var result = await _dbService.QueryAsync<DutyRotationState>(
+            "SELECT DISTINCT group_code, date_type FROM nc_duty_schedules WHERE duty_date >= $1::date",
+            ct, nextMonthStart);
+        if (!result.IsSuccess)
+            return Result.Failure<HashSet<(string, string)>>(result.ErrorCode!, result.Message!);
+
+        var lines = (result.Value ?? new List<DutyRotationState>())
+            .Select(r => (r.GroupCode, r.DateType))
+            .ToHashSet();
+        return Result.Success(lines);
+    }
+
+    /// <summary>本月之后已生成班次的月份（yyyy-MM，升序；供"下游一键重排"）</summary>
+    private async Task<Result<List<string>>> LoadDownstreamGeneratedMonthsAsync(
+        int year, int month, CancellationToken ct)
+    {
+        var result = await _dbService.QueryAsync<string>(@"
+            SELECT DISTINCT to_char(make_date(year, month, 1), 'YYYY-MM')
+            FROM nc_duty_schedules
+            WHERE year > $1 OR (year = $1 AND month > $2)
+            ORDER BY 1", ct, year, month);
+        if (!result.IsSuccess)
+            return Result.Failure<List<string>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<string>());
     }
 
     /// <summary>
     /// 读取锚点月某轮转线的校准起点（nc_duty_settings，key=duty_anchor_start_{组}_{类型}）；
-    /// 值缺失或解析失败返回 null（调用方回退轮转游标）。锚点月起点恒定取此值 → 重生成结果确定。
+    /// 值缺失或解析失败返回 null（调用方回退：该线无任何班次时用轮转游标，否则按名单头）。
+    /// 锚点月起点恒定取此值 → 重生成结果确定。
     /// </summary>
     private async Task<long?> GetAnchorStartMemberAsync(string groupCode, string dateType, CancellationToken ct)
     {

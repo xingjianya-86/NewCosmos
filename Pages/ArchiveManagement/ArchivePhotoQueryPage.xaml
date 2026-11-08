@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.ArchiveManagement"
              x:Class="NewCosmos.Pages.ArchiveManagement.ArchivePhotoQueryPage"
              x:DataType="ArchivePhotoQueryViewModel"
              Title="档案照片查询"
@@ -23,7 +24,7 @@
         <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="16,10">
             <VerticalStackLayout Spacing="8">
                 <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
-                    <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片备注关键词"
+                    <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片名称关键词"
                            MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
                     <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
                             ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
@@ -32,16 +33,23 @@
                             Command="{Binding ApplySearchCommand}"/>
                     <Button Grid.Column="3" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
                             Command="{Binding ExportAllCommand}"/>
-                    <Button Grid.Column="4" Text="导出选中" Style="{StaticResource ButtonOutline}" HeightRequest="40"
-                            Command="{Binding ExportSelectedCommand}"/>
+                    <Button Grid.Column="4" Text="另存为…" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                            Command="{Binding ExportToFolderCommand}"/>
                 </Grid>
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                    <Button Grid.Column="0" Text="{Binding ConvertWebPButtonText}"
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="{Binding ExportSelectedText}"
+                            Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding ExportSelectedCommand}"/>
+                    <Button Grid.Column="1" Text="全选本页" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding SelectAllCommand}"/>
+                    <Button Grid.Column="2" Text="清空勾选" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding ClearSelectionCommand}"/>
+                    <Button Grid.Column="3" Text="{Binding ConvertWebPButtonText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ConvertLegacyPhotosCommand}"
                             IsEnabled="{Binding CanConvertWebP}"/>
-                    <Label Grid.Column="1" Text="旧 JPEG 统一压缩为 WebP（单张 ≤500KB），转换前请先备份数据库"
-                           FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="4" Text="勾选多张后可「导出选中」或「另存为…」到自选目录；旧 JPEG 可转 WebP"
+                           FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                 </Grid>
             </VerticalStackLayout>
         </Border>
@@ -58,18 +66,25 @@
                                    Style="{StaticResource EmptyStateLabel}" Padding="0,20"/>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="ent:ArchivePhoto">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Padding="6,5">
-                                    <VerticalStackLayout Spacing="2">
-                                        <Label Text="{Binding PhotoCategoryName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" FontAttributes="Bold"
-                                               TextColor="{StaticResource TextPrimary}"/>
+                            <DataTemplate x:DataType="vm:ArchivePhotoListItem">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="10" Padding="6,5">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              VerticalOptions="Center"/>
+                                    <Image Grid.Column="1" Source="{Binding Thumbnail}"
+                                           WidthRequest="64" HeightRequest="64" Aspect="AspectFill"
+                                           BackgroundColor="{StaticResource Gray50}" VerticalOptions="Center"/>
+                                    <VerticalStackLayout Grid.Column="2" Spacing="2" VerticalOptions="Center">
+                                        <HorizontalStackLayout Spacing="8">
+                                            <Label Text="{Binding DisplayName}" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
+                                                   FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Text="{Binding CategoryName}" FontSize="13"
+                                                   TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                        </HorizontalStackLayout>
                                         <Label Text="{Binding ApplicantIdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                                        <Label Text="{Binding PhotoName}" FontSize="14" TextColor="{StaticResource TextTertiary}"
-                                               LineBreakMode="TailTruncation"/>
                                     </VerticalStackLayout>
-                                    <Label Grid.Column="1" Text="{Binding FileSize, StringFormat='{0:N0} B'}"
+                                    <Label Grid.Column="3" Text="{Binding FileSize, StringFormat='{0:N0} B'}"
                                            FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
-                                    <Label Grid.Column="2" Text="{Binding CreatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
+                                    <Label Grid.Column="4" Text="{Binding CreatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}"
                                            FontSize="14" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                 </Grid>
                             </DataTemplate>

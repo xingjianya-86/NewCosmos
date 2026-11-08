@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ElderlyBenefits;
@@ -247,12 +248,13 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
         await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyApplicationFormPage, ElderlyFormPageParameter>(new ElderlyFormPageParameter(FormOperationMode.Create));
     }
 
+    /// <summary>已确认 Tab：查看档案（只读打开登记表单，与档案查询页查看入口同模式）</summary>
     [RelayCommand]
     private async Task ViewDetailAsync(ElderlyApplication? app)
     {
         if (app == null) return;
 
-        _logger.LogBusiness("查看普惠高龄登记", ("ApplicationId", app.Id));
+        _logger.LogBusiness("查看普惠高龄档案", ("ApplicationId", app.Id));
         await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyApplicationFormPage, ElderlyFormPageParameter>(new ElderlyFormPageParameter(FormOperationMode.View, app.Id));
     }
 
@@ -296,6 +298,17 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
 
         _logger.LogBusiness("进入普惠高龄停发", ("ApplicationId", app.Id));
         await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyStopPage, Models.Entities.ElderlyApplication>(app);
+    }
+
+    /// <summary>打开该人员的档案照片（查询 / 预览 / 勾选批量导出），预填身份证并自动检索。</summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync(ElderlyApplication? app)
+    {
+        if (app == null || string.IsNullOrWhiteSpace(app.IdCard)) return;
+
+        _logger.LogBusiness("高龄列表-档案照片", ("ApplicationId", app.Id));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(app.IdCard));
     }
 
     [RelayCommand]

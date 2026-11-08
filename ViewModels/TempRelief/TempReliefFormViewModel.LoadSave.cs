@@ -52,7 +52,6 @@ public partial class TempReliefFormViewModel
                 ? TempReliefConstants.DefaultVillage
                 : app.Village;
             ApplicantDetailAddress = app.FamilyDetail;
-            ApplicantAddress = app.FamilyAddress;
             HukouProvince = app.HukouProvince;
             HukouCity = app.HukouCity;
             HukouDistrict = app.HukouDistrict;
@@ -386,8 +385,8 @@ public partial class TempReliefFormViewModel
                 : c.Village;
             // 详细地址：从家庭住址（完整地址）提取村名之后的最后一部分，无则空
             ApplicantDetailAddress = ExtractDetailFromAddress(c.FamilyAddress);
-            // 家庭住址文本保留来源原始完整地址（打印模板用，避免与分列拼接重复）
-            ApplicantAddress = c.FamilyAddress;
+            // family_address 不再保留来源原文：保存时按分列重拼（见 BuildFamilyAddress），
+            // 来源原文只用于提取详细地址
             // 户籍地址统一从当前用户组织机构获取（新建/草稿时已回填，候选人不覆盖）
             // 家庭人口来源快照：仅"有效成员为 0"时兜底（成员明细变化时由 RefreshApplicantFamilySize 覆盖）
             _familySizeSeed = c.FamilySize;
@@ -939,7 +938,7 @@ public partial class TempReliefFormViewModel
             FamilyDistrict = ApplicantDistrict,
             FamilyTown = ApplicantTown,
             FamilyDetail = ApplicantDetailAddress,
-            FamilyAddress = ApplicantAddress,
+            FamilyAddress = BuildFamilyAddress(),
             HukouProvince = HukouProvince,
             HukouCity = HukouCity,
             HukouDistrict = HukouDistrict,

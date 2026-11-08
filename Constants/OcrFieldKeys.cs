@@ -15,6 +15,9 @@ public static class OcrFieldKeys
     /// <summary>身份证号</summary>
     public const string IdCard = "id_card";
 
+    /// <summary>家庭住址（身份证背面住址栏；2026-11-05 新增）</summary>
+    public const string Address = "address";
+
     #endregion
 
     #region 户口本 (HOUSEHOLD_REGISTER)
@@ -81,6 +84,7 @@ public static class OcrFieldKeys
     {
         Name => "姓名",
         IdCard => "身份证号",
+        Address => "家庭住址",
         HeadName => "户主姓名",
         HukouAddress => "户籍地址",
         BankName => "开户行",
@@ -101,7 +105,7 @@ public static class OcrFieldKeys
     /// 空数组 = 全文文本类（PUBLICITY_CHECK / OTHER_CERT）；null = 不参与识别（PERSON_PHOTO）。</summary>
     public static IReadOnlyList<string>? GetFields(string categoryCode) => categoryCode switch
     {
-        PhotoCategoryConstants.ID_CARD => new[] { Name, IdCard },
+        PhotoCategoryConstants.ID_CARD => new[] { Name, IdCard, Address },
         PhotoCategoryConstants.HOUSEHOLD_REGISTER => new[] { HeadName, HukouAddress },
         PhotoCategoryConstants.BANK_CARD => new[] { BankName, CardNumber },
         PhotoCategoryConstants.MEDICAL_RECORD => new[] { Diagnosis, Hospital, Date },

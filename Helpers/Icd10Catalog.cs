@@ -1,5 +1,8 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+#if ANDROID
+using Microsoft.Maui.Storage;
+#endif
 
 namespace NewCosmos.Helpers;
 
@@ -38,10 +41,17 @@ public static class Icd10Catalog
         try
         {
             var jsonPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Icd10", "icd10_common.json");
-            if (!File.Exists(jsonPath))
+            string? json = File.Exists(jsonPath) ? File.ReadAllText(jsonPath) : null;
+
+#if ANDROID
+            // 安卓端 csproj 的 None+CopyToOutputDirectory 只复制到主机输出目录、不进 APK assets，
+            // 字典改由 AndroidAsset 打进 assets/icd10/，只能经包资产读取（同 ConfigService 读 app.ini 的做法）。
+            json ??= ReadAndroidPackageAsset("icd10/icd10_common.json");
+#endif
+
+            if (string.IsNullOrEmpty(json))
                 return new Dictionary<string, string>();
 
-            var json = File.ReadAllText(jsonPath);
             var map = JsonSerializer.Deserialize<Dictionary<string, string>>(json,
                 new JsonSerializerOptions { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
             return map != null && map.Count > 0 ? map : new Dictionary<string, string>();
@@ -52,6 +62,27 @@ public static class Icd10Catalog
             return new Dictionary<string, string>();
         }
     }
+
+#if ANDROID
+    /// <summary>
+    /// 读取 APK 包资产（assets/ 下由 AndroidAsset 打包的文件）。
+    /// 读取失败返回 null，由调用方保持空字典降级（不影响手工录入病名）。
+    /// </summary>
+    private static string? ReadAndroidPackageAsset(string assetPath)
+    {
+        try
+        {
+            using var stream = FileSystem.OpenAppPackageFileAsync(assetPath).GetAwaiter().GetResult();
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"读取安卓 ICD-10 字典资产失败: {assetPath} {ex.Message}");
+            return null;
+        }
+    }
+#endif
 
     /// <summary>
     /// 规范化编码（去空格、转大写）；命中内置字典返回疾病名称，未命中返回 false。

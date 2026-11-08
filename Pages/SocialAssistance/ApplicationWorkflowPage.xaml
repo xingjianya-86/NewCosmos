@@ -88,6 +88,13 @@
                                     IsVisible="{Binding ShowViewArchiveButton}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
                                     CommandParameter="{Binding .}"/>
+                            <Button Text="照片"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource InfoSoft}"
+                                    TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
                                     FontSize="15"
                                     Padding="16,8"
@@ -224,6 +231,13 @@
                                     TextColor="White"
                                     IsVisible="{Binding ShowViewArchiveButton}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ViewArchiveCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="照片"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource InfoSoft}"
+                                    TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=OpenPhotosCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="档案制作"
                                     FontSize="15"

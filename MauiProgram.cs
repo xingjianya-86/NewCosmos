@@ -24,7 +24,6 @@ using NewCosmos.Services.Platform;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.ChangeManagement;
 using NewCosmos.Services.Domain.Printing;
-using NewCosmos.Services.Domain.SpecialApproval;
 using NewCosmos.Services.Domain.TempRelief;
 using NewCosmos.Services.Domain.NearRelative;
 using NewCosmos.Services.Domain.Recovery;
@@ -167,12 +166,6 @@ public static class MauiProgram
         {
             var configService = sp.GetRequiredService<IConfigService>();
             return configService.GetStorageOptions();
-        });
-
-        builder.Services.AddSingleton<UIOptions>(sp =>
-        {
-            var configService = sp.GetRequiredService<IConfigService>();
-            return configService.GetUIOptions();
         });
 
         builder.Services.AddSingleton<PerformanceOptions>(sp =>
@@ -357,7 +350,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeDocumentApplicabilityService, Services.Domain.ChangeManagement.ChangeDocumentApplicabilityService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IImportedArchiveService, Services.Domain.ChangeManagement.ImportedArchiveService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IDynamicManagementRecordService, Services.Domain.ChangeManagement.DynamicManagementRecordService>();
-        builder.Services.AddSingleton<Services.Domain.SpecialApproval.ISpecialApprovalService, Services.Domain.SpecialApproval.SpecialApprovalService>();
         builder.Services.AddSingleton<Services.Domain.SpecialApproval.ISpecialApprovalFormService, Services.Domain.SpecialApproval.SpecialApprovalFormService>();
 
         #endregion
@@ -403,9 +395,7 @@ public static class MauiProgram
         builder.Services.AddTransient<ApplicationFormViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.ApplicationWorkflowViewModel>();
 
-        builder.Services.AddTransient<SpouseInfoViewModel>();
-        builder.Services.AddTransient<FamilyMembersViewModel>();
-        builder.Services.AddTransient<ClassificationViewModel>();
+
         builder.Services.AddTransient<CapabilityAssessmentViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.SpecialApprovalFormViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.ArchiveManagement.ArchiveOutputViewModel>();
@@ -564,9 +554,7 @@ public static class MauiProgram
         builder.Services.AddTransient<Pages.SocialAssistance.ApplicationFormPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.ApplicationWorkflowPage>();
         builder.Services.AddTransient<Pages.Reprint.UnifiedReprintPage>();
-        builder.Services.AddTransient<Pages.SocialAssistance.SpouseInfoPage>();
-        builder.Services.AddTransient<Pages.SocialAssistance.FamilyMembersPage>();
-        builder.Services.AddTransient<Pages.SocialAssistance.ClassificationPage>();
+
         builder.Services.AddTransient<Pages.SocialAssistance.CapabilityAssessmentPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.SpecialApprovalFormPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.CollegeStudentManagementPage>();

@@ -25,7 +25,6 @@ public class ConfigService : IConfigService
     private AppOptions _appOptions = null!;
     private DatabaseOptions _databaseOptions = null!;
     private StorageOptions _storageOptions = null!;
-    private UIOptions _uiOptions = null!;
     private PerformanceOptions _performanceOptions = null!;
     private PreferencesOptions _preferencesOptions = null!;
     private SchemaOptions _schemaOptions = null!;
@@ -108,6 +107,10 @@ public class ConfigService : IConfigService
             // update.ini 同样只在首装复制一次：若不随 APK 覆盖，老手机永远读首装旧副本，
             // 清单地址/开关变更后"检测不到更新"无法自愈（详见方法注释）。
             SyncUpdateIniFromAsset(writableConfigDir);
+
+            // network.ini 也只在首装复制：老手机私有目录副本可能早于 OcrServiceUrl 键引入，
+            // 升级 APK 不同步 → 扫码识别一直报"识别服务地址未配置"（详见方法注释）。
+            SyncNetworkIniFromAsset(writableConfigDir);
         }
         return writableConfigDir;
 #else
@@ -260,6 +263,49 @@ public class ConfigService : IConfigService
         }
     }
 
+    /// <summary>
+    /// Android: 把 APK assets 内 network.ini 的白名单键补进可写目录的 network.ini
+    /// （只补缺失或为空的键，已有非空值一律不覆盖）。
+    /// network.ini 同样只在首装复制一次：老手机私有目录里的副本可能早于 OcrServiceUrl 键引入，
+    /// 且 App 私有目录无任何同步机制，升级 APK 后仍读旧副本 → 扫码识别一直报
+    /// "识别服务地址未配置（network.ini OcrServiceUrl）"。这里从 assets 读该键当前值做启动自愈，
+    /// 用户手工配置过的地址不受影响；失败仅告警不阻断启动。
+    /// </summary>
+    private static void SyncNetworkIniFromAsset(string targetDir)
+    {
+        try
+        {
+            var targetPath = Path.Combine(targetDir, "network.ini");
+            if (!File.Exists(targetPath))
+                return; // 文件整体缺失时由 GetNetworkOptions 走默认值，不在此创建（避免向导流程外落半成品）
+
+            string assetText;
+            using (var assetStream = FileSystem.OpenAppPackageFileAsync("network.ini").GetAwaiter().GetResult())
+            using (var reader = new StreamReader(assetStream))
+            {
+                assetText = reader.ReadToEnd();
+            }
+
+            var requiredKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["OcrServiceUrl"] = ReadIniValue(assetText, "OcrServiceUrl")
+            };
+
+            var (merged, changed) = MergeMissingIniKeys(File.ReadAllText(targetPath), requiredKeys);
+            if (!changed)
+                return;
+
+            File.WriteAllText(targetPath, merged,
+                new global::System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            Serilog.Log.Information("[ConfigService] network.ini 缺失键已从 assets 自愈补齐: {Path}", targetPath);
+        }
+        catch (Exception ex)
+        {
+            // 自愈失败不阻断启动（沿用旧配置，识别功能降级为"地址未配置"）
+            Serilog.Log.Warning("[ConfigService] 自愈 network.ini 失败: {Message}", ex.Message);
+        }
+    }
+
     /// <summary>从 INI 文本按 key 全文件匹配取值（与 ReadIniLines 同口径：忽略 section、跳过注释）</summary>
     private static string ReadIniValue(string iniText, string key)
     {
@@ -275,6 +321,84 @@ public class ConfigService : IConfigService
         return string.Empty;
     }
 #endif
+
+    /// <summary>
+    /// 纯函数：把 <paramref name="requiredKeys"/> 中「文件里缺失或值为空」的键补进 INI 文本，
+    /// 已有非空值一律不覆盖。用于启动时自愈老配置文件缺失的键（如 network.ini 的 OcrServiceUrl）。
+    /// 口径与 ReadIniLines 一致：忽略 section、跳过 # 注释行，按键名大小写不敏感全文件匹配。
+    /// - 键已存在且任一处为非空 → 不动（返回 Changed=false，文本原样）；
+    /// - 键存在但全部为空 → 把最后一处空值行替换为 Key=Value（解析时后者覆盖前者）；
+    /// - 键完全缺失 → 追加到文件末尾（补一个换行，保证追加行独立成行）；
+    /// - 输入若带 BOM 会剥掉，输出保证无 BOM；注释、空行、CRLF 换行风格原样保留。
+    /// </summary>
+    /// <returns>(合并后文本, 是否发生变更)</returns>
+    public static (string Text, bool Changed) MergeMissingIniKeys(
+        string iniText,
+        IReadOnlyDictionary<string, string> requiredKeys)
+    {
+        iniText ??= string.Empty;
+        if (iniText.Length > 0 && iniText[0] == '\uFEFF')
+            iniText = iniText[1..]; // BOM 会让首行注释/section 判定失效，先剥掉
+
+        var changed = false;
+        var newline = iniText.Contains("\r\n") ? "\r\n" : "\n";
+
+        foreach (var pair in requiredKeys)
+        {
+            var key = pair.Key;
+            var value = pair.Value?.Trim();
+            if (string.IsNullOrWhiteSpace(value))
+                continue; // 没有可补的默认值（assets 里该键也为空），补空行无意义
+
+            var lines = iniText.Split('\n');
+            var emptyIdx = -1;
+            var rawKey = key;
+            var hasNonEmpty = false;
+
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var trimmed = lines[i].Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith('#') || trimmed.StartsWith('['))
+                    continue;
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length != 2)
+                    continue;
+                if (!parts[0].Trim().Equals(key, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (parts[1].Trim().Length > 0)
+                {
+                    hasNonEmpty = true; // 已有非空值（后者覆盖前者）→ 不覆盖用户配置
+                    break;
+                }
+                emptyIdx = i;
+                rawKey = parts[0].Trim();
+            }
+
+            if (hasNonEmpty)
+                continue;
+
+            if (emptyIdx >= 0)
+            {
+                // 全部为空 → 替换最后一处空值行，保留行内 CRLF 的 \r 与原键名拼写
+                var keepCr = lines[emptyIdx].EndsWith('\r');
+                lines[emptyIdx] = rawKey + "=" + value + (keepCr ? "\r" : "");
+                iniText = string.Join('\n', lines);
+            }
+            else
+            {
+                // 完全缺失 → 追加到末尾，保证独立成行且文件以换行结尾
+                var sb = new global::System.Text.StringBuilder(iniText);
+                if (sb.Length > 0 && sb[^1] != '\n')
+                    sb.Append(newline);
+                sb.Append(key).Append('=').Append(value).Append(newline);
+                iniText = sb.ToString();
+            }
+            changed = true;
+        }
+
+        return (iniText, changed);
+    }
 
     public AppOptions GetAppOptions()
     {
@@ -686,46 +810,6 @@ public class ConfigService : IConfigService
         return _storageOptions;
     }
 
-    public UIOptions GetUIOptions()
-    {
-        if (_uiOptions != null)
-            return _uiOptions;
-
-        var filePath = Path.Combine(_configDirectory, "app.ini");
-        
-        if (!File.Exists(filePath))
-            throw new ConfigurationException("app.ini", $"配置文件不存在: {filePath}");
-
-        _uiOptions = new UIOptions();
-        
-        foreach (var line in ReadIniLines(filePath))
-        {
-            var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#') || trimmed.StartsWith('['))
-                continue;
-
-            var parts = trimmed.Split('=', 2);
-            if (parts.Length != 2) continue;
-
-            var key = parts[0].Trim();
-            var value = parts[1].Trim();
-
-            switch (key)
-            {
-                case "BackgroundImagesDirectory": _uiOptions.BackgroundImagesDirectory = value; break;
-                case "BackgroundImageFormat": _uiOptions.BackgroundImageFormat = value; break;
-                case "DefaultBackgroundImage": _uiOptions.DefaultBackgroundImage = value; break;
-                case "UseRandomBackground": if (bool.TryParse(value, out var useRandom)) _uiOptions.UseRandomBackground = useRandom; break;
-                case "RememberBackgroundChoice": if (bool.TryParse(value, out var remember)) _uiOptions.RememberBackgroundChoice = remember; break;
-            }
-        }
-
-        _uiOptions.Validate();
-        Serilog.Log.Information("[ConfigService] UI配置加载完成");
-        
-        return _uiOptions;
-    }
-
     public PerformanceOptions GetPerformanceOptions()
     {
         if (_performanceOptions != null)
@@ -801,7 +885,6 @@ public class ConfigService : IConfigService
                 case "RememberedUsernameKey": _preferencesOptions.RememberedUsernameKey = value; break;
                 case "RememberedPasswordKey": _preferencesOptions.RememberedPasswordKey = value; break;
                 case "RememberPasswordKey": _preferencesOptions.RememberPasswordKey = value; break;
-                case "LastBackgroundKey": _preferencesOptions.LastBackgroundKey = value; break;
             }
         }
 
@@ -1269,19 +1352,11 @@ public class ConfigService : IConfigService
         TemplateCachePath=Cache/Templates
         UseAppDataDirectory=true
 
-        [UI]
-        BackgroundImagesDirectory=backgrounds
-        BackgroundImageFormat=.webp
-        DefaultBackgroundImage=background1.webp
-        UseRandomBackground=true
-        RememberBackgroundChoice=true
-
         [Preferences]
         RememberMeKey=RememberMe
         RememberedUsernameKey=RememberedUsername
         RememberedPasswordKey=RememberedPassword
         RememberPasswordKey=RememberPassword
-        LastBackgroundKey=LastBackground
 
         [Export]
         ExportBaseDirectoryName=帝皇权杖δ-me13

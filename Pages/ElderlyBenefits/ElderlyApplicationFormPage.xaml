@@ -582,10 +582,14 @@
                         IsEnabled="{Binding CanGoNext}" HeightRequest="44"/>
                 <Button Grid.Column="2" Text="保存草稿" Style="{StaticResource ButtonOutline}"
                         Command="{Binding SaveCommand}"
-                        IsVisible="{Binding IsSavable}" HeightRequest="44"/>
+                        IsVisible="{Binding IsDraftSaveVisible}" HeightRequest="44"/>
                 <Button Grid.Column="3" Text="保存并确认" Style="{StaticResource ButtonPrimary}"
                         Command="{Binding SaveAndConfirmCommand}"
                         IsVisible="{Binding IsSaveAndConfirmVisible}" HeightRequest="44"/>
+                <!-- 补全模式（停发/复核入口）：档案已是已确认档，主按钮为"保存并进入停发/返回复核" -->
+                <Button Grid.Column="3" Text="{Binding CompletionSaveButtonText}" Style="{StaticResource ButtonPrimary}"
+                        Command="{Binding SaveAndConfirmCommand}"
+                        IsVisible="{Binding IsCompletionSaveVisible}" HeightRequest="44"/>
             </Grid>
         </Border>
 

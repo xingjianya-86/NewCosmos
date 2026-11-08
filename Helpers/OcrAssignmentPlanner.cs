@@ -25,6 +25,7 @@ public static class OcrAssignmentPlanner
         /// <summary>表单级字段目标</summary>
         public const string FormBank = "form:bank";
         public const string FormHukou = "form:hukou";
+        public const string FormAddress = "form:address";
         public const string FormReason = "form:reason";
         public const string FormPhone = "form:phone";
 
@@ -99,4 +100,136 @@ public static class OcrAssignmentPlanner
     /// <summary>取字段值并去首尾空白</summary>
     public static string GetTrimmed(IReadOnlyDictionary<string, string> fields, string key)
         => fields.TryGetValue(key, out var v) ? (v ?? string.Empty).Trim() : string.Empty;
+
+    /// <summary>区划匹配结果：命中的候选名、在文本中的起始下标、实际占用的文本长度。</summary>
+    public readonly record struct RegionMatch(string Name, int Index, int Length);
+
+    /// <summary>
+    /// 在一组候选区划名里匹配地址片段：取「出现位置最靠前，同位置最长」的候选。
+    /// 用于户口本 OCR 地址文本 → 户籍级联（市/县/镇/村）逐级解析；
+    /// 位置靠前保证按"市→县→镇→村"的书写顺序取词，最长匹配防止「林口县」被「林口」类短名截断。
+    /// 村/社区级做**后缀归一化**：区划库存「万寿村委会」，户口本写「万寿村」，精确匹配会漏，
+    /// 因此额外用去后缀的变体（万寿村/万寿）匹配，并返回实际占用的文本长度供逐级截断。
+    /// 精确命中优先于变体命中，降低变体误匹配风险。
+    /// </summary>
+    public static RegionMatch? MatchRegionOption(IReadOnlyList<string> options, string text)
+    {
+        var exact = FindBestMatches(options, text, includeVariants: false);
+        if (exact.Count > 0) return exact[0];
+
+        var variant = FindBestMatches(options, text, includeVariants: true);
+        return variant.Count > 0 ? variant[0] : null;
+    }
+
+    /// <summary>
+    /// 村级匹配（比 <see cref="MatchRegionOption"/> 更严格）：**歧义即视为不匹配**。
+    /// 旧村名/自然屯常只剩词干（如库内「柞木村委会」、户口本写「柞木屯」），只能靠变体命中；
+    /// 若同一位置上多个村共用同一词干（「石青村委会」「石青沟村委会」都含「石青」），
+    /// 猜错会把区划 ID 写成别的村，因此这里返回 null，由上层整体放弃回填、保留表单原值。
+    /// 顺序：全称精确 > 后缀归一/词干变体；任一级出现多个不同候选 → null。
+    /// </summary>
+    public static RegionMatch? MatchVillageOption(IReadOnlyList<string> options, string text)
+    {
+        var exact = FindBestMatches(options, text, includeVariants: false);
+        if (exact.Count == 1) return exact[0];
+        if (exact.Count > 1) return null;   // 重名村：不猜
+
+        var variant = FindBestMatches(options, text, includeVariants: true);
+        return variant.Count == 1 ? variant[0] : null;   // 0=没有；>1=词干歧义，不猜
+    }
+
+    /// <summary>
+    /// 找出「出现位置最靠前、同位置最长」的全部候选（不同名字去重，同名只留一条）。
+    /// 返回多条 = 该位置上存在歧义。精确与变体分两轮调用，保证精确命中永远优先。
+    /// </summary>
+    private static List<RegionMatch> FindBestMatches(
+        IReadOnlyList<string> options, string text, bool includeVariants)
+    {
+        var matches = new List<RegionMatch>();
+        if (string.IsNullOrEmpty(text) || options.Count == 0) return matches;
+
+        var bestIndex = int.MaxValue;
+        var bestLength = 0;
+
+        foreach (var option in options)
+        {
+            if (string.IsNullOrEmpty(option)) continue;
+
+            if (!includeVariants)
+            {
+                Consider(option, option, option.Length);
+                continue;
+            }
+
+            foreach (var key in BuildVariantKeys(option))
+                Consider(option, key, key.Length);
+        }
+
+        return matches;
+
+        void Consider(string name, string key, int length)
+        {
+            var index = text.IndexOf(key, StringComparison.Ordinal);
+            if (index < 0) return;
+
+            if (index < bestIndex || (index == bestIndex && length > bestLength))
+            {
+                bestIndex = index;
+                bestLength = length;
+                matches.Clear();
+            }
+
+            if (index != bestIndex || length != bestLength) return;
+            if (!matches.Any(m => string.Equals(m.Name, name, StringComparison.Ordinal)))
+                matches.Add(new RegionMatch(name, index, length));
+        }
+    }
+
+    /// <summary>
+    /// 生成区划名的等价变体（不含原名本身）：从区划库全称里剥出户口本常见写法。
+    /// 「万寿村委会」「万寿村民委员会」→「万寿村」「万寿」；
+    /// 「XX居民委员会」「XX居委会」→「XX居委会」「XX」；「XX社区」→「XX」；「XX村」→「XX」。
+    /// 镇/县/市级不做剥离（户口本写法与库内一致，避免「林口」误配「林口县」后截断失配）。
+    /// </summary>
+    private static IEnumerable<string> BuildVariantKeys(string option)
+    {
+        var stem = option;
+
+        if (option.EndsWith("村民委员会", StringComparison.Ordinal))
+            stem = option[..^"村民委员会".Length];
+        else if (option.EndsWith("村委会", StringComparison.Ordinal))
+            stem = option[..^"村委会".Length];
+        else if (option.EndsWith("居民委员会", StringComparison.Ordinal))
+            stem = option[..^"居民委员会".Length];
+        else if (option.EndsWith("居委会", StringComparison.Ordinal))
+            stem = option[..^"居委会".Length];
+        else if (option.EndsWith("社区", StringComparison.Ordinal))
+            stem = option[..^"社区".Length];
+        else if (option.EndsWith("村", StringComparison.Ordinal))
+            stem = option[..^"村".Length];
+        else
+            yield break; // 非村级（市/县/镇）：只用全称精确匹配
+
+        if (stem.Length == 0) yield break;
+
+        // 「万寿村委会」→ 先试「万寿村」（最接近户口本写法），再试「万寿」；
+        // 同时兼容户口本全称写法「万寿村民委员会 / 万寿居民委员会」，避免只吃掉前缀、
+        // 把「民委员会99号」当成门牌号写进详细地址。
+        if (!string.Equals(stem + "村", option, StringComparison.Ordinal))
+            yield return stem + "村";
+
+        if (option.EndsWith("村民委员会", StringComparison.Ordinal)
+            || option.EndsWith("村委会", StringComparison.Ordinal))
+            yield return stem + "村民委员会";
+
+        if (option.EndsWith("居民委员会", StringComparison.Ordinal)
+            || option.EndsWith("居委会", StringComparison.Ordinal))
+            yield return stem + "居民委员会";
+
+        if (option.EndsWith("居民委员会", StringComparison.Ordinal)
+            || option.EndsWith("居委会", StringComparison.Ordinal))
+            yield return stem + "居委会";
+
+        yield return stem;
+    }
 }

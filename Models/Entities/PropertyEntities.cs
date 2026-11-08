@@ -82,24 +82,6 @@ public class FinancialAsset
 }
 
 /// <summary>
-/// 土地确权（承包方）实体（纯 POCO，对应 nc_biz_land_confirmations 表）
-/// </summary>
-public class LandConfirmation
-{
-    public long Id { get; set; }
-    public long ApplicationId { get; set; }
-    public string ContractorName { get; set; } = string.Empty;
-    public string VillageName { get; set; } = string.Empty;
-    public decimal TotalConfirmedArea { get; set; }
-    public decimal TotalShares { get; set; }
-    public int TotalPersonCount { get; set; }
-    public decimal DryFieldArea { get; set; }
-    public decimal WetFieldArea { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime DeletedAt { get; set; }
-}
-
-/// <summary>
 /// 土地确权记录实体（支持属性变更通知，对应 nc_biz_land_confirmation_records 表）
 /// </summary>
 public partial class LandConfirmationRecord : ObservableObject

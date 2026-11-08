@@ -34,19 +34,3 @@ public class ColumnMappingInfo
     public string TargetField { get; set; } = string.Empty;
     public bool IsMapped { get; set; }
 }
-
-public class LinkResult
-{
-    public bool Success { get; set; }
-    public int LinkedCount { get; set; }
-    public int UnlinkedCount { get; set; }
-    public string ErrorMessage { get; set; } = string.Empty;
-}
-
-public class ImportError
-{
-    public int RowNumber { get; set; }
-    public string Column { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public string RawValue { get; set; } = string.Empty;
-}

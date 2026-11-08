@@ -95,6 +95,8 @@ public class AddressResolver
     /// <item><c>柞木村村民委员会</c> → <c>柞木村</c>（去掉「村民委员会」，村字已在其前）</item>
     /// <item><c>土甸子村委会</c> → <c>土甸子村</c>（「村委会」→「村」，否则丢掉「村」字）</item>
     /// <item><c>东关居民委员会</c> → <c>东关社区</c></item>
+    /// <item><c>柳树镇本级</c> → 空（「镇本级」= 镇直/无村社区，不是村级名称；
+    ///       不清会拼出「林口县柳树镇柳树镇本级」，2026-11-05 临时救助实测 2 行）</item>
     /// </list>
     /// <see cref="StripVillageSuffix"/> 会把 <c>土甸子村委会</c> 变成 <c>土甸子</c>（丢字），
     /// 故地址拼装不得走它；它只服务「村名缓存」这一既有口径。
@@ -106,6 +108,24 @@ public class AddressResolver
         if (s.EndsWith("村民委员会", StringComparison.Ordinal)) return s[..^5];
         if (s.EndsWith("居民委员会", StringComparison.Ordinal)) return s[..^5] + "社区";
         if (s.EndsWith("村委会", StringComparison.Ordinal)) return s[..^3] + "村";
+        if (s.EndsWith("本级", StringComparison.Ordinal)) return string.Empty;
+        return s;
+    }
+
+    /// <summary>
+    /// 剥掉地址**开头**的省/市前缀（按 <paramref name="province"/> → <paramref name="city"/> 顺序各剥一次）。
+    /// 用途：身份证背面住址是「省+市+县+镇+村+门牌」全量形态，当作详细地址回填后若原样拼进
+    /// <c>family_address</c>，会与其余行的「县+镇+村+门牌」口径不一致（临时救助 2026-11-05 统一）。
+    /// 县及以下**不剥**——它们由 <see cref="BuildAddressFromText"/> 按已含/缺失去重。
+    /// </summary>
+    public static string StripLeadingRegion(string? address, string? province, string? city)
+    {
+        var s = address?.Trim() ?? string.Empty;
+        foreach (var level in new[] { CleanLevel(province), CleanLevel(city) })
+        {
+            if (level.Length > 0 && s.StartsWith(level, StringComparison.Ordinal))
+                s = s[level.Length..].TrimStart();
+        }
         return s;
     }
 
@@ -147,6 +167,13 @@ public class AddressResolver
         var county = CleanLevel(district);
         var townName = CleanLevel(town);
         var village = NormalizeVillageForAddress(community);
+
+        // 村级名自带镇前缀（区划「柳树镇镇直第一居民委员会」→ 规范化后「柳树镇镇直第一社区」）：
+        // 村一级在镇匹配/插入**之后**的位置起搜，带着镇前缀必然落空 → 每重存一次就再插一个「柳树镇」。
+        // 先剥掉镇前缀（资产核查镇直行，2026-11-05）。
+        if (townName.Length > 0 && village.StartsWith(townName, StringComparison.Ordinal))
+            village = village[townName.Length..];
+
         // detail 同样做结尾后缀规范化（全地址形态「…柞木村委会」→「…柞木村」）
         var result = NormalizeVillageForAddress(CleanLevel(detail));
         var cursor = 0;

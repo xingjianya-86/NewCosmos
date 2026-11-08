@@ -80,17 +80,22 @@
                     <!-- 待核对人员 -->
                     <Border Style="{StaticResource CardBorder}">
                         <VerticalStackLayout Spacing="8">
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                                 <Label Grid.Column="0" Text="待核对人员" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
                                 <Border Grid.Column="1" Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                     <Label Text="{Binding MatchTasks.Count}" Style="{StaticResource ChipInfoText}" FontAttributes="Bold" VerticalOptions="Center"/>
                                 </Border>
-                                <Button Grid.Column="2" Text="保存报告" FontSize="15" Padding="10,2" HeightRequest="30"
+                                <Button Grid.Column="2" Text="照片" FontSize="15" Padding="10,2" HeightRequest="30"
+                                        BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}" CornerRadius="6"
+                                        VerticalOptions="Center"
+                                        Command="{Binding OpenPhotosCommand}"
+                                        IsEnabled="{Binding CanOpenPhotos}"/>
+                                <Button Grid.Column="3" Text="保存报告" FontSize="15" Padding="10,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource Success}" CornerRadius="6"
                                         VerticalOptions="Center"
                                         Command="{Binding SaveReportCommand}"
                                         IsEnabled="{Binding CanPrintReport}"/>
-                                <Button Grid.Column="3" Text="打印报告" FontSize="15" Padding="10,2" HeightRequest="30"
+                                <Button Grid.Column="4" Text="打印报告" FontSize="15" Padding="10,2" HeightRequest="30"
                                         BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}" CornerRadius="6"
                                         VerticalOptions="Center"
                                         Command="{Binding PrintSelectedCommand}"

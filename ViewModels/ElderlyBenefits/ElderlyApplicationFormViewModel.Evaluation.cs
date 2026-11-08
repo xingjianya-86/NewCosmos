@@ -138,6 +138,7 @@ public partial class ElderlyApplicationFormViewModel
     public async Task LoadAsync(long id)
     {
         _id = id;
+        _loadedStatus = string.Empty;
         _suppressEvaluate = true;
         await ExecuteAsync(async () =>
         {
@@ -146,6 +147,7 @@ public partial class ElderlyApplicationFormViewModel
                 return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "登记记录不存在");
 
             var app = result.Value;
+            _loadedStatus = app.Status ?? string.Empty;
             Name = app.Name;
             IdCard = app.IdCard;
             Gender = app.Gender;

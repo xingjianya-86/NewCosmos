@@ -113,6 +113,15 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         {
             _logger.Warn($"停止相机预览异常：{ex.Message}");
         }
+
+        // 兜底：任何未经 Complete 的离页（系统返回、导航清理等）也必须恰好回调一次 OnCompleted，
+        // 否则调用方 await TaskCompletionSource 永挂、扫描按钮永久灰死。
+        // 延迟一拍判断：向前 push 分配页 / 退后台 / 原生弹窗时本页仍在导航栈中，不会误触发。
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+        {
+            if (!_completed && !Navigation.NavigationStack.Contains(this))
+                FireCompleted(0);
+        });
     }
 
     protected override void OnSizeAllocated(double width, double height)
@@ -197,10 +206,15 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         }
     }
 
-    /// <summary>识别询问 → 识别（界面等待）→ 跳分配页</summary>
+    /// <summary>识别询问 → 识别（界面等待）→ 跳分配页。
+    /// 2026-11-04：拍照/选图拿到字节后即关闭相机预览（识别期间无需取景，省电防发热）；
+    /// 跳过或识别失败返回取景时再重启预览。</summary>
     private async Task RecognizeAndAssignAsync(byte[] bytes)
     {
         var categoryName = PhotoCategoryConstants.GetDisplayName(_categoryCode);
+
+        // 关闭相机预览（问题修复：识别开始后摄像头一直开着）
+        StopPreview();
 
         // 识别询问（与档案照片页一致的完整流程：模型名 + 预计耗时 + 内网声明）
         ShowBusy(false);
@@ -213,6 +227,7 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         if (!start)
         {
             _logger.LogBusiness("跳过证件 OCR 识别", ("Category", _categoryCode));
+            await RestartPreviewAsync(); // 跳过 → 回取景继续扫
             return;
         }
 
@@ -225,6 +240,7 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         {
             await _dialogService.DisplayAlertAsync("识别失败",
                 result.Message ?? "未识别出有效字段，请正对证件、保证光线充足后重拍", "确定");
+            await RestartPreviewAsync(); // 失败 → 回取景重拍
             return;
         }
 
@@ -245,6 +261,33 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         Complete(applied);
     }
 
+    /// <summary>安全关闭相机预览（幂等，异常只记日志）。</summary>
+    private void StopPreview()
+    {
+        try
+        {
+            Preview.Stop();
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"停止相机预览异常：{ex.Message}");
+        }
+    }
+
+    /// <summary>重启相机预览（跳过/识别失败回取景时；页面已离开则跳过）。</summary>
+    private async Task RestartPreviewAsync()
+    {
+        if (_completed || !Navigation.NavigationStack.Contains(this)) return;
+        try
+        {
+            await Preview.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"重启相机预览失败：{ex.Message}");
+        }
+    }
+
     /// <summary>导航到分配页（分配页自行 Pop 后回调）</summary>
     private async Task NavigateToAsync(OcrAssignParameter parameter)
     {
@@ -259,12 +302,7 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
     /// <summary>结束扫描：回传结果并关闭页面（幂等）</summary>
     private void Complete(int applied)
     {
-        if (_completed) return;
-        _completed = true;
-
-        var callback = _onCompleted;
-        _onCompleted = null;
-        callback?.Invoke(applied);
+        if (!FireCompleted(applied)) return;
 
         MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -280,6 +318,27 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
             if (Navigation.NavigationStack.Count > 1)
                 await Navigation.PopAsync();
         });
+    }
+
+    /// <summary>幂等触发完成回调（任何退出路径必须恰好一次）。返回是否由本次调用触发。</summary>
+    private bool FireCompleted(int applied)
+    {
+        if (_completed) return false;
+        _completed = true;
+
+        var callback = _onCompleted;
+        _onCompleted = null;
+        callback?.Invoke(applied);
+        return true;
+    }
+
+    /// <summary>系统返回/手势返回：放行默认 pop 前先触发完成回调——
+    /// 不回调会让调用方 await TaskCompletionSource 永挂，其扫描按钮（AsyncRelayCommand
+    /// 默认禁止并发执行）永久灰死。</summary>
+    protected override bool OnBackButtonPressed()
+    {
+        FireCompleted(0);
+        return false;
     }
 
     private void ShowBusy(bool busy, string? message = null)

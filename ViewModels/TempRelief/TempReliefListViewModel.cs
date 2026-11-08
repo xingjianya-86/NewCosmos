@@ -284,6 +284,27 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
         await NavigateToPageAsync<Pages.TempRelief.TempReliefFormPage, FormPageParameter>(new FormPageParameter(FormOperationMode.View, app.Id));
     }
 
+    /// <summary>
+    /// 已确认记录照片上传/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
+    /// 与高龄津贴、低收入人口认定等模块共享同一份人员照片。
+    /// 列表入口不传 AssignContext = 只存档不识别（与档案查询/补传入口同语义）；
+    /// 识别回填仅在表单内采集时启用。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync(TempReliefApplication? app)
+    {
+        if (app == null || string.IsNullOrWhiteSpace(app.ApplicantIdCard))
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "提示", "该记录缺少身份证号，无法关联照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("临时救助列表-档案照片", ("ApplicationId", app.Id));
+        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+            new ArchivePhotoParameter(app.ApplicantIdCard.Trim(), app.Id, app.ApplicantName));
+    }
+
     [RelayCommand]
     private async Task EditAsync(TempReliefApplication? app)
     {

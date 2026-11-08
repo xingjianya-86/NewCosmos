@@ -191,7 +191,7 @@
                         <Label Text="· 每组在每种日期类型下独立轮转（领导组最多 3 条轮转线，中层仅节假日轮转）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         <Label Text="· 同一人同一天只值一个班：节假日若中层轮到的人同时也是男生/女生组当前轮到者，男生/女生组自动顺延下一位（被跳过者视为已消耗轮次）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         <Label Text="· 开启「周六周日同一带班领导」后，休息日领导以周末对轮转（周日复用周六人选）；男生/女生组仍每天轮转" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
-                        <Label Text="· 点击表格中的姓名可手工换人（不影响轮转游标）；重新生成整月将按当前游标继续推演" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="· 点击表格中的姓名可手工换人（不影响轮转）；重新生成整月将按本月之前最近一次真实班次接续推演" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                 </Border>
 

@@ -19,7 +19,8 @@ public interface ICollegeStudentService
     Task<Result<List<CollegeStudent>>> GetAllAsync(string? keyword = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 搜索可关联的18-23周岁家庭成员（未建立大学生档案的成员）
+    /// 搜索可关联的18-23周岁家庭成员（未建立大学生档案的成员）。
+    /// 不含「当前属于其他困难人员」的成员（在其他困难人员台账中且当前无在保/在途档案）。
     /// </summary>
     Task<Result<List<FamilyMember>>> SearchEligibleMembersAsync(string? keyword = null, CancellationToken ct = default);
 

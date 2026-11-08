@@ -17,7 +17,7 @@ public interface IHolidayManageService
     /// <summary>确保节假日表存在（幂等，缺表时按 Schema YAML 建表）</summary>
     Task<Result> EnsureTablesExistAsync(CancellationToken ct = default);
 
-    /// <summary>表为空时写入内置 2026 年种子数据（兜底，source=SEED）</summary>
+    /// <summary>按年补齐内置种子数据（该年整年无数据时写入，source=SEED；不影响接口下载/手工维护数据）</summary>
     Task<Result> EnsureSeedDataAsync(CancellationToken ct = default);
 
     /// <summary>获取指定年份的节假日列表</summary>
@@ -73,50 +73,10 @@ public class HolidayManageService : BaseService, IHolidayManageService
         _logger = logger;
     }
 
-    #region 内置 2026 年种子（与 HolidayService 兜底快照同源，含节日名称）
+    #region 内置种子（HolidaySeedConstants：2026–2027 年，含节日名）
 
-    private static readonly (string Date, string DateType, string Name)[] SeedHolidays2026 =
-    {
-        ("2026-01-01", DutyConstants.HolidayRowTypes.HOLIDAY, "元旦"),
-        ("2026-01-02", DutyConstants.HolidayRowTypes.HOLIDAY, "元旦"),
-        ("2026-01-03", DutyConstants.HolidayRowTypes.HOLIDAY, "元旦"),
-        ("2026-01-04", DutyConstants.HolidayRowTypes.MAKEUP, "元旦后补班"),
-        ("2026-02-14", DutyConstants.HolidayRowTypes.MAKEUP, "春节前补班"),
-        ("2026-02-15", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-16", DutyConstants.HolidayRowTypes.HOLIDAY, "除夕"),
-        ("2026-02-17", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-18", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-19", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-20", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-21", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-22", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-23", DutyConstants.HolidayRowTypes.HOLIDAY, "春节"),
-        ("2026-02-28", DutyConstants.HolidayRowTypes.MAKEUP, "春节后补班"),
-        ("2026-04-04", DutyConstants.HolidayRowTypes.HOLIDAY, "清明节"),
-        ("2026-04-05", DutyConstants.HolidayRowTypes.HOLIDAY, "清明节"),
-        ("2026-04-06", DutyConstants.HolidayRowTypes.HOLIDAY, "清明节"),
-        ("2026-05-01", DutyConstants.HolidayRowTypes.HOLIDAY, "劳动节"),
-        ("2026-05-02", DutyConstants.HolidayRowTypes.HOLIDAY, "劳动节"),
-        ("2026-05-03", DutyConstants.HolidayRowTypes.HOLIDAY, "劳动节"),
-        ("2026-05-04", DutyConstants.HolidayRowTypes.HOLIDAY, "劳动节"),
-        ("2026-05-05", DutyConstants.HolidayRowTypes.HOLIDAY, "劳动节"),
-        ("2026-05-09", DutyConstants.HolidayRowTypes.MAKEUP, "劳动节后补班"),
-        ("2026-06-19", DutyConstants.HolidayRowTypes.HOLIDAY, "端午节"),
-        ("2026-06-20", DutyConstants.HolidayRowTypes.HOLIDAY, "端午节"),
-        ("2026-06-21", DutyConstants.HolidayRowTypes.HOLIDAY, "端午节"),
-        ("2026-09-20", DutyConstants.HolidayRowTypes.MAKEUP, "中秋节前补班"),
-        ("2026-09-25", DutyConstants.HolidayRowTypes.HOLIDAY, "中秋节"),
-        ("2026-09-26", DutyConstants.HolidayRowTypes.HOLIDAY, "中秋节"),
-        ("2026-09-27", DutyConstants.HolidayRowTypes.HOLIDAY, "中秋节"),
-        ("2026-10-01", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-02", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-03", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-04", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-05", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-06", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-07", DutyConstants.HolidayRowTypes.HOLIDAY, "国庆节"),
-        ("2026-10-10", DutyConstants.HolidayRowTypes.MAKEUP, "国庆节后补班"),
-    };
+    // 种子数据统一定义在 Constants\HolidaySeedConstants.cs（HolidayService 兜底快照同源），
+    // 新增年份只改那一处。
 
     #endregion
 
@@ -159,35 +119,57 @@ public class HolidayManageService : BaseService, IHolidayManageService
         var ensureResult = await EnsureTablesExistAsync(ct);
         if (ensureResult.IsFailure) return ensureResult;
 
-        var countResult = await _dbService.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM nc_sys_holidays", ct);
-        if (countResult.IsSuccess && countResult.Value > 0)
-        {
-            LogInfo("节假日数据已存在，跳过种子写入");
-            return Result.Success();
-        }
+        // 按年补齐：仅当该年整年无数据时写入内置种子，避免与接口下载（API）/手工维护（MANUAL）数据混写。
+        // 国务院办公厅公布次年安排后，在 HolidaySeedConstants 追加分组即可自动补入。
+        var seedYears = HolidaySeedConstants.All
+            .GroupBy(r => r.Year)
+            .OrderBy(g => g.Key)
+            .ToList();
 
-        LogInfo("节假日表为空，写入内置 2026 年种子数据");
+        var insertedYears = new List<int>();
+
         await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
-            // 逐行参数化写入（种子为编译期常量，仍统一走位置参数规范）
-            foreach (var (dateText, dateType, name) in SeedHolidays2026)
+            foreach (var group in seedYears)
             {
-                var date = DateTime.Parse(dateText);
-                var insertResult = await _dbService.ExecuteNonQueryAsync(@"
-                    INSERT INTO nc_sys_holidays (holiday_date, date_type, name, year, source, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, NOW())
-                    ON CONFLICT (holiday_date) DO NOTHING", ct,
-                    date, dateType, name, date.Year, DutyConstants.Sources.SEED);
-                if (insertResult.IsFailure)
+                var countResult = await _dbService.ExecuteScalarAsync<long>(
+                    "SELECT COUNT(*) FROM nc_sys_holidays WHERE year = $1", ct, group.Key);
+                if (!countResult.IsSuccess)
                 {
                     await tx.RollbackAsync(ct);
-                    return insertResult;
+                    return countResult;
                 }
+
+                if (countResult.Value > 0) continue; // 该年已有数据（接口/手工/旧种子），不干预
+
+                // 逐行参数化写入（种子为编译期常量，仍统一走位置参数规范）
+                foreach (var row in group)
+                {
+                    var insertResult = await _dbService.ExecuteNonQueryAsync(@"
+                        INSERT INTO nc_sys_holidays (holiday_date, date_type, name, year, source, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, NOW())
+                        ON CONFLICT (holiday_date) DO NOTHING", ct,
+                        row.Date.ToDateTime(TimeOnly.MinValue), row.DateType, row.Name,
+                        row.Year, DutyConstants.Sources.SEED);
+                    if (insertResult.IsFailure)
+                    {
+                        await tx.RollbackAsync(ct);
+                        return insertResult;
+                    }
+                }
+
+                insertedYears.Add(group.Key);
             }
 
             await tx.CommitAsync(ct);
-            Logger.LogBusiness($"节假日种子数据写入完成: {SeedHolidays2026.Length} 条");
+            if (insertedYears.Count == 0)
+            {
+                LogInfo("各年份节假日数据已存在，跳过种子写入");
+                return Result.Success();
+            }
+
+            Logger.LogBusiness($"节假日种子数据写入完成: 年份 {string.Join("、", insertedYears)}");
             return Result.Success();
         }
         catch (Exception ex)

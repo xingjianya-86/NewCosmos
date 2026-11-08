@@ -35,6 +35,8 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
 
     private string _batchId = string.Empty;
     private int? _operatorTownId;
+    /// <summary>经办单位所在县（如「林口县」），随乡镇配置一并加载，供 <see cref="FamilyAddress"/> 拼装「县+镇+村+门牌」。</summary>
+    private string _operatorCountyName = string.Empty;
     private bool _isInitialized;
     private Dictionary<string, string> _idTypeCodeMap = new();
     private Dictionary<string, string> _relationshipCodeMap = new();
@@ -74,7 +76,12 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isTownConfigured;
 
-    public string FamilyAddress => $"{OperatorTownName}{SelectedVillage}{FamilyAddressDetail}";
+    /// <summary>
+    /// 家庭住址（统一口径「县+镇+村+门牌」）。
+    /// 原实现 <c>$"{镇}{村}{详细}"</c>：无县、且详细地址框被档案预填成全地址时会重复叠加镇村。
+    /// 现与存量迁移同走 <see cref="AddressResolver.BuildAddressFromText"/> 单点拼装（各级已含即去重、幂等）。
+    /// </summary>
+    public string FamilyAddress => AddressResolver.BuildAddressFromText(_operatorCountyName, OperatorTownName, SelectedVillage, FamilyAddressDetail);
 
     #endregion
 
@@ -223,6 +230,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             }
 
             _operatorTownId = orgResult.Value.TownId.Value;
+            _operatorCountyName = orgResult.Value.CountyName ?? string.Empty;
 
             var townResult = await _regionService.GetTownByIdAsync(_operatorTownId.Value);
             if (townResult.IsSuccess && townResult.Value != null)
@@ -944,7 +952,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         return new QuickAssetCheckSubmitRequest
         {
             ApplicationDate = ApplicationDate,
-            FamilyAddress = FamilyAddressDetail,
+            FamilyAddress = this.FamilyAddress,
             ApplicationReason = GetApplicationReasonCode(SelectedApplicationReason),
             Community = _villageCodeMap.TryGetValue(SelectedVillage, out var code) ? code : SelectedVillage,
             ContactPhone = ContactPhone,

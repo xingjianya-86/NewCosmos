@@ -300,10 +300,11 @@ public partial class DutyScheduleViewModel : ViewModelBase
 
         if (summary == null)
         {
-            // 已生成月份：确认后强制重生成（游标继续消耗）
+            // 已生成月份：确认后强制重生成（起点取本月之前最近一条真实班次，结果可复现）
             var confirm = await _dialogService.DisplayAlertAsync(
                 "重新生成",
-                $"{Year} 年 {Month} 月值班表已生成。\n重新生成将删除该月班次并按当前轮转游标继续推演（相当于重新摇号），确定继续吗？",
+                $"{Year} 年 {Month} 月值班表已生成。\n重新生成将删除该月班次，并按本月之前最近一次真实班次接续推演" +
+                "（结果可复现，不会随机重摇），确定继续吗？",
                 "重新生成", "取消");
             if (!confirm) return;
 
@@ -329,14 +330,44 @@ public partial class DutyScheduleViewModel : ViewModelBase
                   : string.Empty)
             : string.Empty;
 
+        var warningText = summary.Warnings.Count > 0
+            ? "\n\n" + string.Join("\n", summary.Warnings)
+            : string.Empty;
+
         await _dialogService.DisplayAlertAsync("生成完成",
             $"工作日 {summary.WorkdayCount} 天 / 休息日 {summary.RestdayCount} 天 / 法定节假日 {summary.HolidayCount} 天\n" +
             $"共生成 {summary.ScheduleCount} 个班次" +
             (summary.AnchorDay > 1 ? $"\n（轮转锚点生效：本月自 {summary.AnchorDay} 日起生成）" : string.Empty) +
             (summary.ConflictSkippedCount > 0 ? $"\n同人冲突顺延 {summary.ConflictSkippedCount} 次" : string.Empty) +
             (summary.UnavailableSkippedCount > 0 ? $"\n请假/离职边界顺延 {summary.UnavailableSkippedCount} 次" : string.Empty) +
-            changeText,
+            changeText + warningText,
             "确定");
+
+        // 下游一键重排：本月轮转已变化（或本月原无数据）且后续月份已生成时提示，
+        // 否则后续月份仍按旧轮转，与新链条不衔接
+        if (summary.DownstreamMonths.Count > 0 && summary.RotationChanged != false)
+        {
+            var preview = string.Join("、", summary.DownstreamMonths.Take(6))
+                + (summary.DownstreamMonths.Count > 6 ? $" 等 {summary.DownstreamMonths.Count} 个月" : string.Empty);
+            var reflow = await _dialogService.DisplayAlertAsync("后续月份需重排",
+                $"后续已生成月份（{preview}）是按旧轮转生成的，与本月重生成后的结果不衔接。\n\n" +
+                "是否按时间顺序一并重排？重排后串班/代班仍会自动重放。",
+                "一并重排", "暂不");
+            if (reflow)
+            {
+                var reflowResult = await ExecuteAsync(
+                    () => _dutyService.RegenerateMonthsAsync(summary.DownstreamMonths, CancellationToken),
+                    "正在重排后续月份...");
+                if (reflowResult.IsFailure)
+                {
+                    await ShowFailureAsync(reflowResult, "重排后续月份");
+                }
+                else
+                {
+                    await ShowSnackBarAsync($"已按时间顺序重排 {reflowResult.Value} 个后续月份");
+                }
+            }
+        }
 
         // 跨月串班/代班待生效：弹窗询问一键补齐对方月份（生成后重放自动生效）
         if (summary.PendingChangeMonths.Count > 0)
@@ -377,7 +408,7 @@ public partial class DutyScheduleViewModel : ViewModelBase
 
         var confirm = await _dialogService.DisplayAlertAsync(
             "清空值班表",
-            $"确定要删除 {Year} 年 {Month} 月的全部班次吗？\n（轮转游标不受影响，可重新生成）",
+            $"确定要删除 {Year} 年 {Month} 月的全部班次吗？\n（清空后可重新生成：起点取本月之前最近一次真实班次）",
             "删除", "取消");
         if (!confirm) return;
 

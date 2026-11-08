@@ -26,8 +26,13 @@ public class ArchivePhoto
     /// <summary>照片类别（PhotoCategoryConstants：身份证/户口本/公示核查/其他证件）。</summary>
     public string PhotoCategory { get; set; } = PhotoCategoryConstants.OTHER_CERT;
 
-    /// <summary>照片备注/说明（如"户口本第2页"）。</summary>
+    /// <summary>照片备注/说明（如"户口本第2页"）。
+    /// 2026-11-04 起新采集按规则生成：姓名_身份证后4位_类别_编号（该人该类别内流水，往下递增不覆盖）。</summary>
     public string? PhotoName { get; set; }
+
+    /// <summary>列表显示名：有 PhotoName 显示之，否则回退"照片 #Id"（旧数据未回填时）。
+    /// 只读计算属性，不参与 DB 列映射（映射仅取可写属性）。</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(PhotoName) ? $"照片 #{Id}" : PhotoName;
 
     /// <summary>照片字节数（压缩后）。</summary>
     public long FileSize { get; set; }

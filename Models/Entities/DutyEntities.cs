@@ -27,25 +27,6 @@ public class SysHoliday
 }
 
 /// <summary>
-/// 值班成员（nc_duty_members）
-/// </summary>
-public class DutyMember
-{
-    public long Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Phone { get; set; } = string.Empty;
-    public bool IsActive { get; set; } = true;
-    /// <summary>入职时间（空=不限制；值班日当天须已入职才参与轮转）</summary>
-    public DateTime? JoinDate { get; set; }
-    /// <summary>离职时间（空=在职；值班日当天须未离职才参与轮转）</summary>
-    public DateTime? ExitDate { get; set; }
-    public int SortOrder { get; set; }
-    public string Remark { get; set; } = string.Empty;
-    public DateTime? CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
-}
-
-/// <summary>
 /// 成员分组归属（nc_duty_member_groups）
 /// </summary>
 public class DutyGroupAssignment
@@ -463,6 +444,18 @@ public class DutyGenerationSummary
 
     /// <summary>因轮转已变化（或命中请假）而跳过重放的条数（需人工改期/撤销）</summary>
     public int SkippedChangeCount { get; set; }
+
+    /// <summary>
+    /// 本月轮转结果是否与原有班次不同：null=本月原本无数据（清空后生成/首次生成）；
+    /// false=与原班次完全一致（无需提示下游重排）；true=已变化。
+    /// </summary>
+    public bool? RotationChanged { get; set; }
+
+    /// <summary>本月之后已生成班次的月份（yyyy-MM，升序；供"下游一键重排"）</summary>
+    public List<string> DownstreamMonths { get; set; } = new();
+
+    /// <summary>生成过程中的提示（如回溯补生成无前序班次、已按名单头开始）</summary>
+    public List<string> Warnings { get; set; } = new();
 }
 
 /// <summary>

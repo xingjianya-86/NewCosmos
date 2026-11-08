@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.AssetVerification;
@@ -738,6 +739,8 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
     partial void OnSelectedMatchTaskChanged(AssetVerificationTask? value)
     {
         HasSelectedMatchTask = value != null;
+        OpenPhotosCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanOpenPhotos));
 
         if (value != null)
         {
@@ -755,6 +758,23 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             ReportVersionInfoText = string.Empty;
         }
     }
+
+    /// <summary>打开当前选中人员的档案照片（查询 / 预览 / 勾选批量导出），预填身份证并自动检索。</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenPhotosMethod))]
+    private async Task OpenPhotosAsync()
+    {
+        var idCard = SelectedMatchTask?.ArchiveIdCard;
+        if (string.IsNullOrWhiteSpace(idCard)) return;
+
+        Logger.LogBusiness("月度审核-档案照片", ("IdCard", DataMasker.MaskIdCard(idCard)));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(idCard));
+    }
+
+    private bool CanOpenPhotosMethod() => HasSelectedMatchTask && !IsBusy;
+
+    /// <summary>「照片」按钮可用性（XAML 绑定）。</summary>
+    public bool CanOpenPhotos => HasSelectedMatchTask;
 
     [RelayCommand]
     private void SelectMatchTask(AssetVerificationTask task)

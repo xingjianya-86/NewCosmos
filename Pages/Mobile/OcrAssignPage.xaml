@@ -32,14 +32,30 @@
                             StrokeThickness="0" Padding="14" Margin="0,5">
                         <VerticalStackLayout Spacing="8">
 
-                            <!-- 标题行：类别 + 校验警告徽标 -->
-                            <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="{Binding Category, StringFormat='识别记录 · {0}'}"
-                                       FontSize="14" FontAttributes="Bold"
-                                       TextColor="{StaticResource TextPrimary}"/>
-                                <Label Grid.Column="1" IsVisible="{Binding IdCardChecksumInvalid}"
+                            <!-- 标题行：来源照片缩略图 + 类别/标签 + 校验警告徽标 -->
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <Image Grid.Column="0"
+                                       Source="{Binding ThumbnailImage}"
+                                       IsVisible="{Binding HasThumbnail}"
+                                       WidthRequest="64" HeightRequest="64"
+                                       Aspect="AspectFill"
+                                       BackgroundColor="{StaticResource Gray50}"/>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                    <Label Text="{Binding CategoryName, StringFormat='识别记录 · {0}'}"
+                                           FontSize="14" FontAttributes="Bold"
+                                           TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="{Binding PhotoLabel}"
+                                           IsVisible="{Binding HasPhotoLabel}"
+                                           FontSize="12" TextColor="{StaticResource TextSecondary}"
+                                           LineBreakMode="TailTruncation"/>
+                                    <Label Text="{Binding FailReason, StringFormat='❌ {0}'}"
+                                           IsVisible="{Binding IsFailed}"
+                                           FontSize="12" TextColor="{StaticResource Error}"
+                                           LineBreakMode="WordWrap"/>
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2" IsVisible="{Binding IdCardChecksumInvalid}"
                                        Text="校验位不符" FontSize="12" TextColor="#D46B08"
-                                       BackgroundColor="#FFF7E6" Padding="8,2"/>
+                                       BackgroundColor="#FFF7E6" Padding="8,2" VerticalOptions="Start"/>
                             </Grid>
 
                             <!-- 可编辑字段（每字段一行：标签 + Entry） -->

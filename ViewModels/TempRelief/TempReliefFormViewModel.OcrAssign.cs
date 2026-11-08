@@ -20,6 +20,8 @@ public partial class TempReliefFormViewModel : IOcrAssignContext
         {
             case PhotoCategoryConstants.ID_CARD:
                 targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.Head, "申请人"));
+                // 2026-11-05：身份证背面住址 → 详细地址（家庭住址由分列拼装，见 BuildFamilyAddress）
+                targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.FormAddress, "详细地址"));
                 break;
             case PhotoCategoryConstants.BANK_CARD:
                 targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.FormBank, "开户行/银行卡号"));
@@ -65,6 +67,20 @@ public partial class TempReliefFormViewModel : IOcrAssignContext
                 if (OcrAssignmentPlanner.IsBlank(DifficultyReason) && diagnosis.Length > 0)
                 {
                     DifficultyReason = diagnosis;
+                    written = true;
+                }
+                break;
+
+            case OcrAssignmentPlanner.TargetKeys.FormAddress:
+                // 身份证背面住址 → 详细地址（只填空）。分列（省/市/县/镇/村）取自来源数据、界面只读，
+                // 家庭住址在保存时按分列拼装（BuildFamilyAddress），故唯一可编辑、可落库的目标是详细地址。
+                // 身份证住址是「省+市+县+镇+村+门牌」全量形态：先剥省/市前缀，避免拼进 family_address
+                // 后与其余行的「县+镇+村+门牌」口径不一致；县及以下由拼装层去重。
+                var homeAddress = record.GetField(OcrFieldKeys.Address);
+                if (OcrAssignmentPlanner.IsBlank(ApplicantDetailAddress) && homeAddress.Length > 0)
+                {
+                    ApplicantDetailAddress = AddressResolver.StripLeadingRegion(
+                        homeAddress, ApplicantProvince, ApplicantCity);
                     written = true;
                 }
                 break;

@@ -40,6 +40,12 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
     private long _id;
     private bool _suppressEvaluate;
 
+    /// <summary>
+    /// 加载档案时的状态（只读快照）：补全模式加载的多为已确认档（导入建档/复核补建均落 Confirmed），
+    /// "保存并继续"据此决定保存后是否再调 ConfirmAsync——已确认档幂等跳过，已停发档拦截。
+    /// </summary>
+    private string _loadedStatus = string.Empty;
+
     /// <summary>保存后自动跳转到停发页（从导入库建档补全流程）</summary>
     public bool NavigateToStopAfterSave { get; private set; }
 
@@ -49,23 +55,43 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
     /// <summary>导入库来源记录ID（source_type='ElderlySubsidyHistory' 时有效，补全保存后删除导入库用）</summary>
     private long? _importedHistoryId;
 
-    /// <summary>设置 NavigateToStopAfterSave 并通知横幅属性刷新</summary>
+    /// <summary>设置 NavigateToStopAfterSave 并通知横幅/按钮属性刷新</summary>
     public void SetNavigateToStopAfterSave(bool value)
     {
         NavigateToStopAfterSave = value;
-        OnPropertyChanged(nameof(IsModeBannerVisible));
-        OnPropertyChanged(nameof(ModeBannerText));
+        NotifyModeDependentProperties();
     }
 
     /// <summary>保存后返回复核页继续办理（复核前置补全来源，不跳档案输出页）</summary>
     public bool ReturnToReview { get; private set; }
 
-    /// <summary>设置 ReturnToReview 并通知横幅属性刷新</summary>
+    /// <summary>设置 ReturnToReview 并通知横幅/按钮属性刷新</summary>
     public void SetReturnToReview(bool value)
     {
         ReturnToReview = value;
+        NotifyModeDependentProperties();
+    }
+
+    /// <summary>数据补全模式（停发页/复核页的补全入口；加载的档案通常已是在享已确认档）</summary>
+    public bool IsCompletionMode => NavigateToStopAfterSave || ReturnToReview;
+
+    /// <summary>补全模式主按钮文案（保存后按入口继续办理，不重复确认已确认档）</summary>
+    public string CompletionSaveButtonText => NavigateToStopAfterSave
+        ? "保存并进入停发"
+        : ReturnToReview
+            ? "保存并返回复核"
+            : "保存";
+
+    /// <summary>补全模式开关变化后统一刷新依赖属性</summary>
+    private void NotifyModeDependentProperties()
+    {
+        OnPropertyChanged(nameof(IsCompletionMode));
+        OnPropertyChanged(nameof(CompletionSaveButtonText));
         OnPropertyChanged(nameof(IsModeBannerVisible));
         OnPropertyChanged(nameof(ModeBannerText));
+        OnPropertyChanged(nameof(IsSaveAndConfirmVisible));
+        OnPropertyChanged(nameof(IsDraftSaveVisible));
+        OnPropertyChanged(nameof(IsCompletionSaveVisible));
     }
 
     /// <summary>与申请人关系预设选项（字典 FamilyRelationships 中文显示值；档案存量脏值加载时兜底追加保证可见）</summary>

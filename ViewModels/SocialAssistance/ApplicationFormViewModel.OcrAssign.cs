@@ -32,6 +32,9 @@ public partial class ApplicationFormViewModel : IOcrAssignContext
                     targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.Member(i.ToString()), label));
                 }
                 targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.NewSupporter, "新增赡养人"));
+                // 2026-11-05：身份证背面住址 → 家庭地址（与人物行并列可选）
+                if (categoryCode == PhotoCategoryConstants.ID_CARD)
+                    targets.Add(new OcrAssignmentTarget(OcrAssignmentPlanner.TargetKeys.FormAddress, "家庭地址"));
                 break;
 
             case PhotoCategoryConstants.BANK_CARD:
@@ -110,7 +113,27 @@ public partial class ApplicationFormViewModel : IOcrAssignContext
 
             case OcrAssignmentPlanner.TargetKeys.FormHukou:
                 var hukou = record.GetField(OcrFieldKeys.HukouAddress);
-                if (OcrAssignmentPlanner.IsBlank(HukouAddress) && hukou.Length > 0) { HukouAddress = hukou; written = true; }
+                // 2026-11-04 修复：原判据 IsBlank(HukouAddress) 会被表单初始化时按级联默认值
+                // 自动拼出的地址挡住（新建表单 HukouAddress 恒非空），OCR 永远填不进。
+                // 正确判据 = 用户是否手工编辑过：自动默认值可被识别结果覆盖，手填值不覆盖。
+                if (hukou.Length > 0 && !_isHukouAddressManuallyEdited)
+                {
+                    HukouAddress = hukou;
+                    _isHukouAddressManuallyEdited = true;   // 锁定全文，防级联回拼覆盖
+                    written = true;
+
+                    // 同步解析进户籍级联（市/县/镇/村 + 区划 ID），保证保存时 ID 与地址文本一致；
+                    // _isLoadingDefaults 期间抑制 Setter 的异步级联，由解析方法手动加载。
+                    _isLoadingDefaults = true;
+                    try
+                    {
+                        await TryResolveHukouCascadeFromTextAsync(hukou);
+                    }
+                    finally
+                    {
+                        _isLoadingDefaults = false;
+                    }
+                }
                 break;
 
             case OcrAssignmentPlanner.TargetKeys.FormReason:
@@ -119,6 +142,16 @@ public partial class ApplicationFormViewModel : IOcrAssignContext
                 if (OcrAssignmentPlanner.IsBlank(ApplicationReasonDetail) && diagnosis.Length > 0)
                 {
                     ApplicationReasonDetail = diagnosis;
+                    written = true;
+                }
+                break;
+
+            case OcrAssignmentPlanner.TargetKeys.FormAddress:
+                // 身份证背面住址 → 家庭地址（只填空；低收入家庭地址是自由文本）
+                var homeAddress = record.GetField(OcrFieldKeys.Address);
+                if (OcrAssignmentPlanner.IsBlank(Address) && homeAddress.Length > 0)
+                {
+                    Address = homeAddress;
                     written = true;
                 }
                 break;

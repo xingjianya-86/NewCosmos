@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.Maui.Controls;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Services.Platform;
@@ -49,6 +50,9 @@ public sealed partial class OcrRecognizedRecord : ObservableObject
 
     public string Category { get; }
 
+    /// <summary>类别中文名（卡片标题展示用）</summary>
+    public string CategoryName => PhotoCategoryConstants.GetDisplayName(Category);
+
     /// <summary>可编辑字段条目</summary>
     public ObservableCollection<OcrFieldItem> FieldItems { get; } = new();
 
@@ -70,6 +74,27 @@ public sealed partial class OcrRecognizedRecord : ObservableObject
 
     /// <summary>记录是否有可回填内容（字段全空 = 无内容，目标锁定"不使用"）</summary>
     public bool HasContent => Result.HasAny;
+
+    /// <summary>来源照片缩略图（识别时生成；null = 扫描页单拍或解码失败）。XAML Image 绑定用。</summary>
+    public ImageSource? ThumbnailImage =>
+        Result.Thumbnail is { Length: > 0 } bytes
+            ? ImageSource.FromStream(() => new MemoryStream(bytes))
+            : null;
+
+    /// <summary>是否有来源照片缩略图</summary>
+    public bool HasThumbnail => Result.Thumbnail is { Length: > 0 };
+
+    /// <summary>来源照片标签（如「张三_1234_身份证_01」；扫描页单拍为空）</summary>
+    public string PhotoLabel => Result.PhotoLabel;
+
+    /// <summary>来源照片标签是否可见</summary>
+    public bool HasPhotoLabel => !string.IsNullOrWhiteSpace(Result.PhotoLabel);
+
+    /// <summary>识别失败/无内容原因（成功识别出字段为空串）</summary>
+    public string FailReason => Result.FailReason;
+
+    /// <summary>是否识别失败（分配页识别清单显示失败原因）</summary>
+    public bool IsFailed => !string.IsNullOrWhiteSpace(Result.FailReason);
 
     /// <summary>取编辑后的字段值（回填用；键见 OcrFieldKeys，缺省空串）</summary>
     public string GetField(string key)

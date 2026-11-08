@@ -118,18 +118,6 @@ public class PrintTemplate
 }
 
 /// <summary>
-/// 打印数据
-/// </summary>
-public class PrintData
-{
-    public string TemplateCode { get; set; } = string.Empty;
-    public Dictionary<string, object> Fields { get; set; } = new();
-    public List<Dictionary<string, object>> TableData { get; set; } = new();
-    public bool ShowGracePeriodTag { get; set; }
-    public GracePeriodPrintInfo GracePeriodInfo { get; set; } = new();
-}
-
-/// <summary>
 /// 月报表单源文件结果（一张双页表单拆为农村/城市两份）
 /// </summary>
 public class MonthlySourceFile

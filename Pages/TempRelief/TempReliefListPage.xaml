@@ -141,6 +141,14 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ViewDetailCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="补打" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Info}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReprintCommand}"
@@ -189,6 +197,14 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="查看档案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ViewDetailCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="照片" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="补打" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Info}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReprintCommand}"
@@ -327,6 +343,15 @@
                             Padding="16,10"
                             CornerRadius="{StaticResource CornerRadiusMedium}"/>
             </components:PageHeaderView.HeaderActions>
+            <!-- 统计胶囊（Phase 6 迁移时漏迁，20261105 补回；浅色变体适配纸底页头） -->
+            <components:PageHeaderView.Stats>
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding DraftCount}" Caption="草稿（件）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding ConfirmedCount}" Caption="已确认累计（件）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="2" Value="{Binding YearConfirmedText}" Caption="本年确认（人次）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="3" Value="{Binding YearAmountText}" Caption="本年确认金额（元）"/>
+                </Grid>
+            </components:PageHeaderView.Stats>
         </components:PageHeaderView>
 
         <!-- Tab 栏：草稿 / 已确认 / 已终止 -->

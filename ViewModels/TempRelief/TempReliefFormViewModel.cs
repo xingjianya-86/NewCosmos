@@ -247,9 +247,6 @@ public partial class TempReliefFormViewModel : ViewModelBase
     private string _applicantPhone = string.Empty;
 
     [ObservableProperty]
-    private string _applicantAddress = string.Empty;
-
-    [ObservableProperty]
     private string _applicantHukou = string.Empty;
 
     [ObservableProperty]
@@ -1021,6 +1018,24 @@ public partial class TempReliefFormViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(HukouDistrict)) parts.Add(HukouDistrict);
         if (!string.IsNullOrWhiteSpace(HukouTown)) parts.Add(HukouTown);
         return string.Concat(parts);
+    }
+
+    /// <summary>
+    /// 拼接家庭住址文本（落库 family_address；打印/月报「家庭住址」列直取本列）。
+    /// 唯一拼装入口 <c>AddressResolver.BuildAddressFromText</c>（县+镇+村+门牌，自动去重、
+    /// <c>-</c> 占位清空、<c>村民委员会/村委会</c>→<c>XX村</c>、<c>XX镇本级</c>→无村）。
+    /// <para>2026-11-05 统一：原实现照抄来源台账原文（有省全量、有只到村、有「镇直」），
+    /// 且改详细地址不回写本列；现改为保存时按分列重拼，与档案封面、文书直出同口径。</para>
+    /// </summary>
+    private string BuildFamilyAddress()
+    {
+        // 「村委会」是来源无村时的 UI 占位值（TempReliefConstants.DefaultVillage），按无村处理
+        var village = string.IsNullOrWhiteSpace(ApplicantVillage)
+            || ApplicantVillage == TempReliefConstants.DefaultVillage
+            ? string.Empty
+            : ApplicantVillage;
+        return Helpers.AddressResolver.BuildAddressFromText(
+            ApplicantDistrict, ApplicantTown, village, ApplicantDetailAddress);
     }
 
     private void ClearHukou()

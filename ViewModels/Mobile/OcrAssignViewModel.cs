@@ -99,13 +99,19 @@ public partial class OcrAssignViewModel : ViewModelBase
         }
 
         HasChecksumWarning = Records.Any(r => r.IdCardChecksumInvalid);
-        var categoryName = Records.Count > 0
-            ? PhotoCategoryConstants.GetDisplayName(Records[0].Category)
-            : string.Empty;
-        SummaryText = $"{Records.Count} 条「{categoryName}」记录 · 已预匹配 {suggested} 条，可逐条调整去向";
+        var okCount = Records.Count(r => r.HasContent);
+        var failCount = Records.Count - okCount;
+        var categoryNames = Records
+            .Select(r => PhotoCategoryConstants.GetDisplayName(r.Category))
+            .Distinct()
+            .ToList();
+        var categoryText = categoryNames.Count == 1 ? $"「{categoryNames[0]}」" : $"（{categoryNames.Count} 个类别）";
+        SummaryText = failCount == 0
+            ? $"共 {Records.Count} 条{categoryText}记录 · 已预匹配 {suggested} 条，可逐条调整去向"
+            : $"识别清单：{Records.Count} 张 · 成功 {okCount} · 未识别 {failCount} · 已预匹配 {suggested} 条";
 
         _logger.LogBusiness("打开识别结果分配",
-            ("Category", categoryName),
+            ("Category", string.Join("/", categoryNames)),
             ("RecordCount", Records.Count.ToString()),
             ("Suggested", suggested.ToString()));
     }
@@ -162,6 +168,9 @@ public partial class OcrAssignViewModel : ViewModelBase
             }
         }
 
+        // 本轮提示（未回填原因）单独收集：开始前清空，结束后汇总提示一次
+        _context.ClearWarnings();
+
         var applied = 0;
         foreach (var record in Records)
         {
@@ -183,6 +192,14 @@ public partial class OcrAssignViewModel : ViewModelBase
             ("RecordCount", Records.Count.ToString()),
             ("Applied", applied.ToString()));
 
+        // 解析失败/部分未回填（如旧村名匹配不到）必须让用户看到原因，不能静默保持原值
+        var warnings = _context.Warnings;
+        if (warnings.Count > 0)
+        {
+            await _dialogService.DisplayAlertAsync("部分内容未回填",
+                string.Join("\n", warnings.Distinct()), "知道了");
+        }
+
         await CompleteAsync(applied);
     }
 
@@ -196,5 +213,22 @@ public partial class OcrAssignViewModel : ViewModelBase
         _onCompleted = null;
         await GoBackAsync();
         callback?.Invoke(applied);
+    }
+
+    /// <summary>页头「返回」等未经确认回填的退出：先以 0 放行完成回调，否则来源页
+    /// await TaskCompletionSource 永挂、其扫描/识别按钮永久灰死。
+    /// 确认回填路径（CompleteAsync）已先行消费回调，此处为 no-op，不串味 applied。</summary>
+    public override async Task GoBackAsync()
+    {
+        NotifyAbandoned();
+        await base.GoBackAsync();
+    }
+
+    /// <summary>幂等：以 0 触发完成回调（离开分配页且未确认回填时的兜底）。</summary>
+    public void NotifyAbandoned()
+    {
+        var callback = _onCompleted;
+        _onCompleted = null;
+        callback?.Invoke(0);
     }
 }

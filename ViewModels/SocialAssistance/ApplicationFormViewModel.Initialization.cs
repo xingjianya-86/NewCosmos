@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
@@ -1666,72 +1666,79 @@ public partial class ApplicationFormViewModel
             var address = hukouAddress.Trim();
             if (address.Length == 0) return;
 
-            // 市（最长前缀匹配，防同前缀城市歧义）
+            // 市（用统一匹配器：允许带省名前缀，不要求地址以市名开头）
             var citiesResult = await _regionService.GetCitiesAsync();
-            var city = citiesResult.Value?
-                .Where(c => !string.IsNullOrEmpty(c.CityName) && address.StartsWith(c.CityName, StringComparison.Ordinal))
-                .OrderByDescending(c => c.CityName.Length)
-                .FirstOrDefault();
-            if (city == null)
+            var cityMatch = OcrAssignmentPlanner.MatchRegionOption(
+                (citiesResult.Value ?? new List<RegionCity>())
+                    .Select(c => c.CityName).Where(n => !string.IsNullOrEmpty(n)).ToList(),
+                address);
+            if (cityMatch is null)
             {
                 _logger.Warn($"户籍文本解析: 未匹配到地级市: {address}");
                 return;
             }
 
+            var city = citiesResult.Value!.First(c => c.CityName == cityMatch.Value.Name);
             HukouCity = city.CityName;
             _hukouCityId = city.Id;
             await LoadHukouDistrictsForCityAsync(city.CityName);
 
-            var rest = address[city.CityName.Length..];
+            var rest = address[(cityMatch.Value.Index + cityMatch.Value.Length)..];
 
             // 县（限定在已匹配城市下）
             var countiesResult = await _regionService.GetCountiesByCityAsync(city.CityName);
-            var county = countiesResult.Value?
-                .Where(c => !string.IsNullOrEmpty(c.CountyName) && rest.StartsWith(c.CountyName, StringComparison.Ordinal))
-                .OrderByDescending(c => c.CountyName.Length)
-                .FirstOrDefault();
-            if (county == null)
+            var countyMatch = OcrAssignmentPlanner.MatchRegionOption(
+                (countiesResult.Value ?? new List<RegionCounty>())
+                    .Select(c => c.CountyName).Where(n => !string.IsNullOrEmpty(n)).ToList(),
+                rest);
+            if (countyMatch is null)
             {
                 _logger.Warn($"户籍文本解析: 未匹配到区县: {rest}");
                 return;
             }
 
+            var county = countiesResult.Value!.First(c => c.CountyName == countyMatch.Value.Name);
             HukouDistrict = county.CountyName;
             // 该方法内部按名称回填 _hukouCountyId 并加载乡镇选项
             await LoadHukouTownsForDistrictAsync(county.CountyName);
-            rest = rest[county.CountyName.Length..];
+            rest = rest[(countyMatch.Value.Index + countyMatch.Value.Length)..];
 
             // 镇（限定在已匹配县区下）
             var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId ?? county.Id);
-            var town = townsResult.Value?
-                .Where(t => !string.IsNullOrEmpty(t.TownName) && rest.StartsWith(t.TownName, StringComparison.Ordinal))
-                .OrderByDescending(t => t.TownName.Length)
-                .FirstOrDefault();
-            if (town == null)
+            var townMatch = OcrAssignmentPlanner.MatchRegionOption(
+                (townsResult.Value ?? new List<RegionTown>())
+                    .Select(t => t.TownName).Where(n => !string.IsNullOrEmpty(n)).ToList(),
+                rest);
+            if (townMatch is null)
             {
                 _logger.Warn($"户籍文本解析: 未匹配到乡镇: {rest}");
                 return;
             }
 
+            var town = townsResult.Value!.First(t => t.TownName == townMatch.Value.Name);
             HukouTown = town.TownName;
             // 该方法内部按名称回填 _hukouTownId 并加载村选项
             await LoadHukouVillagesForTownAsync(town.TownName);
-            rest = rest[town.TownName.Length..];
+            rest = rest[(townMatch.Value.Index + townMatch.Value.Length)..];
 
-            // 村（限定在已匹配乡镇下，取最长前缀）
+            // 村（限定在已匹配乡镇下；库内「万寿村委会」可匹配户口本「万寿村」）
             var villagesResult = await _regionService.GetVillagesByTownIdAsync(_hukouTownId ?? town.Id);
-            var village = villagesResult.Value?
-                .Where(v => !string.IsNullOrEmpty(v.VillageName) && rest.StartsWith(v.VillageName, StringComparison.Ordinal))
-                .OrderByDescending(v => v.VillageName.Length)
-                .FirstOrDefault();
-            if (village != null)
+            var villageMatch = OcrAssignmentPlanner.MatchRegionOption(
+                (villagesResult.Value ?? new List<RegionVillage>())
+                    .Select(v => v.VillageName).Where(n => !string.IsNullOrEmpty(n)).ToList(),
+                rest);
+            if (villageMatch is not null)
             {
+                var village = villagesResult.Value!.First(v => v.VillageName == villageMatch.Value.Name);
                 HukouVillage = village.VillageName;
                 _hukouVillageId = village.Id;
             }
             else
             {
                 _logger.Warn($"户籍文本解析: 未匹配到村社区: {rest}");
+                // 村名可能是旧自然屯/旧称：清空自动选中的首村，避免错误村名随保存入库
+                if (_addressScope is not { IsVillageLocked: true })
+                    HukouVillage = string.Empty;
             }
 
             _logger.Info($"户籍文本解析完成: {HukouCity}/{HukouDistrict}/{HukouTown}/{HukouVillage}");

@@ -24,6 +24,20 @@ public sealed class OcrRecognizeResult
     /// <summary>服务端推理耗时（毫秒）</summary>
     public long ElapsedMs { get; init; }
 
+    // ── 以下为客户端附加字段（不在服务端契约内，客户端填充，批量识别溯源展示用）──
+
+    /// <summary>来源照片 Id（0 = 扫描页单拍、无存档照片）</summary>
+    public long PhotoId { get; set; }
+
+    /// <summary>来源照片展示标签（如「张三_1234_身份证_01」），分配页卡片溯源用</summary>
+    public string PhotoLabel { get; set; } = string.Empty;
+
+    /// <summary>来源照片缩略图（WebP，长边 ≤240px；null = 无图或解码失败）</summary>
+    public byte[]? Thumbnail { get; set; }
+
+    /// <summary>识别失败/无内容原因（成功识别出字段时为空串）；分配页识别清单用</summary>
+    public string FailReason { get; set; } = string.Empty;
+
     /// <summary>是否至少识别出一个非空字段或文本行</summary>
     public bool HasAny =>
         Fields.Values.Any(v => !string.IsNullOrWhiteSpace(v)) || Lines.Count > 0;

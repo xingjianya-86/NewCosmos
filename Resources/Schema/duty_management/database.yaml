@@ -235,6 +235,9 @@ tables:
         unique: true
       - name: idx_duty_schedules_year_month
         columns: [year, month]
+      # 轮转锚点取数：目标月之前最近一条该线班次（DISTINCT ON group_code,date_type ORDER BY duty_date DESC）
+      - name: idx_duty_schedules_line_date
+        columns: [group_code, date_type, duty_date]
     foreignKeys:
       - name: fk_duty_schedules_member
         columns: [member_id]

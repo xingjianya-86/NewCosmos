@@ -22,17 +22,6 @@ public enum ChangeCategory
 }
 
 /// <summary>
-/// 打印状
-/// </summary>
-public enum PrintStatus
-{
-    Pending,
-    Printing,
-    Completed,
-    Failed
-}
-
-/// <summary>
 /// 归档类型
 /// </summary>
 public enum ArchiveType

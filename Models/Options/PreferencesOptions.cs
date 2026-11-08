@@ -11,7 +11,6 @@ public class PreferencesOptions
     public string RememberedUsernameKey { get; set; } = string.Empty;
     public string RememberedPasswordKey { get; set; } = string.Empty;
     public string RememberPasswordKey { get; set; } = string.Empty;
-    public string LastBackgroundKey { get; set; } = string.Empty;
 
     /// <summary>
     /// 验证配置是否完整

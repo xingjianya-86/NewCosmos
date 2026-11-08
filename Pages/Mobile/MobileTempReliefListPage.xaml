@@ -107,7 +107,7 @@
         </DataTemplate>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 橙色英雄头部 -->
         <!-- 统一页头（纸墨档案风报头 · Phase 6 移动端；业务信息/统计迁入 Stats） -->
@@ -169,8 +169,15 @@
                     Command="{Binding SearchCommand}"/>
         </Grid>
 
+        <!-- 新增入口（复用桌面 CreateNewCommand，Android 自动跳手机表单页） -->
+        <Grid Grid.Row="3" Padding="12,6" BackgroundColor="White">
+            <Button Text="&#x2795; 新增申请" HeightRequest="42" FontSize="15" CornerRadius="10"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    Command="{Binding CreateNewCommand}"/>
+        </Grid>
+
         <!-- 列表 -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <CollectionView ItemsSource="{Binding DraftApps}" ItemTemplate="{StaticResource TempCardTemplate}"
                             IsVisible="{Binding IsTab0Selected}" Margin="12,8" SelectionMode="None">
                 <CollectionView.EmptyView>
@@ -192,7 +199,7 @@
         </Grid>
 
         <!-- 分页 -->
-        <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
+        <Border Grid.Row="5" BackgroundColor="White" StrokeThickness="0" Padding="12,8,12,14">
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
                 <Button Text="上一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
                         BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
@@ -207,7 +214,7 @@
         </Border>
 
         <!-- 加载蒙版 -->
-        <Border Grid.Row="0" Grid.RowSpan="5" BackgroundColor="#80000000"
+        <Border Grid.Row="0" Grid.RowSpan="6" BackgroundColor="#80000000"
                 IsVisible="{Binding IsBusy}" InputTransparent="True">
             <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
                 <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
