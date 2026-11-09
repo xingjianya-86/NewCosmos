@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261108</ApplicationDisplayVersion>
-		<ApplicationVersion>20261108</ApplicationVersion>
+		<ApplicationDisplayVersion>1.2.20261109</ApplicationDisplayVersion>
+		<ApplicationVersion>20261109</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -108,6 +108,18 @@
 	     Windows 端按字体族名解析，族内含 Regular+Bold，FontAttributes=Bold 自动选字重。 -->
 	<ItemGroup>
 		<MauiFont Include="Resources\Fonts\*.ttf" />
+	</ItemGroup>
+
+	<!-- 公文字体随包分发（仅 Windows）：文书打印/Word COM 依赖系统已装字体，
+	     随包带上供主页首屏"一键安装"复制到用户字体目录（FontInstallChecker）。
+	     目录为本机资产（gitignore 不入库，AGENTS §2）：新 clone 无此目录时 glob 不匹配、
+	     不报错，构建照常，仅运行时检测静默跳过。Android 不生成公文文书，不打包。 -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<None Include="公文字体\**\*.ttf;公文字体\**\*.ttc">
+			<Link>公文字体\%(RecursiveDir)%(Filename)%(Extension)</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</None>
 	</ItemGroup>
 
 	<!-- 排除备份文件 -->
