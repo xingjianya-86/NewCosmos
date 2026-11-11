@@ -166,7 +166,7 @@ public static partial class FieldKeys
     public const string PROPERTY_EXEMPTION_SITUATION = "PROPERTY_EXEMPTION_SITUATION"; // 家庭财产豁免情况
     public const string KINSHIP_FILING_SITUATION = "KINSHIP_FILING_SITUATION";     // 近亲属备案
     public const string SURVEY_TIME = "SURVEY_TIME";                              // 入户调查时间
-    public const string PROMISE_DATE = "PROMISE_DATE";                            // 诚信承诺落款日期（首次审批日，未审批=申请日期；已批档案钳下限公示开始日）
+    public const string PROMISE_DATE = "PROMISE_DATE";                            // 诚信承诺落款日期（2026-11-11 起 = 入户调查当天，与 SURVEY_DATE 同源同值；原首次审批日口径见 docs\20261016_申请日期锚点改按调查日与文书日期口径.md）
 
     // 共同生活成员（索引字段基础键）
     public const string SHARED_MEMBER_NAME = "SHARED_MEMBER_NAME";

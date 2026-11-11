@@ -92,6 +92,15 @@ public interface IApplicationService
     /// </summary>
     Task<Result<string>> GetNextApplicationNoAsync(DateTime date, CancellationToken ct = default);
 
+    /// <summary>
+    /// 修改申请日期（申请时间）：同改申请编号日期段与 created_at（申请日期权威来源，
+    /// 解析链见 ArchiveAnchorHelper.ResolveApplicationDate——只改一处无效，编号日期段优先）。
+    /// 仅草稿（status=Draft 且 current_step&lt;5）可改；新日期 ≤ 今天且不早于当年 1 月 1 日。
+    /// 改期会改变该档批次（公示窗口/卷号/文书申请日期/批次顺延提示），返回新申请编号；
+    /// 全程单事务并写审计（nc_biz_application_logs，action=修改申请日期）。
+    /// </summary>
+    Task<Result<string>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default);
+
 /// <summary>
     /// 检查身份证号是否存
 /// </summary>

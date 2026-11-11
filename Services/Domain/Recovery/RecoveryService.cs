@@ -666,21 +666,27 @@ public class RecoveryService : BaseService, IRecoveryService
         {
             LogInfo($"更新追缴记录状态: id={id}, status={status}");
 
-            // 状态守卫（与本服务其余方法"SQL 内联状态校验"风格一致）：
-            // 追缴记录状态机实际只有 Draft→Printed（归档写回），禁止 Printed 回退 Draft 或跳转其他状态。
-            if (status != RecoveryConstants.STATUS_PRINTED)
+            // 状态守卫（与本服务其余方法"SQL 内联状态校验"风格一致；2026-11-08 P1-8 放宽）：
+            //   Draft→Confirmed 快捷结案（死亡联动「追缴结案」一键推进，RecoverySearchViewModel.CloseRecordCommand）；
+            //   Draft/Confirmed→Printed 归档写回（Confirmed 结案后仍可补打/归档出文书）；
+            //   禁止 Printed 回退与跳转。
+            if (status != RecoveryConstants.STATUS_PRINTED && status != RecoveryConstants.STATUS_CONFIRMED)
                 return Result.Failure<bool>(ErrorCodes.VALIDATION_FAILED,
-                    $"追缴记录不支持的目标状态: {status}（仅支持 {RecoveryConstants.STATUS_PRINTED}）");
+                    $"追缴记录不支持的目标状态: {status}（仅支持 {RecoveryConstants.STATUS_CONFIRMED} 结案 / {RecoveryConstants.STATUS_PRINTED} 出文书）");
+
+            var allowedFrom = status == RecoveryConstants.STATUS_CONFIRMED
+                ? new[] { RecoveryConstants.STATUS_DRAFT }
+                : new[] { RecoveryConstants.STATUS_DRAFT, RecoveryConstants.STATUS_CONFIRMED };
 
             var sql = @"
                 UPDATE nc_biz_recovery_records 
                 SET status = $1, updated_at = NOW()
-                WHERE id = $2 AND status = $3";
+                WHERE id = $2 AND status = ANY($3::text[])";
 
-            var result = await _db.ExecuteNonQueryAsync(sql, ct, status, id, RecoveryConstants.STATUS_DRAFT);
+            var result = await _db.ExecuteNonQueryAsync(sql, ct, status, id, allowedFrom);
 
             if (result.IsSuccess && result.Value == 0)
-                return Result.Success(true); // 已是 Printed 的幂等重入（重复点归档不报错）
+                return Result.Success(true); // 幂等重入：已是目标状态（或记录已不存在）不报错（重复点结案/归档）
 
             if (result.IsSuccess)
             {

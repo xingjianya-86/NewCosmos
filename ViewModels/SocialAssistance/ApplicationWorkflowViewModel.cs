@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
+using NewCosmos.Components;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
@@ -8,6 +9,7 @@ using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.AssetVerification;
 using NewCosmos.Services.Domain.SocialAssistance;
+using NewCosmos.Services.Utilities;
 using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -25,6 +27,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     private readonly IAssetVerificationService _verificationService;
     private readonly IApplicationService _applicationService;
     private readonly IGracePeriodService _gracePeriodService;
+    private readonly IHouseholdSurveyService _householdSurveyService;
+    private readonly IBusinessTimelineService _timelineService;
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
@@ -113,6 +117,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         IAssetVerificationService verificationService,
         IApplicationService applicationService,
         IGracePeriodService gracePeriodService,
+        IHouseholdSurveyService householdSurveyService,
+        IBusinessTimelineService timelineService,
         IDialogService dialogService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
@@ -122,6 +128,8 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         _verificationService = verificationService;
         _applicationService = applicationService;
         _gracePeriodService = gracePeriodService;
+        _householdSurveyService = householdSurveyService;
+        _timelineService = timelineService;
         _dialogService = dialogService;
         _logger = logger;
         _serviceProvider = serviceProvider;
@@ -185,6 +193,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         Models.Results.PagedResult<AssetVerificationTask>? assetPage = null;
         Models.Results.PagedResult<ApplicationEntity>? appPage = null;
         IReadOnlyDictionary<long, DateTime>? graceMap = null;
+        IReadOnlyDictionary<long, string>? batchHintMap = null;
         string? loadError = null;
 
         try
@@ -267,6 +276,18 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 else
                     _logger.Warn("工作流渐退期到期日批量查询失败: " + graceResult.ErrorCode + " " + graceResult.Message);
             }
+
+            // 草稿/已建档/已完结三 Tab：批量取最新入户调查日期 → 计算"批次顺延"卡片角标。
+            // 一次 = ANY 查询防 N+1；失败仅记 Warn、角标留空，不打断列表加载。
+            if (appPage != null && appPage.Items.Count > 0)
+            {
+                var surveyDateResult = await _householdSurveyService.GetLatestSurveyDateMapByApplicationIdsAsync(
+                    appPage.Items.Select(x => x.Id).ToList(), ct);
+                if (surveyDateResult.IsSuccess)
+                    batchHintMap = BuildBatchHintMap(appPage.Items, surveyDateResult.Value);
+                else
+                    _logger.Warn("工作流入户调查日期批量查询失败: " + surveyDateResult.ErrorCode + " " + surveyDateResult.Message);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -303,14 +324,14 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     if (assetPage != null) FillPagedPage(HasReportItems, MapAssetPage(assetPage, MapHasReportItem));
                     break;
                 case 2:
-                    if (appPage != null) FillPagedPage(DraftItems, MapApplicationPage(appPage, "草稿", "Danger", WorkflowCardAction.EditDelete, graceMap));
+                    if (appPage != null) FillPagedPage(DraftItems, MapApplicationPage(appPage, "草稿", "Danger", WorkflowCardAction.EditDelete, graceMap, batchHintMap: batchHintMap, changeDateVisible: true));
                     break;
                 case 3:
                     // 已建档未提交（此 Tab 支持批量勾选归档）
-                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete, graceMap, batchSelectable: true));
+                    if (appPage != null) FillPagedPage(ArchiveBuiltItems, MapApplicationPage(appPage, "已建档", "Warning", WorkflowCardAction.EditDelete, graceMap, batchSelectable: true, batchHintMap: batchHintMap));
                     break;
                 case 4:
-                    if (appPage != null) FillPagedPage(ArchiveCompletedItems, MapApplicationPage(appPage, "已完结", "Success", WorkflowCardAction.ViewArchive));
+                    if (appPage != null) FillPagedPage(ArchiveCompletedItems, MapApplicationPage(appPage, "已完结", "Success", WorkflowCardAction.ViewArchive, batchHintMap: batchHintMap));
                     break;
             }
         });
@@ -506,9 +527,11 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         string statusKind,
         WorkflowCardAction action,
         IReadOnlyDictionary<long, DateTime>? graceMap = null,
-        bool batchSelectable = false)
+        bool batchSelectable = false,
+        IReadOnlyDictionary<long, string>? batchHintMap = null,
+        bool changeDateVisible = false)
         => PagedResult<WorkflowCardItem>.FromList(
-            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action, graceMap, batchSelectable)).ToList(),
+            page.Items.Select(a => MapApplicationItem(a, statusText, statusKind, action, graceMap, batchSelectable, batchHintMap, changeDateVisible)).ToList(),
             page.PageIndex, page.PageSize, page.TotalCount);
 
     /// <summary>渐退期注释文案：进行中"渐退期至 yyyy-MM-dd"；已过到期日标"已到期"。</summary>
@@ -518,6 +541,43 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         return endDate >= DateTime.Today
             ? $"渐退期至 {endDate:yyyy-MM-dd}"
             : $"渐退期已到期（至 {endDate:yyyy-MM-dd}）";
+    }
+
+    /// <summary>批次顺延角标文案（未顺延或未取到调查日期时为空）</summary>
+    private static string BuildBatchHint(IReadOnlyDictionary<long, string>? batchHintMap, long applicationId)
+        => batchHintMap != null && batchHintMap.TryGetValue(applicationId, out var text) ? text : string.Empty;
+
+    /// <summary>
+    /// 批次顺延角标文案批量计算：锚点 = 入户调查日期优先（ArchiveAnchorHelper 周期差护栏），
+    /// 顺延判定走 BatchDeferralHelper（与文书公示/卷号同源，禁止此处重抄顺延规则）。
+    /// 仅"已顺延"的申请有文案；单条异常只告警不影响其余卡片（§10）。
+    /// </summary>
+    private Dictionary<long, string> BuildBatchHintMap(
+        IReadOnlyCollection<ApplicationEntity> apps,
+        IReadOnlyDictionary<long, DateTime>? surveyDateMap)
+    {
+        var map = new Dictionary<long, string>();
+        foreach (var app in apps)
+        {
+            try
+            {
+                DateTime? surveyDate = null;
+                if (surveyDateMap != null && surveyDateMap.TryGetValue(app.Id, out var survey) && survey != default)
+                    surveyDate = survey;
+
+                var deferral = BatchDeferralHelper.Resolve(
+                    _timelineService, ArchiveAnchorHelper.ResolveApplicationDate(app), surveyDate);
+                if (deferral.IsDeferred)
+                    map[app.Id] = string.Format(
+                        BusinessCycleConstants.BatchDeferredChipFormat,
+                        deferral.Batch.Year, deferral.Batch.Month);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"批次顺延角标计算失败: ApplicationId={app.Id}, {ex.Message}");
+            }
+        }
+        return map;
     }
 
     private WorkflowCardItem MapSubmittedItem(AssetVerificationTask t) => new()
@@ -551,7 +611,9 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     private static WorkflowCardItem MapApplicationItem(
         ApplicationEntity a, string statusText, string statusKind, WorkflowCardAction action,
         IReadOnlyDictionary<long, DateTime>? graceMap = null,
-        bool batchSelectable = false) => new()
+        bool batchSelectable = false,
+        IReadOnlyDictionary<long, string>? batchHintMap = null,
+        bool changeDateVisible = false) => new()
     {
         Source = a,
         Name = a.ApplicantName,
@@ -560,12 +622,14 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         StatusKind = statusKind,
         ShowSingleRescue = a.IsSingleRescue,
         GraceNote = BuildGraceNote(graceMap, a.Id),
+        BatchHintText = BuildBatchHint(batchHintMap, a.Id),
         MetaLabel = "编号",
         MetaValue = a.ApplicationNo,
         Address = null,
         Time = a.CreatedAt,
         Action = action,
-        IsBatchSelectable = batchSelectable
+        IsBatchSelectable = batchSelectable,
+        ShowChangeDateButton = changeDateVisible
     };
 
     #endregion
@@ -573,6 +637,61 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
     #region 返回
 
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
+
+    #endregion
+
+    #region 修改申请日期
+
+    /// <summary>
+    /// 卡片级"改期"入口（仅草稿 Tab，权限 CHANGE_MANAGE）：修改申请日期
+    /// （申请编号日期段 + created_at 同改，Service 内单事务 + 审计）。
+    /// 改期会改变该档批次（公示窗口/卷号/文书申请日期），故先弹日期、再二次确认；
+    /// 成功后刷新当前 Tab（批次角标/申请添加时间随之重算）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ChangeApplicationDateAsync(WorkflowCardItem? item)
+    {
+        if (item?.Source is not ApplicationEntity app) return;
+
+        var userId = App.CurrentUserId;
+        if (!userId.HasValue)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "登录状态已失效，请重新登录", "确定");
+            return;
+        }
+
+        var hasPermission = await _permissionService.HasPermissionAsync(userId.Value, PermissionCodes.CHANGE_MANAGE, CancellationToken);
+        if (!hasPermission)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "您没有修改申请日期的操作权限", "确定");
+            return;
+        }
+
+        var current = ArchiveAnchorHelper.ResolveApplicationDate(app);
+        var picked = await DateTimePickerPopupView.ShowAsync(current, DateTime.Today, showTime: false, "修改申请日期");
+        if (!picked.HasValue) return;
+
+        var newDay = picked.Value.Date;
+        if (newDay == current.Date) return;
+
+        var confirm = await _dialogService.DisplayAlertAsync("确认修改申请日期",
+            $"申请日期：{current:yyyy-MM-dd} → {newDay:yyyy-MM-dd}\n\n" +
+            "修改后将改变该档案的公示窗口、卷号与文书上的申请日期（批次顺延提示随之重算）；" +
+            "已打印的文书不受影响，需重新出文书才会更新。",
+            "确认修改", "取消");
+        if (!confirm) return;
+
+        var operatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+        var result = await _applicationService.ChangeApplicationDateAsync(app.Id, newDay, operatorName, CancellationToken);
+        if (result.IsFailure)
+        {
+            await _dialogService.DisplayAlertAsync("修改失败", result.Message ?? "修改申请日期失败", "确定");
+            return;
+        }
+
+        await _dialogService.ShowSnackBarAsync($"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value}");
+        await LoadDataAsync();
+    }
 
     #endregion
 

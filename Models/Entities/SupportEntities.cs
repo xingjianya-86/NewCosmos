@@ -86,6 +86,14 @@ public partial class Supporter : ObservableObject
     /// <summary>年收入</summary>
     public decimal AnnualIncome { get; set; }
 
+    /// <summary>
+    /// 月收入（元/月，列 nc_biz_family_members.monthly_income_capacity）。
+    /// 2026-11 补链路：原 Supporter 实体无此属性，SupporterService 的 SELECT/UPDATE/INSERT 三处均漏列，
+    /// 赡养人保存链带不动月收入（先全软删再重写会把 Step2 写入的值清 0）——三处已同步补齐。
+    /// </summary>
+    [ObservableProperty]
+    private decimal _monthlyIncomeCapacity;
+
     /// <summary>家庭住址-省份</summary>
     public string HomeProvince { get; set; } = string.Empty;
 

@@ -16,6 +16,20 @@
         </Border>
 
         <!-- ──────────────────────────────────────────────────────── -->
+        <!-- 卡片0：申请日期（= 申请编号日期段优先 → 创建时间，同 ArchiveAnchorHelper 锚点） -->
+        <!--     修改走"改期"：同改编号日期段与 created_at，影响公示窗口/卷号/文书批次 -->
+        <!-- ──────────────────────────────────────────────────────── -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Label Text="申请日期" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding ApplicationDateText}" FontSize="17" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                <Button Grid.Column="2" Text="修改" Style="{StaticResource ButtonSmall}"
+                        Command="{Binding ChangeApplicationDateCommand}" VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- ──────────────────────────────────────────────────────── -->
         <!-- 卡片1：户籍所在地（独立级联，默认来自组织机构，可修改） -->
         <!-- ──────────────────────────────────────────────────────── -->
         <Border Style="{StaticResource CardBorder}" IsEnabled="{Binding IsAddressScopeAvailable}">

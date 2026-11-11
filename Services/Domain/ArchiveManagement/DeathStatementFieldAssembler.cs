@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.DeathStatement;
 
 namespace NewCosmos.Services.Domain.ArchiveManagement;
@@ -33,6 +34,31 @@ public sealed class DeathStatementFieldInput
     public string? DeclaredByPhone { get; init; }
     public string? DeclaredByType { get; init; }
     public string? DeclaredAtText { get; init; }
+
+    // ── 规范化格式五条目（2026-11-08）──
+    /// <summary>死亡证明类型（死亡医学证明 / 非正常死亡证明；条目一）</summary>
+    public string? CertType { get; init; }
+
+    /// <summary>死亡证明出具机构（条目一）</summary>
+    public string? CertIssueOrg { get; init; }
+
+    /// <summary>遗体处置方式（火化 / 安葬 / 其他；条目二组句分流，空则按下方字段推断）</summary>
+    public string? DispositionBranch { get; init; }
+
+    public DateTime? CremationDate { get; init; }
+    public string? CremationPlace { get; init; }
+    public string? CremationCertNo { get; init; }
+    public DateTime? BurialDate { get; init; }
+    public string? BurialPlace { get; init; }
+
+    /// <summary>家属情况及诉求（条目四，原样输出）</summary>
+    public string? FamilySituation { get; init; }
+
+    /// <summary>矛盾纠纷及信访隐患（无 / 有；条目五）</summary>
+    public string? DisputeStatus { get; init; }
+
+    /// <summary>矛盾纠纷说明（条目五，勾「有」时附注）</summary>
+    public string? DisputeDesc { get; init; }
 
     // ── 上下文与范围 ──
 
@@ -97,6 +123,22 @@ public static class DeathStatementFieldAssembler
             ? DeathStatementService.FormatDeathDateTime(deathDateText, deathTimeText)
             : c.DeathDateTimeText;
 
+        // ── 规范化格式五条目组句（2026-11-08）：Word 模板无法做条件分支，
+        //    每条目输出一个整句占位符；分支/命中判定在本装配器单点完成 ──
+        var certNo = FormOrCtx(input.DeathCertNo, c.DeathCertNo);
+        var certType = FormOrCtx(input.CertType, c.CertType);
+        var certOrg = FormOrCtx(input.CertIssueOrg, c.CertIssueOrg);
+        var certStatement = BuildCertStatement(certType, certOrg, certNo);
+
+        var dispositionText = BuildDispositionText(input, c);
+        var benefitText = BuildBenefitFlagText(c.Identities);
+
+        var disputeStatus = FormOrCtx(input.DisputeStatus, c.DisputeStatus);
+        var disputeDesc = FormOrCtx(input.DisputeDesc, c.DisputeDesc);
+        var disputeText = BuildDisputeText(disputeStatus, disputeDesc);
+
+        var deathAgeText = BuildAgeText(FormOrCtx(input.IdCard, c.IdCard), deathDateText);
+
         var fields = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [FieldKeys.DEATH_NAME] = FormOrCtx(input.Name, c.Name),
@@ -105,7 +147,7 @@ public static class DeathStatementFieldAssembler
             [FieldKeys.DEATH_TIME] = deathTimeText,
             [FieldKeys.DEATH_DATETIME_TEXT] = deathDateTimeText,
             [FieldKeys.DEATH_REASON] = FormOrCtx(input.DeathReason, c.DeathReason),
-            [FieldKeys.DEATH_CERT_NO] = FormOrCtx(input.DeathCertNo, c.DeathCertNo),
+            [FieldKeys.DEATH_CERT_NO] = certNo,
             [FieldKeys.DEATH_PLACE] = FormOrCtx(input.DeathPlace, c.DeathPlace),
             [FieldKeys.DEATH_RELATION] = FormOrCtx(input.Relation, c.Relation),
             [FieldKeys.DECLARED_RELATION] = FormOrCtx(input.DeclaredRelation, c.DeclaredRelation),
@@ -143,7 +185,24 @@ public static class DeathStatementFieldAssembler
             [FieldKeys.OPERATOR_UNIT] = scope?.OrgName ?? string.Empty,
             [FieldKeys.OPERATOR_UNIT_PHONE] = scope?.OrgPhone ?? string.Empty,
             [FieldKeys.DEATH_IDENTITY_COUNT] = c.Identities.Count.ToString(),
-            [FieldKeys.DEATH_REMIND_COUNT] = c.Reminders.Count.ToString()
+            [FieldKeys.DEATH_REMIND_COUNT] = c.Reminders.Count.ToString(),
+
+            // ── 规范化格式五条目（2026-11-08；整句见各 Build* 组句方法，原始键同步供给供自定义模板取数）──
+            [FieldKeys.DEATH_AGE] = deathAgeText,
+            [FieldKeys.DEATH_CERT_TYPE] = certType,
+            [FieldKeys.DEATH_CERT_ISSUE_ORG] = certOrg,
+            [FieldKeys.DEATH_CERT_STATEMENT] = certStatement,
+            [FieldKeys.CREMATION_DATE] = FormatDateText(input.CremationDate, c.CremationDateText),
+            [FieldKeys.CREMATION_PLACE] = FormOrCtx(input.CremationPlace, c.CremationPlace),
+            [FieldKeys.CREMATION_CERT_NO] = FormOrCtx(input.CremationCertNo, c.CremationCertNo),
+            [FieldKeys.BURIAL_DATE] = FormatDateText(input.BurialDate, c.BurialDateText),
+            [FieldKeys.BURIAL_PLACE] = FormOrCtx(input.BurialPlace, c.BurialPlace),
+            [FieldKeys.DISPOSITION_TEXT] = dispositionText,
+            [FieldKeys.FAMILY_SITUATION] = FormOrCtx(input.FamilySituation, c.FamilySituation),
+            [FieldKeys.BENEFIT_FLAG_TEXT] = benefitText,
+            [FieldKeys.DISPUTE_STATUS] = disputeStatus,
+            [FieldKeys.DISPUTE_DESC] = disputeDesc,
+            [FieldKeys.DISPUTE_TEXT] = disputeText
         };
 
         // 身份清单槽（_1.._12，每行 5 键；不足位清空防残留）
@@ -170,6 +229,130 @@ public static class DeathStatementFieldAssembler
         return fields;
     }
 
+    #region 规范化格式组句（2026-11-08；Word 模板无法条件分支 → 每条目一个整句占位符）
+
+    /// <summary>条目一 死亡证明情况：机构/类型/编号按现有信息组句；全空 → 「待办理」（申报常先于死亡证明取得）</summary>
+    private static string BuildCertStatement(string certType, string certOrg, string certNo)
+    {
+        var noPart = string.IsNullOrWhiteSpace(certNo) ? string.Empty : $"（编号：{certNo}）";
+        var hasType = !string.IsNullOrWhiteSpace(certType);
+        var hasOrg = !string.IsNullOrWhiteSpace(certOrg);
+        if (hasType && hasOrg) return $"已由{certOrg}出具《{certType}》{noPart}";
+        if (hasType) return $"已出具《{certType}》{noPart}";
+        if (hasOrg) return $"已由{certOrg}出具死亡证明{noPart}";
+        return string.IsNullOrWhiteSpace(certNo) ? "待办理" : $"死亡证明编号：{certNo}";
+    }
+
+    /// <summary>
+    /// 条目二 遗体处置情况：按表单选中分支组句（火化 / 安葬 / 其他自由文本）；
+    /// 分支为空（带出的存量行）时按字段存在性推断，全空回退遗体安置自由文本。
+    /// 安葬日期 ≥ 今天 → 「拟于」（未办先报），否则 → 「已于」。
+    /// </summary>
+    private static string BuildDispositionText(DeathStatementFieldInput input, DeathStatementContext c)
+    {
+        var cremationDate = input.CremationDate ?? ParseDate(c.CremationDateText);
+        var cremationPlace = FirstNonEmpty(input.CremationPlace, c.CremationPlace);
+        var cremationCertNo = FirstNonEmpty(input.CremationCertNo, c.CremationCertNo);
+        var burialDate = input.BurialDate ?? ParseDate(c.BurialDateText);
+        var burialPlace = FirstNonEmpty(input.BurialPlace, c.BurialPlace);
+        var otherText = FirstNonEmpty(input.RemainsArrangement, c.RemainsArrangement) ?? string.Empty;
+
+        var branch = input.DispositionBranch?.Trim() ?? string.Empty;
+        var hasCremation = cremationDate.HasValue || !string.IsNullOrWhiteSpace(cremationPlace);
+        var hasBurial = burialDate.HasValue || !string.IsNullOrWhiteSpace(burialPlace);
+
+        var useCremation = string.Equals(branch, DeathDeclarationConstants.DispositionCremation, StringComparison.Ordinal)
+            || (branch.Length == 0 && hasCremation);
+        var useBurial = string.Equals(branch, DeathDeclarationConstants.DispositionBurial, StringComparison.Ordinal)
+            || (branch.Length == 0 && !useCremation && hasBurial);
+
+        if (useCremation)
+        {
+            var head = cremationDate.HasValue ? $"已于{cremationDate.Value:yyyy年M月d日}" : "已";
+            var where = string.IsNullOrWhiteSpace(cremationPlace) ? string.Empty : $"在{cremationPlace}";
+            var noPart = string.IsNullOrWhiteSpace(cremationCertNo) ? string.Empty : $"（火化证明编号：{cremationCertNo}）";
+            return $"{head}{where}火化{noPart}";
+        }
+
+        if (useBurial)
+        {
+            if (burialDate is null && string.IsNullOrWhiteSpace(burialPlace))
+                return otherText;
+            var verb = burialDate.HasValue && burialDate.Value.Date >= DateTime.Today ? "拟于" : "已于";
+            var when = burialDate.HasValue ? $"{verb}{burialDate.Value:yyyy年M月d日}安葬于" : "安葬于";
+            return $"{when}{(string.IsNullOrWhiteSpace(burialPlace) ? string.Empty : burialPlace)}";
+        }
+
+        // 「其他」分支 / 无结构化数据（含存量只有安置文本的行）
+        return otherText;
+    }
+
+    /// <summary>
+    /// 条目三 惠民政策享受情况：由身份八源聚合按 低保/特困/高龄/残疾/优抚 关键词命中自动勾选，
+    /// 零手填；命中 → 「☑是 □否 为{命中类别}对象」，未命中 → 「□是 ☑否 为{五类全列}对象」。
+    /// </summary>
+    private static string BuildBenefitFlagText(List<DeathIdentityItem> identities)
+    {
+        var matched = new List<string>();
+
+        void Hit(string label, params string[] keys)
+        {
+            if (matched.Contains(label, StringComparer.Ordinal)) return;
+            if (identities.Any(i => !string.IsNullOrEmpty(i.TypeLabel)
+                                    && keys.Any(k => i.TypeLabel.Contains(k, StringComparison.Ordinal))))
+                matched.Add(label);
+        }
+
+        Hit("低保", "低保", "最低生活保障");
+        Hit("特困", "特困");
+        Hit("高龄", "高龄");
+        Hit("残疾", "残疾");
+        Hit("优抚", "优抚");
+
+        return matched.Count > 0
+            ? $"该死者☑是 □否 为{string.Join("、", matched)}对象，相关补贴已/正在办理停发手续"
+            : "该死者□是 ☑否 为低保/特困/高龄/残疾/优抚对象，相关补贴已/正在办理停发手续";
+    }
+
+    /// <summary>条目五 矛盾纠纷及信访隐患：勾选态打 ☑，勾「有」附说明；未选为空（存量行）</summary>
+    private static string BuildDisputeText(string status, string desc)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return string.Empty;
+        if (string.Equals(status, DeathDeclarationConstants.DisputeNone, StringComparison.Ordinal))
+            return "☑无 □有";
+        if (string.Equals(status, DeathDeclarationConstants.DisputeHas, StringComparison.Ordinal))
+            return string.IsNullOrWhiteSpace(desc) ? "□无 ☑有" : $"□无 ☑有（{desc}）";
+        return status;
+    }
+
+    /// <summary>首段年龄（岁）：身份证出生日期按死亡日期计算（非当前年龄）；取不到出生日期为空</summary>
+    private static string BuildAgeText(string idCard, string deathDateText)
+    {
+        var birth = IdCardValidator.ExtractBirthDate(idCard);
+        if (birth is null) return string.Empty;
+        var death = DateTime.TryParse(deathDateText, out var d) ? d.Date : DateTime.Today;
+        if (death < birth.Value.Date) return string.Empty;
+        var age = death.Year - birth.Value.Year;
+        if (death.Month < birth.Value.Month || (death.Month == birth.Value.Month && death.Day < birth.Value.Day))
+            age--;
+        return age < 0 ? string.Empty : age.ToString();
+    }
+
+    /// <summary>日期 → 中文整段（yyyy年M月d日）；value 优先，回退 context 文本解析</summary>
+    private static string FormatDateText(DateTime? value, string fallbackText)
+    {
+        if (value.HasValue) return value.Value.ToString("yyyy年M月d日");
+        return DateTime.TryParse(fallbackText, out var d) ? d.ToString("yyyy年M月d日") : string.Empty;
+    }
+
+    private static DateTime? ParseDate(string? text) =>
+        DateTime.TryParse(text, out var d) ? d.Date : null;
+
+    private static string? FirstNonEmpty(string? a, string? b) =>
+        !string.IsNullOrWhiteSpace(a) ? a.Trim() : (!string.IsNullOrWhiteSpace(b) ? b.Trim() : null);
+
+    #endregion
+
     /// <summary>
     /// 手工录入未提交时的上下文（仅表单值，身份/提醒/联动走服务聚合）。
     /// 未选择死亡时刻时回退当前时刻——仅影响文书预览聚合，落库必经申报校验的真实必填把关。
@@ -195,6 +378,17 @@ public static class DeathStatementFieldAssembler
             DeclaredByType = input.DeclaredByType ?? string.Empty,
             DeclaredRelation = input.DeclaredRelation ?? string.Empty,
             DeclaredAtText = input.DeclaredAtText ?? string.Empty,
+            // 规范化格式五条目（表单值直接进手工上下文，组句仍由装配器按表单优先取值）
+            CertType = input.CertType ?? string.Empty,
+            CertIssueOrg = input.CertIssueOrg ?? string.Empty,
+            CremationDateText = input.CremationDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            CremationPlace = input.CremationPlace ?? string.Empty,
+            CremationCertNo = input.CremationCertNo ?? string.Empty,
+            BurialDateText = input.BurialDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            BurialPlace = input.BurialPlace ?? string.Empty,
+            FamilySituation = input.FamilySituation ?? string.Empty,
+            DisputeStatus = input.DisputeStatus ?? string.Empty,
+            DisputeDesc = input.DisputeDesc ?? string.Empty,
             VillageName = scope?.VillageName ?? string.Empty,
             TownName = scope?.TownName ?? string.Empty
         };

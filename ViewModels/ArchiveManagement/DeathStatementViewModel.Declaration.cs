@@ -39,7 +39,8 @@ public partial class DeathStatementViewModel
         // 报告人默认同申报人：勾选态在校验/落库前同步一次（取消勾选后不覆盖独立填写值）
         if (IsReporterSameAsDeclarer) SyncReporterFromDeclarer();
 
-        // 9 段前置校验已下沉 DeathDeclareValidator（2026-11 简化·3b），此处只弹首条失败消息
+        // 9 段前置校验已下沉 DeathDeclareValidator（2026-11 简化·3b），此处只弹首条失败消息；
+        // 2026-11-08 规范化格式追加条目二（遗体处置分支）与条目五（矛盾纠纷）两段硬门
         var invalid = DeathDeclareValidator.Validate(new DeathDeclareValidator.Input
         {
             Name = Name,
@@ -52,7 +53,17 @@ public partial class DeathStatementViewModel
             IsTownScope = _scope != null && _scope.IsTownScope,
             DeclaredVillage = DeclaredVillage,
             BusinessMatterOptionCount = BusinessMatterChecks.Count,
-            BusinessMatterCheckedCount = BusinessMatterChecks.Count(o => o.IsChecked)
+            BusinessMatterCheckedCount = BusinessMatterChecks.Count(o => o.IsChecked),
+            DispositionBranch = SelectedDisposition,
+            CremationDate = CremationDate,
+            CremationPlace = CremationPlace,
+            BurialDate = BurialDate,
+            BurialPlace = BurialPlace,
+            RemainsArrangement = RemainsArrangement,
+            DisputeStatus = SelectedDispute,
+            DisputeDesc = DisputeDesc,
+            DisputeNone = DeathDeclarationConstants.DisputeNone,
+            DisputeHas = DeathDeclarationConstants.DisputeHas
         });
         if (invalid != null)
         {
@@ -93,9 +104,23 @@ public partial class DeathStatementViewModel
             ReporterRelation = ReporterRelation?.Trim() ?? string.Empty,
             ReporterPhone = ReporterPhone?.Trim() ?? string.Empty,
             SituationDesc = SituationDesc?.Trim() ?? string.Empty,
-            RemainsArrangement = RemainsArrangement?.Trim() ?? string.Empty,
+            // 遗体处置：只落选中分支的字段（OnSelectedDispositionChanged 已清非选中分支，此处双保险）；
+            // 「其他」分支文本落 remains_arrangement，结构化分支不回写该列（防切换分支残留脏值）
+            RemainsArrangement = IsDispositionOther ? RemainsArrangement?.Trim() ?? string.Empty : string.Empty,
             BusinessAgent = BusinessAgent?.Trim() ?? string.Empty,
             BusinessMatter = BusinessMatter?.Trim() ?? string.Empty,
+            CertType = SelectedCertType?.Trim() ?? string.Empty,
+            CertIssueOrg = CertIssueOrg?.Trim() ?? string.Empty,
+            CremationDate = IsDispositionCremation ? CremationDate : null,
+            CremationPlace = IsDispositionCremation ? CremationPlace?.Trim() ?? string.Empty : string.Empty,
+            CremationCertNo = IsDispositionCremation ? CremationCertNo?.Trim() ?? string.Empty : string.Empty,
+            BurialDate = IsDispositionBurial ? BurialDate : null,
+            BurialPlace = IsDispositionBurial ? BurialPlace?.Trim() ?? string.Empty : string.Empty,
+            FamilySituation = FamilySituation?.Trim() ?? string.Empty,
+            DisputeStatus = SelectedDispute?.Trim() ?? string.Empty,
+            DisputeDesc = string.Equals(SelectedDispute, DeathDeclarationConstants.DisputeHas, StringComparison.Ordinal)
+                ? DisputeDesc?.Trim() ?? string.Empty
+                : string.Empty,
             ApplicationId = _context?.ApplicationId,
             VillageId = _scope!.IsTownScope ? null : _scope.VillageId,
             // 镇级降级：组织无村，落款村名取表单手填的「所在村」（写入 village_name 列）
@@ -142,7 +167,8 @@ public partial class DeathStatementViewModel
     }
 
     // 已删除（2026-11 死亡说明简化·阶段2）：VerifyAsync/VerifyCommand（核实）孤儿命令——
-    // 全仓 PC/手机两页均无 UI 入口（零绑定取证）；Service/接口的 VerifyAsync 保留不动。
+    // 全仓 PC/手机两页均无 UI 入口（零绑定取证）。2026-11-08 P1-5 进一步删除 Service/接口的
+    // VerifyAsync 与 DeathDeclarationConstants.StatusVerified：状态不可达且全库 0 行。
 
     [RelayCommand]
     private async Task RevokeAsync()

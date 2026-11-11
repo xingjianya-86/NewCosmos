@@ -51,6 +51,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
     private readonly IChangeService _changeService = null!;
     private readonly IStandardConfigService _standardConfigService = null!;
     private readonly IClassificationService _classificationService = null!;
+    private readonly IIncomeCalculationService _incomeCalculationService = null!;
 
     public ArchiveProductionViewModel(
         IAssetVerificationService verificationService,
@@ -72,7 +73,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         ICapabilityAssessmentService capabilityAssessmentService,
         IChangeService changeService,
         IStandardConfigService standardConfigService,
-        IClassificationService classificationService)
+        IClassificationService classificationService,
+        IIncomeCalculationService incomeCalculationService)
     {
         _verificationService = verificationService;
         _applicationService = applicationService;
@@ -94,6 +96,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         _changeService = changeService;
         _standardConfigService = standardConfigService;
         _classificationService = classificationService;
+        _incomeCalculationService = incomeCalculationService;
         Title = "档案制作中心";
     }
 
@@ -496,6 +499,12 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         var civilAssistantName = await GetCivilAssistantNameAsync();
         var orgInfo = await GetOrganizationInfoAsync();
 
+        // 入户调查日期（资产核查链路）：核查档无调查记录 → 走 ResolveSurveyDate 无调查兜底（= 申请日当天，
+        // 钳 [申请日, 会议日]）。224 部省协查函 {当前日期} 于 2026-11-11 换绑 SURVEY_DATE 后本链路必须供键，
+        // 否则占位符原样残留。
+        var assetTl = _timelineService.GetTimelineForApplicationDate(detail.ApplicationDate, TimelineType.BusinessProcess);
+        var assetSurveyDate = ResolveSurveyDate(assetTl, null, detail.ApplicationDate);
+
         _currentBusinessType = PrintBusinessTypes.AssetVerification;
         _currentBusinessId = detail.Id;
         _currentClassification = ClassificationConstants.AssetVerification;
@@ -537,6 +546,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.APPLICANT_COUNT] = detail.FamilyMembers.Count.ToString(),
             [FieldKeys.HEAD_FAMILY_SIZE] = detail.FamilyMembers.Count.ToString(),
             [FieldKeys.REPORT_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+            [FieldKeys.SURVEY_DATE] = assetSurveyDate,
             [FieldKeys.CIVIL_ASSISTANT_NAME] = civilAssistantName,
             [FieldKeys.DISTRICT] = orgInfo.District,
             [FieldKeys.TOWN] = orgInfo.Town,
@@ -677,7 +687,8 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             [FieldKeys.COMMUNITY] = app.Community ?? "",
             [FieldKeys.APPLICATION_REASON] = GetApplicationReasonDisplay(app.ApplicationReason),
             [FieldKeys.APPLICATION_DATE] = applicationDate.ToString("yyyy-MM-dd"),
-            [FieldKeys.PROMISE_DATE] = ResolvePromiseDate(tl, app.FirstApprovedAt, applicationDate),
+            // {诚信承诺时间}（2026-11-11 口径改）：= 入户调查当天（复用上方 surveyDate，与 SURVEY_DATE 同源同值）
+            [FieldKeys.PROMISE_DATE] = surveyDate,
             [FieldKeys.CONTACT_PHONE] = app.ApplicantPhone,
             [FieldKeys.STATUS] = ApplicationStatusExtensions.FromCode(app.Status ?? "").GetDescription(),
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,
@@ -1848,7 +1859,8 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             [FieldKeys.COMMUNITY] = app.Community ?? "",
             [FieldKeys.APPLICATION_REASON] = app.ApplicationReason ?? "",
             [FieldKeys.APPLICATION_DATE] = applicationDate.ToString("yyyy-MM-dd"),
-            [FieldKeys.PROMISE_DATE] = ResolvePromiseDate(tl, app.FirstApprovedAt, applicationDate),
+            // {诚信承诺时间}（2026-11-11 口径改）：= 入户调查当天（复用上方 surveyDate，与 SURVEY_DATE 同源同值）
+            [FieldKeys.PROMISE_DATE] = surveyDate,
             [FieldKeys.CONTACT_PHONE] = app.ApplicantPhone ?? "",
             [FieldKeys.STATUS] = "草稿",
             [FieldKeys.OPERATOR_NAME] = App.CurrentUserFullName,

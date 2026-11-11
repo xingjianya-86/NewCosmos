@@ -24,7 +24,7 @@
 -- 幂等：每条带守卫，重复执行全部 UPDATE 0（首执行后已复测通过）。
 -- 执行：psql -w -v ON_ERROR_STOP=1 -f docs/migrations/20261105_asset_verification_family_address_unify.sql
 -- 回滚原值：sql\asset_checks_address_before.csv
---       （C:\NewCosmosCode\backup\20261105_165603_家庭经济状况核对地址统一，298 行 id+community+family_address）
+--       （C:\Projects\NewCosmosCode\backup\20261105_165603_家庭经济状况核对地址统一，298 行 id+community+family_address）
 -- 已知异形（均已在本迁移内规正）：
 --   - id 248「荣华村57号」：「荣华村」为「荣华屯」误写（2026-11-05 用户确认实为柞木村荣华屯），
 --     规正为「林口县柳树镇柞木村荣华屯57号」，community 231025105201（柞木村）本已正确；

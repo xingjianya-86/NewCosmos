@@ -106,10 +106,11 @@ public interface IRecoveryService
         long id, ManualRecoveryRecordDto dto, CancellationToken ct = default);
 
     /// <summary>
-    /// 更新追缴记录状态
+    /// 结案/出文书状态推进（Draft→Confirmed 快捷结案；Draft/Confirmed→Printed 归档写回）。
+    /// 0 行命中视为幂等重入（已是目标状态）返回 true。
     /// </summary>
     /// <param name="id">追缴记录ID</param>
-    /// <param name="status">新状态</param>
+    /// <param name="status">新状态（Confirmed 结案 / Printed 出文书）</param>
     /// <param name="ct">取消令牌</param>
     /// <returns>是否成功</returns>
     Task<Result<bool>> UpdateRecoveryRecordStatusAsync(

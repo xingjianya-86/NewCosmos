@@ -1,7 +1,8 @@
 # 死亡申报台账 Schema 定义
 # 用途：村内死亡申报留痕——「谁在什么时候什么时间，申报了谁的死亡」，死亡确切时间为必填。
-# 关联：application_id 可空（无档案的普通村民也能申报）；death_record_id 一期不回填，
-#       与 nc_biz_death_records 靠 deceased_id_card + application_id 语义关联。
+# 关联：application_id 可空（无档案的普通村民也能申报）；death_record_id 2026-11-08 P2-1 起按身份证回填
+#       （写入点 ChangeService.BackfillDeathRecordLinksAsync + 存量迁移 20261108_death_record_id_backfill.sql），
+#       历史行与未回填场景仍可依赖 deceased_id_card + application_id 语义关联。
 # 设计文档：docs/20261026_死亡情况说明与申报台账规范.md
 database: 死亡申报台账
 version: 1.0
@@ -53,6 +54,38 @@ tables:
         nullable: true
         comment: 死亡地点
 
+      # ── 死亡证明（规范化格式条目一「死亡证明情况」，2026-11-08 迁移 20261108_death_statement_standard_format.sql）──
+      - name: cert_type
+        type: character varying(50)
+        nullable: true
+        comment: 死亡证明类型（死亡医学证明 / 非正常死亡证明，模板《{证明类型}》）
+      - name: cert_issue_org
+        type: character varying(200)
+        nullable: true
+        comment: 死亡证明出具机构（模板「已由XX出具」）
+
+      # ── 遗体处置（规范化格式条目二：火化分支与安葬分支二选一，表单互斥显隐）──
+      - name: cremation_date
+        type: date
+        nullable: true
+        comment: 火化日期（火化分支）
+      - name: cremation_place
+        type: character varying(200)
+        nullable: true
+        comment: 火化地点/殡仪馆（火化分支）
+      - name: cremation_cert_no
+        type: character varying(50)
+        nullable: true
+        comment: 火化证明编号（火化分支）
+      - name: burial_date
+        type: date
+        nullable: true
+        comment: 安葬日期（已安葬或拟安葬，安葬分支）
+      - name: burial_place
+        type: character varying(200)
+        nullable: true
+        comment: 安葬地点/公益性墓地（安葬分支）
+
       # ── 申报（谁在什么时候申报）──
       - name: declared_by_name
         type: character varying(100)
@@ -84,7 +117,7 @@ tables:
         type: character varying(20)
         nullable: false
         defaultValue: 'Pending'
-        comment: 状态（Pending 待核实 / Verified 已核实 / Revoked 已作废）
+        comment: 状态（Pending 待核实 / Revoked 已作废 / Archived 已归档；Verified 已核实已删 2026-11-08）
 
       # ── 核实说明要素（《死亡情况核实说明》模板字段，2026-10-26 迁移 20261026_death_declaration_verify_details.sql）──
       # 报告人与申报人语义独立、分别手填；全部可空（历史行与"只出文书"场景兼容）
@@ -117,6 +150,20 @@ tables:
         nullable: true
         comment: 相关业务事项，如「申请居民死亡医学证明」（模板 {相关业务事项}）
 
+      # ── 情况说明补充（规范化格式条目四/五，2026-11-08）──
+      - name: family_situation
+        type: text
+        nullable: true
+        comment: 家属情况及诉求（模板条目四，长文本）
+      - name: dispute_status
+        type: character varying(20)
+        nullable: true
+        comment: 矛盾纠纷及信访隐患（无 / 有，模板条目五勾选）
+      - name: dispute_desc
+        type: text
+        nullable: true
+        comment: 矛盾纠纷说明（dispute_status=有时必填，另附说明）
+
       # ── 关联（可空，兼容无档案场景）──
       - name: application_id
         type: bigint
@@ -125,7 +172,7 @@ tables:
       - name: death_record_id
         type: bigint
         nullable: true
-        comment: 关联死亡登记ID（nc_biz_death_records.id，一期不回填）
+        comment: 关联死亡登记ID（nc_biz_death_records.id；2026-11-08 P2-1 起按身份证回填，写入点见 ChangeService.BackfillDeathRecordLinksAsync，存量见 20261108_death_record_id_backfill.sql）
 
       # ── 归属与系统 ──
       - name: village_id

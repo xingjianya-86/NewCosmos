@@ -8,7 +8,9 @@ using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
+using NewCosmos.Services.Domain.Printing;
 using NewCosmos.Services.Platform;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.Shared;
 using System.Collections.ObjectModel;
@@ -21,6 +23,8 @@ namespace NewCosmos.ViewModels.ArchiveManagement;
 /// 导出支持「导出全部 / 导出选中 / 另存为…（自选目录）」，文件名按 2026-11-04 命名规则
 /// （姓名_身份证后4位_类别_编号），旧数据无名时回退原格式。
 /// 另提供「历史照片转 WebP」批量维护入口（旧 JPEG 统一压缩为 WebP，单张 ≤500KB）。
+/// 「推送打印」把勾选照片以 JobKind=Photo 写入打印队列，由本机 PC 打印代理认领执行
+/// （与手机端照片打印同链路，版式逐批选择）。
 /// </summary>
 public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 {
@@ -29,6 +33,8 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IPrintQueueService _printQueueService;
+    private readonly INewPermissionService _permissionService;
     private CancellationTokenSource? _convertCts;
     private CancellationTokenSource? _thumbCts;
     private bool _autoSearchOnAppear;
@@ -97,13 +103,17 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         IArchivePhotoWebPMigrationService webpMigrationService,
         IDialogService dialogService,
         ILoggerService logger,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IPrintQueueService printQueueService,
+        INewPermissionService permissionService)
     {
         _photoService = photoService;
         _webpMigrationService = webpMigrationService;
         _dialogService = dialogService;
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _printQueueService = printQueueService;
+        _permissionService = permissionService;
 
         PageSize = 20;
         Title = "档案照片查询";
@@ -213,6 +223,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     {
         OnPropertyChanged(nameof(SelectedCount));
         OnPropertyChanged(nameof(ExportSelectedText));
+        OnPropertyChanged(nameof(PushPrintText));
     }
 
     /// <summary>为当前页照片异步生成缩略图（4 路并发，切页/重新查询时取消上一批）。</summary>
@@ -561,6 +572,130 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     private static string IdCardTail(ArchivePhoto photo)
         => photo.ApplicantIdCard.Length >= 6 ? photo.ApplicantIdCard[^6..] : photo.ApplicantIdCard;
+
+    #endregion
+
+    #region 推送打印
+
+    /// <summary>推送打印按钮文案（勾选时带张数，与「导出选中」同款反馈）。</summary>
+    public string PushPrintText => SelectedCount > 0 ? $"推送打印（{SelectedCount}）" : "推送打印";
+
+    /// <summary>
+    /// 推送打印勾选照片：权限门控（复用 PRINT_FAMILYAPPLICATION，与手机端照片打印同口径、不新增权限种子）
+    /// → 选版式（一次选择应用到本批；「按默认」逐张按类别取 证件原寸/整页）→ 逐张入队
+    /// （JobKind=Photo，照片二进制内联在队列里）→ 本机 PC 打印代理认领后用 Word COM 排版打印。
+    /// 打印机留空：代理用本机默认打印机。
+    /// </summary>
+    [RelayCommand]
+    private async Task PushPrintSelectedAsync()
+    {
+        var checkedItems = Photos.Where(p => p.IsSelected).ToList();
+        if (checkedItems.Count == 0)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请先勾选要推送打印的照片（行首复选框）", "确定");
+            return;
+        }
+
+        // 权限门控：复用「家庭收入档案打印」权限码（与手机端照片打印同源）
+        var userId = App.CurrentUserId;
+        if (userId.HasValue)
+        {
+            var allowed = await _permissionService.HasPermissionAsync(
+                userId.Value, PermissionCodes.PRINT_FAMILYAPPLICATION, CancellationToken);
+            if (!allowed)
+            {
+                await _dialogService.DisplayAlertAsync("权限不足",
+                    "您没有打印权限（PRINT_FAMILYAPPLICATION），请联系管理员", "确定");
+                return;
+            }
+        }
+
+        // 选版式：按默认（逐张按类别）或强制统一版式；取消则中止
+        var buttons = new[] { "按默认（证件原寸/整页）" }
+            .Concat(PhotoLayoutConstants.All.Select(a => a.Name))
+            .ToArray();
+        var choice = await _dialogService.DisplayActionSheetAsync(
+            "选择打印版式", "取消", null, buttons);
+        if (choice == null || choice == "取消") return;
+
+        var forcedLayout = choice switch
+        {
+            "整页" => (string?)PhotoLayoutConstants.FULL_PAGE,
+            "半页" => PhotoLayoutConstants.HALF_PAGE,
+            "证件原寸" => PhotoLayoutConstants.ID_CARD,
+            _ => null // 按默认：证件类原寸、其余整页
+        };
+
+        await ExecuteAsync(async () =>
+        {
+            var okCount = 0;
+            var failures = new List<string>();
+
+            foreach (var item in checkedItems)
+            {
+                try
+                {
+                    var photo = item.Photo;
+                    var dataResult = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
+                    if (dataResult.IsFailure || dataResult.Value == null || dataResult.Value.Length == 0)
+                    {
+                        failures.Add($"{item.DisplayName}：读取照片失败");
+                        continue;
+                    }
+
+                    var layout = forcedLayout
+                        ?? (photo.PhotoCategory == PhotoCategoryConstants.ID_CARD
+                            ? PhotoLayoutConstants.ID_CARD
+                            : PhotoLayoutConstants.FULL_PAGE);
+
+                    var request = new PrintJobRequest
+                    {
+                        BusinessType = PrintBusinessTypes.ArchivePhoto,
+                        BusinessId = photo.ApplicationId,
+                        Classification = photo.PhotoCategoryName,
+                        ApplicantIdCard = photo.ApplicantIdCard,
+                        Copies = 1,
+                        IsDuplex = false,
+                        JobKind = PrintJobConstants.JobKindPhoto,
+                        PhotoData = dataResult.Value,
+                        PhotoLayout = layout,
+                        PhotoCategory = photo.PhotoCategory,
+                        RequestedBy = App.CurrentUserId,
+                        RequestedByName = App.CurrentUserName
+                    };
+
+                    var enqueue = await _printQueueService.EnqueueAsync(request, CancellationToken);
+                    if (enqueue.IsSuccess) okCount++;
+                    else failures.Add($"{item.DisplayName}：{enqueue.Message}");
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{item.DisplayName}：{ex.Message}");
+                }
+            }
+
+            if (okCount > 0)
+            {
+                _logger.LogBusiness("档案照片查询-推送打印入队",
+                    ("Count", okCount), ("Failures", failures.Count));
+            }
+
+            if (failures.Count == 0)
+            {
+                await _dialogService.DisplayAlertAsync("已推送打印",
+                    $"共 {okCount} 张照片已入队，电脑端打印代理将自动打印。", "确定");
+                return Result.Success();
+            }
+
+            await _dialogService.DisplayAlertAsync(
+                okCount > 0 ? "部分推送失败" : "推送失败",
+                $"成功 {okCount} 张，失败 {failures.Count} 项：\n{string.Join("\n", failures.Take(5))}",
+                "确定");
+            return okCount > 0
+                ? Result.Success()
+                : Result.Failure(ErrorCodes.UNKNOWN_ERROR, "推送打印失败");
+        }, "推送打印...");
+    }
 
     #endregion
 }

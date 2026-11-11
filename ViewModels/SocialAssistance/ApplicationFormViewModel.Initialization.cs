@@ -709,6 +709,9 @@ public partial class ApplicationFormViewModel
                 //（2026-10-16 起档案产出改用业务锚点=调查日，两者由周期差 {0,+1} 护栏保证同批次，
                 // 见 ArchiveAnchorHelper.ResolveBusinessAnchorDate；草稿 = null → 校验按今天锚定）
                 _applicationDateBase = ArchiveAnchorHelper.ResolveApplicationDate(app);
+                // 受理锚点落定 → 重算批次顺延提示（新档默认值阶段已按"今天"算过一次，此处校正；
+                // 若随后加载的调查日期与当前值相同不触发 OnSurveyDateChanged，加载完成处再兜底一次）
+                RefreshBatchHint();
                 // 覆写前真旧值：Step5 分类判定会覆写 classification_result/total_guarantee_amount，
                 // 变更流程的新旧对比必须用此处捕获值，否则恒判"无变化"
                 _loadedClassification = app.ClassificationResult;
@@ -1031,6 +1034,14 @@ public partial class ApplicationFormViewModel
                             g.First().MemberCategory, g.First().IsApplicant, g.First().RelationshipToHead),
                         StringComparer.OrdinalIgnoreCase);
 
+                // 赡养人家庭人口改前基线（身份证 → family_size）：Step2 成员卡与 Step3 赡养明细同列双编辑，
+                // 保存前调和只认"偏离本基线"的一侧（ReconcileSupporterFamilySizes）。
+                _loadedFamilySizeByIdCard = _loadedMemberEntities
+                    .Where(m => !string.IsNullOrWhiteSpace(m.IdCard)
+                                && m.MemberCategory == MemberCategoryConstants.SUPPORT)
+                    .GroupBy(m => m.IdCard.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().FamilySize, StringComparer.OrdinalIgnoreCase);
+
                 _addedMemberReasons.Clear();
                 _removedMemberEntries.Clear();
 
@@ -1045,6 +1056,7 @@ public partial class ApplicationFormViewModel
                 if (supportersResult.Value?.Count > 0)
                 {
                     Supporters.Clear();
+                    _loadedSupporterMonthlyIncome.Clear();
                     foreach (var supporter in supportersResult.Value)
                     {
                         if (supporter.MonthlySupportFee <= 0 && supporter.AnnualSupportFee > 0)
@@ -1057,8 +1069,17 @@ public partial class ApplicationFormViewModel
                             : 1;
                         SyncSupporterPickerOptions(supporter);
                         Supporters.Add(supporter);
+
+                        // 月收入加载基线（Step2/Step3 双编辑判定用，保存合并时防 0 覆盖非 0）
+                        var monthlyKey = (supporter.IdCard ?? string.Empty).Trim();
+                        if (monthlyKey.Length > 0)
+                            _loadedSupporterMonthlyIncome[monthlyKey] = supporter.MonthlyIncomeCapacity;
                     }
                     _logger.LogBusiness("赡养人加载完成", ("Count", Supporters.Count));
+                }
+                else
+                {
+                    _loadedSupporterMonthlyIncome.Clear();
                 }
 
                 // 加载照料人
@@ -1126,6 +1147,8 @@ public partial class ApplicationFormViewModel
                 // 入户调查日期加载快照：Step4「调查日期避公示」只拦新档或本次改过的值，
                 // 存量档原值放行（历史档调查日可能本就落在当时公示窗口内）
                 _loadedSurveyDate = SurveyDate;
+                // 调查日期与当前值相同时 OnSurveyDateChanged 不触发 → 加载完成后兜底重算批次顺延提示
+                RefreshBatchHint();
 
                 // 加载经济明细
                 var economicResult = await _economicDetailService.LoadAllAsync(applicationId, ct);

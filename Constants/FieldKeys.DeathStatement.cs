@@ -131,6 +131,65 @@ public static partial class FieldKeys
 
     #endregion
 
+    #region 规范化格式新增（2026-11-08 五条目格式；同批次落库列见 20261108_death_statement_standard_format.sql）
+
+    /// <summary>死亡时年龄（岁；由身份证出生日期按死亡日期推导，非当前年龄）</summary>
+    public const string DEATH_AGE = "DEATH_AGE";
+
+    /// <summary>死亡证明类型（死亡医学证明 / 非正常死亡证明；模板《{死亡证明类型}》）</summary>
+    public const string DEATH_CERT_TYPE = "DEATH_CERT_TYPE";
+
+    /// <summary>死亡证明出具机构（条目一「已由XX出具」）</summary>
+    public const string DEATH_CERT_ISSUE_ORG = "DEATH_CERT_ISSUE_ORG";
+
+    /// <summary>火化日期（条目二火化分支，yyyy年M月d日）</summary>
+    public const string CREMATION_DATE = "CREMATION_DATE";
+
+    /// <summary>火化地点/殡仪馆（条目二火化分支）</summary>
+    public const string CREMATION_PLACE = "CREMATION_PLACE";
+
+    /// <summary>火化证明编号（条目二火化分支）</summary>
+    public const string CREMATION_CERT_NO = "CREMATION_CERT_NO";
+
+    /// <summary>安葬日期（条目二安葬分支，已安葬或拟安葬，yyyy年M月d日）</summary>
+    public const string BURIAL_DATE = "BURIAL_DATE";
+
+    /// <summary>安葬地点/公益性墓地（条目二安葬分支）</summary>
+    public const string BURIAL_PLACE = "BURIAL_PLACE";
+
+    /// <summary>家属情况及诉求（条目四，长文本）</summary>
+    public const string FAMILY_SITUATION = "FAMILY_SITUATION";
+
+    /// <summary>矛盾纠纷及信访隐患勾选态（条目五：无 / 有）</summary>
+    public const string DISPUTE_STATUS = "DISPUTE_STATUS";
+
+    /// <summary>矛盾纠纷说明（条目五：勾「有」时的另附说明）</summary>
+    public const string DISPUTE_DESC = "DISPUTE_DESC";
+
+    /// <summary>
+    /// 惠民政策享受情况（条目三，整句）：由身份八源聚合（DeathStatementContext.Identities）
+    /// 按 低保/特困/高龄/残疾/优抚 关键词命中自动推导「该死者☑是 □否 为XX对象…」，零手填。
+    /// </summary>
+    public const string BENEFIT_FLAG_TEXT = "BENEFIT_FLAG_TEXT";
+
+    /// <summary>
+    /// 条目一整句（组句输出）：有证明信息 → 「已由XX出具《XX》（编号：XX）」；
+    /// 仅有编号 → 「死亡证明编号：XX」；全空 → 「待办理」（申报常先于死亡证明取得）。
+    /// 模板一行一个占位符，组句在装配器单点完成——Word 模板无法做条件分支。
+    /// </summary>
+    public const string DEATH_CERT_STATEMENT = "DEATH_CERT_STATEMENT";
+
+    /// <summary>
+    /// 条目二整句（组句输出）：火化分支 → 「已于X月X日在XX火化（火化证明编号：XX）」；
+    /// 安葬分支 → 「已于/拟于X月X日安葬于XX」；其他 → 自由说明原文；全空 → 回退遗体安置自由文本。
+    /// </summary>
+    public const string DISPOSITION_TEXT = "DISPOSITION_TEXT";
+
+    /// <summary>条目五整句（组句输出）：「☑无 □有」或「□无 ☑有（说明）」，未选为空</summary>
+    public const string DISPUTE_TEXT = "DISPUTE_TEXT";
+
+    #endregion
+
     #region 汇总
 
     /// <summary>身份条数</summary>

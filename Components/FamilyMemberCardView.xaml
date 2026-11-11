@@ -203,11 +203,15 @@
                             SelectedItem="{Binding SelectedIncomeSource}" ItemDisplayBinding="{Binding Display}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Label Grid.Column="6" Text="月收入（元）" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Entry Grid.Column="7" Text="{Binding MonthlyIncomeCapacity}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" Placeholder="" Keyboard="Numeric"/>
-                    <!-- 家庭人口（仅赡养抚养扶养显示） -->
-                    <Label Grid.Column="8" Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
-                           IsVisible="{Binding ShowFamilySize, Source={x:Reference Card}}"/>
-                    <Entry Grid.Column="9" Text="{Binding FamilySize}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" Placeholder="" Keyboard="Numeric"
-                           IsVisible="{Binding ShowFamilySize, Source={x:Reference Card}}"/>
+                </Grid>
+                <!-- 家庭人口（仅赡养抚养扶养显示）：原与上排共用一个 Grid 时写 Grid.Column=8/9，而该 Grid
+                     只有 8 列（0-7）→ 越界被钳到第 7 列，与「月收入」输入框同格重叠而完全看不见
+                     （2026-11-03 模板收敛 3e6128a 引入的回归；收敛前赡养卡是 10 列）。
+                     改为独立 Grid：列定义与上排同宽对齐，且整块随 ShowFamilySize 隐藏 → 共同生活卡零影响。 -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8"
+                      IsVisible="{Binding ShowFamilySize, Source={x:Reference Card}}">
+                    <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                    <Entry Grid.Column="1" Text="{Binding FamilySize}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" Placeholder="" Keyboard="Numeric"/>
                 </Grid>
             </VerticalStackLayout>
             <!-- 删除按钮 -->

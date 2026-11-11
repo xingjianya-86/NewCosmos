@@ -324,13 +324,84 @@ public partial class DeathStatementViewModel
     [ObservableProperty]
     private string _selectedSituation = string.Empty;
 
-    /// <summary>遗体安置预设（字典分类 DeathRemainsArrangements；模板 {死亡人遗体安置情况}）</summary>
-    [ObservableProperty]
-    private ObservableCollection<string> _remainsOptions = new();
+    #region 规范化格式采集（2026-11-08 五条目；落库列见 20261108_death_statement_standard_format.sql）
 
-    /// <summary>当前选中遗体安置预设（Picker 绑定；「其他」→ 不覆盖手填框现值）</summary>
+    /// <summary>死亡证明类型选项（常量 CertTypeOptions：死亡医学证明 / 非正常死亡证明）</summary>
     [ObservableProperty]
-    private string _selectedRemains = string.Empty;
+    private ObservableCollection<string> _certTypeOptions = new();
+
+    /// <summary>当前选中死亡证明类型（条目一，选填）</summary>
+    [ObservableProperty]
+    private string _selectedCertType = string.Empty;
+
+    /// <summary>死亡证明出具机构（条目一，选填）</summary>
+    [ObservableProperty]
+    private string _certIssueOrg = string.Empty;
+
+    /// <summary>遗体处置方式选项（火化 / 安葬 / 其他，常量单一来源）</summary>
+    [ObservableProperty]
+    private ObservableCollection<string> _dispositionOptions = new();
+
+    /// <summary>当前选中遗体处置方式（条目二；三选一互斥显隐，切换即清非选中分支字段保持写入不变量）</summary>
+    [ObservableProperty]
+    private string _selectedDisposition = string.Empty;
+
+    /// <summary>火化分支显隐（SelectedDisposition=火化）</summary>
+    [ObservableProperty]
+    private bool _isDispositionCremation;
+
+    /// <summary>安葬分支显隐（SelectedDisposition=安葬）</summary>
+    [ObservableProperty]
+    private bool _isDispositionBurial;
+
+    /// <summary>其他分支显隐（SelectedDisposition=其他 → 自由说明，落 remains_arrangement）</summary>
+    [ObservableProperty]
+    private bool _isDispositionOther;
+
+    /// <summary>火化日期（date-only；DateTimeEntryView ShowTime=False）</summary>
+    [ObservableProperty]
+    private DateTime? _cremationDate;
+
+    /// <summary>火化地点/殡仪馆</summary>
+    [ObservableProperty]
+    private string _cremationPlace = string.Empty;
+
+    /// <summary>火化证明编号（选填）</summary>
+    [ObservableProperty]
+    private string _cremationCertNo = string.Empty;
+
+    /// <summary>安葬日期（已安葬或拟安葬，可为未来日期）</summary>
+    [ObservableProperty]
+    private DateTime? _burialDate;
+
+    /// <summary>安葬地点/公益性墓地</summary>
+    [ObservableProperty]
+    private string _burialPlace = string.Empty;
+
+    /// <summary>家属情况及诉求（条目四，长文本）</summary>
+    [ObservableProperty]
+    private string _familySituation = string.Empty;
+
+    /// <summary>矛盾纠纷及信访隐患选项（无 / 有）</summary>
+    [ObservableProperty]
+    private ObservableCollection<string> _disputeOptions = new();
+
+    /// <summary>当前选中矛盾纠纷勾选态（条目五，必选）</summary>
+    [ObservableProperty]
+    private string _selectedDispute = string.Empty;
+
+    /// <summary>选「有」→ 展开矛盾纠纷说明输入框</summary>
+    [ObservableProperty]
+    private bool _isDisputeHas;
+
+    /// <summary>矛盾纠纷说明（勾「有」必填）</summary>
+    [ObservableProperty]
+    private string _disputeDesc = string.Empty;
+
+    /// <summary>安葬日期可选上限（拟安葬允许未来日期，放开到 1 年内；火化日期用组件默认上限=当前时刻）</summary>
+    public DateTime BurialDateLimit => DateTime.Today.AddYears(1);
+
+    #endregion
 
     /// <summary>相关业务事项多选行（字典分类 BusinessMatters；勾选拼回 BusinessMatter 串）</summary>
     [ObservableProperty]
@@ -405,29 +476,60 @@ public partial class DeathStatementViewModel
             SituationDesc = value;
     }
 
-    partial void OnSelectedRemainsChanged(string value)
+    /// <summary>
+    /// 遗体处置三选一联动（条目二）：置分支显隐 + 清非选中分支字段——
+    /// 保证落库只有一组处置数据（回填判定与组句输出同口径，防切换分支残留脏值）。
+    /// </summary>
+    partial void OnSelectedDispositionChanged(string value)
     {
-        if (!DeathDeclarationConstants.IsOtherOption(value) && !string.IsNullOrWhiteSpace(value))
-            RemainsArrangement = value;
+        IsDispositionCremation = string.Equals(value, DeathDeclarationConstants.DispositionCremation, StringComparison.Ordinal);
+        IsDispositionBurial = string.Equals(value, DeathDeclarationConstants.DispositionBurial, StringComparison.Ordinal);
+        IsDispositionOther = string.Equals(value, DeathDeclarationConstants.DispositionOther, StringComparison.Ordinal);
+
+        if (!IsDispositionCremation)
+        {
+            CremationDate = null;
+            CremationPlace = string.Empty;
+            CremationCertNo = string.Empty;
+        }
+        if (!IsDispositionBurial)
+        {
+            BurialDate = null;
+            BurialPlace = string.Empty;
+        }
+        // 「其他」分支文本不随切走清空：回填时先灌 RemainsArrangement 再选分支，
+        // 若此时清掉会把带出的原文抹掉；改分支（火化/安葬）时才清——上面两个 if 已覆盖结构化字段，
+        // 文本仅在用户显式改走后由落库语义（结构化优先）自然失效，不再回写。
+    }
+
+    /// <summary>矛盾纠纷选「有」→ 展开说明输入框（条目五）</summary>
+    partial void OnSelectedDisputeChanged(string value)
+    {
+        IsDisputeHas = string.Equals(value, DeathDeclarationConstants.DisputeHas, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// 加载表单预设选项（死亡地点/现场所见/遗体安置/业务事项，字典单一来源；每 VM 实例一次）。
-    /// 字典查询失败仅告警不阻断——选项空时表单仍可手填（死亡地点回落手填态）。
+    /// 加载表单预设选项（死因/死亡地点/现场所见/业务事项，字典单一来源；每 VM 实例一次）。
+    /// 字典查询失败仅告警不阻断——选项空时表单仍可手填（死亡地点/死因回落手填态）。
+    /// 2026-11-08 死因统一读字典 DeathReasons（原常量数组与字典两套选项不一致，已删常量双写）；
+    /// 遗体安置不再走字典 DeathRemainsArrangements——条目二改结构化三分支（火化/安葬/其他），
+    /// 字典种子保留但本表单不再消费。
     /// </summary>
     private async Task LoadFormOptionsAsync()
     {
         if (_formOptionsLoaded) return;
         _formOptionsLoaded = true;
 
+        await LoadDictOptionsAsync(DictionaryTypeCodes.DeathReasons, DeathReasonOptions);
         await LoadDictOptionsAsync(DictionaryTypeCodes.DeathPlaces, DeathPlaceOptions);
         await LoadDictOptionsAsync(DictionaryTypeCodes.DeathSituations, SituationOptions);
-        await LoadDictOptionsAsync(DictionaryTypeCodes.DeathRemainsArrangements, RemainsOptions);
         await LoadBusinessMatterOptionsAsync();
 
-        // 字典没选项时死亡地点回落为手填态（否则无处输入）
+        // 字典没选项时死亡地点/死因回落为手填态（否则无处输入）
         if (DeathPlaceOptions.Count == 0)
             IsDeathPlaceCustom = true;
+        if (DeathReasonOptions.Count == 0)
+            IsDeathReasonCustom = true;
     }
 
     private async Task LoadDictOptionsAsync(string category, ObservableCollection<string> target)
@@ -540,21 +642,34 @@ public partial class DeathStatementViewModel
             SelectedSituation = SituationOptions[0];
             SituationDesc = SituationOptions[0];
         }
-        if (string.IsNullOrWhiteSpace(RemainsArrangement) && RemainsOptions.Count > 0)
-        {
-            SelectedRemains = RemainsOptions[0];
-            RemainsArrangement = RemainsOptions[0];
-        }
+        // 遗体处置无自动默认（条目二三分支必选由提交校验把关；原字典首项默认已随结构化分支移除）
         if (string.IsNullOrWhiteSpace(DeclaredByName))
             DeclaredByName = App.CurrentUserFullName ?? App.CurrentUserName ?? string.Empty;
     }
 
-    /// <summary>按库内值回填三个预设 Picker（命中→直选；未命中→「其他」保留原文；空→清选）</summary>
+    /// <summary>按库内值回填两个预设 Picker + 遗体处置分支（命中→直选；未命中→「其他」保留原文；空→清选）</summary>
     private void SyncPresetSelections()
     {
         SyncPresetSelection(DeathPlace, DeathPlaceOptions, v => SelectedDeathPlace = v, v => IsDeathPlaceCustom = v);
         SyncPresetSelection(SituationDesc, SituationOptions, v => SelectedSituation = v, null);
-        SyncPresetSelection(RemainsArrangement, RemainsOptions, v => SelectedRemains = v, null);
+        SyncDispositionSelection();
+    }
+
+    /// <summary>
+    /// 遗体处置分支回填（条目二）：结构化字段命中 → 对应分支；
+    /// 无结构化但有安置自由文本（存量行）→ 「其他」；全空 → 清选。
+    /// 须在 Cremation*/Burial*/RemainsArrangement 已灌值之后调用（切换回调会清非选中分支）。
+    /// </summary>
+    private void SyncDispositionSelection()
+    {
+        if (CremationDate.HasValue || !string.IsNullOrWhiteSpace(CremationPlace) || !string.IsNullOrWhiteSpace(CremationCertNo))
+            SelectedDisposition = DeathDeclarationConstants.DispositionCremation;
+        else if (BurialDate.HasValue || !string.IsNullOrWhiteSpace(BurialPlace))
+            SelectedDisposition = DeathDeclarationConstants.DispositionBurial;
+        else if (!string.IsNullOrWhiteSpace(RemainsArrangement))
+            SelectedDisposition = DeathDeclarationConstants.DispositionOther;
+        else
+            SelectedDisposition = string.Empty;
     }
 
     private void SyncPresetSelection(string? value, ObservableCollection<string> options,

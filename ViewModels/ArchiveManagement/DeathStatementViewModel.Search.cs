@@ -178,7 +178,17 @@ public partial class DeathStatementViewModel
         SituationDesc = string.Empty;
         SelectedSituation = string.Empty;
         RemainsArrangement = string.Empty;
-        SelectedRemains = string.Empty;
+        SelectedDisposition = string.Empty;
+        SelectedCertType = string.Empty;
+        CertIssueOrg = string.Empty;
+        CremationDate = null;
+        CremationPlace = string.Empty;
+        CremationCertNo = string.Empty;
+        BurialDate = null;
+        BurialPlace = string.Empty;
+        FamilySituation = string.Empty;
+        SelectedDispute = string.Empty;
+        DisputeDesc = string.Empty;
         BusinessAgent = App.CurrentUserFullName ?? string.Empty;
         BusinessMatter = string.Empty;
 
@@ -311,6 +321,20 @@ public partial class DeathStatementViewModel
         RemainsArrangement = context.RemainsArrangement;
         BusinessAgent = context.BusinessAgent;
         BusinessMatter = context.BusinessMatter?.Trim() ?? string.Empty;
+
+        // 规范化格式五条目回填（带出已申报行；处置分支由 SyncPresetSelections→SyncDispositionSelection 按值推断）
+        EnsureOption(CertTypeOptions, context.CertType);
+        SelectedCertType = context.CertType;
+        CertIssueOrg = context.CertIssueOrg;
+        CremationDate = DateTime.TryParse(context.CremationDateText, out var cremationDate) ? cremationDate.Date : null;
+        CremationPlace = context.CremationPlace;
+        CremationCertNo = context.CremationCertNo;
+        BurialDate = DateTime.TryParse(context.BurialDateText, out var burialDate) ? burialDate.Date : null;
+        BurialPlace = context.BurialPlace;
+        FamilySituation = context.FamilySituation;
+        EnsureOption(DisputeOptions, context.DisputeStatus);
+        SelectedDispute = context.DisputeStatus;
+        DisputeDesc = context.DisputeDesc;
 
         // 预设 Picker 回填（命中直选/未命中「其他」保留原文）→ 只补空默认值 → 业务事项勾选态重建
         SyncPresetSelections();

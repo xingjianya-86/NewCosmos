@@ -137,31 +137,12 @@ public class TemplateFieldBuilder
     }
 
     /// <summary>
-    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日=会议日]；
-    /// 无调查记录（补录/未录入）时取申请日当天。
-    /// 与 ArchiveProductionViewModel.ResolveSurveyDate 同口径（2026-10-16 同步）：
-    /// 上限铁律——调查不得落进公示期、不得晚于会议日；倒挂窗口（申请日 > 会议日）时上限优先，
-    /// 正常窗口维持 [申请日, 会议日] 双钳。
+    /// 入户调查日期（文书打印口径）：规则单点在 <see cref="SurveyDateResolver.Resolve"/>（2026-11-11 抽取），
+    /// 此处只负责按本链路模板 config 的 format 输出（yyyy年MM月dd日，补零）。
+    /// 与 ArchiveProductionViewModel.ResolveSurveyDate 同源，仅 format 串不同。
     /// </summary>
     private static string ResolveSurveyDate(TimelineResult timeline, DateTime? actualSurvey, DateTime applicationDate)
-    {
-        var minDate = applicationDate.Date;
-        var maxDate = timeline.MeetingDate.Date;
-        var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
-            ? actualSurvey.Value.Date
-            : (maxDate < minDate ? maxDate : minDate);
-        if (maxDate < minDate)
-        {
-            // 倒挂窗口：只保上限（公示外铁律），不抬到申请日
-            if (baseDate > maxDate) baseDate = maxDate;
-        }
-        else
-        {
-            if (baseDate < minDate) baseDate = minDate;
-            if (baseDate > maxDate) baseDate = maxDate;
-        }
-        return baseDate.ToString("yyyy年MM月dd日");
-    }
+        => SurveyDateResolver.Resolve(timeline, actualSurvey, applicationDate).ToString("yyyy年MM月dd日");
 
     /// <summary>
     /// 统一地址解析：FAMILY_ADDRESS 和所有 FAMILY_MEMBER_ADDRESS_N 都走 addressResolver。

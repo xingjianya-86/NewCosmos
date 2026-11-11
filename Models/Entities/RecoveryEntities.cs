@@ -139,6 +139,9 @@ public partial class RecoveryRecord : ObservableObject
     /// </summary>
     public bool CanDelete => Status == RecoveryConstants.STATUS_DRAFT;
 
+    /// <summary>是否可快捷结案（仅办理中 Draft；2026-11-08 P1-8，死亡联动「追缴结案」动作）</summary>
+    public bool CanClose => Status == RecoveryConstants.STATUS_DRAFT;
+
     /// <summary>
     /// 是否可补打（非草稿状态：已确认/已打印）
     /// </summary>

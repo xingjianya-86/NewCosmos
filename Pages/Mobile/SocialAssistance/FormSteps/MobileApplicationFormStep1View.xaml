@@ -7,6 +7,17 @@
     <!-- Step1（手机版）：基本信息 — 单列堆叠，字段绑定与桌面版一致 -->
     <VerticalStackLayout Spacing="14" IsEnabled="{Binding IsStep1Editable}">
 
+        <!-- 申请日期（= 申请编号日期段优先 → 创建时间；修改走"改期"，影响公示/卷号/文书批次） -->
+        <Border Style="{StaticResource CardBorder}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Label Text="申请日期" Style="{StaticResource FormFieldLabelStyle}" VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding ApplicationDateText}" FontSize="16" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                <Button Grid.Column="2" Text="修改" Style="{StaticResource ButtonSmall}"
+                        Command="{Binding ChangeApplicationDateCommand}" VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
         <!-- 户籍所在地（独立级联，默认来自组织机构，可修改） -->
         <Border Style="{StaticResource CardBorder}">
             <VerticalStackLayout Spacing="12">

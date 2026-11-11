@@ -781,9 +781,21 @@ public class FamilyMember : INotifyPropertyChanged
     public int? SupportMonths { get; set; }
 
     /// <summary>
-    /// 家庭人口
+    /// 家庭人口（**赡养人自己家庭**的人口，与本户认定无关；仅 member_category=赡养抚养扶养 时使用）。
+    /// 与 Step3 赡养明细 Supporter.SupporterFamilySize 落在同一列 family_size，保存前由
+    /// SupporterFamilySizeReconciler 调和——故必须发变更通知，否则调和后 Step2 卡不刷新。
     /// </summary>
-    public int? FamilySize { get; set; }
+    public int? FamilySize
+    {
+        get => _familySize;
+        set
+        {
+            if (_familySize == value) return;
+            _familySize = value;
+            OnPropertyChanged();
+        }
+    }
+    private int? _familySize;
 
     /// <summary>
     /// 赡养人家庭人数

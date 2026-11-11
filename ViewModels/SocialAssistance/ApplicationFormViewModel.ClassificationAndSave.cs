@@ -851,6 +851,10 @@ public partial class ApplicationFormViewModel
         // Step2 新增的赡养抚养扶养人合并进 Supporters（未点"导入家庭成员"也不丢；赡养费计入收入）
         await MergeSupportMembersIntoSupportersAsync();
 
+        // 赡养人「家庭人口」双编辑口调和（Step2 成员卡 / Step3 赡养明细同列 family_size）：
+        // 必须在 SaveFamilyMembersAsync 之前把两侧对齐，否则 SaveSupporters 后写会覆盖 Step2 输入。
+        ReconcileSupporterFamilySizes();
+
         // 强制重新计算收入，确保汇总字段是最新的
         LoadingMessage = "正在计算收入...";
         RecalculateIncome();
@@ -1036,6 +1040,54 @@ public partial class ApplicationFormViewModel
                     string.IsNullOrEmpty(clrRes.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : clrRes.ErrorCode,
                     clrRes.Message ?? "渐退期记录清除失败");
             }
+        }
+    }
+
+    /// <summary>
+    /// 赡养人「家庭人口」双编辑口调和：Step2 成员卡 <c>FamilyMember.FamilySize</c> 与
+    /// Step3 赡养明细 <c>Supporter.SupporterFamilySize</c> 落在同一列
+    /// <c>nc_biz_family_members.family_size</c>（Supporter.Id == FamilyMember.Id）。
+    /// 保存顺序 SaveFamilyMembers 先写、SaveSupporters 后写 → 后者覆盖前者，
+    /// 故必须在 SaveFamilyMembersAsync 之前把两侧对齐，否则 Step2 输入被改回。
+    ///
+    /// 「家庭人口」= 赡养人**自己家庭**的人口，与本户认定无关（两侧是同值的两个编辑口）。
+    /// 判定依据 = 加载基线 _loadedFamilySizeByIdCard（只比现值分不清谁改过），纯逻辑在
+    /// Helpers\SupporterFamilySizeReconciler，规则见其类注释与单测。
+    /// 调用点：SaveApplicationInternalAsync 内 MergeSupportMembersIntoSupportersAsync 之后。
+    /// </summary>
+    private void ReconcileSupporterFamilySizes()
+    {
+        if (Supporters.Count == 0 || SupportMembers.Count == 0) return;
+
+        var supporterByIdCard = new Dictionary<string, Supporter>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in Supporters)
+        {
+            if (!string.IsNullOrWhiteSpace(s.IdCard))
+                supporterByIdCard[s.IdCard.Trim()] = s;   // 重复身份证取首个（与 Merge 同口径）
+        }
+        if (supporterByIdCard.Count == 0) return;
+
+        var changed = 0;
+        foreach (var member in SupportMembers)
+        {
+            if (string.IsNullOrWhiteSpace(member.IdCard)) continue;
+            if (!supporterByIdCard.TryGetValue(member.IdCard.Trim(), out var supporter)) continue;
+
+            var hasBaseline = _loadedFamilySizeByIdCard.TryGetValue(member.IdCard.Trim(), out var baseline);
+            var outcome = SupporterFamilySizeReconciler.Resolve(hasBaseline, baseline, member.FamilySize, supporter.SupporterFamilySize);
+
+            if (!outcome.Changed) continue;
+
+            member.FamilySize = outcome.MemberValue;
+            supporter.SupporterFamilySize = outcome.SupporterValue;
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            _logger.LogBusiness("赡养人家庭人口调和",
+                ("Changed", changed.ToString()),
+                ("BaselineCount", _loadedFamilySizeByIdCard.Count.ToString()));
         }
     }
 

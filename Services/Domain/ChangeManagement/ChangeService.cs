@@ -263,23 +263,8 @@ public class MemberChangeEntry
     public string Remark { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// 成员死亡上下文
-/// </summary>
-public class MemberDeathContext
-{
-    public long ApplicationId { get; set; }
-    public long MemberId { get; set; }
-    public string MemberName { get; set; } = string.Empty;
-    public string MemberIdCard { get; set; } = string.Empty;
-    public DateTime DeathDate { get; set; } = DateTime.Today;
-
-    /// <summary>死亡确切时刻（必填：应用层双门校验的入参侧，空值由 ProcessMemberDeathAsync 拒绝）</summary>
-    public TimeSpan? DeathTime { get; set; }
-
-    public string DeathReason { get; set; } = string.Empty;
-    public string OperatorName { get; set; } = string.Empty;
-}
+// MemberDeathContext「成员死亡上下文」已删（2026-11-08 P0-1）：唯一消费方 ProcessMemberDeathAsync
+// 为死代码（全仓 0 调用方），成员死亡实战走 MemberChangeEntry（见上方）→ RebuildAndReview 批量 CTE。
 
 /// <summary>
 /// 户主变更上下文
@@ -479,10 +464,9 @@ public interface IChangeService
     /// </summary>
     Task<Result<ChangeResult>> ExecuteMemberChangeAsync(MemberChangeContext context, CancellationToken ct = default);
 
-    /// <summary>
-    /// 处理成员死亡
-    /// </summary>
-    Task<Result<ChangeResult>> ProcessMemberDeathAsync(MemberDeathContext context, CancellationToken ct = default);
+    // ProcessMemberDeathAsync「处理成员死亡」已删（2026-11-08 P0-1）：全仓 0 调用方（死代码取证），
+    // 实战链路是 ExecuteMemberChangeAsync → RebuildAndReview 的死亡减员批量 CTE
+    //（docs/20260924 挂点已同步改指该处）；MemberDeathContext 一并移除。
 
     /// <summary>
     /// 执行户主变更

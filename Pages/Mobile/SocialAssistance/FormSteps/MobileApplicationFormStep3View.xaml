@@ -806,6 +806,11 @@
                                                 <Entry Text="{Binding SupporterFamilySize}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
                                             </VerticalStackLayout>
                                         </Grid>
+                                        <!-- 月收入（2026-11 P3：与 Step2 卡同列 monthly_income_capacity，保存时按加载基线双向同步） -->
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                            <Label Text="月收入" Style="{StaticResource FormFieldLabelStyle}"/>
+                                            <Entry Grid.Column="1" Text="{Binding MonthlyIncomeCapacity}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                        </Grid>
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
                                             <Label Text="年赡养费:" Style="{StaticResource FormFieldLabelStyle}"/>
                                             <Label Grid.Column="1" Text="{Binding AnnualSupportFee, StringFormat='{0:F2}'}" FontSize="16"

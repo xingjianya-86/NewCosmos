@@ -135,6 +135,11 @@
                             <Picker ItemsSource="{Binding DeathPlaceOptions}" SelectedItem="{Binding SelectedDeathPlace}"/>
                             <Entry Text="{Binding DeathPlace}" Style="{StaticResource FormFieldEntryStyle}" Placeholder="选「其他」时手填"
                                    IsVisible="{Binding IsDeathPlaceCustom}"/>
+                            <!-- 死亡证明类型与出具机构（文书条目一，选填） -->
+                            <Label Text="死亡证明类型（条目一）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding CertTypeOptions}" SelectedItem="{Binding SelectedCertType}"/>
+                            <Label Text="死亡证明出具机构（条目一）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Entry Text="{Binding CertIssueOrg}" Style="{StaticResource FormFieldEntryStyle}" Placeholder="如：XX镇中心卫生院"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -220,10 +225,45 @@
                                 <Label Text="现场所见情况" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <Picker ItemsSource="{Binding SituationOptions}" SelectedItem="{Binding SelectedSituation}"/>
                                 <Editor Text="{Binding SituationDesc}" Placeholder="选预设自动填入，可微调" HeightRequest="88"/>
-                                <Label Text="遗体安置情况" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Picker ItemsSource="{Binding RemainsOptions}" SelectedItem="{Binding SelectedRemains}"/>
-                                <Editor Text="{Binding RemainsArrangement}" Placeholder="选预设自动填入，可微调" HeightRequest="72"/>
                             </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- ── 规范化情况说明（文书条目二/四/五，2026-11-08）：遗体处置三选一 + 家属诉求 + 矛盾纠纷 ── -->
+                    <Border Style="{StaticResource CardBorderElevated}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="情况说明（文书条目二 / 四 / 五）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <Label Text="遗体处置情况（必选）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding DispositionOptions}" SelectedItem="{Binding SelectedDisposition}"/>
+
+                            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsDispositionCremation}">
+                                <components:DateTimeEntryView Title="火化日期" IsRequired="True" ShowTime="False" Value="{Binding CremationDate}"/>
+                                <Entry Text="{Binding CremationPlace}" Style="{StaticResource FormFieldEntryStyle}" Placeholder="火化地点（殡仪馆）"/>
+                                <Entry Text="{Binding CremationCertNo}" Style="{StaticResource FormFieldEntryStyle}" Placeholder="火化证明编号（选填）"/>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsDispositionBurial}">
+                                <!-- 安葬允许未来日期（拟于X月X日安葬）→ 上限放开到 1 年内 -->
+                                <components:DateTimeEntryView Title="安葬日期（已安葬或拟安葬）" IsRequired="True" ShowTime="False"
+                                                               MaximumDate="{Binding BurialDateLimit}" Value="{Binding BurialDate}"/>
+                                <Entry Text="{Binding BurialPlace}" Style="{StaticResource FormFieldEntryStyle}" Placeholder="安葬地点（公益性墓地）"/>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Spacing="8" IsVisible="{Binding IsDispositionOther}">
+                                <Editor Text="{Binding RemainsArrangement}"
+                                        Placeholder="请说明遗体处置情况（如：现停放于XX殡仪馆，拟于X月X日安葬于XX公益性墓地）" HeightRequest="72"/>
+                            </VerticalStackLayout>
+
+                            <BoxView Style="{StaticResource Divider}" Margin="0"/>
+
+                            <Label Text="家属情况及诉求（条目四）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Editor Text="{Binding FamilySituation}" Placeholder="家属基本情况与相关诉求…" HeightRequest="72"/>
+
+                            <Label Text="矛盾纠纷及信访隐患情况（条目五，必选）" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Picker ItemsSource="{Binding DisputeOptions}" SelectedItem="{Binding SelectedDispute}"/>
+                            <Editor Text="{Binding DisputeDesc}" Placeholder="勾选「有」时填写说明（另附说明）" HeightRequest="72"
+                                    IsVisible="{Binding IsDisputeHas}"/>
                         </VerticalStackLayout>
                     </Border>
 

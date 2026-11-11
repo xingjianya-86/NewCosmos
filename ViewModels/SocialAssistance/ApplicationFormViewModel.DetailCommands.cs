@@ -475,7 +475,10 @@ public partial class ApplicationFormViewModel
             SelectedPersonType = PersonTypeOptions.FirstOrDefault(o => o.Key == "赡养"),
             MonthlySupportFee = defaultMonthlyFee,
             SupportMonths = 12,
-            SupporterFamilySize = 1,
+            // 家庭人口：取 Step2 成员卡已填的值（= 赡养人**自己家庭**的人口，与本户认定无关）。
+            // 原硬编码 1 会把 Step2 输入覆盖回 1——family_size 与 Supporter 同列，
+            // 保存顺序 SaveFamilyMembers → SaveSupporters，后者后写覆盖前者。
+            SupporterFamilySize = member.FamilySize ?? 1,
             IsSupportAbility = hasSupportAbility,
             Gender = member.Gender,
             Age = member.Age,
@@ -491,6 +494,7 @@ public partial class ApplicationFormViewModel
             MainIncomeSource = member.MainIncomeSource,
             WorkCapacity = member.WorkCapacity,
             AnnualIncome = member.AnnualIncome,
+            MonthlyIncomeCapacity = member.MonthlyIncomeCapacity,
             HomeProvince = member.HomeProvince,
             HomeCity = member.HomeCity,
             HomeDistrict = member.HomeDistrict,
@@ -578,6 +582,21 @@ public partial class ApplicationFormViewModel
         supporter.HukouCity = member.HukouCity ?? string.Empty;
         supporter.HukouDistrict = member.HukouDistrict ?? string.Empty;
         supporter.HukouTown = member.HukouTown ?? string.Empty;
+
+        // 月收入双向同步（Step2 卡与 Step3 卡同列 monthly_income_capacity，两侧均可编辑）：
+        // 以加载基线判定本次会话哪一侧被改过——改过的一侧胜出；都没改取成员侧（沿用"成员为准"口径）；
+        // 无基线（新增行）取成员侧；两侧都被改时成员侧胜出（Step2 为主录入卡）。
+        // 无此判定时"非0 被 0 覆盖"会再次清掉月收入（正是本次要修的丢失路径之一）。
+        var monthlyIdKey = (supporter.IdCard ?? string.Empty).Trim();
+        var loadedMonthly = monthlyIdKey.Length > 0 && _loadedSupporterMonthlyIncome.TryGetValue(monthlyIdKey, out var baseline)
+            ? (decimal?)baseline
+            : null;
+        var supporterEdited = loadedMonthly.HasValue && supporter.MonthlyIncomeCapacity != loadedMonthly.Value;
+        var memberEdited = loadedMonthly.HasValue && member.MonthlyIncomeCapacity != loadedMonthly.Value;
+        if (supporterEdited && !memberEdited)
+            member.MonthlyIncomeCapacity = supporter.MonthlyIncomeCapacity;
+        else
+            supporter.MonthlyIncomeCapacity = member.MonthlyIncomeCapacity;
     }
 
     #endregion

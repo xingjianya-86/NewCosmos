@@ -2031,6 +2031,9 @@ public partial class ChangeService
                     return Result.Failure<ChangeResult>(deathResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         deathResult.Message ?? "写入死亡记录失败");
                 }
+
+                // P2-1：死亡登记写入后回填申报台账 death_record_id（同身份证，首次回填不覆盖）
+                await BackfillDeathRecordLinksAsync(ct);
             }
 
             // 9. 跨大类变更补写"原类别停止+新类别新增"；同大类但触发停保时补写 CategoryStop

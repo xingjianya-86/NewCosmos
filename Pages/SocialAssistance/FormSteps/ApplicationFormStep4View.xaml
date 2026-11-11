@@ -20,6 +20,10 @@
                     <Label Grid.Column="2" Text="调查员" Style="{StaticResource FormFieldLabelStyle}"/>
                     <Entry Grid.Column="3" Text="{Binding SurveyorName}" Placeholder="姓名" HeightRequest="38"/>
                 </Grid>
+                <!-- 批次顺延提示：申请/调查日 > 当月会议日 自动顺延下月批次（与文书公示、卷号同批次） -->
+                <Label Text="{Binding BatchHintText}" FontSize="13"
+                       TextColor="{StaticResource WarningDark}"
+                       IsVisible="{Binding HasBatchHint}"/>
                 <!-- 补全模式：调查日期锁定为导入库纳入时间 -->
                 <Label Text="导入库建档补全：入户调查日期取纳入时间，不可修改"
                        IsVisible="{Binding IsSurveyDateLocked}"

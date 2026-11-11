@@ -113,7 +113,7 @@ INSERT INTO nc_biz_death_declarations
 SELECT applicant_name, applicant_id_card, '本人',
        CURRENT_DATE - 5, TIME '08:20:00', '意外', 'DEMO-CERT-' || application_id,
        '演示村民委员会', NULL, '0000-00000000', '村民委员会',
-       CURRENT_TIMESTAMP - INTERVAL '5 days', 'PC', 'Verified',
+       CURRENT_TIMESTAMP - INTERVAL '5 days', 'PC', 'Pending',
        application_id, village_id, town_id, village_name,
        'DEMO', '演示数据：正常已核实申报', 'DEMO', NOW()
 FROM demo_persons WHERE rn = 2;

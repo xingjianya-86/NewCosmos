@@ -10,13 +10,14 @@ using NewCosmos.Services.Domain.UserManagement;
 namespace NewCosmos.Services.Domain.ArchiveManagement;
 
 /// <summary>
-/// 数据提醒（12 条规则）。
+/// 数据提醒（13 条规则）。
 /// 2026-11 死亡说明简化·阶段3c：从 DeathStatementService.cs 纯移动拆出（零行为变更，接口与 DI 不动）。
+/// 2026-11-08 P2-10 追加 R13 死亡日期多源不一致（只提醒不改写，三处时间口径见规范 §5 边界）。
 /// </summary>
 public partial class DeathStatementService
 {
 
-    #region 数据提醒（12 条规则）
+    #region 数据提醒（13 条规则）
 
     private async Task<Result<List<DeathReminderItem>>> BuildRemindersAsync(
         DeathStatementContext context, CancellationToken ct)
@@ -171,7 +172,55 @@ public partial class DeathStatementService
             });
         }
 
+        // R13 死亡日期多源不一致（2026-11-08 P2-10）：申报 vs 档案死亡登记 vs 高龄 death_date。
+        //     三处时间互不校验属规范 §5 既定边界（不改写入）——只提醒人工核对，避免带错日期出文书。
+        if (!string.IsNullOrWhiteSpace(context.DeathDateText))
+        {
+            var cross = await GetCrossDeathDatesAsync(context.IdCard, ct);
+            if (cross != null)
+            {
+                var diffs = new List<string>();
+                if (!string.IsNullOrWhiteSpace(cross.RecordDate) && cross.RecordDate != context.DeathDateText)
+                    diffs.Add($"档案死亡登记 {cross.RecordDate}");
+                if (!string.IsNullOrWhiteSpace(cross.ElderlyDate) && cross.ElderlyDate != context.DeathDateText)
+                    diffs.Add($"高龄登记 {cross.ElderlyDate}");
+                if (diffs.Count > 0)
+                {
+                    list.Add(new DeathReminderItem
+                    {
+                        Level = "提示", Code = "DEATH_DATE_MISMATCH",
+                        Message = $"死亡日期多源不一致：本说明 {context.DeathDateText}，{string.Join("、", diffs)}",
+                        SuggestAction = "核对并以实际死亡日期为准修正各模块", NavKey = "None"
+                    });
+                }
+            }
+        }
+
         return Result.Success(list);
+    }
+
+    /// <summary>跨源死亡日期（档案死亡登记 / 高龄登记，取各自最新；查询失败返回 null 不产生提醒）</summary>
+    private sealed class CrossDeathDateRow
+    {
+        public string? RecordDate { get; set; }
+        public string? ElderlyDate { get; set; }
+    }
+
+    private async Task<CrossDeathDateRow?> GetCrossDeathDatesAsync(string idCard, CancellationToken ct)
+    {
+        var sql = @"SELECT
+            (SELECT TO_CHAR(MAX(d.death_date),'YYYY-MM-DD')
+               FROM nc_biz_death_records d WHERE d.member_id_card = $1) AS record_date,
+            (SELECT TO_CHAR(MAX(e.death_date),'YYYY-MM-DD')
+               FROM nc_biz_elderly_applications e
+              WHERE e.id_card = $1 AND e.death_date IS NOT NULL AND e.deleted_at IS NULL) AS elderly_date";
+        var result = await _db.QuerySingleAsync<CrossDeathDateRow>(sql, ct, idCard);
+        if (result.IsFailure)
+        {
+            LogWarn($"跨源死亡日期查询失败（R13 跳过）: {result.Message}");
+            return null;
+        }
+        return result.Value;
     }
 
     private async Task<bool> HasDeathRecordAsync(string idCard, CancellationToken ct)

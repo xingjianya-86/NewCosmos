@@ -17,331 +17,6 @@ using ApplicationEntity = NewCosmos.Models.Entities.Application;
 
 public partial class ChangeService
 {
-    /// <summary>
-    /// 处理成员死亡
-    /// </summary>
-    public async Task<Result<ChangeResult>> ProcessMemberDeathAsync(MemberDeathContext context, CancellationToken ct = default)
-    {
-        LogInfo($"处理成员死亡: ApplicationId={context.ApplicationId}");
-
-        // 死亡确切时间必填（DB 列可空是为存量历史行；新写入由本入参校验 + 表单必填双门保证）
-        if (context.DeathTime is null)
-            return Result.Failure<ChangeResult>(ErrorCodes.VALIDATION_FAILED, "请选择死亡确切时间");
-
-        await using var tx = await _db.BeginTransactionScopeAsync(ct);
-
-        try
-        {
-            // 1. 获取当前申请数据（已软删的申请不允许再做成员死亡处理）
-            var appSql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL";
-            var appResult = await _db.QuerySingleAsync<ApplicationEntity>(appSql, ct, context.ApplicationId);
-
-            if (!appResult.IsSuccess || appResult.Value == null)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
-            }
-
-            var application = appResult.Value;
-            var oldClassification = application.ClassificationResult ?? string.Empty;
-            var oldGuaranteeAmount = application.TotalGuaranteeAmount;
-            // 变更前家庭人数在任何改写发生前捕获，Before 快照直接用它，
-            // 不再用 FamilySize + 1 反推（改写后反推得到的是错的）
-            var oldFamilySize = application.FamilySize;
-
-            // 2. 标记成员死亡（nc_biz_family_members 无 deleted_by 列，仅置 deleted_at）
-            var updateMemberSql = @"UPDATE nc_biz_family_members
-                                   SET deleted_at = NOW()
-                                   WHERE id = $1 AND application_id = $2;";
-            var markResult = await _db.ExecuteNonQueryAsync(updateMemberSql, ct, context.MemberId, context.ApplicationId);
-            if (markResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(markResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    markResult.Message ?? "标记成员死亡失败");
-            }
-
-            // 3. 创建死亡记录（death_time=死亡确切时刻，新写入必填）
-            var deathSql = @"INSERT INTO nc_biz_death_records
-                            (application_id, member_id, member_name, member_id_card, death_date, death_time, death_reason, operator_name)
-                            VALUES ($1,$2,$3,$4,$5,$6,$7,$8);";
-            var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
-                context.ApplicationId, context.MemberId, context.MemberName,
-                context.MemberIdCard, context.DeathDate, context.DeathTime,
-                context.DeathReason, context.OperatorName);
-            if (deathInsertResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(deathInsertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    deathInsertResult.Message ?? "创建死亡记录失败");
-            }
-
-            // 4. 重新计算家庭人数。
-            //    统计失败绝不能回退为"1 人"继续算：家庭人数直接决定保障金额，
-            //    按错误人数算出的补贴会写进数据库，必须回滚并失败返回。
-            //    剔除赡养抚养扶养人（member_category='Support'），该人群不计入共同生活家庭人数。
-            var countSql = @"SELECT COUNT(*) FROM nc_biz_family_members 
-                            WHERE application_id = $1 AND deleted_at IS null
-                              AND (member_category IS NULL OR member_category <> 'Support')";
-            var countResult = await _db.ExecuteScalarAsync(countSql, ct, context.ApplicationId);
-            if (countResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(countResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    countResult.Message ?? "家庭人数统计失败");
-            }
-            var newFamilySize = (int)countResult.Value;
-
-            // 5. 获取剩余成员（同经济复核：查询失败不能按空成员继续做分类判定）
-            var membersSql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS null";
-            var membersResult = await _db.QueryAsync<FamilyMember>(membersSql, ct, context.ApplicationId);
-            if (membersResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    membersResult.Message ?? "家庭成员查询失败");
-            }
-            var members = membersResult.Value ?? new List<FamilyMember>();
-
-            // 6. 更新家庭人数
-            application.FamilySize = newFamilySize;
-
-            // 7. 重新执行分类判定（需传真实赡养抚养扶养义务人，特困判定依赖"无义务人"条件）
-            var supportersResult = await _supporterService.GetByApplicationIdAsync(context.ApplicationId, ct);
-            if (supportersResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(supportersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    supportersResult.Message ?? "赡养抚养扶养人查询失败");
-            }
-            var supporters = supportersResult.Value ?? new List<Supporter>();
-            var classificationResult = await _classificationService.DetermineClassificationAsync(
-                application, members, supporters, new List<Caregiver>(), ct);
-
-            string newClassification = oldClassification;
-            decimal newGuaranteeAmount = oldGuaranteeAmount;
-            bool triggeredStop = false;
-
-            if (classificationResult.IsSuccess)
-            {
-                newClassification = classificationResult.Value.Classification;
-                newGuaranteeAmount = classificationResult.Value.GuaranteeAmount;
-                triggeredStop = ClassificationConstants.IsCodeStop(newClassification);
-
-                // 保障金三项合成（户月 + 分类施保 + 照料），与 GuaranteeAmountService 同口径；
-                // 照料费：特困分散按能力鉴定重算，集中/非特困一律 0（禁止沿用旧档 DB 值）
-                var newClassifiedAmount = classificationResult.Value.ClassifiedSubsidy.TotalAmount;
-                var newClassifiedType = classificationResult.Value.ClassifiedSubsidy.Types;
-                var newCaregiverAmount = await ResolveCaregiverSubsidyAsync(
-                    newClassification, application.SupportMode, application.Id, ct);
-
-                // 人数变化后重算人均（年值权威；月值 = 年÷人数÷12 一次舍入）
-                if (newFamilySize > 0)
-                {
-                    if (application.TotalAnnualIncome > 0)
-                    {
-                        application.PerCapitaAnnualIncome = Math.Round(application.TotalAnnualIncome / newFamilySize, 2);
-                        application.PerCapitaIncome = Math.Round(application.TotalAnnualIncome / newFamilySize / 12m, 2);
-                    }
-                    else
-                    {
-                        application.PerCapitaAnnualIncome = 0m;
-                        application.PerCapitaIncome = Math.Round(application.TotalFamilyIncome / newFamilySize, 2);
-                    }
-                }
-
-                // 更新申请
-                application.ClassificationResult = newClassification;
-                application.IsEligible = classificationResult.Value.IsEligible;
-                application.ClassifiedSubsidyType = newClassifiedType;
-                application.ClassifiedSubsidyAmount = newClassifiedAmount;
-                application.CaregiverSubsidyAmount = newCaregiverAmount;
-                application.HouseholdMonthlyGuaranteeAmount = newGuaranteeAmount;
-                application.TotalGuaranteeAmount = newGuaranteeAmount + newClassifiedAmount + newCaregiverAmount;
-                application.FamilySize = newFamilySize;
-                application.UpdatedAt = DateTime.Now;
-                application.UpdatedBy = context.OperatorName;
-
-                // 如果最后成员死亡，停止档案。
-                // 状态变更必须过状态机，不能从任意状态直写 "Stopped"：
-                // - Draft（草稿）/ Refused（不予受理）从未进入保障，不存在"停保"一说，
-                //   直写 Stopped 属于绕过状态机产生脏状态 → 拒绝（INVALID_TRANSITION）并回滚整个死亡处理；
-                // - 业务意图确实是"最后成员死亡 → 停保"（死亡是客观事件），因此仅对
-                //   Draft/Refused 阻断：Approved/Completed→Stopped 状态机本就允许；
-                //   Submitted→Stopped 严格状态机不允许，但阻断会让全员死亡的在途申请
-                //   永远无法关闭，故放行并记录警告；
-                // - 已是 Stopped 的申请无需重复转换，保持现状。
-                if (newFamilySize <= 0)
-                {
-                    var currentStatus = ApplicationStatusExtensions.FromCode(application.Status ?? string.Empty);
-                    if (currentStatus == ApplicationStatus.Stopped)
-                    {
-                        triggeredStop = true;
-                    }
-                    else
-                    {
-                        var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
-                        if (transition.IsFailure &&
-                            currentStatus is ApplicationStatus.Draft or ApplicationStatus.Refused)
-                        {
-                            await tx.RollbackAsync(ct);
-                            return Result.Failure<ChangeResult>(
-                                ErrorCodes.INVALID_TRANSITION,
-                                transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
-                        }
-                        if (transition.IsFailure)
-                        {
-                            LogWarn($"成员死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（最后成员死亡）放行");
-                        }
-
-                        application.Status = ApplicationStatus.Stopped.GetCode();
-                        application.StopReason = "最后成员死亡";
-                        application.StopDate = DateTime.Today;
-                        triggeredStop = true;
-                    }
-                }
-
-                // 渐退期状态重建（同事务）：按成员死亡后新分类决定去留；
-                // 最后成员死亡触发停保 → 强制结清既有渐退期。
-                var reconcileRes = await ReconcileGracePeriodAsync(
-                    context.ApplicationId, newClassification, classificationResult.Value.GracePeriod,
-                    oldClassification, oldGuaranteeAmount,
-                    forceClear: newFamilySize <= 0, ct: ct);
-                if (reconcileRes.IsFailure)
-                {
-                    await tx.RollbackAsync(ct);
-                    return Result.Failure<ChangeResult>(reconcileRes.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        reconcileRes.Message ?? "渐退期状态重建失败");
-                }
-
-                // 业务字段更新（不含 status/stop_*：状态写入统一走 ApplicationStatusService）
-                var updateSql = @"UPDATE nc_biz_applications SET
-                    family_size = $1, classification_result = $2, is_eligible = $3,
-                    household_monthly_guarantee_amount = $4, total_guarantee_amount = $5,
-                    classified_subsidy_type = $6, classified_subsidy_amount = $7,
-                    caregiver_subsidy_amount = $8,
-                    per_capita_income = $9, per_capita_annual_income = $10,
-                    updated_at = $11, updated_by = $12
-                    WHERE id = $13;";
-
-                var appUpdateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
-                    application.FamilySize, application.ClassificationResult, application.IsEligible,
-                    application.HouseholdMonthlyGuaranteeAmount, application.TotalGuaranteeAmount,
-                    application.ClassifiedSubsidyType, application.ClassifiedSubsidyAmount,
-                    application.CaregiverSubsidyAmount,
-                    application.PerCapitaIncome, application.PerCapitaAnnualIncome,
-                    application.UpdatedAt, application.UpdatedBy,
-                    application.Id);
-                if (appUpdateResult.IsFailure)
-                {
-                    await tx.RollbackAsync(ct);
-                    return Result.Failure<ChangeResult>(appUpdateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                        appUpdateResult.Message ?? "更新业务字段失败");
-                }
-
-                // 状态写入统一走 ApplicationStatusService（状态机校验 + stop_* 落库 + 审计留痕）
-                if (triggeredStop)
-                {
-                    var deathStop = await _statusService.StopAsync(
-                        context.ApplicationId, application.StopReason ?? "最后成员死亡",
-                        application.StopDate == default ? DateTime.Today : application.StopDate, context.OperatorName,
-                        allowSubmittedOverride: true, ct: ct);
-                    if (deathStop.IsFailure)
-                    {
-                        await tx.RollbackAsync(ct);
-                        return Result.Failure<ChangeResult>(deathStop.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                            deathStop.Message ?? "停保失败");
-                    }
-                }
-            }
-            else
-            {
-                // 分类判定失败绝不能按"沿用旧分类"静默提交：家庭人数已因死亡变化，
-                // 沿用旧结果会写出与实际不符的补贴，必须回滚并失败返回。
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(classificationResult.ErrorCode ?? ErrorCodes.CLASSIFICATION_FAILED,
-                    classificationResult.Message ?? "分类判定失败");
-            }
-
-            // 8. 创建变更记录（写入三要素：category=MemberChange、reason 可解析、随后回填金额）
-            var changeContext = new ChangeContext
-            {
-                ApplicationId = context.ApplicationId,
-                ChangeType = DictionaryConstants.ChangeType.MEMBER_DEATH,
-                ChangeCategory = DictionaryConstants.ChangeCategory.MEMBER_CHANGE,
-                ChangeReason = $"成员死亡: {context.MemberName}({context.MemberIdCard})",
-                ChangeDate = context.DeathDate,
-                OperatorName = context.OperatorName
-            };
-
-            // Before 快照使用改写前捕获的 oldFamilySize（此前用 FamilySize + 1 反推，
-            // 一旦 FamilySize 与成员表行数不同步，反推值就是错的）
-            var beforeJson = JsonSerializer.Serialize(new
-            {
-                FamilySize = oldFamilySize,
-                Classification = oldClassification,
-                GuaranteeAmount = oldGuaranteeAmount
-            });
-
-            var afterJson = JsonSerializer.Serialize(new
-            {
-                FamilySize = newFamilySize,
-                Classification = newClassification,
-                GuaranteeAmount = newGuaranteeAmount,
-                DeceasedMember = context.MemberName
-            });
-
-            var changeIdResult = await CreateChangeAsync(changeContext, beforeJson, afterJson, ct);
-            if (changeIdResult.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(changeIdResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    changeIdResult.Message ?? "创建变更记录失败");
-            }
-            var changeId = changeIdResult.Value;
-
-            // 结构化金额回填（增减员调整表 old/new_guarantee 取数）
-            var updateDeathChange = await _db.ExecuteNonQueryAsync(
-                @"UPDATE nc_biz_change_records SET
-                    old_classification = $1, new_classification = $2,
-                    old_guarantee_amount = $3, new_guarantee_amount = $4,
-                    change_reason_type = $5,
-                    changed_at = NOW()
-                  WHERE id = $6",
-                ct,
-                oldClassification, newClassification,
-                oldGuaranteeAmount, newGuaranteeAmount,
-                ChangeReasonTypeConstants.MemberChange,
-                changeId);
-            if (updateDeathChange.IsFailure)
-            {
-                await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(updateDeathChange.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
-                    updateDeathChange.Message ?? "回填成员死亡变更金额失败");
-            }
-
-            await tx.CommitAsync(ct);
-
-            LogInfo($"成员死亡处理完成: 新家庭人数={newFamilySize}");
-
-            return Result.Success(new ChangeResult
-            {
-                ChangeId = changeId,
-                IsSuccess = true,
-                OldClassification = oldClassification,
-                NewClassification = newClassification,
-                OldGuaranteeAmount = oldGuaranteeAmount,
-                NewGuaranteeAmount = newGuaranteeAmount,
-                TriggeredStop = triggeredStop
-            });
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync(ct);
-            LogException(ex, "成员死亡处理");
-            return Result.FromException<ChangeResult>(ex);
-        }
-    }
 
     /// <summary>
     /// 执行户主变更（停旧建新：所有信息变更建新档案，旧档案停止，便于追踪变更记录）
@@ -487,6 +162,30 @@ public partial class ChangeService
     }
 
     /// <summary>
+    /// 回填申报台账 ↔ 死亡登记外键（2026-11-08 P2-1，原「一期不回填」约定解除）：
+    /// 把 nc_biz_death_declarations.death_record_id 补挂为同身份证**最新**死亡登记。
+    /// 仅首次回填（death_record_id IS NULL，已挂不覆盖）；作废申报不回填；
+    /// 失败只告警不阻断——外键是冗余关联，检索/提醒/联动仍靠 deceased_id_card 语义关联。
+    /// 全表自愈语义：任何一次死亡登记写入都顺带回填该身份证的历史申报与存量缺口。
+    /// </summary>
+    private async Task BackfillDeathRecordLinksAsync(CancellationToken ct)
+    {
+        const string sql = @"
+            UPDATE nc_biz_death_declarations d
+            SET death_record_id = (
+                SELECT r.id FROM nc_biz_death_records r
+                WHERE r.member_id_card = d.deceased_id_card
+                ORDER BY r.id DESC LIMIT 1)
+            WHERE d.death_record_id IS NULL
+              AND d.deleted_at IS NULL
+              AND d.status <> 'Revoked'
+              AND EXISTS (SELECT 1 FROM nc_biz_death_records r2 WHERE r2.member_id_card = d.deceased_id_card)";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct);
+        if (result.IsFailure)
+            LogWarn($"死亡登记外键回填失败（不阻断变更流程）: {result.Message}");
+    }
+
+    /// <summary>
     /// 执行户主死亡变更（停旧建新）
     /// 事务内：停旧 → 身份证查重 → 建新（Draft）→ 复制成员/赡养人/经济明细/入户调查/照料人 → 死亡记录 → 变更记录
     /// </summary>
@@ -520,23 +219,41 @@ public partial class ChangeService
             var oldHeadName = application.ApplicantName;
             var oldHeadIdCard = application.ApplicantIdCard;
 
-            // 2. 状态校验：已停保幂等拒绝；不予受理（Refused，从未进入保障）不允许停保建新；
-            //    草稿（含导入库建档未归档户）/已提交按业务规则（户主死亡客观事件）放行 LogWarn，
-            //    与成员变更/户主变更/经济复核对 Draft 的既有容忍度一致。
+            // 2. 状态校验（2026-11-08 P0-2 统一「最严」策略，与成员变更真实链路
+            //    StopAndRebuild → _statusService.StopAsync 口径对齐：Draft/Refused 拒绝、
+            //    已停保幂等放行、Submitted 放行 LogWarn）：
+            //    - 已停保：幂等——停旧建新链上已有 HouseholdDeath 下游新档则直接返回既有新档
+            //      （不重复建档、不重复写死亡记录；调用方按 NewApplicationId 导航的契约不变）；
+            //      非本流程产生的停保（链上无新档）仍拒绝；
+            //    - Draft / Refused（从未进入保障）：拒绝，防「从未进入保障却已停保建新」脏链。
             var currentStatus = ApplicationStatusExtensions.FromCode(application.Status ?? string.Empty);
             if (currentStatus == ApplicationStatus.Stopped)
             {
+                var existingNewId = await _db.ExecuteScalarAsync<long>(
+                    @"SELECT id FROM nc_biz_applications
+                      WHERE original_application_id = $1 AND chain_type = 'HouseholdDeath' AND deleted_at IS NULL
+                      ORDER BY id DESC LIMIT 1", ct, context.ApplicationId);
+                if (existingNewId.IsSuccess && existingNewId.Value > 0)
+                {
+                    LogInfo($"户主死亡变更幂等放行: 已停保且链上已有新档 {existingNewId.Value}，不重复执行");
+                    return Result.Success(new ChangeResult
+                    {
+                        ChangeId = 0,
+                        IsSuccess = true,
+                        NewApplicationId = existingNewId.Value
+                    });
+                }
                 await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION, "该档案已停保，不能重复执行户主死亡变更");
+                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION,
+                    "该档案已停保（非户主死亡停旧建新产生），不能执行户主死亡变更");
             }
-            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
-            if (transition.IsFailure && currentStatus is ApplicationStatus.Refused)
+            if (currentStatus is ApplicationStatus.Draft or ApplicationStatus.Refused)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(
-                    ErrorCodes.INVALID_TRANSITION,
-                    transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
+                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION,
+                    $"档案处于{currentStatus.GetDescription()}状态（从未进入保障），不能办理户主死亡变更，请先提交该档案");
             }
+            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
             if (transition.IsFailure)
             {
                 LogWarn($"户主死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（户主死亡）放行");
@@ -1001,6 +718,9 @@ public partial class ChangeService
                     deathInsertResult.Message ?? "创建死亡记录失败");
             }
 
+            // P2-1：死亡登记写入后回填申报台账 death_record_id（同身份证，首次回填不覆盖）
+            await BackfillDeathRecordLinksAsync(ct);
+
             // 14. 停止旧档案（户主死亡）——状态写入统一走 ApplicationStatusService（状态机校验 + 审计留痕）
             var stopResult = await _statusService.StopAsync(
                 context.ApplicationId, ChangeReasonTypeConstants.HeadDeceased, context.DeathDate,
@@ -1164,21 +884,40 @@ public partial class ChangeService
             var oldHeadName = application.ApplicantName;
             var oldHeadIdCard = application.ApplicantIdCard;
 
-            // 2. 状态校验（与停旧建新一致）：已停保幂等拒绝；Refused 不允许；Draft/Submitted 按业务规则放行
+            // 2. 状态校验（2026-11-08 P0-2 统一「最严」，与停旧建新同策略）：
+            //    - 已停保幂等：本档案已有户主死亡登记 → 本流程已办过，直接成功（不重复写死亡记录/变更记录，
+            //      联动办结判定以死亡登记为事实源，幂等返回与首次执行同效）；已停保但无户主死亡登记
+            //      （其他原因停保）→ 拒绝；
+            //    - Draft / Refused（从未进入保障）拒绝；Submitted 放行 LogWarn。
             var currentStatus = ApplicationStatusExtensions.FromCode(application.Status ?? string.Empty);
             if (currentStatus == ApplicationStatus.Stopped)
             {
+                var deathCount = await _db.ExecuteScalarAsync<long>(
+                    "SELECT COUNT(*) FROM nc_biz_death_records WHERE application_id = $1 AND is_household_head = TRUE",
+                    ct, context.ApplicationId);
+                if (deathCount.IsSuccess && deathCount.Value > 0)
+                {
+                    LogInfo($"单人户户主死亡整户停止幂等放行: 已停保且已有户主死亡登记 {deathCount.Value} 条，不重复执行");
+                    return Result.Success(new ChangeResult
+                    {
+                        ChangeId = 0,
+                        IsSuccess = true,
+                        OldClassification = oldClassification,
+                        OldGuaranteeAmount = oldGuaranteeAmount,
+                        TriggeredStop = true
+                    });
+                }
                 await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION, "该档案已停保，不能重复执行户主死亡变更");
+                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION,
+                    "该档案已停保（无户主死亡登记，非本流程产生），不能执行单人户户主死亡整户停止");
             }
-            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
-            if (transition.IsFailure && currentStatus is ApplicationStatus.Refused)
+            if (currentStatus is ApplicationStatus.Draft or ApplicationStatus.Refused)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<ChangeResult>(
-                    ErrorCodes.INVALID_TRANSITION,
-                    transition.Message ?? $"不允许从 {currentStatus.GetDescription()} 转换到 已停保");
+                return Result.Failure<ChangeResult>(ErrorCodes.INVALID_TRANSITION,
+                    $"档案处于{currentStatus.GetDescription()}状态（从未进入保障），不能办理单人户户主死亡整户停止，请先提交该档案");
             }
+            var transition = ApplicationStateMachine.ValidateTransition(currentStatus, ApplicationStatus.Stopped);
             if (transition.IsFailure)
             {
                 LogWarn($"单人户户主死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（户主死亡）放行");
@@ -1237,6 +976,9 @@ public partial class ChangeService
                 return Result.Failure<ChangeResult>(deathInsertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                     deathInsertResult.Message ?? "创建死亡记录失败");
             }
+
+            // P2-1：死亡登记写入后回填申报台账 death_record_id（同身份证，首次回填不覆盖）
+            await BackfillDeathRecordLinksAsync(ct);
 
             // 6. 停止旧档案（状态写入统一走 ApplicationStatusService：状态机校验 + stop_* 落库 + 审计留痕）
             var stopResult = await _statusService.StopAsync(

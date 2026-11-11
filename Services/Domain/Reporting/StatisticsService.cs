@@ -246,7 +246,8 @@ public class StatisticsService : BaseService, IStatisticsService
             // 口径与 GetDashboardStatisticsAsync 的 MonthlyNewElderly 一致：
             // - 在享领取人数 = 当前库 status=ApplicationStatusCodes.CONFIRMED 且未死亡（death_date IS NULL）
             //   + 导入库 nc_biz_elderly_subsidy_history 中尚未在当前库建档（身份证不在当前库未删记录）
-            //   且未登记死亡（不在 nc_biz_death_records.member_id_card）的记录数。
+            //   且未死亡（不在 nc_biz_death_records 也无未作废死亡申报——2026-11-08 P1-7 双源，与
+            //   ElderlyApplicationService.NotDeadSql 同口径：只申报未办变更的也应从在享数剔除）的记录数。
             // - 本月新增登记 = 满足「当月真正新增」单点口径（ElderlyNewArchiveFilter：status∈(Confirmed,Stopped)
             //   且 source_type IS NULL 排除导入名册补录 且 建档时未死亡兜底）且 apply_date∈当月自然月，
             //   与仪表盘 MonthlyNewElderly、月报新增明细、补打中心按月名单同源
@@ -263,7 +264,10 @@ public class StatisticsService : BaseService, IStatisticsService
                        WHERE NOT EXISTS (SELECT 1 FROM nc_biz_elderly_applications e
                                          WHERE e.id_card = h.id_card AND e.deleted_at IS NULL)
                          AND NOT EXISTS (SELECT 1 FROM nc_biz_death_records d
-                                         WHERE d.member_id_card = h.id_card))) AS active_count,
+                                         WHERE d.member_id_card = h.id_card)
+                          AND NOT EXISTS (SELECT 1 FROM nc_biz_death_declarations s
+                          WHERE s.deceased_id_card = h.id_card
+                            AND s.deleted_at IS NULL AND s.status <> 'Revoked'))) AS active_count,
                     (SELECT COUNT(*) FROM nc_biz_elderly_applications
                      WHERE {ElderlyNewArchiveFilter.IsNewArchiveExpr("nc_biz_elderly_applications")}
                        AND apply_date >= $1::date AND apply_date < $2::date

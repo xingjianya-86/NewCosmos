@@ -427,6 +427,54 @@ public partial class RecoverySearchViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 快捷结案（2026-11-08 P1-8）：办理中（Draft）→ 已确认（Confirmed）。
+    /// 死亡联动「追缴结案」跳转（RecoverySearchParameter Keyword=死者身份证 + OpenHistoryMode）落本页后，
+    /// 对死者名下办理中记录一键结案——结案后 live 判定（无 Draft）即视为死亡联动任务已办；
+    /// 金额与业务内容仍以表单编辑为准（本动作只推进状态），后续补打/归档可继续 Draft/Confirmed→Printed。
+    /// </summary>
+    [RelayCommand]
+    private async Task CloseRecordAsync(RecoveryRecord record)
+    {
+        if (record == null) return;
+
+        if (record.Status != RecoveryConstants.STATUS_DRAFT)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "仅办理中（草稿）的记录可结案", "确定");
+            return;
+        }
+
+        var confirmed = await _dialogService.DisplayAlertAsync("结案确认",
+            $"确认对 {record.PersonName} 的追缴记录（{record.RecoveryAmount:N2} 元）结案？\n"
+            + "结案后状态转为「已确认」，死亡联动「追缴结案」任务将视为已办。",
+            "确认结案", "取消");
+        if (!confirmed) return;
+
+        try
+        {
+            var result = await _recoveryService.UpdateRecoveryRecordStatusAsync(
+                record.Id, RecoveryConstants.STATUS_CONFIRMED);
+            if (result.IsSuccess)
+            {
+                // Status 是普通属性（无 INPC）→ 整表刷新令 StatusDisplay/CanDelete/CanClose 同步
+                await LoadHistoryAsync();
+                await _dialogService.ShowSnackBarAsync("已结案（已确认）");
+                Logger.LogBusiness("追缴快捷结案",
+                    ("RecordId", record.Id),
+                    ("Person", Services.Core.DataMasker.MaskName(record.PersonName ?? string.Empty)));
+            }
+            else
+            {
+                await _dialogService.DisplayAlertAsync("结案失败", result.Message ?? "结案失败", "确定");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "追缴快捷结案异常");
+            await _dialogService.DisplayAlertAsync("结案失败", "操作异常，请稍后重试", "确定");
+        }
+    }
+
+    /// <summary>
     /// 编辑追缴草稿（仅草稿，按录入模式跳对应表单页）
     /// </summary>
     [RelayCommand]

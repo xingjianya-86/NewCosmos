@@ -219,7 +219,17 @@ public partial class DeathStatementService : BaseService, IDeathStatementService
                                COALESCE(situation_desc,'') AS situation_desc,
                                COALESCE(remains_arrangement,'') AS remains_arrangement,
                                COALESCE(business_agent,'') AS business_agent,
-                               COALESCE(business_matter,'') AS business_matter
+                               COALESCE(business_matter,'') AS business_matter,
+                               COALESCE(cert_type,'') AS cert_type,
+                               COALESCE(cert_issue_org,'') AS cert_issue_org,
+                               COALESCE(TO_CHAR(cremation_date,'YYYY-MM-DD'),'') AS cremation_date_text,
+                               COALESCE(cremation_place,'') AS cremation_place,
+                               COALESCE(cremation_cert_no,'') AS cremation_cert_no,
+                               COALESCE(TO_CHAR(burial_date,'YYYY-MM-DD'),'') AS burial_date_text,
+                               COALESCE(burial_place,'') AS burial_place,
+                               COALESCE(family_situation,'') AS family_situation,
+                               COALESCE(dispute_status,'') AS dispute_status,
+                               COALESCE(dispute_desc,'') AS dispute_desc
                         FROM nc_biz_death_declarations
                         WHERE id = $1 AND deleted_at IS NULL";
             var row = await _db.QuerySingleAsync<DeathStatementRow>(sql, ct, context.DeclarationId.Value);
@@ -251,6 +261,16 @@ public partial class DeathStatementService : BaseService, IDeathStatementService
             context.RemainsArrangement = d.RemainsArrangement ?? string.Empty;
             context.BusinessAgent = d.BusinessAgent ?? string.Empty;
             context.BusinessMatter = d.BusinessMatter ?? string.Empty;
+            context.CertType = d.CertType ?? string.Empty;
+            context.CertIssueOrg = d.CertIssueOrg ?? string.Empty;
+            context.CremationDateText = d.CremationDateText ?? string.Empty;
+            context.CremationPlace = d.CremationPlace ?? string.Empty;
+            context.CremationCertNo = d.CremationCertNo ?? string.Empty;
+            context.BurialDateText = d.BurialDateText ?? string.Empty;
+            context.BurialPlace = d.BurialPlace ?? string.Empty;
+            context.FamilySituation = d.FamilySituation ?? string.Empty;
+            context.DisputeStatus = d.DisputeStatus ?? string.Empty;
+            context.DisputeDesc = d.DisputeDesc ?? string.Empty;
             context.ApplicationId = context.ApplicationId ?? d.ApplicationId;
             if (!string.IsNullOrWhiteSpace(d.VillageName)) context.VillageName = d.VillageName;
         }
@@ -398,6 +418,18 @@ public partial class DeathStatementService : BaseService, IDeathStatementService
         public string? RemainsArrangement { get; set; }
         public string? BusinessAgent { get; set; }
         public string? BusinessMatter { get; set; }
+
+        // ── 规范化格式五条目（2026-11-08）──
+        public string? CertType { get; set; }
+        public string? CertIssueOrg { get; set; }
+        public string? CremationDateText { get; set; }
+        public string? CremationPlace { get; set; }
+        public string? CremationCertNo { get; set; }
+        public string? BurialDateText { get; set; }
+        public string? BurialPlace { get; set; }
+        public string? FamilySituation { get; set; }
+        public string? DisputeStatus { get; set; }
+        public string? DisputeDesc { get; set; }
     }
 
     private sealed class HeadDeathStateRow

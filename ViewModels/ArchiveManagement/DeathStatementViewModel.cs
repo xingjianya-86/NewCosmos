@@ -94,12 +94,16 @@ public partial class DeathStatementViewModel : ViewModelBase
         foreach (var type in DeathDeclarationConstants.DeclaredByTypes)
             DeclaredByTypeOptions.Add(type);
 
-        // Picker 选项（设计语言：关系/死因一律下拉；常量单一来源）
-        foreach (var reason in DeathDeclarationConstants.DeathReasonOptions)
-            DeathReasonOptions.Add(reason);
+        // Picker 选项（关系下拉为常量；死因/死亡地点/现场所见/业务事项走字典，见 LoadFormOptionsAsync）
         foreach (var rel in RelationChoiceDisplays)
             RelationOptions.Add(rel);
-        // 业务事项多选与其余表单预设（死亡地点/现场所见/遗体安置）走字典，见 LoadFormOptionsAsync
+        // 规范化格式选项（证明类型 / 处置分支 / 矛盾纠纷）——固定小集合，常量单一来源
+        foreach (var certType in DeathDeclarationConstants.CertTypeOptions)
+            CertTypeOptions.Add(certType);
+        foreach (var branch in DeathDeclarationConstants.DispositionOptions)
+            DispositionOptions.Add(branch);
+        foreach (var dispute in DeathDeclarationConstants.DisputeStatusOptions)
+            DisputeOptions.Add(dispute);
 
         // 死亡日期与时刻不预设默认值：组件未选择前保持 null，「必填」由提交校验真实把关
     }

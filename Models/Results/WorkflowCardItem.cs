@@ -44,6 +44,11 @@ public class WorkflowCardItem : ObservableObject
 
     public bool HasGraceNote => !string.IsNullOrEmpty(GraceNote);
 
+    /// <summary>批次顺延提示（按入户调查日期锚点判定，如"本批已顺延至 2026年12月"；未顺延为空）</summary>
+    public string BatchHintText { get; init; } = string.Empty;
+
+    public bool HasBatchHint => !string.IsNullOrEmpty(BatchHintText);
+
     /// <summary>元信息标签（"与户主关系" / "编号"）</summary>
     public string MetaLabel { get; init; } = string.Empty;
 
@@ -67,6 +72,9 @@ public class WorkflowCardItem : ObservableObject
     public bool ShowEditButtons => Action == WorkflowCardAction.EditDelete;
 
     public bool ShowViewArchiveButton => Action == WorkflowCardAction.ViewArchive;
+
+    /// <summary>是否显示"改期"按钮（仅草稿 Tab 的申请卡片：修改申请日期，权限 CHANGE_MANAGE）</summary>
+    public bool ShowChangeDateButton { get; init; }
 
     /// <summary>是否显示"近亲属备案"按钮（仅申请卡片；资产核查任务卡不显示）</summary>
     public bool ShowNearRelativeButton => Source is NewCosmos.Models.Entities.Application;

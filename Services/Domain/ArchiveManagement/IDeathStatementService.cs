@@ -42,15 +42,13 @@ public interface IDeathStatementService
     /// </summary>
     Task<Result<int>> CountRecentValidAsync(string idCard, DateTime deathDate, CancellationToken ct = default);
 
-    /// <summary>核实申报（Pending → Verified）。</summary>
-    Task<Result> VerifyAsync(long declarationId, CancellationToken ct = default);
-
     /// <summary>作废申报（软状态 Revoked，不物理删除）。</summary>
     Task<Result> RevokeAsync(long declarationId, string reason, CancellationToken ct = default);
 
     /// <summary>
-    /// 完结归档（Pending/Verified → Archived）：申报流程全部办结结案，
+    /// 完结归档（Pending → Archived；已作废的不可归档）：申报流程全部办结结案，
     /// 退出首页联动提醒横幅与待联动列表；不可对已作废申报归档（先撤销作废不支持，需重新申报）。
+    /// （原 VerifyAsync「Pending → Verified」已删：2026-11-08 P1-5，状态不可达、全库 0 行。）
     /// </summary>
     Task<Result> ArchiveAsync(long declarationId, CancellationToken ct = default);
 

@@ -69,6 +69,10 @@
                                     IsVisible="{Binding HasGraceNote}">
                                 <Label Text="{Binding GraceNote}" Style="{StaticResource ChipWarningText}"/>
                             </Border>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center"
+                                    IsVisible="{Binding HasBatchHint}">
+                                <Label Text="{Binding BatchHintText}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
@@ -102,6 +106,14 @@
                                     TextColor="White"
                                     IsVisible="{Binding ShowArchiveButton}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="改期"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Gray500}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowChangeDateButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ChangeApplicationDateCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑"
                                     FontSize="15"
@@ -213,6 +225,10 @@
                                     IsVisible="{Binding HasGraceNote}">
                                 <Label Text="{Binding GraceNote}" Style="{StaticResource ChipWarningText}"/>
                             </Border>
+                            <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center"
+                                    IsVisible="{Binding HasBatchHint}">
+                                <Label Text="{Binding BatchHintText}" Style="{StaticResource ChipInfoText}"/>
+                            </Border>
                         </HorizontalStackLayout>
 
                         <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
@@ -246,6 +262,14 @@
                                     TextColor="White"
                                     IsVisible="{Binding ShowArchiveButton}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=NavigateToArchiveProductionCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="改期"
+                                    FontSize="15"
+                                    Padding="16,8"
+                                    BackgroundColor="{StaticResource Gray500}"
+                                    TextColor="White"
+                                    IsVisible="{Binding ShowChangeDateButton}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ApplicationWorkflowViewModel}}, Path=ChangeApplicationDateCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑"
                                     FontSize="15"

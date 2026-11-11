@@ -67,6 +67,9 @@ public partial class DeathStatementService
             return Result.Failure<DeathDeclareResult>(ErrorCodes.VALIDATION_FAILED, "申报人身份证号校验不通过，请核对后重新填写");
         if (string.IsNullOrWhiteSpace(request.DeclaredByType))
             return Result.Failure<DeathDeclareResult>(ErrorCodes.VALIDATION_FAILED, "请选择申报人类型");
+        // 条目五（矛盾纠纷）服务端兜底：VM 校验之外的调用方（含历史路径）也必须给勾选态
+        if (string.IsNullOrWhiteSpace(request.DisputeStatus))
+            return Result.Failure<DeathDeclareResult>(ErrorCodes.VALIDATION_FAILED, "请选择矛盾纠纷及信访隐患情况（无 / 有）");
 
         try
         {
@@ -86,9 +89,12 @@ public partial class DeathStatementService
                      application_id, village_id, town_id, village_name,
                      operator_name, remark, created_by, created_at,
                      reporter_name, reporter_relation, reporter_phone,
-                     situation_desc, remains_arrangement, business_agent, business_matter)
+                     situation_desc, remains_arrangement, business_agent, business_matter,
+                     cert_type, cert_issue_org, cremation_date, cremation_place, cremation_cert_no,
+                     burial_date, burial_place, family_situation, dispute_status, dispute_desc)
                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $19, NOW(),
-                          $21,$22,$23,$24,$25,$26,$27)
+                          $21,$22,$23,$24,$25,$26,$27,
+                          $28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
                   RETURNING id, declared_at";
 
             var row = await _db.QuerySingleAsync<DeclareInsertRow>(insertSql, ct,
@@ -118,7 +124,17 @@ public partial class DeathStatementService
                 NullIfEmpty(request.SituationDesc),
                 NullIfEmpty(request.RemainsArrangement),
                 NullIfEmpty(request.BusinessAgent),
-                NullIfEmpty(request.BusinessMatter));
+                NullIfEmpty(request.BusinessMatter),
+                NullIfEmpty(request.CertType),
+                NullIfEmpty(request.CertIssueOrg),
+                request.CremationDate?.Date,
+                NullIfEmpty(request.CremationPlace),
+                NullIfEmpty(request.CremationCertNo),
+                request.BurialDate?.Date,
+                NullIfEmpty(request.BurialPlace),
+                NullIfEmpty(request.FamilySituation),
+                NullIfEmpty(request.DisputeStatus),
+                NullIfEmpty(request.DisputeDesc));
 
             if (row.IsFailure || row.Value == null)
                 return Result.Failure<DeathDeclareResult>(row.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
@@ -155,30 +171,8 @@ public partial class DeathStatementService
     private static object? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <inheritdoc />
-    public async Task<Result> VerifyAsync(long declarationId, CancellationToken ct = default)
-    {
-        try
-        {
-            var sql = @"UPDATE nc_biz_death_declarations
-                        SET status = $1, updated_at = NOW()
-                        WHERE id = $2 AND deleted_at IS NULL AND status <> $1";
-            var result = await _db.ExecuteNonQueryAsync(sql, ct,
-                DeathDeclarationConstants.StatusVerified, declarationId);
-            if (result.IsFailure)
-                return Result.Failure(result.ErrorCode!, result.Message!);
-            if (result.Value <= 0)
-                return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "申报记录不存在或已核实");
-
-            Logger.LogBusiness("死亡申报核实", ("DeclarationId", declarationId.ToString()));
-            return Result.Success();
-        }
-        catch (Exception ex)
-        {
-            LogException(ex, "VerifyAsync");
-            return Result.FromException(ex);
-        }
-    }
+    // VerifyAsync（Pending → Verified）已删（2026-11-08 P1-5）：VM 核实命令在 2026-11 简化阶段2
+    // 即为孤儿命令（全仓 PC/手机两页零 UI 入口），状态不可达且全库 0 行，状态机收敛 Pending → Archived/Revoked。
 
     /// <inheritdoc />
     public async Task<Result> RevokeAsync(long declarationId, string reason, CancellationToken ct = default)
@@ -217,7 +211,7 @@ public partial class DeathStatementService
     {
         try
         {
-            // Pending/Verified → Archived；已作废（Revoked）不可归档（0 行命中），已归档幂等成功（status <> Archived 挡住）
+            // Pending → Archived；已作废（Revoked）不可归档（0 行命中），已归档幂等成功（status <> Archived 挡住）
             var sql = @"UPDATE nc_biz_death_declarations
                         SET status = $1, updated_at = NOW()
                         WHERE id = $2 AND deleted_at IS NULL
@@ -242,6 +236,35 @@ public partial class DeathStatementService
     }
 
     #region 死亡联动待办（nc_biz_death_linkage_tasks，2026-10-31 方案2）
+
+    /// <summary>
+    /// live 已办判定（**唯一 SQL 单点**，2026-11-08 P1-6 抽出）：按任务域计算目标域实时状态——
+    /// ElderlyStop=无在享/草稿高龄、ArchiveHead=有户主死亡登记、ArchiveMember=有死亡登记、
+    /// College=无在读、Recovery=无在办 Draft；ELSE FALSE。
+    /// 使用方：<see cref="GetLinkageTasksAsync"/>（AS is_done）与 <see cref="GetLinkageTaskCountAsync"/>（NOT (…) 反选）。
+    /// ⚠️ 镜像：联动卡 <c>DeathStatementService.Linkage.BuildLinksAsync</c> 按内存身份走**同语义**判定
+    /// （docs/20261031 承认镜像），改动判定条件必须两处同步。
+    /// </summary>
+    private const string LinkageLiveDoneCaseSql = @"CASE t.task_domain
+                          WHEN 'ElderlyStop' THEN NOT EXISTS (
+                               SELECT 1 FROM nc_biz_elderly_applications e
+                               WHERE e.id_card = t.deceased_id_card AND e.deleted_at IS NULL
+                                 AND e.status IN ('Confirmed','Draft'))
+                          WHEN 'ArchiveHead' THEN EXISTS (
+                               SELECT 1 FROM nc_biz_death_records r
+                               WHERE r.member_id_card = t.deceased_id_card AND r.is_household_head)
+                          WHEN 'ArchiveMember' THEN EXISTS (
+                               SELECT 1 FROM nc_biz_death_records r
+                               WHERE r.member_id_card = t.deceased_id_card)
+                          WHEN 'College' THEN NOT EXISTS (
+                               SELECT 1 FROM nc_biz_college_students c
+                               WHERE c.id_card = t.deceased_id_card AND c.deleted_at IS NULL
+                                 AND c.status = 'Studying')
+                          WHEN 'Recovery' THEN NOT EXISTS (
+                               SELECT 1 FROM nc_biz_recovery_records rc
+                               WHERE rc.id_card = t.deceased_id_card AND rc.status = 'Draft')
+                          ELSE FALSE
+                       END";
 
     /// <summary>
     /// 五域幂等补齐核心：对 WHERE 命中的有效申报，按各域身份命中条件 INSERT 缺失任务行。
@@ -369,26 +392,7 @@ public partial class DeathStatementService
                        COALESCE(TO_CHAR(d.death_time,'HH24:MI'),'') AS death_time_text,
                        COALESCE(d.death_reason,'') AS death_reason,
                        COALESCE(d.death_certificate_no,'') AS death_cert_no,
-                       CASE t.task_domain
-                         WHEN 'ElderlyStop' THEN NOT EXISTS (
-                              SELECT 1 FROM nc_biz_elderly_applications e
-                              WHERE e.id_card = t.deceased_id_card AND e.deleted_at IS NULL
-                                AND e.status IN ('Confirmed','Draft'))
-                         WHEN 'ArchiveHead' THEN EXISTS (
-                              SELECT 1 FROM nc_biz_death_records r
-                              WHERE r.member_id_card = t.deceased_id_card AND r.is_household_head)
-                         WHEN 'ArchiveMember' THEN EXISTS (
-                              SELECT 1 FROM nc_biz_death_records r
-                              WHERE r.member_id_card = t.deceased_id_card)
-                         WHEN 'College' THEN NOT EXISTS (
-                              SELECT 1 FROM nc_biz_college_students c
-                              WHERE c.id_card = t.deceased_id_card AND c.deleted_at IS NULL
-                                AND c.status = 'Studying')
-                         WHEN 'Recovery' THEN NOT EXISTS (
-                              SELECT 1 FROM nc_biz_recovery_records rc
-                              WHERE rc.id_card = t.deceased_id_card AND rc.status = 'Draft')
-                         ELSE FALSE
-                       END AS is_done
+                       " + LinkageLiveDoneCaseSql + @" AS is_done
                 FROM nc_biz_death_linkage_tasks t
                 JOIN nc_biz_death_declarations d ON d.id = t.declaration_id
                 WHERE d.deleted_at IS NULL AND d.status <> 'Revoked' AND d.status <> 'Archived'
@@ -475,26 +479,7 @@ public partial class DeathStatementService
                 WHERE d.deleted_at IS NULL AND d.status <> 'Revoked' AND d.status <> 'Archived'
                   AND t.status = 'Pending'
                   AND " + (scope.IsTownScope ? "d.town_id = $1" : "d.village_id = $1") + @"
-                  AND NOT (CASE t.task_domain
-                    WHEN 'ElderlyStop' THEN NOT EXISTS (
-                          SELECT 1 FROM nc_biz_elderly_applications e
-                          WHERE e.id_card = t.deceased_id_card AND e.deleted_at IS NULL
-                            AND e.status IN ('Confirmed','Draft'))
-                    WHEN 'ArchiveHead' THEN EXISTS (
-                          SELECT 1 FROM nc_biz_death_records r
-                          WHERE r.member_id_card = t.deceased_id_card AND r.is_household_head)
-                    WHEN 'ArchiveMember' THEN EXISTS (
-                          SELECT 1 FROM nc_biz_death_records r
-                          WHERE r.member_id_card = t.deceased_id_card)
-                    WHEN 'College' THEN NOT EXISTS (
-                          SELECT 1 FROM nc_biz_college_students c
-                          WHERE c.id_card = t.deceased_id_card AND c.deleted_at IS NULL
-                            AND c.status = 'Studying')
-                    WHEN 'Recovery' THEN NOT EXISTS (
-                          SELECT 1 FROM nc_biz_recovery_records rc
-                          WHERE rc.id_card = t.deceased_id_card AND rc.status = 'Draft')
-                    ELSE FALSE
-                  END)";
+                  AND NOT (" + LinkageLiveDoneCaseSql + @")";
 
             var result = await _db.ExecuteScalarAsync<long>(sql, ct, ScopeId(scope));
             if (result.IsFailure)

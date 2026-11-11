@@ -411,16 +411,42 @@ public partial class MonthlyReportService
         }
 
         // 死亡记录表无乡镇列，乡镇过滤借道 nc_biz_applications.town（join application_id）
-        var sql = $@"SELECT a.applicant_name AS head_name, a.applicant_id_card AS head_id_card,
-                        a.address, d.member_name AS deceased_name, d.member_id_card,
-                        d.death_date, d.new_head_name,
-                        a.classification_result, a.district, a.town, a.community
-                     FROM nc_biz_death_records d
-                     LEFT JOIN nc_biz_applications a ON d.application_id = a.id
-                     WHERE d.death_date >= $1 AND d.death_date < $2
-                       AND ($3 = '' OR a.town = $3)
-                       {categorySql}
-                     ORDER BY d.death_date ASC";
+        // 2026-11-08 P1-7 双源合并：「只申报未办变更」的死亡也计入月报死亡人数——
+        //   源① nc_biz_death_records（既有口径，已办变更）；
+        //   源② nc_biz_death_declarations（未作废、且该身份证在源①无任何登记 → NOT EXISTS 按人去重防双计，
+        //       归属月份以登记为准、无登记时以申报为准）。
+        //   申报无关联档案时：户主列回落死者本人、乡镇借道 nc_regions_towns（town_id）、分类为空
+        //   （带分类过滤时无档案申报天然被排除——无分类可归组）。
+        var sql = $@"(
+            SELECT a.applicant_name AS head_name, a.applicant_id_card AS head_id_card,
+                   a.address, d.member_name AS deceased_name, d.member_id_card,
+                   d.death_date, d.new_head_name,
+                   a.classification_result, a.district, a.town, a.community
+            FROM nc_biz_death_records d
+            LEFT JOIN nc_biz_applications a ON d.application_id = a.id
+            WHERE d.death_date >= $1 AND d.death_date < $2
+              AND ($3 = '' OR a.town = $3)
+              {categorySql}
+        )
+        UNION ALL
+        (
+            SELECT COALESCE(a.applicant_name, s.deceased_name) AS head_name,
+                   COALESCE(a.applicant_id_card, s.deceased_id_card) AS head_id_card,
+                   a.address, s.deceased_name, s.deceased_id_card,
+                   s.death_date, ''::text AS new_head_name,
+                   a.classification_result, a.district,
+                   COALESCE(a.town, rt.town_name) AS town, a.community
+            FROM nc_biz_death_declarations s
+            LEFT JOIN nc_biz_applications a ON a.id = s.application_id AND a.deleted_at IS NULL
+            LEFT JOIN nc_regions_towns rt ON rt.id = s.town_id
+            WHERE s.death_date >= $1 AND s.death_date < $2
+              AND s.deleted_at IS NULL AND s.status <> 'Revoked'
+              AND NOT EXISTS (SELECT 1 FROM nc_biz_death_records d2
+                              WHERE d2.member_id_card = s.deceased_id_card)
+              AND ($3 = '' OR COALESCE(a.town, rt.town_name) = $3)
+              {categorySql}
+        )
+        ORDER BY death_date ASC";
         var result = await _db.QueryAsync<DeathRow>(sql, ct, parameters.ToArray());
         if (result.IsFailure)
             return Result.Failure<List<MonthlyDeathRow>>(result.ErrorCode!, result.Message!);

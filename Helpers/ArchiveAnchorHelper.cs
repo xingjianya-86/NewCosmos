@@ -52,14 +52,9 @@ public static class ArchiveAnchorHelper
         string? applicationNo, DateTime createdAt, DateTime? firstApprovedAt,
         DateTime? dataCompletedAt, DateTime updatedAt)
     {
-        var no = applicationNo;
-        if (!string.IsNullOrEmpty(no) && no.Length >= 10
-            && no.StartsWith("SA", StringComparison.Ordinal)
-            && DateTime.TryParseExact(no.Substring(2, 8), "yyyyMMdd", null,
-                System.Globalization.DateTimeStyles.None, out var fromNo))
-        {
-            return fromNo;
-        }
+        // 编号日期段解析收口到 ApplicationNoHelper（取号/改期/锚点三方共用同一格式口径）
+        var fromNo = ApplicationNoHelper.TryParseDate(applicationNo);
+        if (fromNo.HasValue) return fromNo.Value;
         if (createdAt != default) return createdAt;
         if (firstApprovedAt is { } approved && approved != default) return approved;
         if (dataCompletedAt is { } completed && completed != default) return completed;

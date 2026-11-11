@@ -1023,6 +1023,10 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                 [FieldKeys.AGENT_ID_TYPE] = AgentIdType,
                 [FieldKeys.HEAD_FAMILY_SIZE] = validApplicants.Count.ToString(),
                 [FieldKeys.REPORT_DATE] = DateTime.Now.ToString("yyyy-MM-dd"),
+                // 224 部省协查函 {当前日期} 于 2026-11-11 换绑 SURVEY_DATE：核查流程无调查记录 →
+                // 与档案制作同口径走 ResolveSurveyDate 无调查兜底（申请日当天，钳 [申请日, 会议日]），
+                // 否则本链路不供键 → 占位符原样残留。
+                [FieldKeys.SURVEY_DATE] = ResolveAssetSurveyDate(),
                 [FieldKeys.CIVIL_ASSISTANT_NAME] = civilAssistantName,
                 [FieldKeys.DISTRICT] = orgInfo.District,
                 [FieldKeys.TOWN] = orgInfo.Town,
@@ -1081,6 +1085,18 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
                 $"申请已提交成功，但打开打印预览失败\n{ex.GetType().Name}: {ex.Message}", "确定");
             Reset();
         }
+    }
+
+    /// <summary>
+    /// 入户调查日期（224 部省协查函 {当前日期} 于 2026-11-11 换绑 SURVEY_DATE 后本链路必须供键）。
+    /// 核查流程无入户调查记录 → 走 <see cref="SurveyDateResolver.Resolve"/> 无调查兜底
+    /// （= 申请日当天，钳 [申请日, 会议日]），与档案制作/资产核查补打同源，禁止各自重算。
+    /// </summary>
+    private string ResolveAssetSurveyDate()
+    {
+        var timelineService = _serviceProvider.GetRequiredService<Services.Utilities.IBusinessTimelineService>();
+        var tl = timelineService.GetTimelineForApplicationDate(ApplicationDate, Models.Enums.TimelineType.BusinessProcess);
+        return SurveyDateResolver.Resolve(tl, null, ApplicationDate).ToString("yyyy年M月d日");
     }
 
     private async Task<string> GetCivilAssistantNameAsync()

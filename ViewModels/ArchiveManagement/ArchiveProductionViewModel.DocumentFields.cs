@@ -436,32 +436,11 @@ public partial class ArchiveProductionViewModel
     }
 
     /// <summary>
-    /// 入户调查日期（文书打印口径）：优先用实际入户调查日，钳制到 [申请日, 公示前一工作日=会议日]；
-    /// 无调查记录（补录/未录入）时取申请日当天。
-    /// - 上限铁律（2026-10-16 定）：入户不得落进公示期、不得晚于会议日——上限永远生效；
-    /// - 倒挂窗口（申请日 > 会议日）：两界冲突时**上限优先**，放弃"不早于申请日"下限
-    ///   （如申请 10-12、会议 10-08、调查 10-08 → 打印 10-08，而不是顶到公示期里的 10-12）；
-    /// - 正常窗口维持 [申请日, 会议日] 双钳（调查不早于建档的自愈保留）。
+    /// 入户调查日期（文书打印口径）：规则单点在 <see cref="SurveyDateResolver.Resolve"/>（2026-11-11 抽取），
+    /// 此处只负责按本链路模板 config 的 format 输出（yyyy年M月d日，月/日不补零）。
     /// </summary>
     private static string ResolveSurveyDate(TimelineResult tl, DateTime? actualSurvey, DateTime applicationDate)
-    {
-        var minDate = applicationDate.Date;
-        var maxDate = tl.MeetingDate.Date;
-        var baseDate = actualSurvey.HasValue && actualSurvey.Value.Date != default
-            ? actualSurvey.Value.Date
-            : (maxDate < minDate ? maxDate : minDate); // 无调查记录：默认申请日当天（倒挂窗口取会议日，保证不落公示期）
-        if (maxDate < minDate)
-        {
-            // 倒挂窗口：只保上限（公示外铁律），不抬到申请日
-            if (baseDate > maxDate) baseDate = maxDate;
-        }
-        else
-        {
-            if (baseDate < minDate) baseDate = minDate;
-            if (baseDate > maxDate) baseDate = maxDate;
-        }
-        return baseDate.ToString("yyyy年M月d日");
-    }
+        => SurveyDateResolver.Resolve(tl, actualSurvey, applicationDate).ToString("yyyy年M月d日");
 
     /// <summary>
     /// 业务锚点（申请日期=调查日新口径）+ B 线时间轴：调查日期周期差 {0,+1} 生效
@@ -482,18 +461,6 @@ public partial class ArchiveProductionViewModel
             applicationDate, surveyDate, (appCycle.Year, appCycle.Month), surveyCycle);
         var tl = _timelineService.GetTimelineForApplicationDate(businessDate, TimelineType.BusinessProcess);
         return (businessDate, tl);
-    }
-
-    /// <summary>
-    /// 诚信承诺落款日期（B 线）：首次审批日（未审批兜底申请日期=业务锚点）；
-    /// 已批档案钳下限公示开始日——承诺落款不得早于公示（2026-10-16 口径决策，保留下限）。
-    /// </summary>
-    private static string ResolvePromiseDate(TimelineResult tl, DateTime? firstApprovedAt, DateTime applicationDate)
-    {
-        var date = firstApprovedAt?.Date ?? applicationDate.Date;
-        if (firstApprovedAt.HasValue && date < tl.PublicityStartDate.Date)
-            date = tl.PublicityStartDate.Date;
-        return date.ToString("yyyy-MM-dd");
     }
 
     /// <summary>
@@ -1495,18 +1462,27 @@ public partial class ArchiveProductionViewModel
         // 刚性支出分析（>0 才提：0 支出并非拒保理由，硬接一句反而画蛇添足）
         if (rigidExpenditure > 0)
         {
-            var perCapitaRigid = rigidExpenditure / familySize;
-            var ratio = perCapitaIncome > 0 ? perCapitaRigid / perCapitaIncome : 0;
-            sb.Append($"虽有刚性支出{rigidExpenditure:N2}元/月（占比{ratio:P0}），");
+            // 占比与三条件走 RigidExpenditureRule 单点（与 ClassificationService 判定同口径，分母=毛收入；
+            // 旧实现分母为净收入，与判定改版后会给出不同结论）
+            var grossAnnual = _incomeCalculationService.CalculateGrossAnnualFamilyIncome(
+                app.WorkIncomeTotal, app.BusinessIncomeTotal, app.PropertyIncomeTotal,
+                app.TransferIncomeTotal, app.OtherIncomeTotal,
+                app.AlimonyIncome, app.LandIncomeTotal, app.SubsidyTotal);
+            var ev = RigidExpenditureRule.Evaluate(grossAnnual, app.TotalAnnualIncome, rigidExpenditure, familySize, standard);
+            if (ev.ComponentsInconsistent)
+                _logger.Warn($"停保告知书：申请{app.Id} 分项毛收入与净额+刚性不一致，占比按分项毛计算");
 
-            if (ratio <= 0.5m)
+            // 明示基数为家庭总收入：本段只列净人均，不标基数则群众所列数字×占比对不上（事实性错误）
+            sb.Append($"虽有刚性支出{rigidExpenditure:N2}元/月（占家庭总收入{ev.Ratio:P0}），");
+
+            if (ev.RatioTooLow)
                 sb.Append("但占比未超过50%，不满足刚性支出困难家庭条件。");
-            else if (ratio >= 0.6m)
+            else if (ev.RatioTooHigh)
                 sb.Append("但占比已超过60%，不满足刚性支出困难家庭条件。");
-            else if (perCapitaIncome >= standard * 2)
+            else if (ev.IncomeCapExceeded)
                 sb.Append("但人均收入超过最低生活保障标准2倍，不满足刚性支出困难家庭条件。");
             else
-                sb.Append("扣除刚性支出后人均收入不足最低生活保障标准，不满足刚性支出困难家庭条件。");
+                sb.Append($"扣除刚性支出后人均收入未超过最低生活保障边缘家庭标准（{threshold:N0}元/月），不满足刚性支出困难家庭条件。");
         }
 
         // 结尾不带句号：模板 241 正文「具体原因：{具体原因}。」自带收尾句号，
@@ -1582,9 +1558,14 @@ public partial class ArchiveProductionViewModel
         // 刚性支出 >0 才提（0 支出并非本类拒保理由）
         if (rigidExpenditure > 0)
         {
+            // 同 H4：占比基数=家庭总收入（RigidExpenditureRule 单点，与判定同口径）
+            var grossAnnual = _incomeCalculationService.CalculateGrossAnnualFamilyIncome(
+                app.WorkIncomeTotal, app.BusinessIncomeTotal, app.PropertyIncomeTotal,
+                app.TransferIncomeTotal, app.OtherIncomeTotal,
+                app.AlimonyIncome, app.LandIncomeTotal, app.SubsidyTotal);
+            var ev = RigidExpenditureRule.Evaluate(grossAnnual, app.TotalAnnualIncome, rigidExpenditure, familySize, standard);
             var perCapitaRigid = rigidExpenditure / familySize;
-            var ratio = perCapitaIncome > 0 ? perCapitaRigid / perCapitaIncome : 0;
-            sb.Append($"另经核算，您家庭刚性支出{rigidExpenditure:N2}元/月（人均{perCapitaRigid:N2}元/月，占比{ratio:P0}），亦不满足刚性支出困难家庭的认定条件。");
+            sb.Append($"另经核算，您家庭刚性支出{rigidExpenditure:N2}元/月（人均{perCapitaRigid:N2}元/月，占家庭总收入{ev.Ratio:P0}），亦不满足刚性支出困难家庭的认定条件。");
         }
 
         // ── 第三段：最低工资标准（仅事实参照 + 就业引导）──

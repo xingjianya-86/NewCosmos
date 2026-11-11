@@ -9,7 +9,7 @@
 --       本迁移只修存量（执行时 29 行）。
 -- 幂等：每条带 AND family_address IS DISTINCT FROM '<新值>'，重复执行为 no-op。
 -- 执行：psql -w -v ON_ERROR_STOP=1 -f docs/migrations/20261105_temp_relief_family_address_unify.sql
--- 回滚原值：temp_relief_address_before.csv（C:\NewCosmosCode\backup\20261105_161100_临时救助家庭住址统一）
+-- 回滚原值：temp_relief_address_before.csv（C:\Projects\NewCosmosCode\backup\20261105_161100_临时救助家庭住址统一）
 -- 注意：id 9/11/24/28 来源自相矛盾（结构化村列 与 来源地址原文所指的村 不一致），
 --       本迁移以表单分列（结构化列）为准；如与实际居住地不符，请修正来源数据后重新保存该记录。
 

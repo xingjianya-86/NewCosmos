@@ -265,7 +265,7 @@
             OddTemplate="{StaticResource GraduatingStudentOddRow}"/>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="0">
 
         <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
         <components:PageHeaderView Grid.Row="0"
@@ -275,8 +275,43 @@
                                   BackCommand="{Binding GoBackCommand}"
                                   BackText="返回低收入人口救助帮扶"/>
 
+        <!-- 死亡待退出（死亡联动待办 College 域承接，2026-11-08 P1-4 补 UI——VM 逻辑 2026-10-31 即齐备但本区块缺失，
+             任务生成后无人可见）：无任务或无 COLLEGE_MANAGE 权限时隐藏（LoadDeathCollegeAsync 权限双检 + HasDeathCollegeTasks） -->
+        <Border Grid.Row="1" BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0"
+                StrokeShape="RoundRectangle 8" Padding="14,10" Margin="12,8,12,0"
+                IsVisible="{Binding HasDeathCollegeTasks}">
+            <VerticalStackLayout Spacing="6">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26B0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}"
+                           FontSize="18" TextColor="{StaticResource Warning}" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="{Binding DeathCollegeCountText, StringFormat='死亡待退出（{0}）'}"
+                           FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                    <Label Grid.Column="2" Text="已死亡申报的在读大学生档案，需办理退出登记"
+                           FontSize="12" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                </Grid>
+                <CollectionView ItemsSource="{Binding DeathCollegeTasks}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="DeathLinkageTaskItem">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="6,4"
+                                  BackgroundColor="{StaticResource White}" Margin="0,2">
+                                <VerticalStackLayout Spacing="1" VerticalOptions="Center">
+                                    <Label Text="{Binding DeceasedName}" FontSize="15" FontAttributes="Bold"
+                                           TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Text="{Binding DeceasedIdCard}" FontSize="12" TextColor="{StaticResource TextSecondary}"/>
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="去退出" Style="{StaticResource ButtonSmall}"
+                                        BackgroundColor="{StaticResource Warning}" VerticalOptions="Center"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type CollegeStudentManagementViewModel}}, Path=HandleDeathCollegeCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </Border>
+
         <!-- Tab 栏 -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" Padding="12,8" ColumnSpacing="8"
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" Padding="12,8" ColumnSpacing="8"
               BackgroundColor="{StaticResource White}">
             <!-- Tab 0: 可关联成员 -->
             <Border Grid.Column="0" StrokeShape="RoundRectangle 8" Padding="10,8"
@@ -348,7 +383,7 @@
         </Grid>
 
         <!-- 内容区（4个Tab叠放，IsVisible切换） -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
 
             <!-- Tab0: 可关联成员 -->
             <ScrollView IsVisible="{Binding IsTab0Selected}">
@@ -452,7 +487,7 @@
         </Grid>
 
         <!-- 编辑表单覆盖层 -->
-        <Grid Grid.Row="0" Grid.RowSpan="4"
+        <Grid Grid.Row="0" Grid.RowSpan="5"
               BackgroundColor="#80000000"
               IsVisible="{Binding IsEditorVisible}"
               Padding="40">

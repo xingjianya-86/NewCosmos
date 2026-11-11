@@ -23,6 +23,7 @@ public class ClassificationService : BaseService, IClassificationService
     private readonly ICollegeStudentService _collegeStudentService;
     private readonly IDatabaseService _db;
     private readonly IBusinessTimelineService _businessTimelineService;
+    private readonly IIncomeCalculationService _incomeCalculationService;
 
     public ClassificationService(
         ILoggerService logger,
@@ -30,13 +31,15 @@ public class ClassificationService : BaseService, IClassificationService
         ICapabilityAssessmentService capabilityAssessmentService,
         ICollegeStudentService collegeStudentService,
         IDatabaseService db,
-        IBusinessTimelineService businessTimelineService) : base(logger)
+        IBusinessTimelineService businessTimelineService,
+        IIncomeCalculationService incomeCalculationService) : base(logger)
     {
         _standardConfigService = standardConfigService;
         _capabilityAssessmentService = capabilityAssessmentService;
         _collegeStudentService = collegeStudentService;
         _db = db;
         _businessTimelineService = businessTimelineService;
+        _incomeCalculationService = incomeCalculationService;
     }
 
     /// <summary>
@@ -134,7 +137,7 @@ public class ClassificationService : BaseService, IClassificationService
         if (perCapitaIncome >= lowIncomeThreshold)
         {
             // 第一层：收入超标区间
-            DetermineHighIncomeClassification(result, isRural, perCapitaIncome, standard, lowIncomeThreshold,
+            DetermineHighIncomeClassification(result, isRural, application, perCapitaIncome, standard, lowIncomeThreshold,
                 rigidExpenditure, familySize, allAbove60, hasSevereCondition);
         }
         else if (perCapitaIncome >= standard)
@@ -401,35 +404,43 @@ public class ClassificationService : BaseService, IClassificationService
 
 
     /// <summary>
-    /// 第一层：收入超标区间判定（刚性支出困难家庭）
+    /// 第一层：收入超标区间判定（刚性支出困难家庭）。
+    /// 口径（2026-11 上级确认，三条件单点在 RigidExpenditureRule，判定与 H4 告知书共用）：
+    /// ① 占比 = 人均刚性 ÷ 人均毛收入 ∈(50%,60%) 开区间；② 净人均 &lt; 低保×2；
+    /// ③ 扣除刚性支出后人均（= 毛−刚性 = 净人均，**仅扣一次**）&gt; 低保×1.5（边缘标准，严格大于）。
+    /// 旧实现(2026-11 前)分母用净收入且在净额上再减一次刚性，等效毛基数 33.3%~37.5% 窗口 + 扣减两次，已废止。
     /// </summary>
     private void DetermineHighIncomeClassification(
         ClassificationResult result, bool isRural,
+        ApplicationEntity application,
         decimal perCapitaIncome, decimal standard, decimal lowIncomeThreshold,
         decimal rigidExpenditure, int familySize,
         bool allAbove60, bool hasSevereCondition)
     {
-        var perCapitaRigidExpenditure = rigidExpenditure / familySize;
-        var rigidExpenditureRatio = perCapitaIncome > 0 ? perCapitaRigidExpenditure / perCapitaIncome : 0;
-        var incomeAfterDeduction = perCapitaIncome - perCapitaRigidExpenditure;
+        // 毛年收入：8 分项求和单点取数（§9.4 公式在 IncomeCalculationService，此处禁止重抄）
+        var grossAnnual = _incomeCalculationService.CalculateGrossAnnualFamilyIncome(
+            application.WorkIncomeTotal, application.BusinessIncomeTotal, application.PropertyIncomeTotal,
+            application.TransferIncomeTotal, application.OtherIncomeTotal,
+            application.AlimonyIncome, application.LandIncomeTotal, application.SubsidyTotal);
 
-        // 【规则】刚性支出占收入比例 >50% 且 <60%
-        bool hasHighRigidExpenditure = rigidExpenditureRatio > 0.5m && rigidExpenditureRatio < 0.6m;
-        // 【规则】家庭收入 < 低保标准的2倍
-        bool incomeBelowDoubleStandard = perCapitaIncome < standard * 2;
-        // 【规则】扣减后家庭收入不得低于低保标准
-        bool incomeAfterDeductionMet = incomeAfterDeduction >= standard;
+        var ev = RigidExpenditureRule.Evaluate(
+            grossAnnual, application.TotalAnnualIncome, rigidExpenditure, familySize, standard);
 
-        result.DeterminationDetails.Add($"刚性支出占比: {rigidExpenditureRatio:P2}");
-        result.DeterminationDetails.Add($"扣除刚性支出后人均: {incomeAfterDeduction:F2}");
+        // 分项与落库净额不同源（导入/变更链档案分项缺失）→ 占比按分项毛计算，留痕可查，不静默
+        if (ev.ComponentsInconsistent)
+            LogWarn($"申请{application.Id} 分项毛收入{grossAnnual:F2} 与 净额+刚性{application.TotalAnnualIncome + rigidExpenditure * 12m:F2} 不一致，占比按分项毛计算，请核对收入分项");
 
-        if (hasHighRigidExpenditure && incomeBelowDoubleStandard && incomeAfterDeductionMet)
+        result.DeterminationDetails.Add($"人均毛收入(月): {ev.GrossPerCapitaMonthly:F2}");
+        result.DeterminationDetails.Add($"刚性支出占比(毛基数): {ev.Ratio:P2}");
+        result.DeterminationDetails.Add($"扣除刚性支出后人均(=净人均,月): {perCapitaIncome:F2}");
+
+        if (ev.IsEligible)
         {
             result.Classification = isRural
                 ? ClassificationConstants.RuralRigidExpenditure
                 : ClassificationConstants.UrbanRigidExpenditure;
             result.IsEligible = true;
-            result.DeterminationBasis = "刚性支出占收入50%-60%且家庭收入低于低保标准2倍，扣减后不低于低保标准";
+            result.DeterminationBasis = "刚性支出占家庭总收入50%-60%且家庭收入低于低保标准2倍，扣减后高于最低生活保障边缘标准";
         }
         else
         {

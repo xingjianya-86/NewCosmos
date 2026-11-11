@@ -36,19 +36,22 @@
                     <Button Grid.Column="4" Text="另存为…" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
                             Command="{Binding ExportToFolderCommand}"/>
                 </Grid>
-                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Text="{Binding ExportSelectedText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ExportSelectedCommand}"/>
-                    <Button Grid.Column="1" Text="全选本页" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                    <Button Grid.Column="1" Text="{Binding PushPrintText}"
+                            Style="{StaticResource ButtonPrimary}" HeightRequest="36"
+                            Command="{Binding PushPrintSelectedCommand}"/>
+                    <Button Grid.Column="2" Text="全选本页" Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding SelectAllCommand}"/>
-                    <Button Grid.Column="2" Text="清空勾选" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                    <Button Grid.Column="3" Text="清空勾选" Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ClearSelectionCommand}"/>
-                    <Button Grid.Column="3" Text="{Binding ConvertWebPButtonText}"
+                    <Button Grid.Column="4" Text="{Binding ConvertWebPButtonText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ConvertLegacyPhotosCommand}"
                             IsEnabled="{Binding CanConvertWebP}"/>
-                    <Label Grid.Column="4" Text="勾选多张后可「导出选中」或「另存为…」到自选目录；旧 JPEG 可转 WebP"
+                    <Label Grid.Column="5" Text="勾选多张后可「导出选中」「推送打印」或「另存为…」到自选目录；旧 JPEG 可转 WebP"
                            FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                 </Grid>
             </VerticalStackLayout>

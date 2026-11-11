@@ -301,6 +301,37 @@ public sealed class DeathStatementContext
     public string BusinessAgent { get; set; } = string.Empty;
     public string BusinessMatter { get; set; } = string.Empty;
 
+    // ── 规范化格式五条目（2026-11-08 迁移 20261108_death_statement_standard_format.sql）──
+    /// <summary>死亡证明类型（死亡医学证明 / 非正常死亡证明；条目一）</summary>
+    public string CertType { get; set; } = string.Empty;
+
+    /// <summary>死亡证明出具机构（条目一）</summary>
+    public string CertIssueOrg { get; set; } = string.Empty;
+
+    /// <summary>火化日期（yyyy-MM-dd；火化分支，条目二）</summary>
+    public string CremationDateText { get; set; } = string.Empty;
+
+    /// <summary>火化地点/殡仪馆（火化分支）</summary>
+    public string CremationPlace { get; set; } = string.Empty;
+
+    /// <summary>火化证明编号（火化分支）</summary>
+    public string CremationCertNo { get; set; } = string.Empty;
+
+    /// <summary>安葬日期（yyyy-MM-dd，已安葬或拟安葬；安葬分支，条目二）</summary>
+    public string BurialDateText { get; set; } = string.Empty;
+
+    /// <summary>安葬地点/公益性墓地（安葬分支）</summary>
+    public string BurialPlace { get; set; } = string.Empty;
+
+    /// <summary>家属情况及诉求（条目四，长文本）</summary>
+    public string FamilySituation { get; set; } = string.Empty;
+
+    /// <summary>矛盾纠纷及信访隐患（无 / 有；条目五）</summary>
+    public string DisputeStatus { get; set; } = string.Empty;
+
+    /// <summary>矛盾纠纷说明（勾「有」时的另附说明）</summary>
+    public string DisputeDesc { get; set; } = string.Empty;
+
     /// <summary>是否有有效申报</summary>
     public bool HasDeclaration { get; set; }
 
@@ -368,6 +399,33 @@ public sealed class DeathDeclareRequest
 
     /// <summary>相关业务事项（默认「申请居民死亡医学证明」）</summary>
     public string BusinessMatter { get; set; } = string.Empty;
+
+    // ── 规范化格式五条目（2026-11-08）──
+    /// <summary>死亡证明类型（条目一，选填）</summary>
+    public string CertType { get; set; } = string.Empty;
+
+    /// <summary>死亡证明出具机构（条目一，选填）</summary>
+    public string CertIssueOrg { get; set; } = string.Empty;
+
+    /// <summary>火化日期（火化分支必填由校验把关）</summary>
+    public DateTime? CremationDate { get; set; }
+
+    public string CremationPlace { get; set; } = string.Empty;
+    public string CremationCertNo { get; set; } = string.Empty;
+
+    /// <summary>安葬日期（含拟安葬，可为未来日期）</summary>
+    public DateTime? BurialDate { get; set; }
+
+    public string BurialPlace { get; set; } = string.Empty;
+
+    /// <summary>家属情况及诉求（条目四）</summary>
+    public string FamilySituation { get; set; } = string.Empty;
+
+    /// <summary>矛盾纠纷及信访隐患（无 / 有，条目五）</summary>
+    public string DisputeStatus { get; set; } = string.Empty;
+
+    /// <summary>矛盾纠纷说明（勾「有」必填）</summary>
+    public string DisputeDesc { get; set; } = string.Empty;
 
     public long? ApplicationId { get; set; }
 

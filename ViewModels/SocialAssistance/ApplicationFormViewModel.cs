@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
+using NewCosmos.Components;
 using NewCosmos.Helpers;
 using NewCosmos.Models;
 using NewCosmos.Models.Entities;
@@ -18,6 +19,7 @@ using NewCosmos.Services.Domain.SocialAssistance;
 
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.System;
+using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using NewCosmos.ViewModels.ChangeManagement;
 using System.Collections.ObjectModel;
@@ -111,6 +113,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private DateTime? _loadedSurveyDate;
 
     /// <summary>
+    /// 赡养人月收入加载基线（身份证 → 加载时 monthly_income_capacity）。
+    /// Step2 卡与 Step3 卡编辑同一列（monthly_income_capacity），保存合并时据此判定
+    /// "本次会话哪一侧被改过"，防止非 0 值被另一侧的 0 覆盖清值（见 SyncSupporterBasicsFromMember）。
+    /// </summary>
+    private readonly Dictionary<string, decimal> _loadedSupporterMonthlyIncome = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 受理锚点日期（ArchiveAnchorHelper.ResolveApplicationDate 稳定口径：申请编号内嵌日期→创建→…；新建=今天）。
     /// 专职 Step4「时间排斥」校验的窗口参照（GetTimelineForApplicationDate）——档案产出的 B 线窗口已改用
     /// 业务锚点（申请日期=调查日，ArchiveAnchorHelper.ResolveBusinessAnchorDate，2026-10-16）；
@@ -141,6 +150,14 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// 用于识别"同一身份证仍在册、但身份类型变了"（UI 无身份类型编辑控件，实际路径是删掉后按另一身份重新新增）。
     /// </summary>
     private Dictionary<string, string> _loadedMemberCategoryByIdCard = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 「赡养人家庭人口」改前基线（身份证 → 加载时的 nc_biz_family_members.family_size）。
+    /// Step2 成员卡 FamilyMember.FamilySize 与 Step3 赡养明细 Supporter.SupporterFamilySize
+    /// 写的是同一列，保存时 SaveFamilyMembers 先写、SaveSupporters 后写覆盖——
+    /// 只比两边现值无法分辨"谁被编辑过"，必须有这份加载基线（值拷贝，防原地编辑污染）。
+    /// </summary>
+    private Dictionary<string, int?> _loadedFamilySizeByIdCard = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>成员变更模式：增员登记原因（按新增成员对象引用暂存；弹窗确认后写入）</summary>
     private readonly Dictionary<FamilyMember, MemberChangeReasonResult> _addedMemberReasons =
@@ -552,10 +569,132 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
     #endregion
 
+    #region 申请日期（改期）
+
+    /// <summary>
+    /// 申请日期显示（Step1）：锚点解析值 = 申请编号日期段优先 → created_at
+    /// （与 ArchiveAnchorHelper.ResolveApplicationDate 同源；新档未入库显示今天）。
+    /// </summary>
+    public string ApplicationDateText =>
+        (_applicationDateBase ?? DateTime.Today).ToString("yyyy-MM-dd");
+
+    /// <summary>
+    /// 修改申请日期（Step1 入口，权限 CHANGE_MANAGE，仅已入库草稿）：
+    /// 弹日期选择（上限今天）→ 二次确认（明示将改变公示窗口/卷号/文书申请日期）→
+    /// Service 同改编号日期段与 created_at（单事务+审计）→ 刷新锚点、乐观并发令牌与批次顺延提示。
+    /// </summary>
+    [RelayCommand]
+    private async Task ChangeApplicationDateAsync()
+    {
+        try
+        {
+            if (_applicationId <= 0)
+            {
+                await Dialog.DisplayAlertAsync("提示", "请先保存草稿生成申请编号，再修改申请日期", "确定");
+                return;
+            }
+
+            var userId = App.CurrentUserId;
+            if (!userId.HasValue)
+            {
+                await Dialog.DisplayAlertAsync("提示", "登录状态已失效，请重新登录", "确定");
+                return;
+            }
+
+            var permissionService = _serviceProvider.GetRequiredService<NewCosmos.Services.UserManagement.INewPermissionService>();
+            if (!await permissionService.HasPermissionAsync(userId.Value, PermissionCodes.CHANGE_MANAGE, CancellationToken))
+            {
+                await Dialog.DisplayAlertAsync("提示", "您没有修改申请日期的操作权限", "确定");
+                return;
+            }
+
+            var current = _applicationDateBase ?? DateTime.Today;
+            var picked = await Components.DateTimePickerPopupView.ShowAsync(current, DateTime.Today, showTime: false, "修改申请日期");
+            if (!picked.HasValue) return;
+
+            var newDay = picked.Value.Date;
+            if (newDay == current.Date) return;
+
+            var confirm = await Dialog.DisplayAlertAsync("确认修改申请日期",
+                $"申请日期：{current:yyyy-MM-dd} → {newDay:yyyy-MM-dd}\n\n" +
+                "修改后将改变该档案的公示窗口、卷号与文书上的申请日期（批次顺延提示随之重算）；" +
+                "已打印的文书不受影响，需重新出文书才会更新。",
+                "确认修改", "取消");
+            if (!confirm) return;
+
+            var operatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+            var result = await _applicationService.ChangeApplicationDateAsync(_applicationId, newDay, operatorName, CancellationToken);
+            if (result.IsFailure)
+            {
+                await Dialog.DisplayAlertAsync("修改失败", result.Message ?? "修改申请日期失败", "确定");
+                return;
+            }
+
+            // 改期推进了 updated_at → 重载乐观并发令牌，防本表单下次保存报并发冲突
+            var reload = await _applicationService.GetByIdAsync(_applicationId, CancellationToken);
+            if (reload.IsSuccess && reload.Value != null)
+                _loadedUpdatedAt = reload.Value.UpdatedAt == default ? null : reload.Value.UpdatedAt;
+
+            _applicationDateBase = newDay;
+            OnPropertyChanged(nameof(ApplicationDateText));
+            RefreshBatchHint();
+
+            await Dialog.ShowSnackBarAsync($"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"修改申请日期失败: {ex.Message}");
+            await Dialog.DisplayAlertAsync("修改失败", ex.Message, "确定");
+        }
+    }
+
+    #endregion
+
     #region 入户调查属性
 
     [ObservableProperty]
     private DateTime? _surveyDate;
+
+    /// <summary>
+    /// 批次顺延提示（只读）：按「受理锚点 + 入户调查日期（优先锚点）」判定本档 B 线批次是否已顺延，
+    /// 例："本批已顺延至 2026年12月（会议 12-07 · 公示 12-08 至 12-14）"。未顺延为空、不占位。
+    /// 判定走 BatchDeferralHelper（与文书公示、目录卷号、Step4 时序校验同源），改调查日期即时刷新。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBatchHint))]
+    private string _batchHintText = string.Empty;
+
+    /// <summary>批次顺延提示是否显示（Step4 Label 显隐）</summary>
+    public bool HasBatchHint => !string.IsNullOrWhiteSpace(BatchHintText);
+
+    /// <summary>调查日期变化 → 重算批次顺延提示（值未变不触发，故加载完成处另有兜底重算）</summary>
+    partial void OnSurveyDateChanged(DateTime? value) => RefreshBatchHint();
+
+    /// <summary>
+    /// 批次顺延提示重算：受理锚点 = _applicationDateBase（草稿为 null → 按今天，与 Step4 校验同口径）。
+    /// 提示属只读旁路信息：失败仅 Warn、置空，不阻断表单。
+    /// </summary>
+    private void RefreshBatchHint()
+    {
+        try
+        {
+            var timeline = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
+            var deferral = BatchDeferralHelper.Resolve(
+                timeline, (_applicationDateBase ?? DateTime.Today).Date, SurveyDate);
+            BatchHintText = deferral.IsDeferred
+                ? string.Format(BusinessCycleConstants.BatchDeferredDetailFormat,
+                    deferral.Batch.Year, deferral.Batch.Month,
+                    deferral.Batch.MeetingDate,
+                    deferral.Batch.PublicityStartDate,
+                    deferral.Batch.PublicityEndDate)
+                : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"批次顺延提示计算失败: {ex.Message}");
+            BatchHintText = string.Empty;
+        }
+    }
 
     /// <summary>
     /// 补全模式：入户调查日期锁定值（导入库纳入时间=建档时间 created_at），保存时强制写回。

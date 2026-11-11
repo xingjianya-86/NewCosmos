@@ -864,7 +864,7 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<string>> GetNextApplicationNoAsync(DateTime date, CancellationToken ct = default)
     {
-        var prefix = $"SA{date:yyyyMMdd}";
+        var prefix = ApplicationNoHelper.BuildPrefix(date);
 
         var sql = @"SELECT COALESCE(MAX(CAST(SUBSTRING(application_no FROM 11) AS INTEGER)), 0) + 1
                     FROM nc_biz_applications 
@@ -875,8 +875,142 @@ public class ApplicationService : BaseService, IApplicationService
             return Result.Failure<string>(result.ErrorCode!, result.Message!);
 
         var seq = result.Value;
-        var appNo = $"{prefix}{seq:D4}";
+        var appNo = ApplicationNoHelper.BuildNo(date, (int)seq);
         return Result.Success(appNo);
+    }
+
+    public async Task<Result<string>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default)
+    {
+        LogInfo($"修改申请日期: Id={applicationId}, NewDate={newDate:yyyy-MM-dd}");
+
+        await using var tx = await _db.BeginTransactionScopeAsync(ct);
+        try
+        {
+            // 读档（GetByIdAsync 已过滤 deleted_at IS NULL）
+            var appResult = await GetByIdAsync(applicationId, ct);
+            if (appResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(appResult.ErrorCode!, appResult.Message!);
+            }
+
+            var app = appResult.Value;
+            if (app == null)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+            }
+
+            // 状态闸：仅草稿 Tab（status=Draft 且 step<5，与工作流草稿 Tab 同口径；
+            // 已建档 step=5 需先退回草稿，已完结不开放——防止已出文书与库内批次打架）
+            var isDraftTab = string.Equals(app.Status, ApplicationStatusCodes.DRAFT, StringComparison.Ordinal)
+                             && app.CurrentStep < WorkflowSteps.PENDING_ARCHIVE;
+            if (!isDraftTab)
+            {
+                await tx.RollbackAsync(ct);
+                var message = string.Equals(app.Status, ApplicationStatusCodes.DRAFT, StringComparison.Ordinal)
+                    ? "已建档档案不可修改申请日期，请先退回草稿"
+                    : "当前状态不允许修改申请日期（仅草稿可改）";
+                return Result.Failure<string>(ErrorCodes.INVALID_TRANSITION, message);
+            }
+
+            // 范围闸：≤ 今天 且 不早于当年 1 月 1 日（跨月允许——跨月正是改期的目的；未来日/往年禁止）
+            var today = DateTime.Today;
+            var newDay = newDate.Date;
+            if (newDay > today)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED,
+                    $"申请日期 {newDay:yyyy-MM-dd} 不能晚于今天 {today:yyyy-MM-dd}");
+            }
+            if (newDay < new DateTime(today.Year, 1, 1))
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED,
+                    $"申请日期不能早于 {today.Year}-01-01");
+            }
+
+            var oldNo = app.ApplicationNo;
+            var oldDay = ApplicationNoHelper.TryParseDate(oldNo) ?? app.CreatedAt.Date;
+            if (newDay == oldDay)
+            {
+                await tx.CommitAsync(ct);
+                return Result.Success(oldNo);
+            }
+
+            // 目标日取号：前缀内 MAX+1（同 GetNextApplicationNoAsync 算法），排除自身防自撞；
+            // application_no 有全表唯一索引，并发同日取号仍可能撞 → 下方给出明确提示供重试
+            var prefix = ApplicationNoHelper.BuildPrefix(newDay);
+            var seqSql = @"SELECT COALESCE(MAX(CAST(SUBSTRING(application_no FROM 11) AS INTEGER)), 0) + 1
+                           FROM nc_biz_applications
+                           WHERE application_no LIKE $1 AND application_no <> $2";
+            var seqResult = await _db.ExecuteScalarAsync(seqSql, ct, $"{prefix}%", oldNo);
+            if (seqResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(seqResult.ErrorCode!, seqResult.Message!);
+            }
+
+            var newNo = ApplicationNoHelper.BuildNo(newDay, (int)seqResult.Value);
+
+            // 同改两列：编号日期段（锚点第一优先级）+ created_at（列表"申请添加时间"/排序）；
+            // created_at 仅换日期、保留原时分秒；application_no 作并发守卫（防同档并发改期互相覆盖）
+            var newCreatedAt = newDay + app.CreatedAt.TimeOfDay;
+            var updateSql = @"UPDATE nc_biz_applications
+                              SET application_no = $1, created_at = $2, updated_at = NOW(), updated_by = $3
+                              WHERE id = $4 AND application_no = $5 AND deleted_at IS NULL";
+            var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
+                newNo, newCreatedAt, operatorName, applicationId, oldNo);
+
+            if (updateResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                if (IsUniqueViolation(updateResult))
+                    return Result.Failure<string>(ErrorCodes.DB_UNIQUE_VIOLATION,
+                        "申请编号撞号（同日序号被并发占用），请重试");
+                return Result.Failure<string>(updateResult.ErrorCode!, updateResult.Message!);
+            }
+
+            if (updateResult.Value == 0)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<string>(ErrorCodes.CONCURRENCY_CONFLICT,
+                    "该档案正在被其他操作修改，请刷新后重试");
+            }
+
+            // 审计留痕（列口径同 ApplicationStatusService.WriteAuditAsync；失败不阻断，同其语义）
+            var auditSql = @"INSERT INTO nc_biz_application_logs
+                                  (application_id, action, action_detail, old_value, new_value, operator_name, operated_at)
+                             VALUES ($1, $2, $3, $4, $5, $6, NOW())";
+            var auditResult = await _db.ExecuteNonQueryAsync(auditSql, ct,
+                applicationId, "修改申请日期",
+                $"申请日期 {oldDay:yyyy-MM-dd} → {newDay:yyyy-MM-dd}（编号日期段与创建时间同改，公示/卷号/批次随锚点重算）",
+                $"{oldNo} / {oldDay:yyyy-MM-dd}", $"{newNo} / {newDay:yyyy-MM-dd}",
+                string.IsNullOrEmpty(operatorName) ? "System" : operatorName);
+            if (auditResult.IsFailure)
+                LogWarn($"改期审计写入失败: ApplicationId={applicationId}, {auditResult.Message}");
+
+            await tx.CommitAsync(ct);
+            LogInfo($"申请日期修改成功: Id={applicationId}, {oldNo} → {newNo}");
+            return Result.Success(newNo);
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync(ct);
+            LogException(ex, "修改申请日期失败");
+            return Result.FromException<string>(ex);
+        }
+    }
+
+    /// <summary>
+    /// 判断写入失败是否由 UNIQUE 约束冲突引起（口径同 ArchiveService.IsUniqueViolation：
+    /// 错误码映射不总可靠，兼看消息文本）
+    /// </summary>
+    private static bool IsUniqueViolation(Result result)
+    {
+        if (result.ErrorCode == ErrorCodes.DB_UNIQUE_VIOLATION) return true;
+        var msg = result.Message ?? string.Empty;
+        return msg.Contains("23505") || msg.Contains("duplicate key", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<Result<bool>> CheckIdCardExistsAsync(string idCard, long? excludeId = null, CancellationToken ct = default)

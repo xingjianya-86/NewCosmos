@@ -1327,6 +1327,8 @@ public partial class ApplicationFormViewModel
             {
                 // 1) 成员增删/赡养人/经济明细落库（同一环境事务，失败整体回滚）
                 await MergeSupportMembersIntoSupportersAsync();
+                // 赡养人「家庭人口」同列双编辑调和（Step2/Step3 必须在 SaveFamilyMembers 前对齐，见方法注释）
+                ReconcileSupporterFamilySizes();
                 var memberIdCardToNewId = await SaveFamilyMembersAsync(transactionCt);
                 await SaveSupportersAsync(memberIdCardToNewId, transactionCt);
                 await SaveEconomicDetailsAsync(transactionCt);

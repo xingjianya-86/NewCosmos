@@ -17,6 +17,10 @@
                     <DatePicker Date="{Binding SurveyDate}" Format="yyyy-MM-dd" HeightRequest="44"
                                 IsEnabled="{Binding IsSurveyDateEditable}"/>
                 </VerticalStackLayout>
+                <!-- 批次顺延提示：申请/调查日 > 当月会议日 自动顺延下月批次（与文书公示、卷号同批次） -->
+                <Label Text="{Binding BatchHintText}" FontSize="13"
+                       TextColor="{StaticResource WarningDark}"
+                       IsVisible="{Binding HasBatchHint}"/>
                 <Label Text="导入库建档补全：入户调查日期取纳入时间，不可修改"
                        IsVisible="{Binding IsSurveyDateLocked}"
                        FontSize="14" TextColor="{StaticResource TextSecondary}"/>

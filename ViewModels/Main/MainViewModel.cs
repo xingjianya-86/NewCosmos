@@ -497,6 +497,11 @@ public partial class MainViewModel : ViewModelBase
         // 2026-11 并行化：Office 探测（100~500ms 注册表/COM）与下方权限播种互不依赖，
         // 探测提前入后台跑，权限播种完再取结果弹窗——主页初始化总时长省一个探测段。
         var officeTask = Task.Run(() => OfficeProviderDetector.IsOfficeInstalled());
+
+        // 公文字体安装检查（与 Office 检测同款并行/非阻断口径）：扫描随包 公文字体\ 目录、
+        // 解析族名与系统已装字体比对（SkiaSharp 枚举，纯读注册表/字体表，放线程池避免卡 UI）。
+        // 缺失只影响公文文书打印/导出版式，其余功能正常——按降级继续处理，绝不拖垮主页初始化。
+        var fontTask = Task.Run(FontInstallChecker.GetMissingFonts);
 #endif
 
         InitializeUserInfo();
@@ -526,6 +531,46 @@ public partial class MainViewModel : ViewModelBase
         else
         {
             _logger.Info("Office 检测通过");
+        }
+
+        // 公文字体检查结果（权限播种后取，与 Office 弹窗同位；内部已捕获异常，失败=无缺失）
+        var missingFonts = await fontTask;
+        if (missingFonts.Count == 0)
+        {
+            _logger.Info("公文字体检查通过");
+        }
+        else
+        {
+            var fontNames = string.Join("、", missingFonts.Select(f => f.FileName));
+            _logger.Warn($"公文字体缺失 {missingFonts.Count} 个：{fontNames}");
+            var install = await _dialogService.DisplayAlertAsync(
+                "公文字体缺失",
+                $"系统未安装以下公文排版字体：\n{fontNames}\n\n" +
+                "公文文书打印/导出的版式将不正确（字体被替换）。" +
+                "可一键安装到当前用户字体（免管理员，安装后请重启应用与 Word）。",
+                "一键安装",
+                "暂不");
+            if (install)
+            {
+                // 安装含文件复制与注册表写入，放线程池；结果回 UI 线程弹窗
+                var installResult = await Task.Run(() => FontInstallChecker.Install(missingFonts));
+                if (installResult.IsSuccess)
+                {
+                    _logger.Info($"公文字体一键安装成功 {missingFonts.Count} 个（需重启应用与 Word 生效）");
+                    await _dialogService.DisplayAlertAsync(
+                        "安装完成",
+                        $"已安装 {missingFonts.Count} 个公文字体。\n\n请重启应用与 Word 后生效。",
+                        "确定");
+                }
+                else
+                {
+                    _logger.Warn($"公文字体一键安装未全部成功：{installResult.Message}");
+                    await _dialogService.DisplayAlertAsync(
+                        "安装未完成",
+                        installResult.Message + "\n\n可重启应用后重试，或手动安装 公文字体 目录内的字体。",
+                        "确定");
+                }
+            }
         }
 #endif
 

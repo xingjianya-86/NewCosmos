@@ -27,6 +27,36 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
         return await _db.QuerySingleAsync<HouseholdSurvey?>(sql, ct, applicationId);
     }
 
+    public async Task<Result<IReadOnlyDictionary<long, DateTime>>> GetLatestSurveyDateMapByApplicationIdsAsync(
+        IReadOnlyCollection<long> applicationIds, CancellationToken ct = default)
+    {
+        try
+        {
+            if (applicationIds.Count == 0)
+                return Result.Success<IReadOnlyDictionary<long, DateTime>>(new Dictionary<long, DateTime>());
+
+            // DISTINCT ON + ORDER BY id DESC：同一申请取最新一条未删记录，口径与 GetByApplicationIdAsync 一致
+            var sql = @"SELECT DISTINCT ON (application_id) application_id, survey_date
+                FROM nc_biz_household_surveys
+                WHERE application_id = ANY($1) AND deleted_at IS NULL
+                ORDER BY application_id, id DESC";
+            var result = await _db.QueryAsync<SurveyDateRecord>(sql, ct, applicationIds.ToArray());
+            if (result.IsFailure)
+                return Result.Failure<IReadOnlyDictionary<long, DateTime>>(result.ErrorCode!, result.Message!);
+
+            var map = new Dictionary<long, DateTime>();
+            foreach (var row in result.Value ?? new List<SurveyDateRecord>())
+                map.TryAdd(row.ApplicationId, row.SurveyDate.Date);
+
+            return Result.Success<IReadOnlyDictionary<long, DateTime>>(map);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "批量查询入户调查日期失败");
+            return Result.FromException<IReadOnlyDictionary<long, DateTime>>(ex);
+        }
+    }
+
     public async Task<Result<long>> SaveAsync(long applicationId, HouseholdSurvey survey, CancellationToken ct = default)
     {
         ValidateNotNull(survey, nameof(survey));
