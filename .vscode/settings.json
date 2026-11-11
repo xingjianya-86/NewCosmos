@@ -1,0 +1,10 @@
+{
+    // PowerShell 脚本保存为 UTF-8 with BOM：Windows PowerShell 5.1 对无 BOM 脚本
+    // 按系统 ANSI(GBK) 解析，中文字符串静默乱码（0 语法错误）。
+    // 写法来自微软官方文档：understanding-file-encoding（PowerShell 团队）。
+    // 闸门：deploy\check_encoding.ps1（编辑器配置只是防呆，不是唯一防线）。
+    "[powershell]": {
+        "files.encoding": "utf8bom",
+        "files.autoGuessEncoding": true
+    }
+}

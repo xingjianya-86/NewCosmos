@@ -222,7 +222,7 @@ if (-not $SkipStandardsCheck) {
         & $std -Category ALL | Out-Host
         $report = Join-Path $ScriptsDir "standards_report.txt"
         if (Test-Path -LiteralPath $report) {
-            $redlines = @(Get-Content -LiteralPath $report | Where-Object { $_ -match '^\[(SEC|UI1|SQL1|SQL2|SQL4)\]' })
+            $redlines = @(Get-Content -LiteralPath $report -Encoding UTF8 | Where-Object { $_ -match '^\[(SEC|UI1|SQL1|SQL2|SQL4)\]' })
             if ($redlines.Count -gt 0) {
                 $redlines | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
                 throw "规范检查命中红线 $($redlines.Count) 处（SEC/UI1/SQL1/SQL2/SQL4），勿强行发版；见 deploy\standards_report.txt"
@@ -389,7 +389,7 @@ if (-not $SkipAndroid) {
     $sigFile = Join-Path $androidDir "update.sig"
     & dotnet $signTool sign --key $SigningKey --canonical $canonFile --out $sigFile
     if ($LASTEXITCODE -ne 0) { throw "Android 清单签名失败" }
-    $signature = (Get-Content -LiteralPath $sigFile -Raw).Trim()
+    $signature = (Get-Content -LiteralPath $sigFile -Raw -Encoding UTF8).Trim()
     $manifest = [ordered]@{
         schema = $schema; channel = $Channel; latestVersion = $Version; minSupportedVersion = $MinSupported
         force = [bool]$Force; publishedAt = $publishedAt; notes = ""

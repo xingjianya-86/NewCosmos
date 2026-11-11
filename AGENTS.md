@@ -1,6 +1,6 @@
 # NewCosmos 开发规范（AGENTS.md）
 
-> 更新日期：2026-10-07。本文件只保留"改这个代码库必须知道的事实与规则"。
+> 更新日期：2026-11-11。本文件只保留"改这个代码库必须知道的事实与规则"。
 > 单一事实来源：本文不抄代码——凡涉及可执行逻辑，以指向的源文件为准；业务资料在 `docs/`。
 > 本文**不写死数量与全量文件枚举**（必然过时），易变清单一律给核对命令；失效引用一律直指权威代码。
 
@@ -17,7 +17,7 @@ dotnet build NewCosmos.csproj -f net10.0-windows10.0.19041.0     # Windows
 ```
 
 - **测试项目**：`NewCosmos.Tests\NewCosmos.Tests.csproj`（xUnit，2026-11 引入，只测纯逻辑：金额/分段/校验器/状态机/常量）。验证 = `dotnet test NewCosmos.Tests\NewCosmos.Tests.csproj` 全过 + 编译零错误 + 启动冒烟（登录→列表→表单保存→导入→打印预览）。
-- **规范/迁移检查**（报告式，防回潮）：`powershell -File deploy\check_standards.ps1`（AGENTS §5/§7/§8/§10/§12 违规清单）、`powershell -File deploy\check_migrations.ps1`（docs/migrations 与 nc_sys_migrations 对账，需先 `psql -f deploy\migrations_registry_init.sql`）。
+- **规范/迁移检查**（报告式，防回潮）：`powershell -File deploy\check_standards.ps1`（AGENTS §5/§7/§8/§10/§12 违规清单）、`powershell -File deploy\check_migrations.ps1`（docs/migrations 与 nc_sys_migrations 对账，需先 `psql -f deploy\migrations_registry_init.sql`）、`powershell -File deploy\check_encoding.ps1`（*.ps1 编码：ENC1 无 BOM 含中文=违规退出码 1，ENC2 读写缺 `-Encoding`=告警）。
 - 发版入口：`deploy\publish_all.bat`（先用 `-DryRun` 体检），见 §2。
 - 本地可再生占用（`bin\ obj\ publish\`，≈9 GB）可整删重建，维护见 §2。
 - 改数据库 / 改金额 / 改日志，动手前分别看 §8、§9、§10。
@@ -183,6 +183,7 @@ NewCosmos/
 | 13 | 引入 `Shell` / `AppShell` / 使用 `Shell.Current` | `Navigation\NavigationService` + `PushAsync` | §1 |
 | 14 | `& $ps1 @数组` 传命名参数（数组=位置参数） | 哈希表 splat `& $ps1 @{Version=$v}` | §2 |
 | 15 | 手改 `publish\` 产物或在其中留测试文件 | 发版产物由 `deploy\publish_all` 全量生成 | §2 |
+| 16 | `.ps1` 无 BOM 含中文；文件读写不显式指定编码 | 脚本存 **UTF-8 with BOM**（PS5.1 无 BOM 按 ANSI 解析、字符串静默乱码）；读写显式 `-Encoding UTF8`，写无 BOM 文件用 `UTF8Encoding($false)`（`-Encoding UTF8` 在 5.1 带 BOM、pwsh7 不带，语义不定） | `deploy\check_encoding.ps1` |
 
 ## §6 架构铁律
 

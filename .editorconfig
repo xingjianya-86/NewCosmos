@@ -1,0 +1,10 @@
+# Editor configuration — https://editorconfig.org
+root = true
+
+# PowerShell 脚本必须 UTF-8 with BOM：Windows PowerShell 5.1 解析 .ps1 只认 BOM，
+# 无 BOM 一律按系统 ANSI(GBK) 解码，中文字符串静默乱码且不报语法错
+# （2026-11 实测：0 语法错误、8 处字符串损坏）。chcp/$OutputEncoding 救不了，解析在执行前。
+# charset 对 JetBrains 系编辑器直接生效；VS Code 见 .vscode/settings.json 的 [powershell] 段。
+# 闸门（编辑器配置只是防呆，不是唯一防线）：powershell -File deploy\check_encoding.ps1
+[*.{ps1,psm1,psd1}]
+charset = utf-8-bom

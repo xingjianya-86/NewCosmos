@@ -206,7 +206,7 @@ $toolDll = Join-Path $repo "deploy\UpdateSigningTool\bin\Release\net10.0\UpdateS
 $sigFile = Join-Path $releaseDir "update.sig"
 & dotnet $toolDll sign --key $SigningKey --canonical $canonicalFile --out $sigFile | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "清单签名失败" }
-$signature = (Get-Content -LiteralPath $sigFile -Raw).Trim()
+$signature = (Get-Content -LiteralPath $sigFile -Raw -Encoding UTF8).Trim()
 
 $manifest = [ordered]@{
     schema              = $schema
