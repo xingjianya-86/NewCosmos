@@ -15,6 +15,7 @@ public static class DictDisplayHelper
     private static ConcurrentDictionary<string, string> _familyRelationships = new();
     private static ConcurrentDictionary<string, string> _disabilityTypes = new();
     private static ConcurrentDictionary<string, string> _disabilityLevels = new();
+    private static ConcurrentDictionary<string, string> _healthStatuses = new();
 
     public static void UpdateFromCache(IDictCacheService cache)
     {
@@ -36,6 +37,8 @@ public static class DictDisplayHelper
             cache.GetAllByCategory(DictionaryTypeCodes.DisabilityTypes));
         _disabilityLevels = new ConcurrentDictionary<string, string>(
             cache.GetAllByCategory(DictionaryTypeCodes.DisabilityLevels));
+        _healthStatuses = new ConcurrentDictionary<string, string>(
+            cache.GetAllByCategory(DictionaryTypeCodes.HealthStatuses));
     }
 
     public static string GetAssetExemptionDisplay(string code) =>
@@ -78,4 +81,27 @@ public static class DictDisplayHelper
         string.IsNullOrWhiteSpace(code)
             ? string.Empty
             : (_disabilityLevels.TryGetValue(code, out var v) ? v : code);
+
+    /// <summary>
+    /// 健康状况 key（Healthy/Weak/SevereIllness/SevereDisability/SevereIllnessAndDisability/Other）→ 中文。
+    /// 字典 HealthStatuses 优先（标签可被用户改）→ 未命中回退 HealthStatusConstants 内置映射
+    /// （字典缓存冷启动兜底，防英文原始值泄漏进文书/说明文本）→ 最后原样返回（兼容已中文化的存量值）。
+    /// 收口点：FamilyMember.HealthStatusDisplay、MonthlyReportService.MapHealthStatus、
+    /// FamilySituationTextBuilder 均委托本方法，禁止再各自维护 switch 副本。
+    /// </summary>
+    public static string GetHealthStatusDisplay(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return string.Empty;
+        if (_healthStatuses.TryGetValue(code, out var v)) return v;
+        return code switch
+        {
+            HealthStatusConstants.HEALTHY => HealthStatusConstants.HEALTHY_DISPLAY,
+            HealthStatusConstants.FAIR_OR_WEAK => HealthStatusConstants.FAIR_OR_WEAK_DISPLAY,
+            HealthStatusConstants.SEVERE_DISEASE => HealthStatusConstants.SEVERE_DISEASE_DISPLAY,
+            HealthStatusConstants.SEVERE_DISABILITY => HealthStatusConstants.SEVERE_DISABILITY_DISPLAY,
+            HealthStatusConstants.SEVERE_DISEASE_AND_DISABILITY => HealthStatusConstants.SEVERE_DISEASE_AND_DISABILITY_DISPLAY,
+            "Other" => "其他",
+            _ => code
+        };
+    }
 }

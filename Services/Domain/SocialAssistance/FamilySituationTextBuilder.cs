@@ -1,4 +1,5 @@
 using System.Text;
+using NewCosmos.Helpers;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
 
@@ -53,7 +54,10 @@ public static class FamilySituationTextBuilder
 
         if (c.SickMembers.Count > 0)
         {
-            var details = string.Join("、", c.SickMembers.Select(m => $"{m.Name}{m.HealthStatus}"));
+            // 健康状况经 DictDisplayHelper 转中文（库内存字典键 SevereIllness/…，
+            // 2026-11-12 实测原样拼接输出过"彭文华SevereIllness"）；已中文化的存量值原样通过
+            var details = string.Join("、", c.SickMembers.Select(m =>
+                $"{m.Name}{DictDisplayHelper.GetHealthStatusDisplay(m.HealthStatus)}"));
             sb.Append($"家庭成员中{details}，");
         }
 

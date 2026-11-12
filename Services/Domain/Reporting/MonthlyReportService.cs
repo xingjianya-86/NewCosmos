@@ -362,18 +362,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         };
 
     /// <summary>
-    /// 健康状况码 → 中文（与 FamilyMember.HealthStatusDisplay 一致）
+    /// 健康状况码 → 中文（收口到 DictDisplayHelper.GetHealthStatusDisplay，
+    /// 与 FamilyMember.HealthStatusDisplay 同源，禁止本地 switch 副本）
     /// </summary>
     private static string MapHealthStatus(string code)
-        => code switch
-        {
-            "Healthy" => "健康或良好",
-            "Weak" => "一般或较弱",
-            "SevereIllness" => "重病",
-            "SevereDisability" => "重残",
-            "SevereIllnessAndDisability" => "重病且重残",
-            _ => code
-        };
+        => DictDisplayHelper.GetHealthStatusDisplay(code);
 
     /// <summary>
     /// 分类施保类型（重病/重残/高龄/未成年，去重顿号连接；与 ClassificationService.CalculateClassifiedSubsidyAsync 的 Types 口径一致）。
@@ -752,13 +745,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         foreach (var m in result.Value ?? new List<SickMemberRow>())
         {
             if (!m.ApplicationId.HasValue) continue;
-            var display = m.HealthStatus switch
-            {
-                "SevereIllness" => "重病",
-                "SevereDisability" => "重残",
-                "SevereIllnessAndDisability" => "重病且重残",
-                _ => m.HealthStatus ?? ""
-            };
+            var display = DictDisplayHelper.GetHealthStatusDisplay(m.HealthStatus);
             if (!map.TryGetValue(m.ApplicationId.Value, out var list))
                 map[m.ApplicationId.Value] = list = new List<(string, string)>();
             list.Add((m.Name ?? "", display));

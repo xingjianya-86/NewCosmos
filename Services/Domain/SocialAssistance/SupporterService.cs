@@ -30,7 +30,11 @@ public class SupporterService : BaseService, ISupporterService
                            employment_status, main_income_source, work_capacity, annual_income,
                            monthly_income_capacity,
                            home_province, home_city, home_district, home_town, home_village, home_address,
-                           hukou_province, hukou_city, hukou_district, hukou_town
+                           hukou_province, hukou_city, hukou_district, hukou_town,
+                           -- 末位列：申请表家庭人口（年费乘数，2026-11-12 口径）——放最后使映射时
+                           -- OnCalcFamilySizeChanged 最后触发，年费终值 = 月费×月数×申请家庭人口
+                           COALESCE((SELECT a2.family_size FROM nc_biz_applications a2
+                                     WHERE a2.id = nc_biz_family_members.application_id), 0) AS calc_family_size
                     FROM nc_biz_family_members
                     WHERE application_id = $1 AND member_category = 'Support' AND deleted_at IS NULL
                     ORDER BY created_at";

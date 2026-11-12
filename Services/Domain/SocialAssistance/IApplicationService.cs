@@ -98,8 +98,13 @@ public interface IApplicationService
     /// 仅草稿（status=Draft 且 current_step&lt;5）可改；新日期 ≤ 今天且不早于当年 1 月 1 日。
     /// 改期会改变该档批次（公示窗口/卷号/文书申请日期/批次顺延提示），返回新申请编号；
     /// 全程单事务并写审计（nc_biz_application_logs，action=修改申请日期）。
+    /// <para>
+    /// 联动（2026-11-11）：批次锚点=入户调查日期优先，只改申请日期批次不变——故同事务把入户日期
+    /// 自动钳进窗口 [新申请日, min(会议日, 今天)]（Step4 三重校验同口径）；导入库建档档
+    /// （source_type=ImportedArchive，调查日=纳入时间铁律）与无调查记录的档不动。
+    /// </para>
     /// </summary>
-    Task<Result<string>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default);
+    Task<Result<ChangeApplicationDateResult>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default);
 
 /// <summary>
     /// 检查身份证号是否存

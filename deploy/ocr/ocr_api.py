@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import os
@@ -36,6 +37,7 @@ import time
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import Image
+from pydantic import BaseModel, Field
 
 # ── 服务配置（环境变量覆盖，容器注入）─────────────────────────────────────
 OCR_BASE = os.environ.get("OLLAMA_URL", "http://ollama:11434/v1").strip().rstrip("/")
@@ -46,8 +48,6 @@ REQUEST_TIMEOUT = float(os.environ.get("OCR_REQUEST_TIMEOUT_SECONDS", "300"))
 MAX_IMAGE_BYTES = int(os.environ.get("OCR_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))
 DEFAULT_MAX_TOKENS_KIE = int(os.environ.get("OCR_KIE_MAX_TOKENS", "1024"))
 
-# ── 官方管线常量（勿改，改 = 与官方对齐基线漂移）─────────────────────────
-MAX_IMAGE_EDGE = 2048
 # ── AI 重病判定配置（POST /ai/severity，2026-11-11 P0）────────────────────
 AI_MODEL = os.environ.get("AI_MODEL", "qwen2.5:3b").strip()
 AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "256"))
@@ -58,6 +58,8 @@ AI_CATALOG_PATH = os.environ.get(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "severe_disease_catalog.json"),
 )
 
+# ── 官方管线常量（勿改，改 = 与官方对齐基线漂移）─────────────────────────
+MAX_IMAGE_EDGE = 2048
 
 # 官方 mcp_ocr_server.py PROMPTS["document"] / PROMPTS["text"] 逐字复制
 PROMPT_DOCUMENT = (
@@ -172,8 +174,6 @@ def extract_json_fields(raw: str, fields: list[str]) -> dict[str, str]:
         return {}
     return {field: str(data.get(field, "") or "") for field in fields}
 
-
-app = FastAPI(title="newcosmos-ocr-api", docs_url=None, redoc_url=None)
 
 # ── AI 重病判定（P0）：清单加载 + 确定性层 + LLM 兜底 ─────────────────────
 # 设计依据（2026-11-11 补测定稿）：
@@ -339,6 +339,8 @@ def parse_severity(raw: str, catalog: dict) -> tuple[str, str, float, str]:
     return verdict, matched, confidence, reason
 
 
+app = FastAPI(title="newcosmos-ocr-api", docs_url=None, redoc_url=None)
+
 
 @app.get("/health")
 async def health() -> dict:
@@ -406,8 +408,6 @@ async def recognize(file: UploadFile = File(...), category: str = Form(...)) -> 
     return _response(category, "text", {}, lines, result["text"], result.get("usage"), started)
 
 
-def _response(category: str, mode: str, fields: dict, lines: list[str], raw: str,
-              usage: dict | None, started: float) -> dict:
 class SeverityRequest(BaseModel):
     """重病判定请求：name 必填（客户端先用本地 ICD 字典把编码转成名称），code 可选作判别上下文。"""
     name: str = Field(default="", max_length=200)
@@ -459,6 +459,8 @@ async def severity(req: SeverityRequest) -> dict:
     }
 
 
+def _response(category: str, mode: str, fields: dict, lines: list[str], raw: str,
+              usage: dict | None, started: float) -> dict:
     return {
         "ok": True,
         "category": category,

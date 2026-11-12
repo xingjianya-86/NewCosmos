@@ -1043,14 +1043,6 @@ public partial class ApplicationFormViewModel
                             g.First().MemberCategory, g.First().IsApplicant, g.First().RelationshipToHead),
                         StringComparer.OrdinalIgnoreCase);
 
-                // 赡养人家庭人口改前基线（身份证 → family_size）：Step2 成员卡与 Step3 赡养明细同列双编辑，
-                // 保存前调和只认"偏离本基线"的一侧（ReconcileSupporterFamilySizes）。
-                _loadedFamilySizeByIdCard = _loadedMemberEntities
-                    .Where(m => !string.IsNullOrWhiteSpace(m.IdCard)
-                                && m.MemberCategory == MemberCategoryConstants.SUPPORT)
-                    .GroupBy(m => m.IdCard.Trim(), StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(g => g.Key, g => g.First().FamilySize, StringComparer.OrdinalIgnoreCase);
-
                 _addedMemberReasons.Clear();
                 _removedMemberEntries.Clear();
 
@@ -1084,6 +1076,9 @@ public partial class ApplicationFormViewModel
                         if (monthlyKey.Length > 0)
                             _loadedSupporterMonthlyIncome[monthlyKey] = supporter.MonthlyIncomeCapacity;
                     }
+                    // 年费乘数下发（2026-11-12 口径）：加载 SQL 已带出申请表家庭人口，此处兜底
+                    // 覆盖 family_size 异常/新档等场景，保证 CalcFamilySize 与表单 FamilySize 一致
+                    ApplyCalcFamilySizeToSupporters();
                     _logger.LogBusiness("赡养人加载完成", ("Count", Supporters.Count));
                 }
                 else

@@ -988,9 +988,13 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
 
             // 批查已登记身份证（原逐人 CheckIdCardExistsAsync：每批一次 COUNT 往返；= ANY($1) 一次取全）
             var registeredSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // candidates.Keys.ToArray() 是 string[]（引用类型数组）：作为唯一实参会被 params object[] 按
+            // normal form 当成形参数组本身 → 元素被摊成 $1..$N，$1 退化为首张卡，ANY($1) 报 42809
+            //（2026-11-11 实测：完成归档即触发，位置 63 = 本 SQL 中 '=' 偏移；同型先例见
+            // ReviewAge90.cs:1047 / BankFlowQueryService.cs:140 / SeedMergeService.cs:112）。
             var registeredResult = await _db.QueryAsync<string>(
                 "SELECT id_card FROM nc_biz_elderly_applications WHERE id_card = ANY($1) AND deleted_at IS NULL",
-                ct, candidates.Keys.ToArray());
+                ct, new object[] { candidates.Keys.ToArray() });
             if (registeredResult.IsSuccess && registeredResult.Value != null)
             {
                 foreach (var c in registeredResult.Value)

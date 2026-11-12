@@ -151,14 +151,6 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     private Dictionary<string, string> _loadedMemberCategoryByIdCard = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// 「赡养人家庭人口」改前基线（身份证 → 加载时的 nc_biz_family_members.family_size）。
-    /// Step2 成员卡 FamilyMember.FamilySize 与 Step3 赡养明细 Supporter.SupporterFamilySize
-    /// 写的是同一列，保存时 SaveFamilyMembers 先写、SaveSupporters 后写覆盖——
-    /// 只比两边现值无法分辨"谁被编辑过"，必须有这份加载基线（值拷贝，防原地编辑污染）。
-    /// </summary>
-    private Dictionary<string, int?> _loadedFamilySizeByIdCard = new(StringComparer.OrdinalIgnoreCase);
-
     /// <summary>成员变更模式：增员登记原因（按新增成员对象引用暂存；弹窗确认后写入）</summary>
     private readonly Dictionary<FamilyMember, MemberChangeReasonResult> _addedMemberReasons =
         new(ReferenceEqualityComparer.Instance);
@@ -249,6 +241,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     [ObservableProperty]
     private int _familySize = 1;
 
+    /// <summary>
+    /// 申请表家庭人口变化 → 下发给全部赡养人（年费乘数，2026-11-12 口径）：
+    /// 增删共同生活成员会改 FamilySize，赡养年费 = 月费×月数×本值，必须联动重算。
+    /// </summary>
+    partial void OnFamilySizeChanged(int value) => ApplyCalcFamilySizeToSupporters();
+
     [ObservableProperty]
     private string _applicationReason = string.Empty;
 
@@ -300,6 +298,18 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         }
     }
 
+    /// <summary>
+    /// 健康状况是否属重病/重残（家庭情况说明筛选口径）：按【显示值】判定——
+    /// 字典键（SevereIllness/…）与已中文化的存量值（"重病"）均能命中，避免键值/中文两套表示漏筛。
+    /// </summary>
+    private static bool IsSevereHealthStatus(string? healthStatus)
+    {
+        var display = DictDisplayHelper.GetHealthStatusDisplay(healthStatus);
+        return display is HealthStatusConstants.SEVERE_DISEASE_DISPLAY
+            or HealthStatusConstants.SEVERE_DISABILITY_DISPLAY
+            or HealthStatusConstants.SEVERE_DISEASE_AND_DISABILITY_DISPLAY;
+    }
+
     private string GenerateApplicationReasonDetail(string reason)
     {
         // 与月报会议记录共用 FamilySituationTextBuilder，保证口径一致、金额自洽
@@ -308,8 +318,12 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             ApplicantName = ApplicantName,
             HukouType = HukouType?.Display ?? "",
             FamilySize = FamilySize,
+            // 重病/重残成员筛选（家庭情况说明"家庭成员中…"一句）：按健康状况【显示值】判定——
+            // 库里存的是字典键（SevereIllness/SevereDisability/…），原实现拿中文"重病/重残"比较键
+            // 恒为 false，只剩 IsSevereDisease 兜底命中，且把原始键拼进文本（实测输出"彭文华SevereIllness"）；
+            // 显示值判定同时兼容键与已中文化的存量值，并补上"重病且重残"漏项。
             SickMembers = FamilyMembers
-                .Where(m => m.HealthStatus == "重病" || m.HealthStatus == "重残" || m.IsSevereDisease)
+                .Where(m => m.IsSevereDisease || IsSevereHealthStatus(m.HealthStatus))
                 .Select(m => (m.Name, m.HealthStatus))
                 .ToList(),
             Reason = reason,
@@ -618,7 +632,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
             var confirm = await Dialog.DisplayAlertAsync("确认修改申请日期",
                 $"申请日期：{current:yyyy-MM-dd} → {newDay:yyyy-MM-dd}\n\n" +
                 "修改后将改变该档案的公示窗口、卷号与文书上的申请日期（批次顺延提示随之重算）；" +
-                "已打印的文书不受影响，需重新出文书才会更新。",
+                "已打印的文书不受影响，需重新出文书才会更新。\n\n" +
+                "注意：批次按入户调查日期锚定——若入户日期超出新窗口，" +
+                "系统会自动把它同步到「新申请日 ~ 会议日」之间，否则批次不变。",
                 "确认修改", "取消");
             if (!confirm) return;
 
@@ -637,9 +653,16 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
             _applicationDateBase = newDay;
             OnPropertyChanged(nameof(ApplicationDateText));
+
+            // 联动回写：服务端已同事务把入户日期钳进 [新申请日, min(会议日, 今天)] →
+            // 赋值触发 OnSurveyDateChanged → RefreshBatchHint（与手动改调查日同路径）
+            var syncedSurvey = result.Value.SurveyDate;
+            if (syncedSurvey.HasValue) SurveyDate = syncedSurvey;
             RefreshBatchHint();
 
-            await Dialog.ShowSnackBarAsync($"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value}");
+            await Dialog.ShowSnackBarAsync(syncedSurvey.HasValue
+                ? $"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value.ApplicationNo}；入户调查日期已同步为 {syncedSurvey:yyyy-MM-dd}"
+                : $"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value.ApplicationNo}");
         }
         catch (Exception ex)
         {

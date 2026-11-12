@@ -47,6 +47,12 @@ public interface IFamilyMemberService
     Task<Result<int>> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
+    /// 软删除申请的【非赡养】成员（户主+共同生活），返回删除行数（2026-11-12）。
+    /// 表单保存链专用——赡养行由 SupporterService 独占写入，本方法不得触碰。
+    /// </summary>
+    Task<Result<int>> DeleteNonSupportByApplicationIdAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 查询申请下已登记死亡的成员身份证（历史数据未软删，展示/生成档案时须过滤）
     /// </summary>
     Task<Result<List<string>>> GetDeadIdCardsByApplicationIdAsync(long applicationId, CancellationToken ct = default);

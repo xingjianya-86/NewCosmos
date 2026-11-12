@@ -221,13 +221,15 @@
                     <Label Grid.Column="6" Text="月收入（元）" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Entry Grid.Column="7" Text="{Binding MonthlyIncomeCapacity}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" Placeholder="" Keyboard="Numeric"/>
                 </Grid>
-                <!-- 家庭人口（仅赡养抚养扶养显示）：原与上排共用一个 Grid 时写 Grid.Column=8/9，而该 Grid
+                <!-- 赡养人家庭人口（仅赡养抚养扶养显示）：原与上排共用一个 Grid 时写 Grid.Column=8/9，而该 Grid
                      只有 8 列（0-7）→ 越界被钳到第 7 列，与「月收入」输入框同格重叠而完全看不见
                      （2026-11-03 模板收敛 3e6128a 引入的回归；收敛前赡养卡是 10 列）。
-                     改为独立 Grid：列定义与上排同宽对齐，且整块随 ShowFamilySize 隐藏 → 共同生活卡零影响。 -->
+                     改为独立 Grid：列定义与上排同宽对齐，且整块随 ShowFamilySize 隐藏 → 共同生活卡零影响。
+                     2026-11-12 口径改名：与 Step3「家庭人口」（=申请表家庭人口，年费乘数）区分——
+                     本字段=赡养人**自己家**的人口，信息字段不参与赡养费计算。 -->
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8"
                       IsVisible="{Binding ShowFamilySize, Source={x:Reference Card}}">
-                    <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                    <Label Text="赡养人家庭人口" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Entry Grid.Column="1" Text="{Binding FamilySize}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" Placeholder="" Keyboard="Numeric"/>
                 </Grid>
             </VerticalStackLayout>

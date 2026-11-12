@@ -458,17 +458,10 @@ public class FamilyMember : INotifyPropertyChanged
     public string HealthStatus { get; set; } = string.Empty;
 
     /// <summary>
-    /// 健康状况显示文本（中文）
+    /// 健康状况显示文本（中文）——收口到 DictDisplayHelper.GetHealthStatusDisplay
+    /// （字典 HealthStatuses 优先 + HealthStatusConstants 内置回退），禁止在本类再维护 switch 副本
     /// </summary>
-    public string HealthStatusDisplay => HealthStatus switch
-    {
-        "Healthy" => "健康或良好",
-        "Weak" => "一般或较弱",
-        "SevereIllness" => "重病",
-        "SevereDisability" => "重残",
-        "SevereIllnessAndDisability" => "重病且重残",
-        _ => HealthStatus
-    };
+    public string HealthStatusDisplay => DictDisplayHelper.GetHealthStatusDisplay(HealthStatus);
 
     /// <summary>
     /// 劳动能力
@@ -815,9 +808,10 @@ public class FamilyMember : INotifyPropertyChanged
     public int? SupportMonths { get; set; }
 
     /// <summary>
-    /// 家庭人口（**赡养人自己家庭**的人口，与本户认定无关；仅 member_category=赡养抚养扶养 时使用）。
-    /// 与 Step3 赡养明细 Supporter.SupporterFamilySize 落在同一列 family_size，保存前由
-    /// SupporterFamilySizeReconciler 调和——故必须发变更通知，否则调和后 Step2 卡不刷新。
+    /// 赡养人家庭人口（赡养人**自己家庭**的人口，与本户认定无关；仅 member_category=赡养抚养扶养 时使用）。
+    /// 2026-11-12 口径：Step2 成员卡「赡养人家庭人口」是**唯一编辑口**，保存时单向同步进
+    /// Supporter（SyncSupporterBasicsFromMember）；**不参与赡养费计算**——年费乘数改用
+    /// 申请表家庭人口（Supporter.CalcFamilySize）。Step3 卡「家庭人口」直接显示申请表 FamilySize。
     /// </summary>
     public int? FamilySize
     {

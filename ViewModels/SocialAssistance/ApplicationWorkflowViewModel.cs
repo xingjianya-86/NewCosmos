@@ -677,7 +677,9 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
         var confirm = await _dialogService.DisplayAlertAsync("确认修改申请日期",
             $"申请日期：{current:yyyy-MM-dd} → {newDay:yyyy-MM-dd}\n\n" +
             "修改后将改变该档案的公示窗口、卷号与文书上的申请日期（批次顺延提示随之重算）；" +
-            "已打印的文书不受影响，需重新出文书才会更新。",
+            "已打印的文书不受影响，需重新出文书才会更新。\n\n" +
+            "注意：批次按入户调查日期锚定——若入户日期超出新窗口，" +
+            "系统会自动把它同步到「新申请日 ~ 会议日」之间，否则批次不变。",
             "确认修改", "取消");
         if (!confirm) return;
 
@@ -689,7 +691,9 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
             return;
         }
 
-        await _dialogService.ShowSnackBarAsync($"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value}");
+        await _dialogService.ShowSnackBarAsync(result.Value.SurveyDate.HasValue
+            ? $"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value.ApplicationNo}；入户调查日期已同步为 {result.Value.SurveyDate:yyyy-MM-dd}"
+            : $"申请日期已改为 {newDay:yyyy-MM-dd}，编号 {result.Value.ApplicationNo}");
         await LoadDataAsync();
     }
 

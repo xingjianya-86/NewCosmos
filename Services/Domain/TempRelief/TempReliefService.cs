@@ -622,7 +622,10 @@ public class TempReliefService : BaseService, ITempReliefService
             if (existingTables.Count > 0)
             {
                 var unionParts = existingTables
-                    .Select(t => $"SELECT '{t}' AS tbl FROM {t} WHERE applicant_id_card = $1 LIMIT 1");
+                    // 每段必须自带括号：PostgreSQL 中 UNION 操作数含 LIMIT 时无括号是语法错误
+                    //（syntax error at or near "UNION"，42601）——2026-11-12 实测修复；
+                    // 此前批查每次失败并静默走下方逐表回退，功能对但性能退化且刷错误日志
+                    .Select(t => $"(SELECT '{t}' AS tbl FROM {t} WHERE applicant_id_card = $1 LIMIT 1)");
                 // [SQL 白名单背书] unionSql 仅由上方硬编码白名单表名生成（见方法注释）
                 var unionSql = string.Join(" UNION ALL ", unionParts);
                 var matched = await _db.QueryAsync<string>(unionSql, ct, idCard);

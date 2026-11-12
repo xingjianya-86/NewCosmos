@@ -11,6 +11,7 @@
     SQL1  字符串插值进 SQL（§5-1 禁止，只允许 $1..$n 位置参数）
     SQL2  SELECT *（§5-2 宽表禁用；窄表存量见计数）
     SQL3  EXTRACT() 包列用于过滤（§8 索引失效；豁免注释 [索引豁免] 除外）
+    SQL4  ANY($n) 协变陷阱：string[] 作 params object[] 唯一实参（§8；PG 42809，2026-11 实锤）
     UI1   App.CurrentUserId ?? 1 回退管理员（批次1 已修，防回潮）
     SYNC  .Result / .Wait() 阻塞调用（死锁风险）
     LOG1  空 catch 吞异常（§7）
@@ -39,6 +40,8 @@ function Hit($cat, $file, $line, $text) {
 
 foreach ($f in $files) {
     $lines = [System.IO.File]::ReadAllLines($f.FullName)
+    # SQL4 前置：本文件是否存在【未强转】的 = ANY($n)（= ANY($1::text[]) 这类带强转的不算）
+    $fileHasUncastAny = ($lines -join "`n") -match '= ANY\(\$\d+\)'
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $t = $lines[$i]
         if ($t -match '^\s*(///|//)') { continue }   # 注释行不计
@@ -83,6 +86,21 @@ foreach ($f in $files) {
         # SQL3: EXTRACT( 用于 WHERE/AND 过滤且无豁免注释
         if ($Category -in 'ALL','SQL' -and $t -match 'EXTRACT\s*\(' -and ($t -match 'WHERE|AND\s+EXTRACT') -and ($lines[$i+1] -notmatch '索引豁免' -and $t -notmatch '索引豁免')) {
             Hit 'SQL3' $f $n $t
+        }
+
+        # SQL4: ANY($n) 协变陷阱（2026-11-11 实锤，完成归档即触发 PG 42809）——
+        #   string[] 是引用类型数组，可协变成 object[]：作为 DB 调用的【唯一实参】时编译器按 normal form
+        #   把数组本身当成形参数组 → 元素摊成 $1..$N → $1 退化为标量 → "op ANY/ALL (array) requires array"。
+        #   安全形态不命中：new object[]{ arr } 显式包装 / 多实参（编译器构造新数组）/ long[] 等值类型数组 /
+        #   List<object>.ToArray()（本身就是 object[]，pageParams/paramValues 等分页参数惯用法）。
+        #   只报：裸 .ToArray() 作 ct 之后的唯一实参 + 本文件含未强转 ANY($n) + 实参名含字符串集合特征
+        #   （cards/keys/codes/names/strings/texts——勿用 str/value 等泛子串：listResult/paramValues 会误报）。
+        #   修法见同型先例：ReviewAge90.cs:1047、BankFlowQueryService.cs:140、SeedMergeService.cs:112。
+        if ($Category -in 'ALL','SQL' -and $fileHasUncastAny -and
+            $t -match '(?:,\s*|\s+)ct,\s*[A-Za-z_][A-Za-z0-9_.]*\.ToArray\(\)\s*\)\s*;?\s*$' -and
+            $t -notmatch 'new\s+object\[\]' -and
+            $t -match '(?i)(cards|keys|codes|names|strings|texts|idcard)') {
+            Hit 'SQL4' $f $n $t
         }
 
         # UI1: 管理员回退

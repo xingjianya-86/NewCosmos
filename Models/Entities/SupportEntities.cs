@@ -31,7 +31,11 @@ public partial class Supporter : ObservableObject
     [ObservableProperty]
     private int _supportMonths = 12;
 
-    /// <summary>赡养家庭人数（人）</summary>
+    /// <summary>
+    /// 赡养人家庭人口（赡养人**自己家**的人口，Step2 成员卡「赡养人家庭人口」编辑，2026-11-12 口径：
+    /// 纯信息字段，**不参与赡养费计算**——年费乘数改用 CalcFamilySize=申请表家庭人口）。
+    /// 对应列 nc_biz_family_members.family_size。
+    /// </summary>
     [ObservableProperty]
     private int _supporterFamilySize = 1;
 
@@ -127,11 +131,24 @@ public partial class Supporter : ObservableObject
     partial void OnMonthlySupportFeeChanged(decimal value) => RecalculateAnnualFee();
     partial void OnSupportMonthsChanged(int value) => RecalculateAnnualFee();
     partial void OnSupporterFamilySizeChanged(int value) => RecalculateAnnualFee();
+    partial void OnCalcFamilySizeChanged(int value) => RecalculateAnnualFee();
+
+    /// <summary>
+    /// 计算用家庭人口 = **低收入人口认定申请表的家庭人口**（2026-11-12 口径裁决：
+    /// 赡养人自己家庭的人口不参与赡养费计算）。
+    /// 来源：① SupporterService 加载时经子查询带出申请表 family_size；② VM 在申请表家庭人口
+    /// 变化/新增赡养人时下发（ApplyCalcFamilySizeToSupporters）。0 = 尚未下发（外部直读实体），
+    /// 此时年费回退按 SupporterFamilySize（赡养人家庭人口）计算，保持历史行为。不落库。
+    /// </summary>
+    [ObservableProperty]
+    private int _calcFamilySize;
 
     private void RecalculateAnnualFee()
     {
         var months = SupportMonths > 0 ? SupportMonths : 1;
-        var size = SupporterFamilySize > 0 ? SupporterFamilySize : 1;
+        // 乘数优先级：申请表家庭人口（新口径）→ 未下发时回退赡养人家庭人口（兼容外部直读路径）
+        var size = CalcFamilySize > 0 ? CalcFamilySize
+            : SupporterFamilySize > 0 ? SupporterFamilySize : 1;
         AnnualSupportFee = Math.Round(MonthlySupportFee * months * size, 2);
         OnPropertyChanged(nameof(AnnualSupportFee));
     }

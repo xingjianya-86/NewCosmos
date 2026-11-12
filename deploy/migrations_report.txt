@@ -1,3 +1,4 @@
-﻿检查时间: 2026-11-08 21:38:36
+﻿检查时间: 2026-11-12 07:10:06
 [PENDING] 20261103_destitute_cancel_filing_categories.sql
 [PENDING] 20261104_archive_photo_name_backfill.sql
+[PENDING] 20261111_template_survey_date_bindings.sql

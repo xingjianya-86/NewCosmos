@@ -851,9 +851,9 @@ public partial class ApplicationFormViewModel
         // Step2 新增的赡养抚养扶养人合并进 Supporters（未点"导入家庭成员"也不丢；赡养费计入收入）
         await MergeSupportMembersIntoSupportersAsync();
 
-        // 赡养人「家庭人口」双编辑口调和（Step2 成员卡 / Step3 赡养明细同列 family_size）：
-        // 必须在 SaveFamilyMembersAsync 之前把两侧对齐，否则 SaveSupporters 后写会覆盖 Step2 输入。
-        ReconcileSupporterFamilySizes();
+        // （2026-11-12 口径变更）原"家庭人口双编辑口调和"（ReconcileSupporterFamilySizes）已废弃：
+        // Step3「家庭人口」改绑申请表 FamilySize（只读自动）、Step2「赡养人家庭人口」单向同步
+        // 进 Supporter（SyncSupporterBasicsFromMember），同列双编辑冲突面不复存在
 
         // 强制重新计算收入，确保汇总字段是最新的
         LoadingMessage = "正在计算收入...";
@@ -1044,54 +1044,6 @@ public partial class ApplicationFormViewModel
     }
 
     /// <summary>
-    /// 赡养人「家庭人口」双编辑口调和：Step2 成员卡 <c>FamilyMember.FamilySize</c> 与
-    /// Step3 赡养明细 <c>Supporter.SupporterFamilySize</c> 落在同一列
-    /// <c>nc_biz_family_members.family_size</c>（Supporter.Id == FamilyMember.Id）。
-    /// 保存顺序 SaveFamilyMembers 先写、SaveSupporters 后写 → 后者覆盖前者，
-    /// 故必须在 SaveFamilyMembersAsync 之前把两侧对齐，否则 Step2 输入被改回。
-    ///
-    /// 「家庭人口」= 赡养人**自己家庭**的人口，与本户认定无关（两侧是同值的两个编辑口）。
-    /// 判定依据 = 加载基线 _loadedFamilySizeByIdCard（只比现值分不清谁改过），纯逻辑在
-    /// Helpers\SupporterFamilySizeReconciler，规则见其类注释与单测。
-    /// 调用点：SaveApplicationInternalAsync 内 MergeSupportMembersIntoSupportersAsync 之后。
-    /// </summary>
-    private void ReconcileSupporterFamilySizes()
-    {
-        if (Supporters.Count == 0 || SupportMembers.Count == 0) return;
-
-        var supporterByIdCard = new Dictionary<string, Supporter>(StringComparer.OrdinalIgnoreCase);
-        foreach (var s in Supporters)
-        {
-            if (!string.IsNullOrWhiteSpace(s.IdCard))
-                supporterByIdCard[s.IdCard.Trim()] = s;   // 重复身份证取首个（与 Merge 同口径）
-        }
-        if (supporterByIdCard.Count == 0) return;
-
-        var changed = 0;
-        foreach (var member in SupportMembers)
-        {
-            if (string.IsNullOrWhiteSpace(member.IdCard)) continue;
-            if (!supporterByIdCard.TryGetValue(member.IdCard.Trim(), out var supporter)) continue;
-
-            var hasBaseline = _loadedFamilySizeByIdCard.TryGetValue(member.IdCard.Trim(), out var baseline);
-            var outcome = SupporterFamilySizeReconciler.Resolve(hasBaseline, baseline, member.FamilySize, supporter.SupporterFamilySize);
-
-            if (!outcome.Changed) continue;
-
-            member.FamilySize = outcome.MemberValue;
-            supporter.SupporterFamilySize = outcome.SupporterValue;
-            changed++;
-        }
-
-        if (changed > 0)
-        {
-            _logger.LogBusiness("赡养人家庭人口调和",
-                ("Changed", changed.ToString()),
-                ("BaselineCount", _loadedFamilySizeByIdCard.Count.ToString()));
-        }
-    }
-
-    /// <summary>
     /// 保存赡养人（失败抛 BusinessException，由外层统一事务回滚）
     /// </summary>
     private async Task SaveSupportersAsync(Dictionary<string, long> memberIdCardToNewId, CancellationToken ct)
@@ -1124,6 +1076,21 @@ public partial class ApplicationFormViewModel
                 string.IsNullOrEmpty(result.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : result.ErrorCode,
                 $"赡养人保存失败: {result.Message}");
         }
+
+        // 新增赡养人 Id 反填（2026-11-12）：SaveFamilyMembersAsync 已跳过赡养行，成员实体的 Id
+        // 只能从 SupporterService 的 RETURNING 回填取——否则同一会话内该成员下次保存仍按 Id=0
+        // 当新行再插，产生重复行
+        foreach (var s in supporters)
+        {
+            if (s.Id <= 0 || string.IsNullOrWhiteSpace(s.IdCard)) continue;
+            var trimmed = s.IdCard.Trim();
+            var member = FamilyMembers.FirstOrDefault(m =>
+                m.MemberCategory == MemberCategoryConstants.SUPPORT
+                && m.IdCard != null
+                && m.IdCard.Trim().Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+            if (member != null && member.Id != s.Id) member.Id = s.Id;
+        }
+
         _logger.LogBusiness("赡养人保存完成", ("Count", supporters.Count));
     }
 
@@ -1267,10 +1234,11 @@ public partial class ApplicationFormViewModel
     {
         var idCardToNewId = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-        // ── 第1步：先软删该申请的全部现有成员（同事务，失败整体回滚，零数据丢失风险）──
-        // 这样做解决"先插后删+AddAsync防重复校验"的逻辑死锁：
-        // 先插旧记录未删 → COUNT(*) > 0 → 校验必失败 → 保存必回滚
-        var deleteResult = await _familyMemberService.DeleteByApplicationIdAsync(_applicationId, ct);
+        // ── 第1步：软删该申请的【非赡养】现有成员（同事务，失败整体回滚，零数据丢失风险）──
+        // 赡养行（member_category='Support'）不参与本方法的删/插：其唯一写入方是 SupporterService
+        //（2026-11-12 修复：原"全删全插 + SupporterService 复活/差集删"互相对打，每次保存产生
+        //  "同刻创建即删除"孤儿行、且有效赡养行在代际间跳变导致赡养费跳变）。
+        var deleteResult = await _familyMemberService.DeleteNonSupportByApplicationIdAsync(_applicationId, ct);
         if (deleteResult.IsFailure)
         {
             _logger.Error($"删除旧家庭成员失败: {deleteResult.Message}");
@@ -1289,9 +1257,18 @@ public partial class ApplicationFormViewModel
         // → AddRangeAsync 多行 VALUES 一次批写（2 条 SQL），id_card→id 映射取自 RETURNING。
         var seenIdCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skippedDuplicates = new List<string>();
+        var supportSkipped = 0;
         var requests = new List<FamilyMemberCreateRequest>(FamilyMembers.Count);
         foreach (var member in FamilyMembers)
         {
+            // 赡养行跳过（2026-11-12）：删/插均由 SupporterService 独占负责，本方法不再触碰——
+            // 原全删全插会与其"复活+差集删"对打，产生孤儿行并使赡养费在代际间跳变
+            if (member.MemberCategory == MemberCategoryConstants.SUPPORT)
+            {
+                supportSkipped++;
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(member.Name) || string.IsNullOrWhiteSpace(member.IdCard))
                 continue;
 
@@ -1329,7 +1306,6 @@ public partial class ApplicationFormViewModel
                 HukouAddress = member.HukouAddress,
                 HomeProvince = member.HomeProvince,
                 HomeCity = member.HomeCity,
-                MedicalSelfPaid12m = member.MedicalSelfPaid12m,
                 HomeDistrict = member.HomeDistrict,
                 HomeTown = member.HomeTown,
                 HomeVillage = member.HomeVillage,
@@ -1353,6 +1329,7 @@ public partial class ApplicationFormViewModel
                 SecondaryDiseaseName = member.SecondaryDisease,
                 DiseaseCode = member.DiseaseCode,
                 IsSevereDisease = member.IsSevereDisease,
+                MedicalSelfPaid12m = member.MedicalSelfPaid12m,
                 IsLaborExempt = member.IsLaborExempt,
                 IsHouseholdHead = member.IsHouseholdHead,
                 MemberCategory = member.MemberCategory,
@@ -1387,7 +1364,10 @@ public partial class ApplicationFormViewModel
         foreach (var (idCard, newId) in insertResult.Value)
             idCardToNewId[idCard] = newId;
 
-        _logger.LogBusiness("家庭成员保存完成", ("Total", FamilyMembers.Count.ToString()), ("Saved", requests.Count.ToString()));
+        _logger.LogBusiness("家庭成员保存完成",
+            ("Total", FamilyMembers.Count.ToString()),
+            ("Saved", requests.Count.ToString()),
+            ("SupportSkipped", supportSkipped.ToString()));   // 赡养行由 SupporterService 保存
         return idCardToNewId;
     }
 

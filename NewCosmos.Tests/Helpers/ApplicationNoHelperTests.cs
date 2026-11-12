@@ -82,4 +82,28 @@ public class ApplicationNoHelperTests
             null, default, null, null, default);
         Assert.Equal(today, resolved);
     }
+
+    // ── 改期联动：入户日期钳进窗口 [新申请日, min(会议日, 今天)] ──
+
+    [Xunit.Fact]
+    public void ClampSurveyDate_低于下限_取下限()
+        // 入户早于新申请日 → 时序倒挂，钳到申请日
+        => Assert.Equal(new DateTime(2026, 11, 8),
+            BatchDeferralHelper.ClampSurveyDate(new DateTime(2026, 11, 6), new DateTime(2026, 11, 8), new DateTime(2026, 11, 9)));
+
+    [Xunit.Fact]
+    public void ClampSurveyDate_高于上限_取上限()
+        // 入户晚于 min(会议日, 今天) → 钳到上限（保 Step4 公示/不倒填未来校验通过）
+        => Assert.Equal(new DateTime(2026, 11, 9),
+            BatchDeferralHelper.ClampSurveyDate(new DateTime(2026, 11, 11), new DateTime(2026, 11, 6), new DateTime(2026, 11, 9)));
+
+    [Xunit.Fact]
+    public void ClampSurveyDate_窗口内_原样保留()
+        => Assert.Equal(new DateTime(2026, 11, 7),
+            BatchDeferralHelper.ClampSurveyDate(new DateTime(2026, 11, 7), new DateTime(2026, 11, 6), new DateTime(2026, 11, 9)));
+
+    [Xunit.Fact]
+    public void ClampSurveyDate_窗口倒挂_防御取下限()
+        => Assert.Equal(new DateTime(2026, 11, 8),
+            BatchDeferralHelper.ClampSurveyDate(new DateTime(2026, 11, 7), new DateTime(2026, 11, 8), new DateTime(2026, 11, 6)));
 }

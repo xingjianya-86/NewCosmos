@@ -87,4 +87,17 @@ public static class BatchDeferralHelper
     /// </summary>
     public static bool IsDeferred(TimelineResult baseLine, TimelineResult batchLine)
         => (baseLine.Year, baseLine.Month) != (batchLine.Year, batchLine.Month);
+
+    /// <summary>
+    /// 入户调查日期钳进窗口 [minDate, maxDate]（改期联动用，2026-11-11）：
+    /// 低于下限取下限（不能早于新申请日——Step4 时序倒挂校验）；
+    /// 高于上限取上限（不能晚于 min(会议日, 今天)——Step4 公示/不倒填未来校验）；
+    /// 窗口倒挂（防御，理论不发生）以 minDate 为准。
+    /// </summary>
+    public static DateTime ClampSurveyDate(DateTime current, DateTime minDate, DateTime maxDate)
+    {
+        if (maxDate < minDate) return minDate;
+        if (current < minDate) return minDate;
+        return current > maxDate ? maxDate : current;
+    }
 }

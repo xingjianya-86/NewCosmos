@@ -9,6 +9,7 @@ using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.AssetVerification;
 using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.StateMachine;
+using NewCosmos.Services.Utilities;
 
 namespace NewCosmos.Services.Domain.SocialAssistance;
 
@@ -26,6 +27,7 @@ public class ApplicationService : BaseService, IApplicationService
     private readonly IClassificationService _classificationService;
     private readonly IGuaranteeAmountService _guaranteeAmountService;
     private readonly Services.Core.IApplicationStatusService _statusService;
+    private readonly IBusinessTimelineService _timelineService;
 
     /// <summary>「已完结档案」状态过滤集（已出草稿态，防 Draft/Refused 异常行混入）</summary>
     private static readonly List<string> ArchivedStatusFilter = new()
@@ -39,7 +41,8 @@ public class ApplicationService : BaseService, IApplicationService
         IElderlyApplicationService elderlyApplicationService,
         IClassificationService classificationService,
         IGuaranteeAmountService guaranteeAmountService,
-        Services.Core.IApplicationStatusService statusService) : base(logger)
+        Services.Core.IApplicationStatusService statusService,
+        IBusinessTimelineService timelineService) : base(logger)
     {
         _db = db;
         _pdfVerificationService = pdfVerificationService;
@@ -47,6 +50,7 @@ public class ApplicationService : BaseService, IApplicationService
         _classificationService = classificationService;
         _guaranteeAmountService = guaranteeAmountService;
         _statusService = statusService;
+        _timelineService = timelineService;
     }
 
     /// <summary>
@@ -416,11 +420,11 @@ public class ApplicationService : BaseService, IApplicationService
             SetIfChanged("secondary_disease_name", request.SecondaryDiseaseName, app.SecondaryDiseaseName);
             SetIfChanged("disease_code", request.DiseaseCode, app.DiseaseCode);
             SetIfChanged("is_severe_disease", request.IsSevereDisease, app.IsSevereDisease);
+            SetIfChanged("medical_self_paid_12m", request.MedicalSelfPaid12m, app.MedicalSelfPaid12m);
             SetIfChanged("disability_type", request.DisabilityType, app.DisabilityType);
             SetIfChanged("disability_level", request.DisabilityLevel, app.DisabilityLevel);
             SetIfChanged("health_status", request.HealthStatus, app.HealthStatus);
             SetIfChanged("employment_status", request.EmploymentStatus, app.EmploymentStatus);
-            SetIfChanged("medical_self_paid_12m", request.MedicalSelfPaid12m, app.MedicalSelfPaid12m);
             SetIfChanged("work_unit", request.WorkUnit, app.WorkUnit);
             SetIfChanged("income_source", request.IncomeSource, app.IncomeSource);
             SetIfChanged("bank_name", request.BankName, app.BankName);
@@ -589,11 +593,11 @@ public class ApplicationService : BaseService, IApplicationService
             SecondaryDiseaseName = application.SecondaryDiseaseName,
             DiseaseCode = application.DiseaseCode,
             IsSevereDisease = application.IsSevereDisease,
+            MedicalSelfPaid12m = application.MedicalSelfPaid12m,
             EmploymentStatus = application.EmploymentStatus,
             WorkUnit = application.WorkUnit,
             IncomeSource = application.IncomeSource,
             BankName = application.BankName ?? string.Empty,
-            MedicalSelfPaid12m = application.MedicalSelfPaid12m,
             BankAccount = application.BankAccount ?? string.Empty,
             ConfirmedFamilySize = application.ConfirmedFamilySize,
             IsSingleRescue = application.IsSingleRescue,
@@ -883,7 +887,7 @@ public class ApplicationService : BaseService, IApplicationService
         return Result.Success(appNo);
     }
 
-    public async Task<Result<string>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default)
+    public async Task<Result<ChangeApplicationDateResult>> ChangeApplicationDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default)
     {
         LogInfo($"修改申请日期: Id={applicationId}, NewDate={newDate:yyyy-MM-dd}");
 
@@ -895,14 +899,14 @@ public class ApplicationService : BaseService, IApplicationService
             if (appResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(appResult.ErrorCode!, appResult.Message!);
+                return Result.Failure<ChangeApplicationDateResult>(appResult.ErrorCode!, appResult.Message!);
             }
 
             var app = appResult.Value;
             if (app == null)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
+                return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.APPLICATION_NOT_FOUND, "申请不存在");
             }
 
             // 状态闸：仅草稿 Tab（status=Draft 且 step<5，与工作流草稿 Tab 同口径；
@@ -915,7 +919,7 @@ public class ApplicationService : BaseService, IApplicationService
                 var message = string.Equals(app.Status, ApplicationStatusCodes.DRAFT, StringComparison.Ordinal)
                     ? "已建档档案不可修改申请日期，请先退回草稿"
                     : "当前状态不允许修改申请日期（仅草稿可改）";
-                return Result.Failure<string>(ErrorCodes.INVALID_TRANSITION, message);
+                return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.INVALID_TRANSITION, message);
             }
 
             // 范围闸：≤ 今天 且 不早于当年 1 月 1 日（跨月允许——跨月正是改期的目的；未来日/往年禁止）
@@ -924,13 +928,13 @@ public class ApplicationService : BaseService, IApplicationService
             if (newDay > today)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED,
+                return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.VALIDATION_FAILED,
                     $"申请日期 {newDay:yyyy-MM-dd} 不能晚于今天 {today:yyyy-MM-dd}");
             }
             if (newDay < new DateTime(today.Year, 1, 1))
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED,
+                return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.VALIDATION_FAILED,
                     $"申请日期不能早于 {today.Year}-01-01");
             }
 
@@ -939,7 +943,7 @@ public class ApplicationService : BaseService, IApplicationService
             if (newDay == oldDay)
             {
                 await tx.CommitAsync(ct);
-                return Result.Success(oldNo);
+                return Result.Success(new ChangeApplicationDateResult(oldNo, null));
             }
 
             // 目标日取号：前缀内 MAX+1（同 GetNextApplicationNoAsync 算法），排除自身防自撞；
@@ -952,7 +956,7 @@ public class ApplicationService : BaseService, IApplicationService
             if (seqResult.IsFailure)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(seqResult.ErrorCode!, seqResult.Message!);
+                return Result.Failure<ChangeApplicationDateResult>(seqResult.ErrorCode!, seqResult.Message!);
             }
 
             var newNo = ApplicationNoHelper.BuildNo(newDay, (int)seqResult.Value);
@@ -970,25 +974,74 @@ public class ApplicationService : BaseService, IApplicationService
             {
                 await tx.RollbackAsync(ct);
                 if (IsUniqueViolation(updateResult))
-                    return Result.Failure<string>(ErrorCodes.DB_UNIQUE_VIOLATION,
+                    return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.DB_UNIQUE_VIOLATION,
                         "申请编号撞号（同日序号被并发占用），请重试");
-                return Result.Failure<string>(updateResult.ErrorCode!, updateResult.Message!);
+                return Result.Failure<ChangeApplicationDateResult>(updateResult.ErrorCode!, updateResult.Message!);
             }
 
             if (updateResult.Value == 0)
             {
                 await tx.RollbackAsync(ct);
-                return Result.Failure<string>(ErrorCodes.CONCURRENCY_CONFLICT,
+                return Result.Failure<ChangeApplicationDateResult>(ErrorCodes.CONCURRENCY_CONFLICT,
                     "该档案正在被其他操作修改，请刷新后重试");
+            }
+
+            // ── 入户调查日期联动（2026-11-11）────────────────────────────────
+            // 批次锚点 = 入户日期优先：只改申请日期、入户日期不动 → 批次/顺延提示不变（实测反馈）。
+            // 同事务把入户日期钳进窗口 [新申请日, min(公示前一工作日(=会议日), 今天)]——
+            // 即 Step4 三重校验（≥申请日 / ≤今天 / ≤会议日）的合法区间，钳完必然可保存。
+            // 例外：导入库建档档（source_type=ImportedArchive）调查日=纳入时间铁律（Step4 锁定且校验豁免），不动；
+            //       该档无入户调查记录时无可钳对象，跳过。
+            DateTime? clampedSurveyDate = null;
+            if (!string.Equals(app.SourceType, ChainTypeConstants.IMPORTED_ARCHIVE, StringComparison.OrdinalIgnoreCase))
+            {
+                var surveyRowSql = @"SELECT survey_date FROM nc_biz_household_surveys
+                                     WHERE application_id = $1 AND deleted_at IS NULL
+                                     ORDER BY id DESC LIMIT 1";
+                var surveyRows = await _db.QueryAsync<SurveyDateRow>(surveyRowSql, ct, applicationId);
+                if (surveyRows.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeApplicationDateResult>(surveyRows.ErrorCode!, surveyRows.Message!);
+                }
+
+                var currentSurvey = (surveyRows.Value ?? new List<SurveyDateRow>()).FirstOrDefault()?.SurveyDate;
+                if (currentSurvey.HasValue)
+                {
+                    var bLine = _timelineService.GetTimelineForApplicationDate(newDay, TimelineType.BusinessProcess);
+                    var upper = _timelineService.GetPrePublicityWorkday(bLine);
+                    if (upper > today) upper = today;
+                    if (upper < newDay) upper = newDay;   // 防御：窗口倒挂钳回申请日（理论不发生）
+
+                    var targetSurvey = BatchDeferralHelper.ClampSurveyDate(currentSurvey.Value.Date, newDay, upper);
+                    if (targetSurvey != currentSurvey.Value.Date)
+                    {
+                        var surveyUpdateSql = @"UPDATE nc_biz_household_surveys
+                                                SET survey_date = $1, updated_at = NOW()
+                                                WHERE application_id = $2 AND deleted_at IS NULL";
+                        var surveyUpdate = await _db.ExecuteNonQueryAsync(surveyUpdateSql, ct,
+                            targetSurvey, applicationId);
+                        if (surveyUpdate.IsFailure)
+                        {
+                            await tx.RollbackAsync(ct);
+                            return Result.Failure<ChangeApplicationDateResult>(surveyUpdate.ErrorCode!, surveyUpdate.Message!);
+                        }
+                        LogInfo($"改期联动调整入户调查日期: Id={applicationId}, {currentSurvey.Value.Date:yyyy-MM-dd} → {targetSurvey:yyyy-MM-dd}");
+                        clampedSurveyDate = targetSurvey;   // 仅在实际改动时返回，供 UI 回写与提示
+                    }
+                }
             }
 
             // 审计留痕（列口径同 ApplicationStatusService.WriteAuditAsync；失败不阻断，同其语义）
             var auditSql = @"INSERT INTO nc_biz_application_logs
                                   (application_id, action, action_detail, old_value, new_value, operator_name, operated_at)
                              VALUES ($1, $2, $3, $4, $5, $6, NOW())";
+            var auditDetail = $"申请日期 {oldDay:yyyy-MM-dd} → {newDay:yyyy-MM-dd}（编号日期段与创建时间同改，公示/卷号/批次随锚点重算）"
+                + (clampedSurveyDate.HasValue
+                    ? $"；入户调查日期同步为 {clampedSurveyDate:yyyy-MM-dd}（窗口 [新申请日, min(会议日, 今天)]）"
+                    : string.Empty);
             var auditResult = await _db.ExecuteNonQueryAsync(auditSql, ct,
-                applicationId, "修改申请日期",
-                $"申请日期 {oldDay:yyyy-MM-dd} → {newDay:yyyy-MM-dd}（编号日期段与创建时间同改，公示/卷号/批次随锚点重算）",
+                applicationId, "修改申请日期", auditDetail,
                 $"{oldNo} / {oldDay:yyyy-MM-dd}", $"{newNo} / {newDay:yyyy-MM-dd}",
                 string.IsNullOrEmpty(operatorName) ? "System" : operatorName);
             if (auditResult.IsFailure)
@@ -996,14 +1049,20 @@ public class ApplicationService : BaseService, IApplicationService
 
             await tx.CommitAsync(ct);
             LogInfo($"申请日期修改成功: Id={applicationId}, {oldNo} → {newNo}");
-            return Result.Success(newNo);
+            return Result.Success(new ChangeApplicationDateResult(newNo, clampedSurveyDate));
         }
         catch (Exception ex)
         {
             await tx.RollbackAsync(ct);
             LogException(ex, "修改申请日期失败");
-            return Result.FromException<string>(ex);
+            return Result.FromException<ChangeApplicationDateResult>(ex);
         }
+    }
+
+    /// <summary>入户调查日期批查投影（仅取 survey_date 一列，供改期联动钳制）</summary>
+    private sealed class SurveyDateRow
+    {
+        public DateTime? SurveyDate { get; set; }
     }
 
     /// <summary>

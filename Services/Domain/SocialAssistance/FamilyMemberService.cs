@@ -208,7 +208,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                 ${40},${41},${42},${43},${44},${45},${46},${47},${48},${49},${50}, NOW(), NOW())";
 
             var values = new List<string>(requests.Count);
-            var args = new List<object>(requests.Count * 50);
+            var args = new List<object>(requests.Count * 51);
             foreach (var r in requests)
             {
                 var baseIdx = args.Count;
@@ -447,6 +447,25 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             LogError($"删除家庭成员失败: {ex.Message}");
             return Result.Failure<int>(ErrorCodes.DB_CONNECTION_FAILED, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// 软删除申请的【非赡养】家庭成员（户主+共同生活），返回删除行数（2026-11-12）。
+    /// 表单保存链专用：赡养行（member_category='Support'）由 SupporterService 独占写入
+    ///（upsert + 差集删），本方法不得触碰——原"全删全插"与其互打会产生同刻创建即删除的孤儿行。
+    /// </summary>
+    public async Task<Result<int>> DeleteNonSupportByApplicationIdAsync(long applicationId, CancellationToken ct = default)
+    {
+        LogInfo($"软删非赡养成员: ApplicationId={applicationId}");
+
+        var sql = @"UPDATE nc_biz_family_members SET deleted_at = NOW()
+                    WHERE application_id = $1 AND member_category <> 'Support' AND deleted_at IS NULL";
+        var deleteResult = await _db.ExecuteNonQueryAsync(sql, ct, applicationId);
+        if (deleteResult.IsFailure)
+            return Result.Failure<int>(deleteResult.ErrorCode!, deleteResult.Message!);
+
+        LogInfo($"软删非赡养成员完成: 删除行数={deleteResult.Value}");
+        return Result.Success(deleteResult.Value);
     }
 
     /// <summary>

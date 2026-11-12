@@ -802,8 +802,10 @@
                                                 <Entry Text="{Binding SupportMonths}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
                                             </VerticalStackLayout>
                                             <VerticalStackLayout Grid.Column="2" Spacing="2">
-                                                <Label Text="家庭人数" Style="{StaticResource FormFieldLabelStyle}"/>
-                                                <Entry Text="{Binding SupporterFamilySize}" Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                                                <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}"/>
+                                                <!-- 2026-11-12 口径：= 申请表家庭人口（只读自动，年费乘数）；赡养人自家人口在 Step2 编辑 -->
+                                                <Entry Text="{Binding BindingContext.FamilySize, Source={x:Reference StepRoot}}"
+                                                       IsEnabled="False" Style="{StaticResource FormFieldEntryStyle}"/>
                                             </VerticalStackLayout>
                                         </Grid>
                                         <!-- 月收入（2026-11 P3：与 Step2 卡同列 monthly_income_capacity，保存时按加载基线双向同步） -->

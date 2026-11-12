@@ -352,6 +352,19 @@ public partial class ApplicationFormViewModel
     private void UpdateFamilySize()
     {
         FamilySize = SharedLivingMembers.Count + 1; // +1 是户主
+        // FamilySize 变化经 OnFamilySizeChanged 钩子自动下发（ApplyCalcFamilySizeToSupporters）
+    }
+
+    /// <summary>
+    /// 申请表家庭人口 → 全部赡养人的年费乘数下发（2026-11-12 口径：赡养费年值 =
+    /// 月费 × 月数 × 申请表家庭人口，与赡养人自己家的人口无关）。
+    /// 触发点：FamilySize 变化（OnFamilySizeChanged）、赡养人加载完成后、新增/构建赡养人时。
+    /// </summary>
+    private void ApplyCalcFamilySizeToSupporters()
+    {
+        var size = FamilySize > 0 ? FamilySize : 1;
+        foreach (var supporter in Supporters)
+            supporter.CalcFamilySize = size;   // 值未变不触发事件；变化时实体内自动重算年费
     }
 
     [RelayCommand]
@@ -479,6 +492,8 @@ public partial class ApplicationFormViewModel
             // 原硬编码 1 会把 Step2 输入覆盖回 1——family_size 与 Supporter 同列，
             // 保存顺序 SaveFamilyMembers → SaveSupporters，后者后写覆盖前者。
             SupporterFamilySize = member.FamilySize ?? 1,
+            // 年费乘数 = 申请表家庭人口（2026-11-12 口径：赡养人自家人口不参与计算）
+            CalcFamilySize = FamilySize > 0 ? FamilySize : 1,
             IsSupportAbility = hasSupportAbility,
             Gender = member.Gender,
             Age = member.Age,
@@ -552,7 +567,9 @@ public partial class ApplicationFormViewModel
     /// </summary>
     private void SyncSupporterBasicsFromMember(Supporter supporter, FamilyMember member)
     {
-        if (member.Id > 0) supporter.Id = member.Id;
+        // 仅在 Supporter 尚无有效 Id 时采纳成员 Id（2026-11-12：SaveFamilyMembers 已跳过 Support 行，
+        // 双侧同源同 id；原盲改会把更新目标切到别的代际行——赡养费跳变的根子之一）
+        if (supporter.Id <= 0 && member.Id > 0) supporter.Id = member.Id;
         supporter.ApplicationId = _applicationId;
         supporter.Name = member.Name ?? string.Empty;
         supporter.IdCard = member.IdCard ?? string.Empty;
@@ -572,6 +589,10 @@ public partial class ApplicationFormViewModel
         supporter.MainIncomeSource = member.MainIncomeSource ?? string.Empty;
         supporter.WorkCapacity = member.WorkCapacity ?? string.Empty;
         supporter.AnnualIncome = member.AnnualIncome;
+        // 赡养人家庭人口（信息字段）单向同步：Step2 成员卡是唯一编辑口（2026-11-12 口径），
+        // Step3「家庭人口」已改绑申请表 FamilySize，不再产生同列双编辑冲突（原 reconciler 因此废弃）
+        if (member.FamilySize is int ownSize && ownSize > 0)
+            supporter.SupporterFamilySize = ownSize;
         supporter.HomeProvince = member.HomeProvince ?? string.Empty;
         supporter.HomeCity = member.HomeCity ?? string.Empty;
         supporter.HomeDistrict = member.HomeDistrict ?? string.Empty;
@@ -622,6 +643,7 @@ public partial class ApplicationFormViewModel
             MonthlySupportFee = defaultMonthlyFee,
             SupportMonths = 12,
             SupporterFamilySize = 1,
+            CalcFamilySize = FamilySize > 0 ? FamilySize : 1, // 年费乘数 = 申请表家庭人口（2026-11-12 口径）
             IsSupportAbility = true,
             Relationship = "",
             SelectedRelationship = null

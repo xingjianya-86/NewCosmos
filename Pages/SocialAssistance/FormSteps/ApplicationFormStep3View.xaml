@@ -873,12 +873,14 @@
                                             <Entry Grid.Column="1" Text="{Binding MonthlyIncomeCapacity}" HeightRequest="32" FontSize="17" Keyboard="Numeric" BackgroundColor="Transparent"/>
                                             <Label Grid.Column="2" Text="元" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                         </Grid>
-                                        <!-- 月数 + 家庭人数 -->
+                                        <!-- 月数 + 家庭人口（2026-11-12 口径：家庭人口 = 低收入认定申请表的家庭人口，
+                                             只读自动、年赡养费乘数用它；赡养人自己家的人口在 Step2 成员卡编辑、不参与计算） -->
                                         <Grid ColumnDefinitions="Auto,*,Auto,Auto,*,Auto" ColumnSpacing="4">
                                             <Label Text="月数:" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
                                             <Entry Grid.Column="1" Text="{Binding SupportMonths}" HeightRequest="32" FontSize="17" Keyboard="Numeric" BackgroundColor="Transparent"/>
-                                            <Label Grid.Column="3" Text="家庭人数:" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
-                                            <Entry Grid.Column="4" Text="{Binding SupporterFamilySize}" HeightRequest="32" FontSize="17" Keyboard="Numeric" BackgroundColor="Transparent"/>
+                                            <Label Grid.Column="3" Text="家庭人口:" FontSize="16" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}"/>
+                                            <Entry Grid.Column="4" Text="{Binding BindingContext.FamilySize, Source={x:Reference StepRoot}}"
+                                                   IsEnabled="False" HeightRequest="32" FontSize="17" BackgroundColor="Transparent"/>
                                         </Grid>
                                         <!-- 年赡养费（自动计算，只读） -->
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
