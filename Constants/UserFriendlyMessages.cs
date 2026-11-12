@@ -99,6 +99,9 @@ public static class UserFriendlyMessages
         [ErrorCodes.OCR_RECOGNIZE_FAILED] = "识别服务处理失败，请稍后重试",
         [ErrorCodes.OCR_NO_FIELD] = "未识别出有效字段，请正对证件、保证光线充足后重拍，或手动录入",
         [ErrorCodes.OCR_ASSIGN_INCOMPLETE] = "还有识别记录未选择去向，请逐条选择或标记不使用",
+        [ErrorCodes.AI_SERVICE_UNREACHABLE] = "AI 判定服务未连接，不影响填写——可自行勾选是否重病",
+        [ErrorCodes.AI_TIMEOUT] = "AI 判定响应超时，可稍后重试或自行勾选是否重病",
+        [ErrorCodes.AI_JUDGE_FAILED] = "AI 判定失败，可自行勾选是否重病",
 
         #endregion
 

@@ -212,6 +212,22 @@
                     <Entry Text="{Binding DiseaseNameText}" Placeholder="输入疾病编码自动带出，可手工修改"
                            Style="{StaticResource FormFieldEntryStyle}"/>
                 </VerticalStackLayout>
+                <!-- AI 重病判定建议条（verdict=severe 才显示；点击忽略） -->
+                <Label Text="{Binding AiSeveritySuggestionText}"
+                       IsVisible="{Binding HasAiSeveritySuggestion}"
+                       FontSize="12" TextColor="{StaticResource Primary}"
+                       Margin="0,4,0,0" LineBreakMode="WordWrap">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnAiSuggestionDismissed"/>
+                    </Label.GestureRecognizers>
+                </Label>
+                <!-- 前12个月个人医疗自付（费用口径重病判定输入，第六十八条） -->
+                <VerticalStackLayout Spacing="4" Margin="0,6,0,0">
+                    <Label Text="前12个月个人医疗自付累计（元）" Style="{StaticResource FormFieldLabelStyle}"/>
+                    <Entry Text="{Binding MedicalSelfPaid12m}"
+                           Placeholder="超上年度人均可支配收入按费用口径认定重病"
+                           Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </Border>
 

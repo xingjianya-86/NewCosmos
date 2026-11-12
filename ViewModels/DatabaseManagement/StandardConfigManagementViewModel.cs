@@ -141,6 +141,7 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
         Categories.Add(new StandardCategoryView("农业补贴价格", "LandFertilityPrice", "SoybeanPrice", "CornPrice", "RotationPrice", "SurfaceWaterRicePrice", "GroundWaterRicePrice"));
         Categories.Add(new StandardCategoryView("高龄津贴标准", "ELDERLY_SUBSIDY"));
         Categories.Add(new StandardCategoryView("临时救助小额定额", "TEMP_RELIEF_SMALL"));
+        Categories.Add(new StandardCategoryView("重病费用口径阈值", "SevereDiseaseCostThreshold"));
     }
 
     public async Task InitializePermissionsAsync(int userId)

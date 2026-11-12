@@ -252,7 +252,8 @@ public class ApplicationService : BaseService, IApplicationService
               household_monthly_guarantee_amount, person_category_protection_total_amount,
               caregiver_subsidy_amount, total_guarantee_amount,
               is_special_approval, special_approval_id,
-              status, current_step, created_by, created_at, updated_at, bank_name, bank_account)
+              status, current_step, created_by, created_at, updated_at, bank_name, bank_account,
+              medical_self_paid_12m)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
                     $11,$12,$13,$14,$15,$16,$17,$18,
                     $19,$20,$21,$22,$23,$24,$25,$26,
@@ -261,7 +262,7 @@ public class ApplicationService : BaseService, IApplicationService
                     $44,$45,$46,$47,$48,$49,$50,$51,$52,$53,
                     $54,$55,$56,$57,$58,$59,$60,$61,$62,$63,
                     $64,$65,$66,$67,$68,$69,$70,$71,$72,$73,
-                    $74,$75,$76,$77,$78,$79,$80)
+                    $74,$75,$76,$77,$78,$79,$80,$81)
             RETURNING id";
 
             var insertResult = await _db.ExecuteScalarAsync(sql, ct,
@@ -299,7 +300,8 @@ public class ApplicationService : BaseService, IApplicationService
                 application.CreatedBy ?? "System",
                 application.CreatedAt == default ? DateTime.Now : application.CreatedAt,
                 DateTime.Now,
-                application.BankName ?? string.Empty, application.BankAccount ?? string.Empty);
+                application.BankName ?? string.Empty, application.BankAccount ?? string.Empty,
+                (object?)application.MedicalSelfPaid12m);
 
             if (insertResult.IsFailure)
             {
@@ -418,6 +420,7 @@ public class ApplicationService : BaseService, IApplicationService
             SetIfChanged("disability_level", request.DisabilityLevel, app.DisabilityLevel);
             SetIfChanged("health_status", request.HealthStatus, app.HealthStatus);
             SetIfChanged("employment_status", request.EmploymentStatus, app.EmploymentStatus);
+            SetIfChanged("medical_self_paid_12m", request.MedicalSelfPaid12m, app.MedicalSelfPaid12m);
             SetIfChanged("work_unit", request.WorkUnit, app.WorkUnit);
             SetIfChanged("income_source", request.IncomeSource, app.IncomeSource);
             SetIfChanged("bank_name", request.BankName, app.BankName);
@@ -590,6 +593,7 @@ public class ApplicationService : BaseService, IApplicationService
             WorkUnit = application.WorkUnit,
             IncomeSource = application.IncomeSource,
             BankName = application.BankName ?? string.Empty,
+            MedicalSelfPaid12m = application.MedicalSelfPaid12m,
             BankAccount = application.BankAccount ?? string.Empty,
             ConfirmedFamilySize = application.ConfirmedFamilySize,
             IsSingleRescue = application.IsSingleRescue,
@@ -1284,9 +1288,9 @@ public class ApplicationService : BaseService, IApplicationService
                  hukou_province, hukou_city, hukou_district, hukou_town,
                  employment_status, work_unit, main_income_source, annual_income,
                  annual_support_fee, is_support_ability, monthly_support_fee, support_months, family_size,
-                 person_type, monthly_income_capacity,
+                 person_type, monthly_income_capacity, medical_self_paid_12m,
                  created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,NOW(),NOW())";
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,NOW(),NOW())";
 
             // 户主成员插入失败必须让整个单人保创建失败回滚（此前结果被丢弃，产生无成员的孤儿申请）
             await ExecOrThrowAsync(_db, memberInsertSql, ct,
@@ -1301,7 +1305,8 @@ public class ApplicationService : BaseService, IApplicationService
                 member.HukouProvince ?? "", member.HukouCity ?? "", member.HukouDistrict ?? "", member.HukouTown ?? "",
                 member.EmploymentStatus ?? "", member.WorkUnit ?? "", member.MainIncomeSource ?? "", member.AnnualIncome,
                 member.AnnualSupportFee, member.IsSupportAbility, member.MonthlySupportFee, member.SupportMonths, member.FamilySize,
-                member.PersonType ?? "", member.MonthlyIncomeCapacity);
+                member.PersonType ?? "", member.MonthlyIncomeCapacity,
+                (object?)member.MedicalSelfPaid12m);
 
             // 复制经济信息（务工收入、经营收入等）
             await CopyEconomicDataAsync(sourceApplicationId, newAppId, ct);

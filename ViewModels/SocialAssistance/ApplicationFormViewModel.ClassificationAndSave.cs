@@ -1329,6 +1329,7 @@ public partial class ApplicationFormViewModel
                 HukouAddress = member.HukouAddress,
                 HomeProvince = member.HomeProvince,
                 HomeCity = member.HomeCity,
+                MedicalSelfPaid12m = member.MedicalSelfPaid12m,
                 HomeDistrict = member.HomeDistrict,
                 HomeTown = member.HomeTown,
                 HomeVillage = member.HomeVillage,

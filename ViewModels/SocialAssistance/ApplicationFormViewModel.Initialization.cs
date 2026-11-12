@@ -812,7 +812,16 @@ public partial class ApplicationFormViewModel
 
                 // 恢复疾病编码 / 是否重病 / 二级疾病文本（重病勾选联动在 OnIsSevereDiseaseChanged 中生效）
                 DiseaseCode = app.DiseaseCode ?? string.Empty;
-                IsSevereDisease = app.IsSevereDisease;
+                _suppressSevereRejectTrack = true; // 加载恢复赋值不算"用户否决 AI 自动勾选"
+                try
+                {
+                    IsSevereDisease = app.IsSevereDisease;
+                }
+                finally
+                {
+                    _suppressSevereRejectTrack = false;
+                }
+                MedicalSelfPaid12m = app.MedicalSelfPaid12m; // 恢复费用口径输入（变化触发费用判定，闸门防误勾）
                 DiseaseNameText = app.SecondaryDiseaseName ?? string.Empty;
 
                 // ── 第4步：验证映射结果，输出诊断日志 ──
@@ -2136,6 +2145,12 @@ public partial class ApplicationFormViewModel
             SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.SEVERE_DISEASE);
         else if (SelectedHealthStatusObj?.Key == HealthStatusConstants.SEVERE_DISEASE)
             SelectedHealthStatusObj = HealthStatusOptions.FirstOrDefault(o => o.Key == HealthStatusConstants.HEALTHY);
+
+        // 人工否决跟踪：true→false 只可能来自用户（AI 自动勾选只勾不取消）；
+        // 加载恢复期间抑制（_suppressSevereRejectTrack）。用户取消过一次后本会话
+        // 不再自动勾选（ShouldAutoCheck 闸门，人工优先——2026-11-11 补测定稿）
+        if (!value && !_suppressSevereRejectTrack)
+            _severeDiseaseAutoCheckRejected = true;
     }
 
     /// <summary>
@@ -2144,7 +2159,11 @@ public partial class ApplicationFormViewModel
     /// </summary>
     public void ApplyApplicantDiseaseCode(string? code)
     {
-        if (string.IsNullOrWhiteSpace(code)) return;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            HasAiSeveritySuggestion = false; // 清空输入即失效旧建议
+            return;
+        }
         if (!Helpers.Icd10Catalog.TryGetName(code, out var name)) return;
 
         DiseaseNameText = name;
@@ -2153,6 +2172,9 @@ public partial class ApplicationFormViewModel
         var match = DiseaseCategoryOptions.FirstOrDefault(o => o.Key == category);
         if (match != null && SelectedDiseaseCategoryObj?.Key != match.Key)
             SelectedDiseaseCategoryObj = match; // 触发级联加载 + UpdateHealthStatus
+
+        // AI 重病判定（P1）：确定性秒出；未命中走缓存/服务端 LLM 消抖管线（详见 ApplicationFormViewModel.AiJudgment.cs）
+        RequestApplicantAiJudgment(code, name);
     }
 
     #endregion

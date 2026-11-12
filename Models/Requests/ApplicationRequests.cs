@@ -85,6 +85,9 @@ public class ApplicationUpdateRequest
     public string SecondaryDiseaseName { get; set; } = string.Empty;
     public string DiseaseCode { get; set; } = string.Empty;
     public bool IsSevereDisease { get; set; }
+
+    /// <summary>前12个月个人医疗自付累计（元）——费用口径重病判定输入（黑龙政办法第六十八条）；空=未录入</summary>
+    public decimal? MedicalSelfPaid12m { get; set; }
     public string EmploymentStatus { get; set; } = string.Empty;
     public string WorkUnit { get; set; } = string.Empty;
     public string IncomeSource { get; set; } = string.Empty;
@@ -170,6 +173,9 @@ public class FamilyMemberCreateRequest
     public string DiseaseCode { get; set; } = string.Empty;
     public bool IsSevereDisease { get; set; }
 
+    /// <summary>前12个月个人医疗自付累计（元）——费用口径重病判定输入（黑龙政办法第六十八条）；空=未录入</summary>
+    public decimal? MedicalSelfPaid12m { get; set; }
+
     /// <summary>免于劳动力判定（因照顾本户重病/重残亲属）</summary>
     public bool IsLaborExempt { get; set; }
 
@@ -247,6 +253,9 @@ public class FamilyMemberUpdateRequest
     public string SecondaryDiseaseName { get; set; } = string.Empty;
     public string DiseaseCode { get; set; } = string.Empty;
     public bool IsSevereDisease { get; set; }
+
+    /// <summary>前12个月个人医疗自付累计（元）——费用口径重病判定输入（黑龙政办法第六十八条）；空=未录入</summary>
+    public decimal? MedicalSelfPaid12m { get; set; }
 
     /// <summary>免于劳动力判定（因照顾本户重病/重残亲属）</summary>
     public bool IsLaborExempt { get; set; }

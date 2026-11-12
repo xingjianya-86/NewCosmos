@@ -8,6 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 
 COPY ocr_api.py .
+COPY severe_disease_catalog.json .
 
 # 8788 与现有容器端口无冲突（实测占用：22/80/443/888/3000/3001/3009/3180/3443/5140/5432/6099/6333/7979/8765/8790/9993/10000/46823）
 EXPOSE 8788

@@ -320,6 +320,19 @@ public static class ErrorCodes
 
     #endregion
 
+    #region AI 重病判定 (AI_xxx)
+
+    /// <summary>AI 判定服务不可达（内网服务未启动、地址未配置或模型不可用）</summary>
+    public const string AI_SERVICE_UNREACHABLE = "AI_SERVICE_UNREACHABLE";
+
+    /// <summary>AI 判定超时（模型冷启动或 OCR/AI 抢模型换入换出）</summary>
+    public const string AI_TIMEOUT = "AI_TIMEOUT";
+
+    /// <summary>服务端 AI 判定失败（请求无效、模型异常或响应格式不符）</summary>
+    public const string AI_JUDGE_FAILED = "AI_JUDGE_FAILED";
+
+    #endregion
+
     #region 操作状态 (OP_xxx)
 
     /// <summary>操作进行中</summary>

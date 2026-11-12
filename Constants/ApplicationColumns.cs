@@ -12,7 +12,7 @@ public static class ApplicationColumns
         "marital_status, education_level, political_status, hukou_address, hukou_city_id, hukou_county_id, hukou_town_id, hukou_village_id, " +
         "disability_card_no, province, city_id, county_id, town_id, village_id, city, district, " +
         "town, community, address, bank_name, bank_account, physical_condition, disease_name, secondary_disease_name, " +
-        "disease_code, is_severe_disease, disability_type, disability_level, health_status, employment_status, work_unit, income_source, " +
+        "disease_code, is_severe_disease, medical_self_paid_12m, disability_type, disability_level, health_status, employment_status, work_unit, income_source, " +
         "is_single_rescue, support_mode, application_reason, application_reason_detail, caregiver_type, destitute_support_type, support_institution_id, family_size, " +
         "confirmed_family_size, work_income_total, business_income_total, property_income_total, transfer_income_total, other_income_total, total_family_income, per_capita_income, " +
         "rigid_expenditure, alimony_income, total_annual_income, per_capita_annual_income, is_eligible, classification_result, classified_subsidy_type, classified_subsidy_amount, " +

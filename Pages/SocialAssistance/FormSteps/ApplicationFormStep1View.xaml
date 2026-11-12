@@ -358,6 +358,22 @@
                                Style="{StaticResource FormFieldEntryStyle}"/>
                     </VerticalStackLayout>
                 </Grid>
+                <!-- AI 重病判定建议条（verdict=severe 才显示；点击忽略；自动勾选只勾不取消） -->
+                <Label Text="{Binding AiSeveritySuggestionText}"
+                       IsVisible="{Binding HasAiSeveritySuggestion}"
+                       FontSize="13" TextColor="{StaticResource Primary}"
+                       Margin="0,6,0,0" LineBreakMode="WordWrap">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnAiSuggestionDismissed"/>
+                    </Label.GestureRecognizers>
+                </Label>
+                <!-- 前12个月个人医疗自付（费用口径重病判定输入，黑龙政办法第六十八条；失焦提交触发判定） -->
+                <VerticalStackLayout Spacing="4" Margin="0,8,0,0">
+                    <Label Text="前12个月个人医疗自付累计（元）" Style="{StaticResource FormFieldLabelStyle}" FontSize="13"/>
+                    <Entry Text="{Binding MedicalSelfPaid12m}"
+                           Placeholder="住院+门诊慢特病+高值药品累计自付；超上年度人均可支配收入按费用口径认定重病"
+                           Keyboard="Numeric" Style="{StaticResource FormFieldEntryStyle}"/>
+                </VerticalStackLayout>
             </VerticalStackLayout>
         </Border>
 

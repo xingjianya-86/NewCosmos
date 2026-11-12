@@ -48,6 +48,32 @@ bash smoke_test.sh /tmp/idcard_sample.jpg ID_CARD
 
 `{service, model, backend, model_available, error?}`——`service=ok` 且 `model_available=true` 为健康。
 
+### `POST /ai/severity`（AI 重病判定，2026-11-11 P0）
+
+请求：`{"name": "尿毒症，规律血液透析", "code": "N18.5"}`（`name` 必填——客户端先用本地
+ICD 字典把编码转成名称再调用；`code` 可选，仅作判别上下文）。
+
+| 字段 | 说明 |
+|---|---|
+| `verdict` | `severe` / `not_severe` / `unknown` |
+| `matched_item` | 命中的清单项；**已校验∈清单**（LLM 胡扯的项被置空） |
+| `auto_eligible` | `verdict=severe && matched_item≠空`——客户端**仅在此为 true 时**自动预勾选重病 |
+| `source` | `deterministic`（清单精确/单向包含/编码段，毫秒级）/ `llm`（qwen 兜底语义变体） |
+| `policy_version` | 清单文件 sha256 前16位，客户端据此失效本地判定缓存 |
+| `confidence` / `reason` / `model` / `usage` / `elapsed_ms` | 展示与审计用 |
+
+判定顺序：确定性层命中直接返回（不进 LLM、不依赖模型在线）→ 未命中调 qwen2.5:3b
+（prompt 见 `ocr_api.py build_severity_prompt`，补测 v5 定稿：全目录 + 反向禁令 + 负例 few-shot）。
+错误：400 缺 name / 502 模型不可用（确定性层未命中时）/ 500 清单缺失。
+清单文件 `severe_disease_catalog.json` 挂载进容器，**修改后保存即热载**（mtime 检测），
+无需重建镜像；`items/aliases/code_ranges` 结构与业务裁定注释见该文件 `notes`。
+
+冒烟回归（改 prompt/清单/换模型后必跑，33 例固化自 2026-11-11 补测）：
+
+```bash
+python3 smoke_ai_severity.py http://192.168.0.2:8788   # 全 PASS 退出码 0；约 3-4 分钟
+```
+
 ## 资源预算（宿主：i3-4170 4 线程 / 7.7G，另有 10 个业务容器）
 
 | 项 | 限额 | 说明 |

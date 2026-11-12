@@ -643,9 +643,43 @@ public class FamilyMember : INotifyPropertyChanged
                 _isSevereDisease = value;
                 OnPropertyChanged();
                 ApplySevereDiseaseToHealthStatus(value);
+                // 人工否决跟踪：true→false 只可能来自用户（AI 自动勾选只勾不取消）；
+                // 用户取消过一次后本会话不再自动勾选（ISevereDiseaseAdviceService.ShouldAutoCheck 闸门，人工优先）
+                if (!value) AiSevereDiseaseRejected = true;
             }
         }
     }
+
+    /// <summary>
+    /// 用户已人工取消过 AI 自动勾选（transient 不落库；人工优先，本会话内 AI 不再自动勾选本成员）
+    /// </summary>
+    public bool AiSevereDiseaseRejected { get; set; }
+
+    /// <summary>
+    /// 前12个月个人医疗自付累计（元）——费用口径重病判定输入（黑龙政办法第六十八条）；空=未录入
+    /// </summary>
+    public decimal? MedicalSelfPaid12m { get; set; }
+
+    private string _aiSuggestionText = string.Empty;
+
+    /// <summary>AI 重病判定建议条文案（transient 不落库；空=隐藏）。仅 verdict=severe 时有值</summary>
+    public string AiSuggestionText
+    {
+        get => _aiSuggestionText;
+        set
+        {
+            if (_aiSuggestionText == value) return;
+            _aiSuggestionText = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasAiSuggestion));
+        }
+    }
+
+    /// <summary>是否显示 AI 建议条</summary>
+    public bool HasAiSuggestion => !string.IsNullOrWhiteSpace(_aiSuggestionText);
+
+    /// <summary>忽略 AI 建议条（点击隐藏；已自动勾选的保持不变，由经办人自行取消）</summary>
+    public void DismissAiSuggestion() => AiSuggestionText = string.Empty;
 
     /// <summary>
     /// 勾选"是否重病"同步健康状态为重病；取消勾选仅在当前为重病时回退为健康

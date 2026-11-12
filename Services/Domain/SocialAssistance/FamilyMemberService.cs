@@ -93,13 +93,13 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             disease_code, is_severe_disease, is_labor_exempt,
             is_applicant, member_category, employment_status, work_unit, main_income_source, annual_income, work_capacity,
             monthly_income_capacity, family_size, person_type, annual_support_fee, monthly_support_fee,
-            support_months, is_support_ability, birth_date,
+            support_months, is_support_ability, birth_date, medical_self_paid_12m,
             created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
             $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
             $31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
-            $41, $42, $43, $44, $45, $46, $47, $48, $49, $50,
+            $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51,
             NOW(), NOW())
             RETURNING id";
 
@@ -119,7 +119,8 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                 request.WorkCapacity,
                 request.MonthlyIncomeCapacity, (object?)request.FamilySize, request.PersonType,
                 request.AnnualSupportFee, request.MonthlySupportFee, (object?)request.SupportMonths,
-                request.IsSupportAbility, (object?)request.BirthDate);
+                request.IsSupportAbility, (object?)request.BirthDate,
+                (object?)request.MedicalSelfPaid12m);
 
             if (insertResult.IsFailure)
             {
@@ -187,8 +188,8 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                     $"身份证号 {DataMasker.MaskIdCard(conflict.IdCard)} 已在此申请中存在");
             }
 
-            // 多行 VALUES 批插：52 列（50 业务列 + created_at/updated_at）× N 行，$1..$50N 平铺（§8 鼓励的批写模式）
-            // [SQL 白名单背书] cols=本地 const 列清单（硬编码 52 列，与 ApplicationColumns 同模式）；
+            // 多行 VALUES 批插：53 列（51 业务列 + created_at/updated_at）× N 行，$1..$51N 平铺（§8 鼓励的批写模式）
+            // [SQL 白名单背书] cols=本地 const 列清单（硬编码 53 列，与 ApplicationColumns 同模式）；
             // values 由硬编码 rowTpl + 请求对象字段生成，无外部 SQL 输入（check_standards SQL1 豁免 cols/values）。
             const string cols = @"application_id, name, id_card, relationship_to_head, gender, age, ethnicity, phone,
                 hukou_type, hukou_address, home_province, home_city, home_district, home_town, home_village, home_address,
@@ -199,12 +200,12 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                 disease_code, is_severe_disease, is_labor_exempt,
                 is_applicant, member_category, employment_status, work_unit, main_income_source, annual_income, work_capacity,
                 monthly_income_capacity, family_size, person_type, annual_support_fee, monthly_support_fee,
-                support_months, is_support_ability, birth_date,
+                support_months, is_support_ability, birth_date, medical_self_paid_12m,
                 created_at, updated_at";
-            // 占位符必须与 cols 的业务列数严格相等（50）：曾漏 ${48}/${49} → "INSERT has more target columns than expressions"。
+            // 占位符必须与 cols 的业务列数严格相等（51）：曾漏 ${48}/${49} → "INSERT has more target columns than expressions"。
             var rowTpl = @"(${0},${1},${2},${3},${4},${5},${6},${7},${8},${9},${10},${11},${12},${13},${14},${15},${16},${17},${18},${19},
                 ${20},${21},${22},${23},${24},${25},${26},${27},${28},${29},${30},${31},${32},${33},${34},${35},${36},${37},${38},${39},
-                ${40},${41},${42},${43},${44},${45},${46},${47},${48},${49}, NOW(), NOW())";
+                ${40},${41},${42},${43},${44},${45},${46},${47},${48},${49},${50}, NOW(), NOW())";
 
             var values = new List<string>(requests.Count);
             var args = new List<object>(requests.Count * 50);
@@ -216,8 +217,8 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                     baseIdx + 11, baseIdx + 12, baseIdx + 13, baseIdx + 14, baseIdx + 15, baseIdx + 16, baseIdx + 17, baseIdx + 18, baseIdx + 19, baseIdx + 20,
                     baseIdx + 21, baseIdx + 22, baseIdx + 23, baseIdx + 24, baseIdx + 25, baseIdx + 26, baseIdx + 27, baseIdx + 28, baseIdx + 29, baseIdx + 30,
                     baseIdx + 31, baseIdx + 32, baseIdx + 33, baseIdx + 34, baseIdx + 35, baseIdx + 36, baseIdx + 37, baseIdx + 38, baseIdx + 39, baseIdx + 40,
-                    baseIdx + 41, baseIdx + 42, baseIdx + 43, baseIdx + 44, baseIdx + 45, baseIdx + 46, baseIdx + 47, baseIdx + 48,
-                    baseIdx + 49, baseIdx + 50));
+                    baseIdx + 41, baseIdx + 42, baseIdx + 43, baseIdx + 44, baseIdx + 45, baseIdx + 46, baseIdx + 47, baseIdx + 48, baseIdx + 49,
+                    baseIdx + 50, baseIdx + 51));
 
                 args.AddRange(new object[]
                 {
@@ -235,7 +236,8 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                     r.EmploymentStatus, r.WorkUnit, r.MainIncomeSource, r.AnnualIncome, r.WorkCapacity,
                     r.MonthlyIncomeCapacity, (object?)r.FamilySize!, r.PersonType,
                     r.AnnualSupportFee, r.MonthlySupportFee, (object?)r.SupportMonths!,
-                    r.IsSupportAbility, (object?)r.BirthDate!
+                    r.IsSupportAbility, (object?)r.BirthDate!,
+                    (object?)r.MedicalSelfPaid12m!
                 });
             }
 
@@ -311,8 +313,9 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
             annual_support_fee = $44, monthly_support_fee = $45, support_months = $46,
             is_support_ability = $47,
             birth_date = $48,
+            medical_self_paid_12m = $49,
             updated_at = NOW()
-            WHERE id = $49";
+            WHERE id = $50";
 
             var updateResult = await _db.ExecuteNonQueryAsync(sql, ct,
                 request.Name, request.Relation,
@@ -332,6 +335,7 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
                 request.AnnualSupportFee, request.MonthlySupportFee, (object?)request.SupportMonths,
                 request.IsSupportAbility,
                 (object?)request.BirthDate,
+                (object?)request.MedicalSelfPaid12m,
                 request.MemberId);
 
             if (updateResult.IsFailure)

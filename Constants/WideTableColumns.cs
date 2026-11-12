@@ -63,7 +63,7 @@ public static class WideTableColumns
         "hukou_province, hukou_city, hukou_district, hukou_town, home_village," +
         "secondary_disease, person_type, annual_support_fee, is_support_ability," +
         "monthly_income_capacity, family_size, work_unit, monthly_support_fee, support_months," +
-        "main_income_source, disease_code, is_severe_disease, is_labor_exempt";
+        "main_income_source, disease_code, is_severe_disease, is_labor_exempt, medical_self_paid_12m";
 
     /// <summary>nc_biz_labor_incomes 全列（按列序）</summary>
     public const string LaborIncomesColumns =

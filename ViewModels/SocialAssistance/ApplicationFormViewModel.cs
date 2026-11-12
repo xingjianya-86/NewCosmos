@@ -2129,6 +2129,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         IChangeService changeService,
         IVisitRecordService visitRecordService,
         IAddressScopeService addressScopeService,
+        Services.Domain.SevereDisease.ISevereDiseaseAdviceService severeDiseaseAdviceService,
         ILoggerService logger)
     {
         _serviceProvider = serviceProvider;
@@ -2155,6 +2156,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         _householdSurveyService = householdSurveyService;
         _changeService = changeService;
         _visitRecordService = visitRecordService;
+        _severeDiseaseAdvice = severeDiseaseAdviceService;
         _logger = logger;
 
         TotalSteps = 5;

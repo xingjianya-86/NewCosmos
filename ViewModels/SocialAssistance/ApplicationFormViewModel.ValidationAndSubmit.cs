@@ -333,6 +333,7 @@ public partial class ApplicationFormViewModel
             SecondaryDiseaseName = string.IsNullOrWhiteSpace(DiseaseNameText) ? (SelectedDiseaseNameObj?.Key ?? "") : DiseaseNameText,
             DiseaseCode = DiseaseCode ?? "",
             IsSevereDisease = IsSevereDisease,
+            MedicalSelfPaid12m = MedicalSelfPaid12m,
             ApplicationReason = SelectedApplicationReasonObj?.Key ?? DefaultValuesConstants.APPLICATION_REASON_KEY,
             ApplicationReasonDetail = ApplicationReasonDetail,
             FamilySize = FamilySize,

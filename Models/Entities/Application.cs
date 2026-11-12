@@ -197,6 +197,12 @@ public class Application
     public bool IsSevereDisease { get; set; }
 
     /// <summary>
+    /// 前12个月个人医疗自付累计（元）——费用口径重病判定输入（黑龙政办法第六十八条：超过上年度
+    /// 居民人均可支配收入即重病患者）；空=未录入。口径=申请前12个月住院+门诊慢特病+高值药品累计自付。
+    /// </summary>
+    public decimal? MedicalSelfPaid12m { get; set; }
+
+    /// <summary>
     /// 残疾类型
     /// </summary>
     public string DisabilityType { get; set; } = string.Empty;

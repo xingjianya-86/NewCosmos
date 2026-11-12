@@ -22,4 +22,8 @@ public partial class ApplicationFormStep1View : ContentView
     {
         ViewModel?.ApplyApplicantDiseaseCode(e.NewTextValue);
     }
+
+    /// <summary>点击忽略 AI 建议条（隐藏；已自动勾选的保持不变，由经办人自行取消）</summary>
+    private void OnAiSuggestionDismissed(object? sender, TappedEventArgs e)
+        => ViewModel?.DismissAiSeveritySuggestion();
 }

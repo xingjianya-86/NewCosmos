@@ -114,5 +114,25 @@ public partial class FamilyMemberCardView : ContentView
         // 先写回实体属性（与绑定提交一致），再触发字典回填与一级归类（同步 Picker 选中项）
         member.DiseaseCode = e.NewTextValue ?? string.Empty;
         member.ApplyDiseaseCode(e.NewTextValue, Host?.DiseaseCategoryOptions);
+        // AI 重病判定（P1）：确定性秒出；未命中走缓存/服务端 LLM 消抖管线
+        Host?.RequestMemberAiJudgment(member, e.NewTextValue);
+    }
+
+    /// <summary>
+    /// 成员前12个月个人自付变化：先写回实体（WinUI 绑定默认失焦才提交源），再触发费用口径重病判定
+    /// </summary>
+    private void OnFamilyMemberSelfPaidChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is not Entry entry || entry.BindingContext is not FamilyMember member) return;
+
+        member.MedicalSelfPaid12m = decimal.TryParse(e.NewTextValue, out var v) ? v : null;
+        Host?.RequestMemberCostJudgment(member);
+    }
+
+    /// <summary>点击忽略成员 AI 建议条（隐藏；已自动勾选的保持不变，由经办人自行取消）</summary>
+    private void OnAiSuggestionDismissed(object? sender, TappedEventArgs e)
+    {
+        if (sender is BindableObject { BindingContext: FamilyMember member })
+            member.DismissAiSuggestion();
     }
 }

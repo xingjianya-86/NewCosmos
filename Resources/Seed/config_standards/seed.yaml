@@ -65,3 +65,8 @@ tables:
       - { standard_type: "RotationPrice", standard_name: "轮作补贴价格", hukou_type: null, support_mode: null, standard_value: 150.00, unit: "元/亩", effective_start_date: "2025-01-01", description: "耕地轮作补贴每亩价格" }
       - { standard_type: "SurfaceWaterRicePrice", standard_name: "地表水水稻价格", hukou_type: null, support_mode: null, standard_value: 156.75, unit: "元/亩", effective_start_date: "2026-10-15", description: "地表水灌溉水稻补贴每亩价格（原156.53，自2026-10-15起执行）" }
       - { standard_type: "GroundWaterRicePrice", standard_name: "地下水水稻价格", hukou_type: null, support_mode: null, standard_value: 106.75, unit: "元/亩", effective_start_date: "2026-10-15", description: "地下水灌溉水稻补贴每亩价格（原106.53，自2026-10-15起执行）" }
+
+      # ── 重病费用口径阈值（2026-11-12 引入；黑龙政办法第六十八条：前12个月个人累计自付
+      #    超过上年度本地区居民人均可支配收入 → 重病患者。按申请户籍类型取档。 ──
+      - { standard_type: "SevereDiseaseCostThreshold", standard_name: "重病费用口径阈值（上年度农村居民人均可支配收入）", hukou_type: "Rural", support_mode: null, standard_value: 29381.00, unit: "元/年", effective_start_date: "2026-01-01", description: "费用口径重病判定阈值-农村档：2025年全年人均可支配收入29381元；申请前12个月个人累计自付（住院+门诊慢特病+高值药品）超过本值即认定重病患者" }
+      - { standard_type: "SevereDiseaseCostThreshold", standard_name: "重病费用口径阈值（上年度城镇居民人均可支配收入）", hukou_type: "Urban", support_mode: null, standard_value: 41757.00, unit: "元/年", effective_start_date: "2026-01-01", description: "费用口径重病判定阈值-城镇档：2025年全年人均可支配收入41757元；申请前12个月个人累计自付（住院+门诊慢特病+高值药品）超过本值即认定重病患者" }

@@ -50,5 +50,23 @@ public partial class MobileApplicationFormStep2View : ContentView
 
         member.DiseaseCode = e.NewTextValue ?? string.Empty;
         member.ApplyDiseaseCode(e.NewTextValue, ViewModel?.DiseaseCategoryOptions);
+        // AI 重病判定（P1）：确定性秒出；未命中走缓存/服务端 LLM 消抖管线
+        ViewModel?.RequestMemberAiJudgment(member, e.NewTextValue);
+    }
+
+    /// <summary>成员前12个月个人自付变化：先写回实体，再触发费用口径重病判定</summary>
+    private void OnFamilyMemberSelfPaidChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is not Entry entry || entry.BindingContext is not FamilyMember member) return;
+
+        member.MedicalSelfPaid12m = decimal.TryParse(e.NewTextValue, out var v) ? v : null;
+        ViewModel?.RequestMemberCostJudgment(member);
+    }
+
+    /// <summary>点击忽略成员 AI 建议条（隐藏；已自动勾选的保持不变）</summary>
+    private void OnAiSuggestionDismissed(object? sender, TappedEventArgs e)
+    {
+        if (sender is BindableObject { BindingContext: FamilyMember member })
+            member.DismissAiSuggestion();
     }
 }

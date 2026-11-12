@@ -48,6 +48,16 @@ DEFAULT_MAX_TOKENS_KIE = int(os.environ.get("OCR_KIE_MAX_TOKENS", "1024"))
 
 # ── 官方管线常量（勿改，改 = 与官方对齐基线漂移）─────────────────────────
 MAX_IMAGE_EDGE = 2048
+# ── AI 重病判定配置（POST /ai/severity，2026-11-11 P0）────────────────────
+AI_MODEL = os.environ.get("AI_MODEL", "qwen2.5:3b").strip()
+AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "256"))
+AI_KEEP_ALIVE = os.environ.get("AI_KEEP_ALIVE", "24h").strip()
+AI_TIMEOUT = float(os.environ.get("AI_REQUEST_TIMEOUT_SECONDS", "90"))
+AI_CATALOG_PATH = os.environ.get(
+    "AI_CATALOG_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "severe_disease_catalog.json"),
+)
+
 
 # 官方 mcp_ocr_server.py PROMPTS["document"] / PROMPTS["text"] 逐字复制
 PROMPT_DOCUMENT = (
@@ -165,6 +175,170 @@ def extract_json_fields(raw: str, fields: list[str]) -> dict[str, str]:
 
 app = FastAPI(title="newcosmos-ocr-api", docs_url=None, redoc_url=None)
 
+# ── AI 重病判定（P0）：清单加载 + 确定性层 + LLM 兜底 ─────────────────────
+# 设计依据（2026-11-11 补测定稿）：
+#   确定性层为主（毫秒级、离线、可审计），LLM 只兜语义变体；
+#   只做单向包含（输入⊃清单项），禁止反向——业务裁定：脑梗塞无"急性"不算、
+#   糖尿病未分型不算（反向包含会让这两个短输入误命中长清单项）。
+_catalog_cache: dict = {"mtime": -1.0, "data": None, "policy_version": ""}
+
+
+def get_catalog() -> dict:
+    """加载重病清单（mtime 变化自动热载，改清单无需重启容器）。
+    policy_version = 文件 sha256 前16位，客户端据此失效判定缓存。"""
+    try:
+        mtime = os.path.getmtime(AI_CATALOG_PATH)
+    except OSError as exc:
+        raise RuntimeError(f"severe disease catalog missing: {AI_CATALOG_PATH}") from exc
+    if _catalog_cache["data"] is None or mtime != _catalog_cache["mtime"]:
+        with open(AI_CATALOG_PATH, "rb") as fh:
+            raw = fh.read()
+        data = json.loads(raw.decode("utf-8"))
+        _catalog_cache["mtime"] = mtime
+        _catalog_cache["data"] = data
+        _catalog_cache["policy_version"] = hashlib.sha256(raw).hexdigest()[:16]
+    return _catalog_cache["data"]
+
+
+_FULLWIDTH_MAP = str.maketrans({"（": "(", "）": ")", "：": ":", "，": ",", "－": "-", "　": ""})
+
+
+def _norm_name(s: str) -> str:
+    """名称规范化：去空白 + 全角转半角 + 小写（匹配专用，不改展示原文）。"""
+    return re.sub(r"\s+", "", (s or "").strip()).translate(_FULLWIDTH_MAP).lower()
+
+
+def deterministic_severity(name: str, code: str, catalog: dict) -> dict | None:
+    """确定性层：① 精确（清单项/别名）② 单向包含（输入⊃清单项/别名，最长优先）
+    ③ 编码段表。命中返回 {matched_item, reason}，未命中返回 None（交 LLM）。"""
+    norm = _norm_name(name)
+    if not norm:
+        return None
+    items = [str(x) for x in catalog.get("items", [])]
+    aliases = {str(k): str(v) for k, v in (catalog.get("aliases") or {}).items()}
+
+    for item in items:
+        if norm == _norm_name(item):
+            return {"matched_item": item, "reason": f"清单精确命中：{item}"}
+    for alias, canonical in aliases.items():
+        if norm == _norm_name(alias):
+            return {"matched_item": canonical, "reason": f"清单别名命中：{alias}→{canonical}"}
+
+    best_text, best_item, best_alias = "", "", ""
+    for item in items:
+        ni = _norm_name(item)
+        if len(ni) >= 2 and ni in norm and len(ni) > len(best_text):
+            best_text, best_item = ni, item
+    for alias, canonical in aliases.items():
+        na = _norm_name(alias)
+        if len(na) >= 2 and na in norm and len(na) > len(best_text):
+            best_text, best_item, best_alias = na, canonical, alias
+    if best_item:
+        reason = (f"清单别名包含命中：{best_alias}→{best_item}" if best_alias
+                  else f"清单包含命中：{best_item}")
+        return {"matched_item": best_item, "reason": reason}
+
+    code_u = (code or "").strip().upper()
+    m = re.match(r"^([A-Z])(\d{1,3})", code_u)
+    if m:
+        letter, num = m.group(1), int(m.group(2))
+        for rng in catalog.get("code_ranges", []):
+            if str(rng.get("letter", "")) == letter and int(rng["min"]) <= num <= int(rng["max"]):
+                item = str(rng["item"])
+                return {"matched_item": item, "reason": f"编码 {code_u} 命中 {item}"}
+    return None
+
+
+def build_severity_prompt(catalog: dict) -> str:
+    """LLM 判定 prompt（2026-11-11 补测 v5 定稿：全目录 + 反向禁令 + 负例 few-shot）。"""
+    items = "、".join(str(x) for x in catalog.get("items", []))
+    return (
+        "你是民政救助经办辅助助手。判断给定疾病是否属于重病。\n"
+        f"重病病种目录（本地执行口径，以本清单为准）：{items}。\n"
+        "规则：疾病属于清单任一项（含同义词、俗称、部位与术式变体）=severe；"
+        "清单外=not_severe；无法判断=unknown。\n"
+        "反向禁令（同样重要）：归入清单项必须语义相同，禁止把相近病种乱归——"
+        "2型糖尿病不是I型糖尿病；陈旧性脑梗死不是急性脑梗塞；甲状腺结节不是甲状腺癌；"
+        "普通肺炎不是耐多药肺结核。禁止用医学常识否决清单，也禁止因名字相似就归入清单。\n"
+        '只输出一行纯JSON（禁止markdown代码块）：{"verdict":"severe|not_severe|unknown",'
+        '"matched_item":"清单项或空字符串","confidence":0.0到1.0,"reason":"一句话依据"}\n'
+        "示例：\n"
+        '疾病：ICD-10编码 C16.9（胃恶性肿瘤） → {"verdict":"severe","matched_item":"胃癌",'
+        '"confidence":0.95,"reason":"C16.9为胃恶性肿瘤，命中清单胃癌"}\n'
+        '疾病：重度精神分裂症 → {"verdict":"severe","matched_item":"重症精神病",'
+        '"confidence":0.95,"reason":"重度精神分裂症属重症精神病，命中清单"}\n'
+        '疾病：慢性肾功能不全4期 → {"verdict":"severe","matched_item":"慢性肾脏病",'
+        '"confidence":0.95,"reason":"慢性肾功能不全属慢性肾脏病，命中清单"}\n'
+        '疾病：2型糖尿病 → {"verdict":"not_severe","matched_item":"","confidence":0.95,'
+        '"reason":"清单仅含I型糖尿病，2型糖尿病不属清单"}\n'
+        '疾病：陈旧性脑梗死 → {"verdict":"not_severe","matched_item":"","confidence":0.95,'
+        '"reason":"清单仅含急性脑梗塞/急性脑梗死，陈旧性非急性期"}\n'
+        '疾病：ICD-10编码 K21.9（胃食管反流病） → {"verdict":"not_severe","matched_item":"",'
+        '"confidence":0.95,"reason":"胃食管反流病不在清单内"}\n'
+        "疾病："
+    )
+
+
+async def chat_text(prompt: str, max_tokens: int) -> dict:
+    """文本对话（/ai/severity 用）：temperature=0，无图、无视觉管线解码参数。"""
+    payload: dict = {
+        "model": AI_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0,
+    }
+    if AI_KEEP_ALIVE:
+        payload["keep_alive"] = AI_KEEP_ALIVE
+
+    async with httpx.AsyncClient(timeout=AI_TIMEOUT) as client:
+        try:
+            resp = await client.post(f"{OCR_BASE}/chat/completions", json=payload)
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"Local model is unavailable at {OCR_BASE}: {exc}") from exc
+    if resp.status_code != 200:
+        raise RuntimeError(f"Local inference returned HTTP {resp.status_code}: {resp.text[:500]}")
+
+    data = resp.json()
+    message = data["choices"][0]["message"]["content"]
+    if isinstance(message, list):
+        message = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in message)
+    text = str(message or "").strip()
+    if not text:
+        raise RuntimeError("Local model returned an empty response")
+    return {"text": text, "usage": data.get("usage") or {}}
+
+
+def parse_severity(raw: str, catalog: dict) -> tuple[str, str, float, str]:
+    """解析 LLM JSON 输出。坏格式降级 unknown（不猜）；matched_item 必须∈清单
+    （含别名归一），否则置空——客户端凭 matched_item 非空才允许自动预勾选。"""
+    verdict, matched, confidence, reason = "unknown", "", 0.0, ""
+    match = re.search(r"\{[\s\S]*\}", raw)
+    if match:
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            v = str(data.get("verdict", "")).strip().lower()
+            if v in ("severe", "not_severe", "unknown"):
+                verdict = v
+            raw_item = str(data.get("matched_item", "")).strip()
+            items = {str(x) for x in catalog.get("items", [])}
+            aliases = {str(k): str(v) for k, v in (catalog.get("aliases") or {}).items()}
+            if raw_item in items:
+                matched = raw_item
+            elif raw_item in aliases:
+                matched = aliases[raw_item]
+            try:
+                confidence = max(0.0, min(1.0, float(data.get("confidence", 0))))
+            except (TypeError, ValueError):
+                confidence = 0.0
+            reason = str(data.get("reason", "")).strip()[:300]
+    if not reason:
+        reason = "AI 输出无法解析，待人工判定"
+    return verdict, matched, confidence, reason
+
+
 
 @app.get("/health")
 async def health() -> dict:
@@ -234,6 +408,57 @@ async def recognize(file: UploadFile = File(...), category: str = Form(...)) -> 
 
 def _response(category: str, mode: str, fields: dict, lines: list[str], raw: str,
               usage: dict | None, started: float) -> dict:
+class SeverityRequest(BaseModel):
+    """重病判定请求：name 必填（客户端先用本地 ICD 字典把编码转成名称），code 可选作判别上下文。"""
+    name: str = Field(default="", max_length=200)
+    code: str = Field(default="", max_length=32)
+
+
+@app.post("/ai/severity")
+async def severity(req: SeverityRequest) -> dict:
+    """重病判定：确定性层（清单精确/单向包含/编码段）→ 未命中走 LLM 兜底。
+    auto_eligible = severe 且 matched_item∈清单——客户端仅在此为 true 时自动预勾选。
+    响应带 policy_version（清单文件哈希），客户端据此失效本地判定缓存。"""
+    started = time.monotonic()
+    name = (req.name or "").strip()
+    code = (req.code or "").strip()
+    if not name:
+        raise HTTPException(status_code=400,
+                            detail="name is required (resolve ICD code to name client-side first)")
+    try:
+        catalog = get_catalog()
+    except (RuntimeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail=f"catalog unavailable: {exc}") from exc
+    policy_version = str(_catalog_cache["policy_version"])
+
+    det = deterministic_severity(name, code, catalog)
+    if det:
+        return {
+            "ok": True, "verdict": "severe", "matched_item": det["matched_item"],
+            "confidence": 1.0, "reason": det["reason"], "source": "deterministic",
+            "auto_eligible": True, "policy_version": policy_version, "model": "",
+            "usage": {}, "elapsed_ms": int((time.monotonic() - started) * 1000),
+        }
+
+    prompt = build_severity_prompt(catalog) + "\n" + name \
+        + (f"（ICD-10：{code}）" if code else "") + "\n"
+    try:
+        result = await chat_text(prompt, AI_MAX_TOKENS)
+    except RuntimeError as exc:
+        # 显式失败：确定性层未命中且模型不可用，交客户端走"无建议"降级（§7 不吞异常）
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    verdict, matched, confidence, reason = parse_severity(result["text"], catalog)
+    return {
+        "ok": True, "verdict": verdict, "matched_item": matched,
+        "confidence": confidence, "reason": reason, "source": "llm",
+        "auto_eligible": verdict == "severe" and bool(matched),
+        "policy_version": policy_version, "model": AI_MODEL,
+        "usage": result.get("usage") or {},
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+    }
+
+
     return {
         "ok": True,
         "category": category,

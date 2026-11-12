@@ -1,0 +1,61 @@
+# AI 判定缓存数据库 Schema 定义
+# 缓存服务端 /ai/severity 的判定结果（客户端确定性层毫秒级，不入缓存）。
+# 有效性锚点：policy_version = 客户端随包清单 sha256 前16位（SevereDiseaseJudge.PolicyVersion），
+# 清单发版 → 版本变 → 读取比对不中 → 自然失效重判；失效行由下次判定 upsert 覆盖，无需批量清理。
+# 两份清单字节同步约定见 severe_disease_catalog.json notes；判定口径见 Helpers/SevereDiseaseJudge.cs。
+database: AI判定缓存数据库
+version: 1.0
+description: 缓存 AI 重病判定结果，使同一疾病输入重复判定毫秒返回、并在 AI 服务不可用时保持可用
+
+tables:
+  - name: nc_sys_ai_judgments
+    comment: "[系统] AI 判定缓存表 - 每个规范化输入一行（input_key=名称规范化|编码大写）；policy_version 与当前清单版本不一致视为失效"
+    columns:
+      - name: input_key
+        type: character varying(300)
+        nullable: false
+        primaryKey: true
+        comment: 判定缓存键（SevereDiseaseJudge.BuildCacheKey：名称去空白/全角转半角/小写 + "|" + 编码大写）
+      - name: verdict
+        type: character varying(16)
+        nullable: false
+        comment: 判定结果 severe/not_severe/unknown
+      - name: matched_item
+        type: character varying(100)
+        nullable: false
+        defaultValue: "''"
+        comment: 命中清单项（已双侧校验∈清单；空=LLM 未归入清单，禁止自动预勾选）
+      - name: confidence
+        type: real
+        nullable: false
+        defaultValue: "0"
+        comment: 置信度 0-1（展示用）
+      - name: reason
+        type: text
+        nullable: false
+        defaultValue: "''"
+        comment: 判定依据（建议条展示 + 审计）
+      - name: source
+        type: character varying(16)
+        nullable: false
+        defaultValue: "'llm'"
+        comment: 判定来源 llm/deterministic（仅 llm 结果入缓存）
+      - name: policy_version
+        type: character varying(16)
+        nullable: false
+        comment: 写入时的清单版本（随包清单 sha256 前16位）；读取时与当前版本比对，不匹配=失效
+      - name: model
+        type: character varying(64)
+        nullable: false
+        defaultValue: "''"
+        comment: 服务端模型名（审计；确定性结果为空）
+      - name: created_at
+        type: timestamp with time zone
+        nullable: false
+        defaultValue: NOW()
+        comment: 首次判定时间
+      - name: updated_at
+        type: timestamp with time zone
+        nullable: false
+        defaultValue: NOW()
+        comment: 最近判定时间（upsert 刷新）

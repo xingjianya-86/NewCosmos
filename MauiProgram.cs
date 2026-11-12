@@ -141,6 +141,12 @@ public static class MauiProgram
         // 内网证件 OCR 识别（Xiaomi-OCR-0，deploy\ocr\ocr_api.py）：图片+类别 → 字段/文本行
         builder.Services.AddSingleton<Services.Platform.IOcrRecognizeClient, Services.Platform.RemoteOcrRecognizeClient>();
 
+        // AI 重病判定（deploy\ocr\ocr_api.py /ai/severity，与 OCR 同服务）：
+        // 客户端判定核心在 Helpers\SevereDiseaseJudge（静态随包，不入 DI）；此处为服务客户端+缓存+管线
+        builder.Services.AddSingleton<Services.Platform.IAiJudgeClient, Services.Platform.RemoteAiJudgeClient>();
+        builder.Services.AddSingleton<Services.Core.IAiJudgmentCacheService, Services.Core.AiJudgmentCacheService>();
+        builder.Services.AddSingleton<Services.Domain.SevereDisease.ISevereDiseaseAdviceService, Services.Domain.SevereDisease.SevereDiseaseAdviceService>();
+
         // 在线更新与客户端版本台账
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
         builder.Services.AddSingleton<IAppUpdateCoordinator, AppUpdateCoordinator>();
