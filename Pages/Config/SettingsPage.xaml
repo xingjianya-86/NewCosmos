@@ -64,6 +64,20 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- 更新日志 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="更新日志" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView Style="{StaticResource Divider}" Margin="0"/>
+                        <Label Text="查看当前版本与升级历史（本机轨迹 + 在线全量），并手动检查更新。升级说明来自发版时的 CHANGELOG.md，升级弹窗与新版首次启动也会显示当次内容。"
+                               FontSize="14" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                        <FlexLayout Direction="Row" Wrap="Wrap" JustifyContent="Start">
+                            <Button Text="打开更新日志" Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding OpenUpdateLogCommand}" Margin="0,0,8,0" MinimumWidthRequest="140"/>
+                        </FlexLayout>
+                    </VerticalStackLayout>
+                </Border>
+
                 <!-- 生效说明 -->
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="10">

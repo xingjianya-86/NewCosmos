@@ -15,7 +15,7 @@
         <!-- 统一页头（纸墨档案风报头 · Phase 6；本页无图标盒，故不写 Glyph） -->
         <components:PageHeaderView Grid.Row="0"
                                    Title="档案照片查询"
-                                   Subtitle="按身份证或备注检索人员证件照，支持预览与批量导出到输出根"
+                                   Subtitle="按身份证或备注检索人员证件照，支持插入（选图/拖拽）、预览与批量导出到输出根"
                                    BackCommand="{Binding GoBackCommand}"
                                    BackText="返回">
         </components:PageHeaderView>
@@ -23,7 +23,7 @@
         <!-- 查询条 -->
         <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="16,10">
             <VerticalStackLayout Spacing="8">
-                <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
+                <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                     <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片名称关键词"
                            MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
                     <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
@@ -31,12 +31,18 @@
                             SelectedItem="{Binding SelectedCategoryOption}"/>
                     <Button Grid.Column="2" Text="查询" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
                             Command="{Binding ApplySearchCommand}"/>
-                    <Button Grid.Column="3" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
+                    <Button Grid.Column="3" Text="插入照片" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                            Command="{Binding InsertPhotosCommand}"/>
+                    <!-- 导出格式：默认 WebP（库内原图），可切 JPG（民政等外部系统不支持 WebP）；手机端收进「更多」 -->
+                    <Picker Grid.Column="4" x:Name="pickerExportFormat" WidthRequest="118" MinimumHeightRequest="44"
+                            ItemsSource="{Binding ExportFormatOptions}" ItemDisplayBinding="{Binding Name}"
+                            SelectedItem="{Binding SelectedExportFormatOption}"/>
+                    <Button Grid.Column="5" x:Name="btnExportAll" Text="导出全部" Style="{StaticResource ButtonSuccess}" HeightRequest="40"
                             Command="{Binding ExportAllCommand}"/>
-                    <Button Grid.Column="4" Text="另存为…" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                    <Button Grid.Column="6" x:Name="btnExportToFolder" Text="另存为…" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
                             Command="{Binding ExportToFolderCommand}"/>
                 </Grid>
-                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Text="{Binding ExportSelectedText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ExportSelectedCommand}"/>
@@ -45,27 +51,34 @@
                             Command="{Binding PushPrintSelectedCommand}"/>
                     <Button Grid.Column="2" Text="全选本页" Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding SelectAllCommand}"/>
-                    <Button Grid.Column="3" Text="清空勾选" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                    <Button Grid.Column="3" x:Name="btnClearSelection" Text="清空勾选" Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ClearSelectionCommand}"/>
-                    <Button Grid.Column="4" Text="{Binding ConvertWebPButtonText}"
+                    <Button Grid.Column="4" x:Name="btnConvertWebP" Text="{Binding ConvertWebPButtonText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ConvertLegacyPhotosCommand}"
                             IsEnabled="{Binding CanConvertWebP}"/>
-                    <Label Grid.Column="5" Text="勾选多张后可「导出选中」「推送打印」或「另存为…」到自选目录；旧 JPEG 可转 WebP"
+                    <Button Grid.Column="5" x:Name="btnOpenCapture" Text="打开采集页" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding OpenCapturePageCommand}"/>
+                    <Button Grid.Column="6" x:Name="btnBackfill" Text="照片补传" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding OpenBackfillPageCommand}"/>
+                    <!-- 手机端「更多」：收拢桌面端摆在外面的次要功能（导出全部/另存为/清空/转WebP/采集页/补传/导出格式） -->
+                    <Button Grid.Column="7" x:Name="btnMore" Text="更多 ▾" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            IsVisible="False" Command="{Binding MoreOptionsCommand}"/>
+                    <Label Grid.Column="8" x:Name="lblHint" Text="插入须先查到具体的人（身份证），也可把图片直接拖进窗口；勾选多张可导出/推送打印/另存为"
                            FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                 </Grid>
             </VerticalStackLayout>
         </Border>
 
-        <!-- 列表 + 预览 -->
-        <Grid Grid.Row="2" Padding="16,8" ColumnDefinitions="6.5*,3.5*" ColumnSpacing="12">
+        <!-- 列表 + 预览（手机端由 code-behind 切成单列并隐藏预览列，预览改走全屏弹层） -->
+        <Grid x:Name="listPreviewGrid" Grid.Row="2" Padding="16,8" ColumnDefinitions="6.5*,3.5*" ColumnSpacing="12">
             <Border Grid.Column="0" Style="{StaticResource CardBorder}">
                 <Grid RowDefinitions="Auto,*" RowSpacing="6">
                     <Label Text="照片清单" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                     <CollectionView Grid.Row="1" ItemsSource="{Binding Photos}" SelectionMode="Single"
                                     SelectedItem="{Binding SelectedPhoto, Mode=TwoWay}">
                         <CollectionView.EmptyView>
-                            <Label Text="暂无照片（可用身份证号检索，或先在手机端补传）"
+                            <Label Text="暂无照片（先用身份证号查询；插入须先查到该人，或在采集页/补传页上传）"
                                    Style="{StaticResource EmptyStateLabel}" Padding="0,20"/>
                         </CollectionView.EmptyView>
                         <CollectionView.ItemTemplate>
@@ -96,7 +109,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Style="{StaticResource CardBorder}">
+            <Border x:Name="previewBorder" Grid.Column="1" Style="{StaticResource CardBorder}">
                 <Grid RowDefinitions="Auto,*" RowSpacing="6">
                     <Label Text="预览" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                     <Grid Grid.Row="1">
@@ -147,6 +160,32 @@
                        IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
             </VerticalStackLayout>
         </Border>
+
+        <!-- 全屏预览（手机端：点列表行打开；桌面端预览在右侧面板，此层保持隐藏） -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" IsVisible="{Binding IsPreviewOpen}" BackgroundColor="#F2000000">
+            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="16,14,16,6">
+                    <Label Grid.Column="0" Text="{Binding PreviewInfo}" FontSize="14" TextColor="#EEFFFFFF"
+                           VerticalOptions="Center" LineBreakMode="TailTruncation"/>
+                    <Button Grid.Column="1" Text="关闭" FontSize="14" Padding="18,0" HeightRequest="36" CornerRadius="8"
+                            BackgroundColor="#33FFFFFF" TextColor="White"
+                            Command="{Binding ClosePreviewCommand}"/>
+                </Grid>
+                <Grid Grid.Row="1" Padding="12,0">
+                    <Label Text="正在加载照片…" FontSize="15" TextColor="#CCFFFFFF"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           IsVisible="{Binding IsPreviewLoading}"/>
+                    <Label Text="照片不可用（可能已被删除）" FontSize="15" TextColor="#CCFFFFFF"
+                           HorizontalTextAlignment="Center"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           IsVisible="{Binding ShowPreviewEmpty}"/>
+                    <Image Source="{Binding PreviewImage}" Aspect="AspectFit"
+                           IsVisible="{Binding HasPreviewImage}"/>
+                </Grid>
+                <Label Grid.Row="2" Text="照片属公民身份敏感信息，仅存内网数据库 · 点「关闭」返回列表"
+                       FontSize="12" TextColor="#AAFFFFFF" HorizontalOptions="Center" Padding="0,0,0,16"/>
+            </Grid>
+        </Grid>
 
     </Grid>
 </ContentPage>

@@ -19,9 +19,17 @@ public interface ITempReliefService
     Task<Result<TempReliefCandidate>> GetCandidateDetailAsync(string sourceTable, long sourceFamilyId, string? excludeIdCard = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 获取小额定额档位列表（启用中）
+    /// 按身份证跨来源解析户籍分类（当前库低保申请库优先，其次 6 个导入台账库；
+    /// 农村/城镇低保台账按表名固定，其余取 hukou_type 列）。
+    /// 未找到返回 Success("")，由表单提示手动选择档位（=手选户籍分类）。
     /// </summary>
-    Task<Result<List<Models.Entities.ConfigStandard>>> GetSmallAmountLevelsAsync(CancellationToken ct = default);
+    Task<Result<string>> ResolveHukouTypeAsync(string? idCard, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取小额定额档位（2026-11-13 起 = 按户籍动态取低保月标准：农村 632 / 城镇 827）：
+    /// 户籍可解析 → 单档（自动锁定）；户籍为空/未知 → 农村 + 城镇两档手选。
+    /// </summary>
+    Task<Result<List<Models.Entities.ConfigStandard>>> GetSmallAmountLevelsAsync(string? hukouType, CancellationToken ct = default);
 
     Task<Result<TempReliefApplication>> GetByIdAsync(long id, CancellationToken ct = default);
 

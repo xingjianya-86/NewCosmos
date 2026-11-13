@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.TempRelief;
@@ -285,10 +286,10 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     }
 
     /// <summary>
-    /// 已确认记录照片上传/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
-    /// 与高龄津贴、低收入人口认定等模块共享同一份人员照片。
-    /// 列表入口不传 AssignContext = 只存档不识别（与档案查询/补传入口同语义）；
-    /// 识别回填仅在表单内采集时启用。
+    /// 已确认记录照片查看/上传：进入**档案照片查询页**（与低收入工作流、高龄申请列表同口径）——
+    /// 检索、缩略图、预览、勾选批量推送打印、插入/拖拽；要就地拍照用查询页里的「打开采集页」。
+    /// 照片按身份证归档，与高龄津贴、低收入人口认定共享同一份人员照片。
+    /// 列表入口不传 AssignContext = 只存档不识别；识别回填由表单内的采集入口承担。
     /// </summary>
     [RelayCommand]
     private async Task OpenPhotosAsync(TempReliefApplication? app)
@@ -301,8 +302,8 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
         }
 
         _logger.LogBusiness("临时救助列表-档案照片", ("ApplicationId", app.Id));
-        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(app.ApplicantIdCard.Trim(), app.Id, app.ApplicantName));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(app.ApplicantIdCard.Trim(), ApplicationId: app.Id));
     }
 
     [RelayCommand]

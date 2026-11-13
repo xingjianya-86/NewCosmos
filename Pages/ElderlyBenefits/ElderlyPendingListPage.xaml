@@ -34,11 +34,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="办理" Style="{StaticResource ButtonSmall}"
-                            BackgroundColor="{StaticResource Primary}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
-                            CommandParameter="{Binding .}"
-                            VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="办理" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -63,11 +67,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="办理" Style="{StaticResource ButtonSmall}"
-                            BackgroundColor="{StaticResource Primary}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
-                            CommandParameter="{Binding .}"
-                            VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="办理" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleNewCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -97,11 +105,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="复核办理" Style="{StaticResource ButtonSmall}"
-                            BackgroundColor="{StaticResource Warning}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
-                            CommandParameter="{Binding .}"
-                            VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="复核办理" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Warning}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -126,11 +138,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="复核办理" Style="{StaticResource ButtonSmall}"
-                            BackgroundColor="{StaticResource Warning}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
-                            CommandParameter="{Binding .}"
-                            VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="复核办理" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Warning}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleTransferCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -160,11 +176,15 @@
                             </Label.Text>
                         </Label>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="停发办理" Style="{StaticResource ButtonSmall}"
-                            BackgroundColor="{StaticResource Error}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleDeathStopCommand}"
-                            CommandParameter="{Binding .}"
-                            VerticalOptions="Center"/>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding DeceasedIdCard}"/>
+                        <Button Text="停发办理" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Error}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyPendingListViewModel}}, Path=HandleDeathStopCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>

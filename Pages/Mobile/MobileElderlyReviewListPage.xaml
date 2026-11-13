@@ -18,11 +18,17 @@
                         <Label Text="{Binding CategoryChangeDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         <Label Text="{Binding TriggerSourceName}" FontSize="14" TextColor="{StaticResource Info}"/>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="办理" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
-                            BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
-                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
-                            CommandParameter="{Binding .}"/>
+                    <VerticalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                        <Button Text="照片" FontSize="13" Padding="14,0" HeightRequest="30" CornerRadius="8"
+                                BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="办理" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                                BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
+                                IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </VerticalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -36,11 +42,17 @@
                         <Label Text="{Binding CategoryName}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                         <Label Text="{Binding IssueStartMonth}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                     </VerticalStackLayout>
-                    <Button Grid.Column="1" Text="复核" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
-                            BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
-                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
-                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
-                            CommandParameter="{Binding .}"/>
+                    <VerticalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center">
+                        <Button Text="照片" FontSize="13" Padding="14,0" HeightRequest="30" CornerRadius="8"
+                                BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=OpenPhotosCommand}"
+                                CommandParameter="{Binding IdCard}"/>
+                        <Button Text="复核" FontSize="14" Padding="12,0" HeightRequest="34" CornerRadius="8"
+                                BackgroundColor="{StaticResource ModuleElderly}" TextColor="White"
+                                IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </VerticalStackLayout>
                 </Grid>
             </Border>
         </DataTemplate>

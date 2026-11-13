@@ -20,11 +20,16 @@
                 <Label Grid.Column="2" Text="{Binding CategoryChangeDisplay}" FontSize="16" VerticalOptions="Center"/>
                 <Label Grid.Column="3" Text="{Binding TriggerSourceName}" FontSize="15"
                        TextColor="{StaticResource Info}" VerticalOptions="Center"/>
-                <Button Grid.Column="4" Text="办理" Style="{StaticResource ButtonSmall}"
-                        BackgroundColor="{StaticResource ModuleElderly}"
-                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
-                        Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
-                        CommandParameter="{Binding .}"/>
+                <HorizontalStackLayout Grid.Column="4" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
+                    <Button Text="办理" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource ModuleElderly}"
+                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewPendingCommand}"
+                            CommandParameter="{Binding .}"/>
+                </HorizontalStackLayout>
             </Grid>
         </DataTemplate>
 
@@ -39,11 +44,16 @@
                 <Label Grid.Column="2" Text="{Binding IdCard}" FontSize="16" VerticalOptions="Center"/>
                 <Label Grid.Column="3" Text="{Binding CategoryName}" FontSize="16" VerticalOptions="Center"/>
                 <Label Grid.Column="4" Text="{Binding IssueStartMonth}" FontSize="16" VerticalOptions="Center"/>
-                <Button Grid.Column="5" Text="复核" Style="{StaticResource ButtonSmall}"
-                        BackgroundColor="{StaticResource ModuleElderly}"
-                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
-                        Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
-                        CommandParameter="{Binding .}"/>
+                <HorizontalStackLayout Grid.Column="5" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
+                    <Button Text="复核" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource ModuleElderly}"
+                            IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=CanReview}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyReviewListViewModel}}, Path=ReviewApplicationCommand}"
+                            CommandParameter="{Binding .}"/>
+                </HorizontalStackLayout>
             </Grid>
         </DataTemplate>
     </ContentPage.Resources>

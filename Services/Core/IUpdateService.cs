@@ -48,4 +48,10 @@ public interface IUpdateService
 
     /// <summary>记录跳过的版本</summary>
     void SetSkippedVersion(string version);
+
+    /// <summary>
+    /// 拉取服务端全量升级日志（与本平台清单同目录的 changelog.json，多源按序回退）。
+    /// 仅作展示，不参与安装决策；未配置清单地址/全部源失败时返回 Failure（显式失败，不吞）。
+    /// </summary>
+    Task<Result<string>> FetchChangelogJsonAsync(CancellationToken ct = default);
 }

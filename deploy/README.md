@@ -46,6 +46,7 @@
 | 非强制升级 | F（否） | Y=最低支持版本取"上一版"（低于它才强制）；默认=强制到本版 |
 | 发布后推送 GitHub | Y（是） | F=不提交推送 |
 | 回环下载校验 | Y（是） | F=跳过大文件下载（仅保留清单/签名校验） |
+| 本次更新说明 | `CHANGELOG.md` 当前版本段 | 自动抽取当前版本段（缺段回退 `## [未发布]` 段，两者都没有则黄字警告），可 Y=采用 / N=手动输入 / E=留空 |
 
 > 已显式传入的参数不会再询问；自动化/无人值守用 `-NonInteractive`。
 
@@ -59,6 +60,14 @@
 | `-Force` | 清单 `force=true`（无论版本都强制更新） |
 | `-SkipWindows` / `-SkipAndroid` / `-SkipGit` / `-SkipDownloadVerify` | 跳过对应环节 |
 | `-NonInteractive` | 关闭交互向导 |
+| `-Notes <text>` / `-NotesFile <path>` | 显式指定本次更新说明（单行 / UTF-8 文件多行），优先于 CHANGELOG 抽取 |
+
+**升级日志链路**（2026-11-12 起）：
+素材单一来源是仓库根 `CHANGELOG.md`（`## [版本号] - 日期` 分段，待发内容先写 `## [未发布]` 段）→
+发版时抽取当前段写入**两端清单 `notes`**（Windows 经 `-NotesFile`、Android 写同一份文本），
+并把 `{version, channel, publishedAt, force, notes}` 合并进服务端 `stable/changelog.json` 与 `android/changelog.json`（同版本覆盖、拉取失败不阻断发版）→
+客户端：升级弹窗显示说明摘要、下载后落 `update_pending.json`、新版首启写入本机历史并**自动提示一次**、应用内「设置 → 更新日志」页展示本机历史与在线全量。
+`changelog.json` 仅作展示，**不参与安装决策**（安装仍走签名清单 `update.json`）。
 
 **版本号格式**：`1.1.yyyyMMdd`（如 `1.1.20261010`）。脚本自动同步：
 `NewCosmos.csproj`(ApplicationDisplayVersion/ApplicationVersion) / `config\app.ini`(Version) / `installer\NewCosmosSetup.iss`(MyAppVersion/VersionInfoVersion)。

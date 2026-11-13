@@ -22,6 +22,9 @@
                 <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="17" VerticalOptions="Center"/>
                 <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="17" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
                     <Button Text="停发" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopCommand}"
@@ -41,6 +44,9 @@
                 <Label Grid.Column="4" Text="{Binding CategoryName}" FontSize="17" VerticalOptions="Center"/>
                 <Label Grid.Column="5" Text="{Binding IssueStartMonth}" FontSize="17" VerticalOptions="Center"/>
                 <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
                     <Button Text="停发" Style="{StaticResource ButtonSmall}"
                             BackgroundColor="{StaticResource Warning}"
                             Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopCommand}"
@@ -67,10 +73,15 @@
                 <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
                 <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
                 <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="17" VerticalOptions="Center"/>
-                <Button Grid.Column="6" Text="建档并停发" Style="{StaticResource ButtonSmall}"
-                        BackgroundColor="{StaticResource Warning}"
-                        Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
-                        CommandParameter="{Binding .}"/>
+                <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
+                    <Button Text="建档并停发" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
+                            CommandParameter="{Binding .}"/>
+                </HorizontalStackLayout>
             </Grid>
         </DataTemplate>
         <DataTemplate x:Key="ImportedStopOddRow" x:DataType="ent:ElderlyImportedSearchItem">
@@ -84,10 +95,15 @@
                 <Label Grid.Column="3" Text="{Binding IdCard}" FontSize="17" VerticalOptions="Center"/>
                 <Label Grid.Column="4" Text="{Binding SourceDisplay}" FontSize="15" VerticalOptions="Center" TextColor="{StaticResource Info}"/>
                 <Label Grid.Column="5" Text="{Binding Age, StringFormat='{0} 岁'}" FontSize="17" VerticalOptions="Center"/>
-                <Button Grid.Column="6" Text="建档并停发" Style="{StaticResource ButtonSmall}"
-                        BackgroundColor="{StaticResource Warning}"
-                        Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
-                        CommandParameter="{Binding .}"/>
+                <HorizontalStackLayout Grid.Column="6" Spacing="8" HorizontalOptions="Center">
+                    <Button Text="照片" Style="{StaticResource ButtonSmall}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                            CommandParameter="{Binding IdCard}"/>
+                    <Button Text="建档并停发" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Warning}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
+                            CommandParameter="{Binding .}"/>
+                </HorizontalStackLayout>
             </Grid>
         </DataTemplate>
         <converters:AlternatingRowTemplateSelector x:Key="ImportedStopSelector"

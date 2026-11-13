@@ -19,6 +19,8 @@
 #   -SkipTemplateCheck   跳过模板字段体检
 #   -SkipTests           跳过发布前 dotnet test 门槛（默认执行，~1-2 分钟）
 #   -SkipStandardsCheck  跳过 check_standards 规范检查（默认执行，红线类命中即中断）
+#   -Notes <text>        本次更新说明（升级弹窗与「更新日志」页显示；缺省自动抽取 CHANGELOG.md 当前版本段）
+#   -NotesFile <path>    从 UTF-8 文件读取更新说明（多行文本）
 #
 # 依赖：.NET 10 SDK + maui；Inno Setup 6；JDK17 + Android SDK；keystore\keystore.props。
 # 内网地址来自 deploy\deploy.local.ps1（gitignored）；上一版查询/入库需环境变量 NEWCOSMOS_DB_PASSWORD。
@@ -32,6 +34,8 @@ param(
     [string]$PrevVersion = "",
     [switch]$Force,
     [string]$Channel = "stable",
+    [string]$Notes = "",
+    [string]$NotesFile = "",
     [switch]$SkipWindows,
     [switch]$SkipAndroid,
     [switch]$SkipGit,
@@ -54,6 +58,23 @@ $Repo = Split-Path -Parent $ScriptsDir
 Set-Location $Repo
 
 function Write-Step([string]$t) { Write-Host ""; Write-Host "== $t ==" -ForegroundColor Cyan }
+
+# ── CHANGELOG.md 抽取当前版本段（升级日志唯一素材来源）──
+# 返回 @{ Text; Source }：exact=当前版本段 / unreleased=「未发布」段回退 / missing=两段都没有或文件不可读。
+# 显式 UTF-8 读取（PS5.1 Get-Content 默认 ANSI，中文会乱码）。
+function Get-ChangelogSection([string]$Ver) {
+    $cl = Join-Path $Repo "CHANGELOG.md"
+    if (-not (Test-Path -LiteralPath $cl)) { return @{ Text = ""; Source = "missing" } }
+    try { $text = [IO.File]::ReadAllText($cl, [Text.Encoding]::UTF8) } catch { return @{ Text = ""; Source = "missing" } }
+
+    $m = [regex]::Match($text, "(?ms)" + [regex]::Escape("## [$Ver]") + "[^\r\n]*\r?\n.*?(?=^## \[|\z)")
+    if ($m.Success) { return @{ Text = $m.Value.Trim(); Source = "exact" } }
+
+    $m = [regex]::Match($text, "(?ms)" + [regex]::Escape("## [未发布]") + "[^\r\n]*\r?\n.*?(?=^## \[|\z)")
+    if ($m.Success) { return @{ Text = $m.Value.Trim(); Source = "unreleased" } }
+
+    return @{ Text = ""; Source = "missing" }
+}
 
 # ── 发布环境体检（DryRun 与正式发布共用；只报告不构建）──
 # 2026-11 新增：DryRun 原只打印计划，缺依赖（Inno/JDK/SDK/SSH/签名键/deploy.local）要到真跑
@@ -122,6 +143,24 @@ if (-not $NonInteractive -and -not $DryRun) {
         $v = Read-Host "版本号 [默认 $Version]"
         if (-not [string]::IsNullOrWhiteSpace($v)) { $Version = $v.Trim() }
     }
+    # 升级日志素材：默认抽取 CHANGELOG.md 当前版本段（缺段回退「未发布」段），可手动输入或留空
+    if (-not $PSBoundParameters.ContainsKey('Notes') -and -not $PSBoundParameters.ContainsKey('NotesFile')) {
+        $clSec = Get-ChangelogSection $Version
+        if ($clSec.Text) {
+            $srcLabel = if ($clSec.Source -eq 'exact') { "CHANGELOG.md [$Version] 段" } else { "CHANGELOG.md [未发布] 段（建议发版前把标题改成版本号）" }
+            Write-Host ""
+            Write-Host "本次更新说明（升级弹窗显示 · 来源：$srcLabel）：" -ForegroundColor Cyan
+            Write-Host $clSec.Text -ForegroundColor DarkGray
+            $a = Read-Host "采用? Y=采用 / N=手动输入 / E=留空 [回车=Y]"
+            if ($a -match '^(n|N)$') { $Notes = Read-Host "更新说明（单行；多行请用 -NotesFile）" }
+            elseif ($a -match '^(e|E)$') { $Notes = "" }
+            else { $Notes = $clSec.Text }
+        } else {
+            Write-Host "警告：CHANGELOG.md 缺少 [$Version] 与 [未发布] 段落，升级弹窗将没有更新说明（建议发版前补写）" -ForegroundColor Yellow
+            $a = Read-Host "仍要手动输入说明? Y=输入 / N=留空 [回车=N]"
+            if ($a -match '^(y|Y)$') { $Notes = Read-Host "更新说明（单行）" }
+        }
+    }
     if (-not $PSBoundParameters.ContainsKey('WithPatch')) {
         $a = Read-Host "生成增量补丁（上一版→本版）? Y/F [回车=F]"
         if ($a -match '^(y|Y)$') { $WithPatch = $true }
@@ -175,6 +214,21 @@ if (-not $MinSupported) {
 if ($SoftUpdate -and -not $prevResolved) { Write-Host "警告：未能解析上一版，-SoftUpdate 退化为强制（minSupported=版本号）" -ForegroundColor Yellow }
 Write-Host "发布版本: $Version（最低支持 $MinSupported，渠道 $Channel，强制=$([bool]$Force)，增量补丁=$([bool]$WithPatch)）"
 
+# ── 升级日志素材落地：-NotesFile/-Notes → notes 文本 → 临时 UTF-8 文件 ──
+# 供 Windows 分支传 publish_release.ps1 -NotesFile、Android 分支写清单 notes、changelog.json 合并共用。
+if ($NotesFile -ne "" -and (Test-Path -LiteralPath $NotesFile)) {
+    # 显式按 UTF-8 读取（PS5.1 Get-Content 默认 ANSI，中文会乱码）
+    $Notes = [IO.File]::ReadAllText($NotesFile, [Text.Encoding]::UTF8).Trim()
+}
+$notesText = ""
+if ($Notes) { $notesText = $Notes.Trim() }
+$notesPath = ""
+if ($notesText -ne "") {
+    New-Item -ItemType Directory -Force -Path (Join-Path $Repo "publish") | Out-Null
+    $notesPath = Join-Path $Repo "publish\notes_$Version.md"
+    [IO.File]::WriteAllText($notesPath, $notesText, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 if ($DryRun) {
     Write-Host ""
     Write-Host "===== DRY RUN（不构建/不上传/不推 GitHub）=====" -ForegroundColor Yellow
@@ -194,6 +248,11 @@ if ($DryRun) {
     Write-Host ("  GitHub  : {0}" -f $(if ($SkipGit) { "跳过" } else { "提交并推送" }))
     Write-Host ("  产物目录: {0}" -f (Join-Path $Repo "publish\release\$Version"))
     Write-Host ("  版本同步: {0}（csproj/app.ini/iss；DryRun 不写入）" -f $Version)
+    if ($notesText -ne "") {
+        Write-Host ("  更新说明: 已就绪（{0} 字）—— Windows 走 -NotesFile，Android 写清单 notes" -f $notesText.Length) -ForegroundColor Cyan
+    } else {
+        Write-Host "  更新说明: 空（升级弹窗将无更新说明；建议在 CHANGELOG.md 写当前版本段）" -ForegroundColor Yellow
+    }
     if ($envIssues.Count -gt 0) {
         Write-Host ""
         Write-Host "体检发现 $($envIssues.Count) 个缺失依赖（正式发版将中断）：" -ForegroundColor Red
@@ -309,6 +368,8 @@ if (-not $SkipWindows) {
     $prArgs = @{ Version = $Version; MinSupported = $MinSupported; Channel = $Channel }
     if (-not $WithPatch) { $prArgs['SkipPatch'] = $true }
     if ($Force) { $prArgs['Force'] = $true }
+    # 升级日志：把本次更新说明传给底层（写入 Windows 清单 notes）
+    if ($notesPath -ne "") { $prArgs['NotesFile'] = $notesPath }
     & $pr @prArgs
     if ($LASTEXITCODE -ne 0) { throw "Windows 发布失败（退出码 $LASTEXITCODE）" }
 }
@@ -392,7 +453,7 @@ if (-not $SkipAndroid) {
     $signature = (Get-Content -LiteralPath $sigFile -Raw -Encoding UTF8).Trim()
     $manifest = [ordered]@{
         schema = $schema; channel = $Channel; latestVersion = $Version; minSupportedVersion = $MinSupported
-        force = [bool]$Force; publishedAt = $publishedAt; notes = ""
+        force = [bool]$Force; publishedAt = $publishedAt; notes = $notesText
         package = [ordered]@{ url = $apkName; size = $size; sha256 = $sha }
         signature = $signature
     }
@@ -425,6 +486,51 @@ if (-not $SkipAndroid) {
 }
 else { Write-Host "跳过 Android" -ForegroundColor Yellow }
 
+# ── 2.5 升级日志全量（changelog.json）：与服务端历史合并后上传 ──
+# 应用内「更新日志」页拉取全量历史；仅作展示，不参与安装决策（安装仍走签名清单 update.json）。
+if ((-not $SkipWindows) -or (-not $SkipAndroid)) {
+    Write-Step "升级日志：合并并上传 changelog.json"
+    try {
+        $clRemote = "$ServerUser@$ServerHost"
+        $clPublishedAt = (Get-Date).ToString("yyyy-MM-ddTHH:mm:sszzz")
+
+        $entries = @()
+        try {
+            # 清单在 stable/（Windows）与 android/ 两处各存一份全量历史，客户端按各自清单目录读取
+            $oldJson = (& ssh -i $SshKey -o BatchMode=yes -o StrictHostKeyChecking=accept-new $clRemote "cat $ServerRoot/stable/changelog.json 2>/dev/null" 2>$null) -join "`n"
+            if ($oldJson -and $oldJson.Trim()) {
+                $oldObj = $oldJson | ConvertFrom-Json
+                if ($oldObj.entries) { $entries = @($oldObj.entries) }
+            }
+        } catch {
+            Write-Host "  服务端 changelog.json 拉取/解析失败（按全新重建，仅保留本次）: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+
+        # 同版本覆盖：重发/补发不产生重复条目
+        $entries = @($entries | Where-Object { $_.version -ne $Version })
+        $newList = @([ordered]@{
+            version     = $Version
+            channel     = $Channel
+            publishedAt = $clPublishedAt
+            force       = [bool]$Force
+            notes       = $notesText
+        }) + $entries
+
+        $clDoc = [ordered]@{ schema = 1; updatedAt = $clPublishedAt; entries = $newList }
+        $clPath = Join-Path $Repo "publish\changelog.json"
+        [IO.File]::WriteAllText($clPath, (ConvertTo-Json $clDoc -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+
+        & ssh -i $SshKey -o BatchMode=yes -o StrictHostKeyChecking=accept-new $clRemote "mkdir -p $ServerRoot/stable $ServerRoot/android" | Out-Null
+        foreach ($dest in @("stable", "android")) {
+            & scp -i $SshKey -o BatchMode=yes -o StrictHostKeyChecking=accept-new $clPath "${clRemote}:$ServerRoot/$dest/changelog.json"
+            if ($LASTEXITCODE -ne 0) { throw "changelog.json 上传 $dest/ 失败（退出码 $LASTEXITCODE）" }
+        }
+        Write-Host "  changelog.json 已上传（stable/ + android/ 各一份）：共 $($newList.Count) 个版本，本版说明 $($notesText.Length) 字" -ForegroundColor Green
+    } catch {
+        Write-Host "  升级日志上传失败（不阻断发版，下次发版会重新合并）: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 # ── 3. 回环校验：从服务器下载更新包并验签/校验 SHA256 ──
 if ((-not $SkipDownloadVerify) -and (-not $SkipWindows -or -not $SkipAndroid)) {
     Write-Step "回环校验：从服务器下载最新包（验签 + SHA256）"
@@ -437,7 +543,7 @@ else { Write-Host "跳过回环下载校验" -ForegroundColor Yellow }
 # ── 4. GitHub ──
 if (-not $SkipGit) {
     Write-Step "GitHub：提交版本号并推送"
-    & git add NewCosmos.csproj config/app.ini installer/NewCosmosSetup.iss
+    & git add NewCosmos.csproj config/app.ini installer/NewCosmosSetup.iss CHANGELOG.md
     & git diff --cached --quiet
     if ($LASTEXITCODE -eq 0) { Write-Host "版本号无变化，跳过提交" -ForegroundColor Yellow }
     else {

@@ -5,6 +5,7 @@ using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.TempRelief;
@@ -13,6 +14,7 @@ using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace NewCosmos.ViewModels.TempRelief;
@@ -161,37 +163,93 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private string _selectedSmallAmountLevel = string.Empty;
 
-    /// <summary>选中的小额档位金额</summary>
+    /// <summary>确定金额（可编辑：默认=户籍对应低保月标准，只可下调不可上调）</summary>
     [ObservableProperty]
-    private string _confirmAmountDisplay = string.Empty;
+    private string _confirmAmountInput = string.Empty;
 
+    /// <summary>小额定额说明（自动匹配户籍 / 户籍缺失需手选 / 金额上限提示）</summary>
+    [ObservableProperty]
+    private string _smallAmountHint = string.Empty;
+
+    /// <summary>确定金额（落库值；输入非法时为 0，保存前会被校验拦截）</summary>
     private decimal _confirmAmount;
+
+    /// <summary>当前档位对应的低保月标准（确定金额上限）</summary>
+    private decimal _confirmAmountMax;
+
+    /// <summary>正在整体刷新档位选项（此时选中首项不代表用户手选户籍）</summary>
+    private bool _applyingLevelOptions;
 
     partial void OnSelectedSmallAmountLevelChanged(string value)
     {
         UpdateConfirmAmount();
+
+        // 户籍未从数据库读到（列表含两档）时，用户手选档位即视为选定户籍分类
+        if (!_applyingLevelOptions && !_suppressReload)
+            TryAdoptHukouFromLevel(value);
     }
 
+    partial void OnConfirmAmountInputChanged(string value)
+    {
+        _confirmAmount = TempReliefConstants.TryParseConfirmAmount(value, out var amount) ? amount : 0m;
+    }
+
+    /// <summary>
+    /// 档位变化：确定金额默认回到该档标准（可再手动下调）。
+    /// 存量记录由 LoadAsync 回填原档位名+原金额，旧金额不受影响。
+    /// </summary>
     private void UpdateConfirmAmount()
     {
         var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
         if (level != null)
         {
+            _confirmAmountMax = level.StandardValue;
             _confirmAmount = level.StandardValue;
-            ConfirmAmountDisplay = $"{_confirmAmount:F2} 元";
+            ConfirmAmountInput = level.StandardValue.ToString("0.##", CultureInfo.InvariantCulture);
         }
         else
         {
+            _confirmAmountMax = 0m;
             _confirmAmount = 0m;
-            ConfirmAmountDisplay = string.Empty;
+            ConfirmAmountInput = string.Empty;
         }
+
+        SmallAmountHint = BuildSmallAmountHint();
+    }
+
+    /// <summary>定额说明：户籍来自数据库则提示已自动匹配；未读到则提示手动选择档位（=手选户籍分类）</summary>
+    private string BuildSmallAmountHint()
+    {
+        if (TempReliefConstants.ResolveSubsistenceStandardType(_hukouType) == null)
+            return "未读取到户籍分类，请手动选择档位；确定金额可下调，不得超过所选标准。";
+
+        return _confirmAmountMax > 0
+            ? $"已按户籍匹配低保月标准 {_confirmAmountMax:F2} 元/月；确定金额可下调，不得超过 {_confirmAmountMax:F2} 元。"
+            : "未取到当前生效的低保月标准，无法自动确定金额。";
+    }
+
+    /// <summary>户籍缺失时：把用户手选的档位回写为户籍分类（Rural/Urban），保存时随申请落库</summary>
+    private void TryAdoptHukouFromLevel(string levelName)
+    {
+        if (TempReliefConstants.ResolveSubsistenceStandardType(_hukouType) != null) return;
+
+        var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == levelName);
+        if (level == null) return;
+
+        if (level.StandardType == TempReliefConstants.SubsistenceStandardRural)
+            _hukouType = "Rural";
+        else if (level.StandardType == TempReliefConstants.SubsistenceStandardUrban)
+            _hukouType = "Urban";
+
+        SmallAmountHint = BuildSmallAmountHint();
     }
 
     private List<ConfigStandard> SmallAmountLevels { get; set; } = new();
 
     private async Task LoadSmallAmountLevelsAsync()
     {
-        var result = await _applicationService.GetSmallAmountLevelsAsync(CancellationToken);
+        // 定额救助按户籍动态取低保月标准（农村 632 / 城镇 827；户籍为空时两档手选）
+        var result = await _applicationService.GetSmallAmountLevelsAsync(_hukouType, CancellationToken);
         if (result.IsFailure || result.Value == null)
         {
             _logger.LogError(new Exception(result.Message ?? "未知错误"), "加载小额定额档位失败");
@@ -199,16 +257,33 @@ public partial class TempReliefFormViewModel : ViewModelBase
         }
 
         SmallAmountLevels = result.Value;
-        MainThread.BeginInvokeOnMainThread(() =>
+
+        // 已在 UI 线程时同步应用：BeginInvokeOnMainThread 在 Windows 上恒入队，
+        // 会晚于 LoadAsync 的存量档位兜底（EnsureLegacySmallAmountOption）执行，
+        // 把注入的旧档位选项清掉、选中项改回低保档 → 存量金额回显丢失。
+        void ApplyLevelOptions()
         {
-            SmallAmountLevelOptions.Clear();
-            foreach (var level in SmallAmountLevels)
+            _applyingLevelOptions = true;
+            try
             {
-                SmallAmountLevelOptions.Add(level.StandardName);
+                SmallAmountLevelOptions.Clear();
+                foreach (var level in SmallAmountLevels)
+                {
+                    SmallAmountLevelOptions.Add(level.StandardName);
+                }
+                if (SmallAmountLevelOptions.Count > 0)
+                    SelectedSmallAmountLevel = SmallAmountLevelOptions[0];
             }
-            if (SmallAmountLevelOptions.Count > 0)
-                SelectedSmallAmountLevel = SmallAmountLevelOptions[0];
-        });
+            finally
+            {
+                _applyingLevelOptions = false;
+            }
+        }
+
+        if (MainThread.IsMainThread)
+            ApplyLevelOptions();
+        else
+            MainThread.BeginInvokeOnMainThread(ApplyLevelOptions);
     }
 
     #endregion
@@ -430,21 +505,24 @@ public partial class TempReliefFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
-    /// 与高龄津贴、低收入人口认定等模块共享同一份人员照片。
+    /// 照片查看/采集：进入**档案照片查询页**（与低收入、高龄同口径）——检索/预览/批量推送打印/插入；
+    /// 要就地拍照走查询页的「打开采集页」，申请 ID 与识别回填上下文随参数透传，
+    /// 「拍照 → OCR → 回填表单」能力保留。照片按身份证归档，三模块共享同一份人员照片。
     /// </summary>
     [RelayCommand]
     private async Task OpenPhotosAsync()
     {
         if (string.IsNullOrWhiteSpace(ApplicantIdCard))
         {
-            await _dialogService.DisplayAlertAsync("提示", "请先选择申请人（身份证号缺失），再采集照片", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "请先选择申请人（身份证号缺失），再查看或采集照片", "确定");
             return;
         }
 
-        _logger.LogBusiness("临时救助-照片采集/查看", ("ApplicationId", _id.ToString()));
-        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _id > 0 ? _id : null, ApplicantName,
+        _logger.LogBusiness("临时救助-档案照片", ("ApplicationId", _id.ToString()));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(
+                ApplicantIdCard.Trim(),
+                ApplicationId: _id > 0 ? _id : null,
                 AssignContext: this));
     }
 
@@ -463,8 +541,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
     private DateTime _applyDate = DateTime.Today;
 
     /// <summary>
-    /// 归属批次提示（只读）：新建/草稿时显示本次申请落在哪个 C 线批次，
-    /// 例："本次归属：2026年11月批次（公示 11-10~11-12，验收 11-13）"。
+    /// 归属批次提示（只读）：新建/草稿时显示本次申请落在哪个 C 线批次与逐笔时间曲线，
+    /// 例："本次归属：2026年11月批次（公示 11-11~11-13，验收 11-14）"。
+    /// 批次 = 申请日 ≤ 当月 13 号归本月（仅作标签）；曲线 = 申请日+1 公示起、+3 止、+4 验收。
     /// 编辑/查看已存档案保留库中原值、不重算，故为空。
     /// </summary>
     [ObservableProperty]
@@ -474,7 +553,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
     /// <summary>归属批次提示是否显示（配合 StringNotEmptyConverter 控制 Label 显隐）</summary>
     public bool HasBatchHint => !string.IsNullOrWhiteSpace(BatchHintText);
 
-    /// <summary>申请日期变化 → 按验收日 A 归属 C 线批次并重算公示日期（超过当月 13 号自动顺延下月批次；申请日期本身不被改写）</summary>
+    /// <summary>申请日期变化 → 重算逐笔 5 天曲线（公示起 = 申请日+1、止 = +3、验收 = +4）与批次标签</summary>
     partial void OnApplyDateChanged(DateTime value)
     {
         if (_suppressReload) return;
@@ -961,7 +1040,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     /// <summary>
     /// 新建模式默认值：填报单位=当前登录用户所属单位、乡镇验收人=本单位民政助理、
-    /// 户籍地址=当前用户组织机构、公示日期=C线当月窗口（公示起=验收日前3天、止=验收日前1天）、入户核实默认文本
+    /// 户籍地址=当前用户组织机构、公示日期=逐笔 5 天曲线（公示起=申请日次日、止=+3、验收=+4）、入户核实默认文本
     /// </summary>
     private async Task ApplyCreateDefaultsAsync()
     {
@@ -1113,13 +1192,11 @@ public partial class TempReliefFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// C 线归属批次与公示日期默认值（新建/草稿场景）：
+    /// C 线逐笔 5 天曲线与批次标签（新建/草稿场景，2026-11-13 起）：
     /// ① 申请日期先修正为「不晚于今日」（仅未来日期被拉回今天，不做回填钳制）；
-    /// ② 按验收日 A 归属批次：申请日 ≤ 当月验收日(13号) 归本月，否则顺延下月（跨年接续）；
-    /// ③ 公示起止、验收日取归属月窗口，并写入归属批次提示。
-    /// 申请日期本身不改写——2026-10-20 前的"越界钳到 A−5"会把 10-14 后录入的申请回填成 10-08、
-    /// 归属永远停在本月，已废止。
-    /// 公示日期仅用于新建/草稿场景；编辑或查看已保存档案时公示日期保留库中原值，不经此方法重算。
+    /// ② 曲线：公示起 = 申请日+1、公示止 = 申请日+3（恒 3 天）、验收日 = 申请日+4（自动推导，不手填）；
+    /// ③ 批次仅作标签：申请日 ≤ 当月验收日(13号) 归本月，否则顺延下月（跨年接续），与公示/验收脱钩。
+    /// 申请日期本身不改写。公示日期仅用于新建/草稿场景；编辑或查看已保存档案时保留库中原值、不重算。
     /// </summary>
     private async Task ApplyPublicizeDefaultsAsync()
     {
@@ -1130,7 +1207,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
             // 申请日期自动修正：不晚于今日
             var corrected = ApplyDate == default || ApplyDate.Date > DateTime.Today ? DateTime.Today : ApplyDate.Date;
-            var timeline = await timelineService.CalculateTempReliefForApplyDateAsync(corrected);
+            // 批次标签（申请日 ≤ A 归本月）与逐笔曲线分开取：曲线才是公示/验收的唯一口径
+            var batch = await timelineService.CalculateTempReliefForApplyDateAsync(corrected);
+            var curve = timelineService.BuildTempReliefCurve(corrected);
 
             // 仅最新一次计算生效：连续触发（如快速连续修改申请日期）时丢弃过期结果
             if (generation != Volatile.Read(ref _publicizeCalcGeneration))
@@ -1139,14 +1218,14 @@ public partial class TempReliefFormViewModel : ViewModelBase
             _suppressReload = true;
             try
             {
-                // 只回拉未来日期到今天；过去日期与归属月窗口内的日期一律原样保留
+                // 只回拉未来日期到今天；过去日期原样保留
                 if (ApplyDate.Date != corrected)
                     ApplyDate = corrected;
 
-                PublicizeStartDateValue = timeline.PublicityStartDate;
-                PublicizeEndDateValue = timeline.PublicityEndDate;
+                PublicizeStartDateValue = curve.PublicityStartDate;
+                PublicizeEndDateValue = curve.PublicityEndDate;
                 HasPublicizeDates = true;
-                BatchHintText = BuildBatchHint(timeline);
+                BatchHintText = BuildBatchHint(batch, curve);
             }
             finally
             {
@@ -1159,9 +1238,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
         }
     }
 
-    /// <summary>归属批次提示文案：本次归属：{年}年{月}批次（公示 起~止，验收 A）</summary>
-    private static string BuildBatchHint(TimelineResult timeline)
-        => $"本次归属：{timeline.Year}年{timeline.Month}月批次" +
-           $"（公示 {timeline.PublicityStartDate:MM-dd}~{timeline.PublicityEndDate:MM-dd}，验收 {timeline.AuditDate:MM-dd}）";
+    /// <summary>归属批次提示文案：本次归属：{年}年{月}批次（公示 起~止，验收 逐笔验收日）</summary>
+    private static string BuildBatchHint(TimelineResult batch, TimelineResult curve)
+        => $"本次归属：{batch.Year}年{batch.Month}月批次" +
+           $"（公示 {curve.PublicityStartDate:MM-dd}~{curve.PublicityEndDate:MM-dd}，验收 {curve.AuditDate:MM-dd}）";
 
 }

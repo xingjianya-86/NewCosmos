@@ -2407,8 +2407,10 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     }
 
     /// <summary>
-    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
-    /// 与高龄津贴、临时救助等模块共享同一份人员照片。
+    /// 照片查看/采集：进入**档案照片查询页**（与列表入口、高龄/临时救助同口径）——
+    /// 检索、预览、勾选批量推送打印、插入/拖拽；要就地拍照走查询页的「打开采集页」，
+    /// 表单的申请 ID 与识别回填上下文随参数透传，「拍照 → OCR → 回填表单」能力保留。
+    /// 照片按身份证归档，与高龄津贴、临时救助等模块共享同一份人员照片。
     /// </summary>
     [RelayCommand]
     private async Task OpenPhotosAsync()
@@ -2416,13 +2418,15 @@ public partial class ApplicationFormViewModel : FormViewModelBase
         if (string.IsNullOrWhiteSpace(ApplicantIdCard))
         {
             await _serviceProvider.GetRequiredService<IDialogService>()
-                .DisplayAlertAsync("提示", "请先填写身份证号，再采集照片", "确定");
+                .DisplayAlertAsync("提示", "请先填写身份证号，再查看或采集照片", "确定");
             return;
         }
 
-        _logger.LogBusiness("低收入认定-照片采集/查看", ("ApplicationId", _applicationId.ToString()));
-        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(ApplicantIdCard.Trim(), _applicationId > 0 ? _applicationId : null, ApplicantName,
+        _logger.LogBusiness("低收入认定-档案照片", ("ApplicationId", _applicationId.ToString()));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(
+                ApplicantIdCard.Trim(),
+                ApplicationId: _applicationId > 0 ? _applicationId : null,
                 AssignContext: this));
     }
 

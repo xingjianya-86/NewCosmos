@@ -10,6 +10,7 @@ namespace NewCosmos.Services.Core;
 public class AppUpdateCoordinator : IAppUpdateCoordinator
 {
     private readonly IUpdateService _updateService;
+    private readonly IUpdateHistoryService _updateHistory;
     private readonly IDialogService _dialogService;
     private readonly ILoadingProgressService _progressService;
     private readonly ILoggerService _logger;
@@ -17,12 +18,14 @@ public class AppUpdateCoordinator : IAppUpdateCoordinator
 
     public AppUpdateCoordinator(
         IUpdateService updateService,
+        IUpdateHistoryService updateHistory,
         IDialogService dialogService,
         ILoadingProgressService progressService,
         ILoggerService logger,
         ILoadingProgressRunner progressRunner)
     {
         _updateService = updateService;
+        _updateHistory = updateHistory;
         _dialogService = dialogService;
         _progressService = progressService;
         _logger = logger;
@@ -100,11 +103,23 @@ public class AppUpdateCoordinator : IAppUpdateCoordinator
         }
     }
 
+    /// <summary>升级弹窗文案：更新说明过长只给摘要（完整内容在「设置 → 更新日志」查看）。</summary>
+    private const int NotesSummaryMaxLength = 600;
+
     private string BuildUpdateMessage(UpdateInfo info)
     {
         var sizeText = info.PackageSize > 0 ? $"{info.PackageSize / 1024d / 1024d:F0} MB" : "未知大小";
-        var notes = string.IsNullOrWhiteSpace(info.Notes) ? string.Empty : $"\n\n更新说明：\n{info.Notes}";
+        var notes = string.IsNullOrWhiteSpace(info.Notes)
+            ? string.Empty
+            : "\n\n更新说明：\n" + TruncateNotes(info.Notes);
         return $"当前版本：{_updateService.CurrentVersion}\n最新版本：{info.LatestVersion}（{sizeText}）{notes}";
+    }
+
+    private static string TruncateNotes(string notes)
+    {
+        var text = notes.Trim();
+        if (text.Length <= NotesSummaryMaxLength) return text;
+        return text[..NotesSummaryMaxLength] + "\n……（余下内容见 设置 → 更新日志）";
     }
 
     private async Task<bool> DownloadAndInstallAsync(UpdateInfo info, CancellationToken ct)
@@ -118,6 +133,10 @@ public class AppUpdateCoordinator : IAppUpdateCoordinator
                     $"正在下载更新包... {p:F0}%"), innerCt);
             if (download.IsFailure)
                 throw new Exception(download.Message);
+
+            // 更新说明此刻在手：先落盘，新版首启写入本机升级历史并提示一次（升级日志功能）
+            await _updateHistory.SavePendingAsync(
+                info.LatestVersion, info.Notes, info.PublishedAt, innerCt);
 
             _progressService.UpdateProgress(LoadingSteps.Total, "正在启动更新程序...");
             var launch = _updateService.LaunchInstaller(download.Value, info.LatestVersion);

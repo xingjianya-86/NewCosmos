@@ -512,6 +512,10 @@ public partial class MobileMainViewModel : ViewModelBase
         await NavigateToPageAsync<Pages.Mobile.MobilePhotoBackfillPage>("照片补传");
     }
 
+    /// <summary>更新日志（当前版本 / 检查更新 / 升级历史：本机轨迹 + 服务端全量）。</summary>
+    [RelayCommand]
+    private Task OpenUpdateLogAsync() => NavigateToPageAsync<Pages.Config.UpdateLogPage>("更新日志");
+
     private async Task NavigateToCollegeStudentAsync()
     {
         // 入口门控（与桌面 MainViewModel.NavigateToCollegeStudentAsync 同口径：COLLEGE_MANAGE）

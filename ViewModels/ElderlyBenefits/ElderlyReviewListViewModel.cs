@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
+using NewCosmos.Models.Requests;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.UserManagement;
@@ -176,6 +177,22 @@ public partial class ElderlyReviewListViewModel : PagedSearchViewModelBase
         Logger.LogBusiness("进入高龄复核（按身份证）", ("IdCard", DataMasker.MaskIdCard(kw)));
         await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyReviewPage, ElderlyReviewPageParameter>(
             new ElderlyReviewPageParameter(IdCard: kw));
+    }
+
+    /// <summary>行内「照片」：打开该人员的档案照片（查询/预览/勾选批量推送打印/插入），预填身份证自动检索。</summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync(string? idCard)
+    {
+        if (string.IsNullOrWhiteSpace(idCard))
+        {
+            await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                "提示", "该记录缺少身份证号，无法查看照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("高龄复核-档案照片", ("IdCard", DataMasker.MaskIdCard(idCard)));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(idCard.Trim()));
     }
 
     // 返回上一页：使用基类 GoBackCommand

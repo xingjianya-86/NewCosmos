@@ -12,6 +12,7 @@ using NewCosmos.Services.Utilities;
 using NewCosmos.ViewModels.Base;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace NewCosmos.ViewModels.TempRelief;
@@ -41,6 +42,16 @@ public partial class TempReliefFormViewModel
 
             ApplicantName = app.ApplicantName;
             ApplicantIdCard = app.ApplicantIdCard;
+
+            // 户籍快照缺失（存量记录）时按身份证跨来源补判：当前库申请库 + 导入台账
+            if (string.IsNullOrWhiteSpace(_hukouType) && !string.IsNullOrWhiteSpace(app.ApplicantIdCard))
+            {
+                var hukouResult = await _applicationService.ResolveHukouTypeAsync(app.ApplicantIdCard, CancellationToken);
+                if (hukouResult.IsSuccess && !string.IsNullOrWhiteSpace(hukouResult.Value))
+                    _hukouType = hukouResult.Value;
+                else if (hukouResult.IsFailure)
+                    _logger.Warn($"存量申请户籍分类补判失败: id={app.Id}, msg={hukouResult.Message}");
+            }
             ApplicantGender = app.Gender;
             ApplicantAge = app.Age;
             ApplicantPhone = app.Phone;
@@ -111,8 +122,8 @@ public partial class TempReliefFormViewModel
         // 读入已有申请：救助原因取保存值，视为"已有内容"，类型/明细变化前不自动覆盖
         _reasonDirty = true;
 
-        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按 C 线窗口重算
-        // （草稿申请日期本就重置为今天 → 按验收日 A 归属，超过 13 号自动落到下月批次）
+        // 草稿读入：户籍地址按当前用户组织机构重新规划，公示日期按逐笔 5 天曲线重算
+        // （草稿申请日期本就重置为今天 → 公示 = 申请日+1~+3、验收 = +4；批次标签按 13 号归属）
         if (isDraft)
         {
             await ResolveHukouFromOrganizationAsync(CancellationToken);
@@ -124,7 +135,7 @@ public partial class TempReliefFormViewModel
             BatchHintText = string.Empty;
         }
 
-        // 小额：加载档位并回显
+        // 小额：加载档位并回显（档位=户籍对应低保月标准；存量旧档位名走附加选项兜底，金额不丢）
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {
             await LoadSmallAmountLevelsAsync();
@@ -132,12 +143,34 @@ public partial class TempReliefFormViewModel
             if (app0 != null && !string.IsNullOrEmpty(app0.SmallAmountLevel))
             {
                 _suppressReload = true;
+                EnsureLegacySmallAmountOption(app0.SmallAmountLevel, app0.ConfirmAmount);
                 SelectedSmallAmountLevel = app0.SmallAmountLevel;
                 _confirmAmount = app0.ConfirmAmount ?? 0m;
-                ConfirmAmountDisplay = _confirmAmount > 0 ? $"{_confirmAmount:F2} 元" : string.Empty;
+                ConfirmAmountInput = _confirmAmount > 0 ? _confirmAmount.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty;
                 _suppressReload = false;
             }
         }
+    }
+
+    /// <summary>
+    /// 存量小额记录回显兜底：旧档位名（一般困难/较重困难/特别困难 等）不在当前档位列表时，
+    /// 以原名+原金额注入为附加选项——Picker 正常显示、金额原样回显、保存不改写；
+    /// 只有用户主动改选新档位（户籍低保标准档）后才按新口径落库。
+    /// </summary>
+    private void EnsureLegacySmallAmountOption(string legacyName, decimal? legacyAmount)
+    {
+        if (SmallAmountLevels.Any(s => s.StandardName == legacyName)) return;
+
+        SmallAmountLevels.Insert(0, new ConfigStandard
+        {
+            StandardName = legacyName,
+            StandardValue = legacyAmount ?? 0m,
+            Unit = "元/次",
+            IsActive = true,
+            EffectiveStartDate = DateTime.Today
+        });
+        if (!SmallAmountLevelOptions.Contains(legacyName))
+            SmallAmountLevelOptions.Insert(0, legacyName);
     }
 
     private async Task LoadMembersAsync(long id)
@@ -371,6 +404,9 @@ public partial class TempReliefFormViewModel
             _sourceTable = c.SourceTable;
             _sourceFamilyId = c.SourceFamilyId;
             _hukouType = c.HukouType;
+            // 定额救助按户籍自动锁定低保月标准：候选人带入户籍后重算档位（新建流程，无旧档位需保留）
+            if (ReliefType == TempReliefConstants.ReliefTypeSmall)
+                await LoadSmallAmountLevelsAsync();
 
             ApplicantName = c.Name;
             ApplicantIdCard = c.IdCard;
@@ -392,8 +428,7 @@ public partial class TempReliefFormViewModel
             _familySizeSeed = c.FamilySize;
             ApplicantFamilySize = c.FamilySize;
             ApplicantFamilyCategory = TempReliefConstants.NormalizeFamilyCategory(c.FamilyCategory);
-            // 申请日期不变 → 公示窗口不变；这里重算一次只为让归属批次提示与公示日期保持同源
-            // （旧注释"特殊群体5个工作日/普通10个工作日"属 2026-10-18 重构前口径，simplified 已删除）
+            // 申请日期不变 → 逐笔 5 天曲线不变；这里重算一次只为让批次标签与公示日期保持同源
             await ApplyPublicizeDefaultsAsync();
             // 银行信息：来源台账预填（一卡通账号优先，其次银行卡号；开户行取 bank_name）
             BankName = c.BankName;
@@ -902,13 +937,28 @@ public partial class TempReliefFormViewModel
         if (DifficultyType == TempReliefConstants.DifficultyTypeEducation && Educations.Count == 0)
             return "困难类型为教育支出，请至少添加一条教育支出明细";
 
-        if (ReliefType == TempReliefConstants.ReliefTypeSmall && string.IsNullOrEmpty(SelectedSmallAmountLevel))
-            return "小额快速救助请选择定额档位";
+        if (ReliefType == TempReliefConstants.ReliefTypeSmall)
+        {
+            if (string.IsNullOrEmpty(SelectedSmallAmountLevel))
+                return "小额快速救助请选择定额档位";
+
+            // 确定金额可下调，但不得超过户籍对应低保月标准（标准缺失时跳过上限校验）
+            var selectedLevel = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
+            var maxAmount = selectedLevel?.StandardValue ?? _confirmAmountMax;
+            if (!TempReliefConstants.TryValidateConfirmAmount(ConfirmAmountInput, maxAmount, out _, out var amountError))
+                return amountError;
+        }
 
         if (HasPublicizeDates && PublicizeEndDateValue < PublicizeStartDateValue)
             return "公示结束日期不能早于开始日期";
 
-        // 申请日期不在此报错：归属月由 ApplyPublicizeDefaultsAsync 按验收日 A 归属（超过 13 号顺延下月），申请日期不改写
+        // 新建/草稿：公示曲线自动推导（申请日+1 ~ +3，恒 3 天）；此处兜底防异常路径改坏只读值
+        if (HasPublicizeDates && !string.IsNullOrEmpty(BatchHintText)
+            && PublicizeEndDateValue.Date != PublicizeStartDateValue.Date.AddDays(2))
+            return "公示期须为 3 天（公示止 = 公示起 + 2 天），请重新选择申请日期";
+
+        // 申请日期不在此报错：批次标签由 ApplyPublicizeDefaultsAsync 按验收日 A 归属（超过 13 号顺延下月），
+        // 逐笔 5 天曲线随申请日平移，申请日期本身不改写
         return null;
     }
 
@@ -1010,7 +1060,10 @@ public partial class TempReliefFormViewModel
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {
             app.SmallAmountLevel = SelectedSmallAmountLevel;
-            app.ConfirmAmount = _confirmAmount > 0 ? _confirmAmount : null;
+            // 确定金额以输入框为准（可下调）；校验在 ValidateBeforeSave 已拦截非法/超上限值
+            app.ConfirmAmount = TempReliefConstants.TryParseConfirmAmount(ConfirmAmountInput, out var confirmAmount)
+                ? confirmAmount
+                : null;
         }
         else
         {

@@ -16,10 +16,16 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
                                TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="停发" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="8"
-                                BackgroundColor="{StaticResource Warning}" TextColor="White"
-                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopCommand}"
-                                CommandParameter="{Binding .}"/>
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                            <Button Text="照片" FontSize="13" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding IdCard}"/>
+                            <Button Text="停发" FontSize="14" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopCommand}"
+                                    CommandParameter="{Binding .}"/>
+                        </HorizontalStackLayout>
                     </Grid>
                     <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
@@ -44,10 +50,16 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="{Binding Name}" FontSize="16" FontAttributes="Bold"
                                TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
-                        <Button Grid.Column="1" Text="建档并停发" FontSize="14" Padding="10,0" HeightRequest="32" CornerRadius="8"
-                                BackgroundColor="{StaticResource Warning}" TextColor="White"
-                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
-                                CommandParameter="{Binding .}"/>
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                            <Button Text="照片" FontSize="13" Padding="12,0" HeightRequest="32" CornerRadius="8"
+                                    BackgroundColor="{StaticResource InfoSoft}" TextColor="{StaticResource PrimaryDark}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=OpenPhotosCommand}"
+                                    CommandParameter="{Binding IdCard}"/>
+                            <Button Text="建档并停发" FontSize="14" Padding="10,0" HeightRequest="32" CornerRadius="8"
+                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyStopListViewModel}}, Path=StopFromImportedCommand}"
+                                    CommandParameter="{Binding .}"/>
+                        </HorizontalStackLayout>
                     </Grid>
                     <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">

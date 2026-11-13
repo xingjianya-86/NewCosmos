@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.Mobile.MobileArchivePhotoPage"
              x:DataType="MobileArchivePhotoViewModel"
              Title="档案照片"
@@ -68,36 +67,59 @@
             <CollectionView.EmptyView>
                 <VerticalStackLayout Padding="20" Spacing="8" VerticalOptions="Center">
                     <Label Text="📷" FontSize="30" HorizontalOptions="Center" TextColor="{StaticResource TextTertiary}"/>
-                    <Label Text="该类别暂无照片，点击上方按钮采集" FontSize="14"
+                    <Label Text="{OnPlatform WinUI='该类别暂无照片，点上方按钮采集，或把图片直接拖进窗口', Default='该类别暂无照片，点击上方按钮采集'}"
+                           FontSize="14"
                            TextColor="{StaticResource TextTertiary}" HorizontalOptions="Center"/>
                 </VerticalStackLayout>
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="ent:ArchivePhoto">
+                <DataTemplate x:DataType="MobileArchivePhotoItem">
                     <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14" Margin="0,5">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" RowDefinitions="Auto,Auto" RowSpacing="4">
-                            <Label Grid.Row="0" Grid.Column="0"
-                                   Text="{Binding DisplayName}"
-                                   FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
-                            <Label Grid.Row="1" Grid.Column="0"
-                                   Text="{Binding CreatedAt, StringFormat='采集：{0:yyyy-MM-dd HH:mm}'}"
-                                   FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" RowDefinitions="Auto,Auto" RowSpacing="4">
 
-                            <Button Grid.Row="0" Grid.Column="1"
+                            <!-- 缩略图（异步加载）：点它全屏查看 -->
+                            <Image Grid.Column="0" Grid.RowSpan="2"
+                                   Source="{Binding Thumbnail}"
+                                   WidthRequest="64" HeightRequest="64" Aspect="AspectFill"
+                                   BackgroundColor="{StaticResource Gray50}" VerticalOptions="Center">
+                                <Image.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=PreviewPhotoCommand}"
+                                        CommandParameter="{Binding Photo}"/>
+                                </Image.GestureRecognizers>
+                            </Image>
+
+                            <!-- 名称/时间：点文字区同样全屏查看 -->
+                            <VerticalStackLayout Grid.Column="1" Grid.RowSpan="2" Spacing="3" VerticalOptions="Center">
+                                <VerticalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=PreviewPhotoCommand}"
+                                        CommandParameter="{Binding Photo}"/>
+                                </VerticalStackLayout.GestureRecognizers>
+                                <Label Text="{Binding DisplayName}"
+                                       FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="{Binding CreatedAt, StringFormat='采集：{0:yyyy-MM-dd HH:mm}'}"
+                                       FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="点图片或此处放大查看"
+                                       FontSize="11" TextColor="{StaticResource TextTertiary}"
+                                       IsVisible="{Binding HasThumbnail}"/>
+                            </VerticalStackLayout>
+
+                            <Button Grid.Column="2" Grid.Row="0"
                                     Text="打印" FontSize="14" Padding="12,0" HeightRequest="30" CornerRadius="8"
                                     BackgroundColor="{StaticResource Primary}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=PrintPhotoCommand}"
-                                    CommandParameter="{Binding .}"/>
-                            <Button Grid.Row="1" Grid.Column="1"
+                                    CommandParameter="{Binding Photo}"/>
+                            <Button Grid.Column="2" Grid.Row="1"
                                     Text="删除" FontSize="14" Padding="12,0" HeightRequest="30" CornerRadius="8"
                                     BackgroundColor="{StaticResource DangerSoft}" TextColor="{StaticResource Error}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=DeletePhotoCommand}"
-                                    CommandParameter="{Binding .}"/>
-                            <Button Grid.Row="0" Grid.Column="2"
+                                    CommandParameter="{Binding Photo}"/>
+                            <Button Grid.Column="3" Grid.Row="0"
                                     Text="导出" FontSize="14" Padding="12,0" HeightRequest="30" CornerRadius="8"
                                     BackgroundColor="{StaticResource SuccessSoft}" TextColor="{StaticResource SecondaryDark}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type MobileArchivePhotoViewModel}}, Path=ExportPhotoCommand}"
-                                    CommandParameter="{Binding .}"/>
+                                    CommandParameter="{Binding Photo}"/>
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -111,7 +133,7 @@
                         BackgroundColor="{StaticResource Primary}" TextColor="White"
                         IsVisible="{Binding IsRecognizeVisible}"
                         Command="{Binding BatchRecognizeCommand}"/>
-                <Label Text="照片属公民身份敏感信息，仅存内网数据库，不上传外网。打印功能后续开放。"
+                <Label Text="{OnPlatform WinUI='照片属公民身份敏感信息，仅存内网数据库，不上传外网；电脑端可直接把图片拖进窗口导入。', Default='照片属公民身份敏感信息，仅存内网数据库，不上传外网；照片可点「打印」推送到电脑端打印。'}"
                        FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
             </VerticalStackLayout>
         </Border>
@@ -127,6 +149,38 @@
                        TextColor="#CCFFFFFF" FontSize="12" HorizontalOptions="Center"/>
             </VerticalStackLayout>
         </Border>
+
+        <!-- 全屏预览（点列表缩略图/文字打开；盖住整页，右上角关闭） -->
+        <Grid Grid.Row="0" Grid.RowSpan="5" IsVisible="{Binding IsPreviewOpen}" BackgroundColor="#F2000000">
+            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+
+                <!-- 信息条 + 关闭 -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="16,14,16,6">
+                    <Label Grid.Column="0" Text="{Binding PreviewInfo}"
+                           FontSize="14" TextColor="#EEFFFFFF" VerticalOptions="Center"
+                           LineBreakMode="TailTruncation"/>
+                    <Button Grid.Column="1" Text="关闭" FontSize="14" Padding="18,0" HeightRequest="36" CornerRadius="8"
+                            BackgroundColor="#33FFFFFF" TextColor="White"
+                            Command="{Binding ClosePreviewCommand}"/>
+                </Grid>
+
+                <!-- 大图 -->
+                <Grid Grid.Row="1" Padding="12,0">
+                    <Label Text="正在加载照片…" FontSize="15" TextColor="#CCFFFFFF"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           IsVisible="{Binding IsPreviewLoading}"/>
+                    <Label Text="照片不可用（可能已被删除）" FontSize="15" TextColor="#CCFFFFFF"
+                           HorizontalTextAlignment="Center"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           IsVisible="{Binding ShowPreviewEmpty}"/>
+                    <Image Source="{Binding PreviewImage}" Aspect="AspectFit"
+                           IsVisible="{Binding HasPreviewImage}"/>
+                </Grid>
+
+                <Label Grid.Row="2" Text="照片属公民身份敏感信息，仅存内网数据库 · 点「关闭」返回列表"
+                       FontSize="12" TextColor="#AAFFFFFF" HorizontalOptions="Center" Padding="0,0,0,16"/>
+            </Grid>
+        </Grid>
 
     </Grid>
 </ContentPage>

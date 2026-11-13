@@ -189,7 +189,11 @@ public partial class MainViewModel : ViewModelBase
                 // 后补追缴：独立模块卡（权限 RECOVERY_VIEW，与侧栏同源门控），紧随死亡情况说明
                 (Card("后补追缴", "停止人员追缴 · 手工录入",
                     "覆盖低保、刚性支出、临时救助与高龄停止人员的追缴办理与台账",
-                    "\uE8D1", "#FFF3E0", "#7a5315", "进入模块", NavigateCommand, "Recovery"), CanAccessRecovery)
+                    "\uE8D1", "#FFF3E0", "#7a5315", "进入模块", NavigateCommand, "Recovery"), CanAccessRecovery),
+                // 照片补传：历史档案照片按人补传（入口跟随档案查看权，与死亡情况说明同口径）
+                (Card("照片补传", "按人检索 · 连续采集 · 推送打印",
+                    "跨低收入/高龄/临时救助检索人员已传照片数，勾选后连续采集证件照并可推送打印",
+                    "", "#ECFDF5", "#2e4738", "进入模块", NavigateCommand, "PhotoBackfill"), CanAccessArchiveQuery)
             }),
             (ModuleCategoryConstants.TOOLS, new()
             {
@@ -1068,6 +1072,17 @@ public partial class MainViewModel : ViewModelBase
                 case "DeathStatement":
                     if (!CanAccessArchiveQuery) { await ShowNoPermissionAlertAsync(); return; }
                     await NavigateToAsync<Pages.ArchiveManagement.DeathStatementPage>("死亡情况说明");
+                    break;
+
+                // 更新日志：当前版本 / 检查更新 / 升级历史（本机轨迹 + 服务端全量），无权限门槛
+                case "UpdateLog":
+                    await NavigateToAsync<Pages.Config.UpdateLogPage>("更新日志");
+                    break;
+
+                // 照片补传：入口跟随档案查看权（与死亡情况说明同口径，不新增权限种子）
+                case "PhotoBackfill":
+                    if (!CanAccessArchiveQuery) { await ShowNoPermissionAlertAsync(); return; }
+                    await NavigateToAsync<Pages.Mobile.MobilePhotoBackfillPage>("照片补传");
                     break;
 
                 case "Database":

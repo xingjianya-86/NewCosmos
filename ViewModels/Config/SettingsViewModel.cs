@@ -110,6 +110,10 @@ public partial class SettingsViewModel : ViewModelBase
         await ApplyOutputRootAsync(picked);
     }
 
+    /// <summary>打开更新日志页（当前版本 / 检查更新 / 升级历史：本机 + 在线全量）。</summary>
+    [RelayCommand]
+    private Task OpenUpdateLogAsync() => NavigateToPageAsync<Pages.Config.UpdateLogPage>("更新日志");
+
     /// <summary>恢复默认输出根（删除用户覆盖，回退 config/document_output.yaml）</summary>
     [RelayCommand]
     private async Task ResetOutputRootAsync()

@@ -186,21 +186,24 @@ public partial class ElderlyApplicationFormViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 照片采集/查看：复用档案照片页（nc_biz_archive_photos），照片按身份证归档，
-    /// 高龄津贴、低收入人口认定、临时救助等模块共享同一份人员照片。
+    /// 照片查看/采集：进入**档案照片查询页**（与低收入、临时救助同口径）——检索/预览/批量推送打印/插入；
+    /// 要就地拍照走查询页的「打开采集页」，申请 ID 与识别回填上下文随参数透传，OCR 回填能力保留。
+    /// 照片按身份证归档，与低收入人口认定、临时救助等模块共享同一份人员照片。
     /// </summary>
     [RelayCommand]
     private async Task OpenPhotosAsync()
     {
         if (string.IsNullOrWhiteSpace(IdCard))
         {
-            await _dialogService.DisplayAlertAsync("提示", "请先填写身份证号码，再采集照片", "确定");
+            await _dialogService.DisplayAlertAsync("提示", "请先填写身份证号码，再查看或采集照片", "确定");
             return;
         }
 
-        _logger.LogBusiness("高龄津贴-照片采集/查看", ("ApplicationId", _id.ToString()));
-        await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(IdCard.Trim(), _id > 0 ? _id : null, Name,
+        _logger.LogBusiness("高龄津贴-档案照片", ("ApplicationId", _id.ToString()));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(
+                IdCard.Trim(),
+                ApplicationId: _id > 0 ? _id : null,
                 AssignContext: this));
     }
 

@@ -201,6 +201,7 @@ public class BatchDeferralHelperTests
         public Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate) => throw new NotSupportedException();
         public TimelineResult CalculateTempReliefForApplyDate(DateTime applyDate) => throw new NotSupportedException();
         public DateTime GetTempReliefInvestigationPrintDate(TimelineResult cLine) => throw new NotSupportedException();
+        public TimelineResult BuildTempReliefCurve(DateTime applyDate, DateTime? publicityStart = null) => throw new NotSupportedException();
         public DateTime GetPrePublicityWorkday(TimelineResult bLine) => throw new NotSupportedException();
     }
 }

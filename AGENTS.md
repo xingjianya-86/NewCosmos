@@ -64,6 +64,7 @@ deploy\publish_release.ps1 -Version 1.1.yyyyMMdd [-MinSupported 1.1.xxx] [-Force
 ```
 
 - 流程：版本三处同步 → Release 自包含发布 → Inno 安装包（`installer\NewCosmosSetup.iss`，产物 `publish\NewCosmosSetup_*.exe`）→ 清单签名 → 上传服务器 → 回环下载校验。公开库权威文档：`deploy\README.md`（另有本机 `docs\20260918_在线更新系统.md`，因含内网地址被 `.gitignore` 排除，不在仓库内）。
+- **升级日志（2026-11-12 起）**：素材单一来源是仓库根 `CHANGELOG.md`（`## [版本号] - 日期` 分段，`### 新增/变更/修复` 分组；待发内容先写 `## [未发布]` 段，发版时改标题）。向导自动抽当前版本段（缺段回退未发布段，都没有则黄字警告）→ Windows 经 `-NotesFile` 写进 `update.json.notes`、Android 清单写同一份文本 → 升级弹窗显示摘要；同时合并上传服务端 `changelog.json`（应用内「更新日志」页读全量，仅展示、不参与安装决策）。**发版前必须写当前版本段**。
 - 配套工具：`deploy\PatchTool`（增量补丁）、`deploy\UpdateSigningTool`（更新签名）、`deploy\download_update.ps1` / `download_update.bat`（回环校验）。
 - 本机服务器参数写 `deploy\deploy.local.ps1`（`*.local.ps1` 已忽略，样例 `deploy.sample.ps1`）。
 - **失败排查**：窗口保持不退（`pause`），报错同时转录到 `deploy\publish_all.last.log`（`*.log` 已忽略）。

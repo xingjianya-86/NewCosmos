@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.Config.UpdateLogPage"
+             x:DataType="UpdateLogViewModel"
+             Title="更新日志"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <!-- 升级日志：当前版本 + 检查更新 + 升级历史（本机轨迹 ∪ 服务端全量 changelog.json）
+         素材来源 = 发版时从仓库根 CHANGELOG.md 抽取、写入 update.json.notes 的说明文本。 -->
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="0">
+
+        <!-- 页头 -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="更新日志"
+                                   Subtitle="升级说明与历史（本机轨迹 + 服务端全量）"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回"/>
+
+        <!-- 当前版本 + 操作 -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="16,12" Margin="12,8" StrokeShape="RoundRectangle 12">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <VerticalStackLayout Spacing="4" VerticalOptions="Center">
+                    <Label Text="{Binding CurrentVersion, StringFormat='当前版本 {0}'}"
+                           FontSize="17" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                    <Label Text="升级说明来自发版时的 CHANGELOG.md；下次升级弹窗与升级后首次启动都会显示当次内容"
+                           FontSize="12" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                    <Button Text="检查更新" Style="{StaticResource ButtonPrimary}" HeightRequest="38" Padding="14,0"
+                            Command="{Binding CheckUpdatesCommand}"/>
+                    <Button Text="在线日志" Style="{StaticResource ButtonOutline}" HeightRequest="38" Padding="14,0"
+                            Command="{Binding LoadRemoteCommand}"/>
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+
+        <!-- 升级历史 -->
+        <Grid Grid.Row="2" Padding="12,0">
+            <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="{Binding EmptyHint}" Style="{StaticResource EmptyStateLabel}"
+                           Padding="0,24" HorizontalTextAlignment="Center"/>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="UpdateHistoryItem">
+                        <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0"
+                                Padding="14" Margin="0,5">
+                            <VerticalStackLayout Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="{Binding Version}" FontSize="16"
+                                           FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                    <Label Grid.Column="1" Text="{Binding TimeText}" FontSize="13"
+                                           TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                </Grid>
+                                <Label Text="{Binding NotesText}" FontSize="14"
+                                       TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                <Label Text="{Binding SourceName}" FontSize="12" TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- 加载蒙版 -->
+            <Border BackgroundColor="#80000000" IsVisible="{Binding IsBusy}" InputTransparent="True">
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                    <ActivityIndicator IsRunning="True" Color="White" IsVisible="{Binding IsBusy}"/>
+                    <Label Text="{Binding LoadingMessage}" TextColor="White" FontSize="15" HorizontalOptions="Center"
+                           IsVisible="{Binding LoadingMessage, Converter={StaticResource StringNotEmptyConverter}}"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 底部说明 -->
+        <Label Grid.Row="3"
+               Text="在线日志为只读展示；是否安装、是否强制由签名清单 update.json 决定。"
+               FontSize="12" TextColor="{StaticResource TextTertiary}"
+               Margin="16,6,16,14" HorizontalTextAlignment="Center"/>
+
+    </Grid>
+</ContentPage>

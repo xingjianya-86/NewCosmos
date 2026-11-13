@@ -4,6 +4,7 @@ using NewCosmos.Constants;
 using NewCosmos.Models.DeathStatement;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
@@ -318,6 +319,21 @@ public partial class ElderlyPendingListViewModel : ViewModelBase
     /// </summary>
     [RelayCommand]
     private Task RefreshAsync() => LoadPendingAsync();
+
+    /// <summary>行内「照片」：打开该人员的档案照片（查询/预览/勾选批量推送打印/插入），预填身份证自动检索。</summary>
+    [RelayCommand]
+    private async Task OpenPhotosAsync(string? idCard)
+    {
+        if (string.IsNullOrWhiteSpace(idCard))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "该记录缺少身份证号，无法查看照片", "确定");
+            return;
+        }
+
+        _logger.LogBusiness("高龄待办-档案照片", ("IdCard", DataMasker.MaskIdCard(idCard)));
+        await NavigateToPageAsync<Pages.ArchiveManagement.ArchivePhotoQueryPage, ArchivePhotoQueryParameter>(
+            new ArchivePhotoQueryParameter(idCard.Trim()));
+    }
 
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
 }

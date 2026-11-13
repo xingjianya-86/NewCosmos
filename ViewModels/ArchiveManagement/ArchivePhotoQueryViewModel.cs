@@ -39,6 +39,15 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     private CancellationTokenSource? _thumbCts;
     private bool _autoSearchOnAppear;
 
+    /// <summary>从采集页/补传页返回时是否需要无条件重查（刚插入的照片要立即出现在列表）。</summary>
+    private bool _returnRefreshNeeded;
+
+    /// <summary>表单带入的申请 ID（「打开采集页」优先用，保持照片与当前申请的关联）。</summary>
+    private long? _prefillApplicationId;
+
+    /// <summary>表单带入的识别回填上下文（透传采集页，保住「拍照 → OCR → 回填表单」能力）。</summary>
+    private IOcrAssignContext? _assignContext;
+
     protected override IServiceProvider ServiceProvider => _serviceProvider;
     protected override ILoggerService Logger => _logger;
 
@@ -60,6 +69,18 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     [ObservableProperty]
     private PhotoCategoryFilterOption? _selectedCategoryOption;
 
+    /// <summary>导出格式选项：默认 WebP（库内原图、体积小）；JPG 供民政等不支持 WebP 的外部系统。</summary>
+    public ObservableCollection<ExportFormatOption> ExportFormatOptions { get; } = new();
+
+    [ObservableProperty]
+    private ExportFormatOption? _selectedExportFormatOption;
+
+    /// <summary>当前导出格式代码（webp / jpeg），三个导出入口与手机端「更多」菜单共用。</summary>
+    public string ExportFormat => SelectedExportFormatOption?.Code ?? PhotoFormatConstants.WebP;
+
+    partial void OnSelectedExportFormatOptionChanged(ExportFormatOption? value)
+        => OnPropertyChanged(nameof(ExportFormat));
+
     [ObservableProperty]
     private ArchivePhotoListItem? _selectedPhoto;
 
@@ -68,6 +89,28 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     [ObservableProperty]
     private string _previewInfo = "选择左侧照片查看预览";
+
+    /// <summary>手机端全屏预览是否打开（桌面端预览走右侧面板，此层始终隐藏）。</summary>
+    [ObservableProperty]
+    private bool _isPreviewOpen;
+
+    /// <summary>手机端全屏预览大图加载中。</summary>
+    [ObservableProperty]
+    private bool _isPreviewLoading;
+
+    /// <summary>是否已取到预览大图。</summary>
+    public bool HasPreviewImage => PreviewImage is not null;
+
+    /// <summary>预览空态（没取到图也没在加载：读取失败/照片已删）。</summary>
+    public bool ShowPreviewEmpty => !HasPreviewImage && !IsPreviewLoading;
+
+    partial void OnPreviewImageChanged(ImageSource? value)
+    {
+        OnPropertyChanged(nameof(HasPreviewImage));
+        OnPropertyChanged(nameof(ShowPreviewEmpty));
+    }
+
+    partial void OnIsPreviewLoadingChanged(bool value) => OnPropertyChanged(nameof(ShowPreviewEmpty));
 
     /// <summary>待转 WebP 的历史照片数。</summary>
     [ObservableProperty]
@@ -122,14 +165,21 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         foreach (var (code, name) in PhotoCategoryConstants.All)
             CategoryOptions.Add(new PhotoCategoryFilterOption(code, name));
         _selectedCategoryOption = CategoryOptions[0];
+
+        // 导出格式（默认 WebP；JPG 供民政等外部系统）——顺序即默认优先
+        ExportFormatOptions.Add(new ExportFormatOption(PhotoFormatConstants.WebP, "WebP（原图）"));
+        ExportFormatOptions.Add(new ExportFormatOption(PhotoFormatConstants.Jpeg, "JPG（外部系统兼容）"));
+        _selectedExportFormatOption = ExportFormatOptions[0];
     }
 
-    /// <summary>业务页「照片」入口注入：预填关键词（身份证号），进页自动检索。</summary>
+    /// <summary>业务页/表单「照片」入口注入：预填关键词（身份证号）、申请 ID 与识别上下文，进页自动检索。</summary>
     public void ApplyParameter(ArchivePhotoQueryParameter parameter)
     {
         if (!string.IsNullOrWhiteSpace(parameter.Keyword))
             Keyword = parameter.Keyword.Trim();
         _autoSearchOnAppear = parameter.AutoSearch;
+        _prefillApplicationId = parameter.ApplicationId;
+        _assignContext = parameter.AssignContext;
     }
 
     public override async Task OnAppearingAsync()
@@ -137,9 +187,11 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         await base.OnAppearingAsync();
         await RefreshPendingCountAsync();
 
-        if (_autoSearchOnAppear)
+        // 业务页带身份证进入 → 自动检索；从采集页/补传页返回 → 无条件重查（新插入照片要立即可见）
+        if (_autoSearchOnAppear || _returnRefreshNeeded)
         {
             _autoSearchOnAppear = false;
+            _returnRefreshNeeded = false;
             PageIndex = 1;
             await LoadDataAsync();
         }
@@ -163,36 +215,126 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     partial void OnSelectedPhotoChanged(ArchivePhotoListItem? value)
     {
-        PreviewImage = null;
+        // 桌面端：右侧预览面板；手机端：预览列已隐藏，选中即弹全屏预览层
+        var phone = DeviceInfo.Idiom == DeviceIdiom.Phone;
+
         if (value == null)
         {
-            PreviewInfo = "选择左侧照片查看预览";
+            PreviewImage = null;
+            IsPreviewLoading = false;
+            IsPreviewOpen = false;
+            PreviewInfo = phone ? "点选列表中的照片放大查看" : "选择左侧照片查看预览";
             return;
         }
 
         var photo = value.Photo;
         PreviewInfo = $"{photo.PhotoCategoryName} · {DataMasker.MaskIdCard(photo.ApplicantIdCard)} · {photo.CreatedAt:yyyy-MM-dd HH:mm}";
+        PreviewImage = null;
+
+        if (phone)
+        {
+            IsPreviewOpen = true;
+            IsPreviewLoading = true;
+        }
+
         SafeFireAndForget(async () =>
         {
-            var data = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
-            if (data.IsFailure || data.Value == null || data.Value.Length == 0) return;
-
-            var bytes = data.Value;
-            var format = ImageTranscoder.DetectFormat(bytes);
-            if (string.IsNullOrEmpty(format))
-                format = photo.ImageFormat;
-
-            // WinUI 对 WebP 支持不一致：预览统一先转 JPEG（不改变库内格式）。
-            var displayBytes = bytes;
-            if (format == PhotoFormatConstants.WebP
-                && !ImageTranscoder.TryToJpeg(bytes, out displayBytes))
+            try
             {
-                PreviewInfo = "照片预览失败（WebP 转码失败）";
+                var data = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
+                if (data.IsFailure || data.Value == null || data.Value.Length == 0)
+                {
+                    PreviewInfo = "照片读取失败（可能已被删除）";
+                    return;
+                }
+
+                var bytes = data.Value;
+                var format = ImageTranscoder.DetectFormat(bytes);
+                if (string.IsNullOrEmpty(format))
+                    format = photo.ImageFormat;
+
+                // WinUI 对 WebP 支持不一致：预览统一先转 JPEG（不改变库内格式）。
+                var displayBytes = bytes;
+                if (format == PhotoFormatConstants.WebP
+                    && !ImageTranscoder.TryToJpeg(bytes, out displayBytes))
+                {
+                    PreviewInfo = "照片预览失败（WebP 转码失败）";
+                    return;
+                }
+
+                var source = ImageSource.FromStream(() => new MemoryStream(displayBytes));
+                await MainThread.InvokeOnMainThreadAsync(() => PreviewImage = source);
+            }
+            catch (OperationCanceledException)
+            {
+                // 离开页面/新操作顶掉：忽略
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"照片预览加载失败 Id={photo.Id}: {ex.Message}");
+                PreviewInfo = "照片预览失败";
+            }
+            finally
+            {
+                IsPreviewLoading = false;
+            }
+        });
+    }
+
+    /// <summary>关闭手机端全屏预览并清空选中（下次点同一行可再次打开）。</summary>
+    [RelayCommand]
+    private void ClosePreview()
+    {
+        IsPreviewOpen = false;
+        IsPreviewLoading = false;
+        PreviewImage = null;
+        SelectedPhoto = null;
+    }
+
+    /// <summary>
+    /// 手机端「更多」菜单：把桌面端摆在查询条上的次要功能收进 ActionSheet 分发
+    /// （导出全部 / 另存为 / 清空勾选 / 转 WebP / 打开采集页 / 照片补传 / 导出格式）。
+    /// </summary>
+    [RelayCommand]
+    private async Task MoreOptionsAsync()
+    {
+        var buttons = new List<string> { "导出全部", "另存为…", "清空勾选" };
+        if (CanConvertWebP)
+            buttons.Add($"历史照片转 WebP（剩余 {PendingWebPCount} 张）");
+        buttons.Add("打开采集页");
+        buttons.Add("照片补传");
+        buttons.Add($"导出格式（当前：{PhotoFormatConstants.GetDisplayName(ExportFormat)}）");
+
+        var choice = await _dialogService.DisplayActionSheetAsync("更多操作", "取消", null, buttons.ToArray());
+        if (string.IsNullOrEmpty(choice) || choice == "取消") return;
+
+        if (choice == "导出全部") await ExportAllAsync();
+        else if (choice == "另存为…") await ExportToFolderAsync();
+        else if (choice == "清空勾选") ClearSelection();
+        else if (choice.StartsWith("历史照片转", StringComparison.Ordinal)) await ConvertLegacyPhotosAsync();
+        else if (choice == "打开采集页") await OpenCapturePageAsync();
+        else if (choice == "照片补传") await OpenBackfillPageAsync();
+        else if (choice.StartsWith("导出格式", StringComparison.Ordinal)) await PickExportFormatAsync();
+    }
+
+    /// <summary>选导出格式（手机端在「更多」里；桌面端用查询条上的格式下拉）。</summary>
+    private async Task PickExportFormatAsync()
+    {
+        var buttons = ExportFormatOptions.Select(o => o.Name).ToArray();
+        var current = PhotoFormatConstants.GetDisplayName(ExportFormat);
+        var choice = await _dialogService.DisplayActionSheetAsync(
+            $"导出格式（当前 {current}）", "取消", null, buttons);
+        if (string.IsNullOrEmpty(choice) || choice == "取消") return;
+
+        foreach (var option in ExportFormatOptions)
+        {
+            if (option.Name == choice)
+            {
+                SelectedExportFormatOption = option;
+                _logger.LogBusiness("档案照片-导出格式切换", ("Format", option.Code));
                 return;
             }
-
-            PreviewImage = ImageSource.FromStream(() => new MemoryStream(displayBytes));
-        });
+        }
     }
 
     protected override async Task LoadDataAsync()
@@ -412,7 +554,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 page++;
             }
 
-            _logger.LogBusiness("档案照片导出", ("Count", exported), ("Root", root));
+            _logger.LogBusiness("档案照片导出", ("Count", exported), ("Format", ExportFormat), ("Root", root));
 
             await _dialogService.DisplayAlertAsync("导出完成",
                 exported == 0
@@ -444,7 +586,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                     exported++;
             }
 
-            _logger.LogBusiness("档案照片导出选中", ("Count", exported), ("Root", root));
+            _logger.LogBusiness("档案照片导出选中", ("Count", exported), ("Format", ExportFormat), ("Root", root));
             await _dialogService.DisplayAlertAsync("导出完成",
                 $"已导出 {exported}/{checkedItems.Count} 张照片到：\n{root}", "确定");
             return Result.Success();
@@ -510,7 +652,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
             }
 
             _logger.LogBusiness("档案照片另存为",
-                ("Count", exported), ("Failed", failed), ("Target", targetDir));
+                ("Count", exported), ("Failed", failed), ("Format", ExportFormat), ("Target", targetDir));
 
             var scope = checkedItems.Count > 0 ? $"勾选 {checkedItems.Count} 张" : "当前查询结果";
             await _dialogService.DisplayAlertAsync("保存完成",
@@ -521,7 +663,8 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         }, "保存照片...");
     }
 
-    /// <summary>导出单张到指定目录；同名文件自动追加 Id 防覆盖。返回是否成功。</summary>
+    /// <summary>导出单张到指定目录；同名文件自动追加 Id 防覆盖。返回是否成功。
+    /// 导出格式按 <see cref="ExportFormat"/>（默认 WebP 原样；选 JPG 时转码，转码失败显式判失败，不静默回退）。</summary>
     private async Task<bool> ExportOneAsync(ArchivePhoto photo, string dir, CancellationToken ct)
     {
         try
@@ -533,17 +676,31 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 return false;
             }
 
-            Directory.CreateDirectory(dir);
-
-            var format = ImageTranscoder.DetectFormat(data.Value);
+            var bytes = data.Value;
+            var format = ImageTranscoder.DetectFormat(bytes);
             if (string.IsNullOrEmpty(format))
                 format = photo.ImageFormat;
+
+            // 导出为 JPG：已是 JPEG 透传，其余（WebP/PNG）转 JPEG q90
+            if (ExportFormat == PhotoFormatConstants.Jpeg && format != PhotoFormatConstants.Jpeg)
+            {
+                if (!ImageTranscoder.TryToJpeg(bytes, out var jpegBytes))
+                {
+                    _logger.Warn($"照片导出转 JPG 失败 Id={photo.Id}（原格式 {format}）");
+                    return false;
+                }
+
+                bytes = jpegBytes;
+                format = PhotoFormatConstants.Jpeg;
+            }
+
+            Directory.CreateDirectory(dir);
 
             var filePath = Path.Combine(dir, BuildFileName(photo, format));
             if (File.Exists(filePath))
                 filePath = Path.Combine(dir, BuildFileName(photo, format, forceIdSuffix: true));
 
-            await File.WriteAllBytesAsync(filePath, data.Value, ct);
+            await File.WriteAllBytesAsync(filePath, bytes, ct);
             return true;
         }
         catch (Exception ex)
@@ -572,6 +729,247 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     private static string IdCardTail(ArchivePhoto photo)
         => photo.ApplicantIdCard.Length >= 6 ? photo.ApplicantIdCard[^6..] : photo.ApplicantIdCard;
+
+    #endregion
+
+    #region 插入（PC 端：页内选图 / 拖拽 / 打开采集页 / 照片补传）
+
+    /// <summary>插入来源（日志口径）。</summary>
+    private const string InsertSourcePick = "选图";
+    private const string InsertSourceDrop = "拖拽";
+
+    /// <summary>
+    /// 插入照片：先锁定"已存在被查询的人"（18 位身份证 + 低收入/高龄/临时救助档案中存在）
+    /// → 选类别 → 本机多选图片 → 走与手机端采集同一保存入口入库 → 立即刷新。
+    /// 归属人解析不出或档案不存在时显式拒绝，不静默放行。
+    /// </summary>
+    [RelayCommand]
+    private async Task InsertPhotosAsync()
+    {
+        try
+        {
+            var owner = await ResolveOwnerForInsertAsync();
+            if (owner == null) return;
+
+            var category = await ResolveInsertCategoryAsync();
+            if (category == null) return; // 用户取消选类别
+
+            var picked = await MediaPicker.Default.PickPhotosAsync();
+            if (picked == null) return;
+
+            var files = new List<byte[]>();
+            foreach (var file in picked)
+            {
+                try
+                {
+                    await using var stream = await file.OpenReadAsync();
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    if (ms.Length > 0) files.Add(ms.ToArray());
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"读取所选图片失败 {file.FileName}: {ex.Message}");
+                }
+            }
+
+            await InsertBytesAsync(owner, category, files, InsertSourcePick);
+        }
+        catch (FeatureNotSupportedException)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "当前平台不支持选图", "确定");
+        }
+        catch (PermissionException)
+        {
+            await _dialogService.DisplayAlertAsync("权限不足", "请在系统设置中允许相册访问权限", "确定");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "插入照片失败");
+            await _dialogService.DisplayAlertAsync("错误", $"插入失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 拖拽图片文件插入（Windows 拖放入口，由页面 code-behind 在 UI 线程回调）。
+    /// 与「插入照片」共用同一套归属人校验、类别判定与入库逻辑。
+    /// </summary>
+    public async Task InsertFromDroppedPathsAsync(IReadOnlyList<string>? paths)
+    {
+        try
+        {
+            if (paths == null || paths.Count == 0)
+            {
+                await _dialogService.DisplayAlertAsync("提示",
+                    "未检测到可插入的图片文件（支持 jpg / jpeg / png / webp / bmp / gif）", "确定");
+                return;
+            }
+
+            var owner = await ResolveOwnerForInsertAsync();
+            if (owner == null) return;
+
+            var category = await ResolveInsertCategoryAsync();
+            if (category == null) return;
+
+            var files = new List<byte[]>(paths.Count);
+            foreach (var path in paths)
+            {
+                try
+                {
+                    var bytes = await File.ReadAllBytesAsync(path);
+                    if (bytes.Length > 0) files.Add(bytes);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"读取拖入图片失败 {Path.GetFileName(path)}: {ex.Message}");
+                }
+            }
+
+            await InsertBytesAsync(owner, category, files, InsertSourceDrop);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "拖拽插入照片失败");
+            await _dialogService.DisplayAlertAsync("错误", $"插入失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 打开手机端采集页（复用 MobileArchivePhotoPage：拍照 / 相册多选 / 分类入库同一套逻辑），
+    /// 归属人校验与「插入照片」同口径；表单带入的申请 ID 与识别上下文一并透传（保住 OCR 回填）；
+    /// 返回本页时自动重查。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenCapturePageAsync()
+    {
+        try
+        {
+            var owner = await ResolveOwnerForInsertAsync();
+            if (owner == null) return;
+
+            _returnRefreshNeeded = true;
+            await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+                new ArchivePhotoParameter(
+                    owner.IdCard,
+                    _prefillApplicationId ?? owner.ApplicationId,
+                    owner.PersonName,
+                    AssignContext: _assignContext));
+        }
+        catch (Exception ex)
+        {
+            _returnRefreshNeeded = false;
+            _logger.LogError(ex, "打开档案照片采集页失败");
+            await _dialogService.DisplayAlertAsync("错误", $"打开采集页失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 打开照片补传页（复用 MobilePhotoBackfillPage：三域搜人 → 勾选 → 连续采集），返回本页时自动重查。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenBackfillPageAsync()
+    {
+        try
+        {
+            _returnRefreshNeeded = true;
+            await NavigateToPageAsync<Pages.Mobile.MobilePhotoBackfillPage>("照片补传");
+        }
+        catch (Exception ex)
+        {
+            _returnRefreshNeeded = false;
+            _logger.LogError(ex, "打开照片补传页失败");
+            await _dialogService.DisplayAlertAsync("错误", $"打开补传页失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 锁定插入归属人：关键词为合法身份证用之，否则用"当前查询结果同属一人"（见 <see cref="PhotoOwnerResolver"/>）；
+    /// 再查库确认该身份证确实存在于三类业务档案，取回姓名与代表业务 ID。任一步不通过都给出可执行的提示。
+    /// </summary>
+    private async Task<PhotoOwner?> ResolveOwnerForInsertAsync()
+    {
+        var idCard = PhotoOwnerResolver.Resolve(Keyword, Photos.Select(p => p.ApplicantIdCard));
+        if (string.IsNullOrEmpty(idCard))
+        {
+            await _dialogService.DisplayAlertAsync("请先指定档案人员",
+                "插入的照片必须挂到已存在的档案人员名下。\n\n" +
+                "请先在查询框输入该人员的 18 位身份证号并点「查询」" +
+                "（或让查询结果只显示这一个人），再执行插入。", "确定");
+            return null;
+        }
+
+        var result = await _photoService.ResolveOwnerAsync(idCard, CancellationToken);
+        if (result.IsFailure)
+        {
+            await _dialogService.DisplayAlertAsync("无法插入", result.Message ?? "档案人员不存在", "确定");
+            return null;
+        }
+
+        return result.Value;
+    }
+
+    /// <summary>
+    /// 插入类别：查询条已选具体类别直接用；选的是「全部类别」则弹类别选择（与手机端采集同一套类别常量）。
+    /// 用户取消返回 null。
+    /// </summary>
+    private async Task<string?> ResolveInsertCategoryAsync()
+    {
+        if (!string.IsNullOrEmpty(SelectedCategoryCode)) return SelectedCategoryCode;
+
+        var buttons = PhotoCategoryConstants.All.Select(a => a.Name).ToArray();
+        var choice = await _dialogService.DisplayActionSheetAsync("选择照片类别", "取消", null, buttons);
+        if (string.IsNullOrEmpty(choice) || choice == "取消") return null;
+
+        foreach (var (code, name) in PhotoCategoryConstants.All)
+        {
+            if (name == choice) return code;
+        }
+
+        return PhotoCategoryConstants.OTHER_CERT;
+    }
+
+    /// <summary>批量入库 → 记业务日志 → 刷新列表与待转计数 → 汇总提示（成功/失败张数 + 首个原因）。</summary>
+    private async Task InsertBytesAsync(PhotoOwner owner, string category, List<byte[]> files, string source)
+    {
+        if (files.Count == 0)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "没有可插入的图片文件", "确定");
+            return;
+        }
+
+        var result = await ExecuteAsync(async () =>
+        {
+            var insert = await _photoService.InsertPhotosAsync(owner, category, files, CancellationToken);
+            if (insert.IsFailure)
+                return Result.Failure<BatchPhotoInsertResult>(insert.ErrorCode!, insert.Message!);
+
+            _logger.LogBusiness("档案照片插入",
+                ("Source", source),
+                ("Applicant", DataMasker.MaskIdCard(owner.IdCard)),
+                ("Category", category),
+                ("Total", insert.Value.Total),
+                ("Succeeded", insert.Value.Succeeded),
+                ("Failed", insert.Value.Failed));
+            return Result.Success(insert.Value);
+        }, files.Count > 1 ? $"插入 {files.Count} 张照片..." : "插入照片...");
+
+        if (result.IsFailure)
+        {
+            await _dialogService.DisplayAlertAsync("插入失败", result.Message ?? "插入失败", "确定");
+            return;
+        }
+
+        var summary = result.Value;
+        var catName = PhotoCategoryConstants.GetDisplayName(category);
+        var message = summary.Failed == 0
+            ? $"已插入 {summary.Succeeded} 张照片（{catName}）到 {owner.Summary}"
+            : $"已插入 {summary.Succeeded} 张，失败 {summary.Failed} 张（{catName}）到 {owner.Summary}" +
+              (string.IsNullOrWhiteSpace(summary.FirstError) ? string.Empty : $"\n原因：{summary.FirstError}");
+
+        await LoadDataAsync();
+        await RefreshPendingCountAsync();
+        await _dialogService.DisplayAlertAsync(summary.HasSuccess ? "插入完成" : "插入失败", message, "确定");
+    }
 
     #endregion
 
@@ -744,3 +1142,6 @@ public partial class ArchivePhotoListItem : ObservableObject
 
 /// <summary>照片查询类别选项（空代码 = 全部）。</summary>
 public sealed record PhotoCategoryFilterOption(string Code, string Name);
+
+/// <summary>导出格式选项（webp 默认 / jpeg 供民政等外部系统）。</summary>
+public sealed record ExportFormatOption(string Code, string Name);

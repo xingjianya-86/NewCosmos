@@ -276,6 +276,15 @@ public class TempReliefService : BaseService, ITempReliefService
 
             var candidate = result.Value.ToCandidate(sourceTable);
 
+            // 户籍分类缺失时跨来源兜底：当前库申请库优先，其次导入台账（见 ResolveHukouTypeAsync）
+            if (string.IsNullOrWhiteSpace(candidate.HukouType))
+            {
+                var hukouResult = await ResolveHukouTypeAsync(candidate.IdCard, ct);
+                if (hukouResult.IsFailure)
+                    return Result.Failure<TempReliefCandidate>(hukouResult.ErrorCode!, hukouResult.Message!);
+                candidate.HukouType = hukouResult.Value ?? string.Empty;
+            }
+
             // 镇/村缺失时从地址文本解析（台账表 street/community 列常为空，地址中携带"XX镇XX村"）；户籍缺失时以家庭住址兜底
             await ResolveTownVillageAsync(candidate, ct);
             if (string.IsNullOrWhiteSpace(candidate.HukouAddress))
@@ -345,6 +354,54 @@ public class TempReliefService : BaseService, ITempReliefService
         {
             LogException(ex, "获取候选人详情失败");
             return Result.FromException<TempReliefCandidate>(ex);
+        }
+    }
+
+    /// <summary>
+    /// 按身份证跨来源解析户籍分类（定额救助按户籍取低保月标准的判定入口）：
+    /// ① 当前库 nc_biz_applications（低保申请库，最新一条）→ ② 农村低保台账（固定"农村"）
+    /// → ③ 城镇低保台账（固定"城镇"）→ ④ 特困 → ⑤ 边缘 → ⑥ 刚性支出 → ⑦ 其他困难（取 hukou_type 列）。
+    /// 取第一个非空值；全部缺失返回 Success("")，由表单提示手动选择档位（=手选户籍分类）。
+    /// </summary>
+    public async Task<Result<string>> ResolveHukouTypeAsync(string? idCard, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idCard))
+            return Result.Success(string.Empty);
+
+        try
+        {
+            const string sql = @"
+                SELECT hukou_type
+                FROM (
+                    SELECT 1 AS prio, id AS ref_id, COALESCE(hukou_type, '') AS hukou_type
+                      FROM nc_biz_applications WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 2, id, '农村' FROM nc_biz_rural_subsistence_families WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 3, id, '城镇' FROM nc_biz_urban_subsistence_families WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 4, id, COALESCE(hukou_type, '') FROM nc_biz_destitute_families WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 5, id, COALESCE(hukou_type, '') FROM nc_biz_low_income_edge_families WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 6, id, COALESCE(hukou_type, '') FROM nc_biz_rigid_expenditure_families WHERE applicant_id_card = $1
+                    UNION ALL
+                    SELECT 7, id, COALESCE(hukou_type, '') FROM nc_biz_other_difficulty_families WHERE applicant_id_card = $1
+                ) t
+                WHERE COALESCE(hukou_type, '') <> ''
+                ORDER BY prio, ref_id DESC
+                LIMIT 1";
+
+            var result = await _db.QuerySingleAsync<HukouTypeRow>(sql, ct, idCard.Trim());
+            if (result.IsFailure)
+                return Result.Failure<string>(result.ErrorCode!, result.Message!);
+
+            return Result.Success(result.Value?.HukouType ?? string.Empty);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "跨来源解析户籍分类失败");
+            return Result.FromException<string>(ex);
         }
     }
 
@@ -800,13 +857,60 @@ public class TempReliefService : BaseService, ITempReliefService
 
     #region 小额定额档位
 
-    public async Task<Result<List<ConfigStandard>>> GetSmallAmountLevelsAsync(CancellationToken ct = default)
+    public async Task<Result<List<ConfigStandard>>> GetSmallAmountLevelsAsync(string? hukouType, CancellationToken ct = default)
     {
-        var result = await _standardConfigService.GetConfigStandardsAsync(TempReliefConstants.StandardType, ct);
-        if (result.IsFailure || result.Value == null)
-            return Result.Failure<List<ConfigStandard>>(result.ErrorCode ?? ErrorCodes.CONFIG_NOT_FOUND, result.Message ?? "未配置小额定额档位");
+        // 2026-11-13 起定额救助 = 按户籍动态取低保月标准（农村 632 / 城镇 827），
+        // 原「临时救助小额定额」三档（500/1000/2000）已停用、不再读取；低保调标后自动跟随。
+        var standardType = TempReliefConstants.ResolveSubsistenceStandardType(hukouType);
+        if (standardType != null)
+        {
+            var single = await BuildSubsistenceLevelAsync(standardType, ct);
+            if (single.IsFailure)
+                return Result.Failure<List<ConfigStandard>>(single.ErrorCode!, single.Message!);
+            return Result.Success(new List<ConfigStandard> { single.Value! });
+        }
 
-        return Result.Success(result.Value.Where(s => s.IsEffective).OrderBy(s => s.StandardValue).ToList());
+        // 户籍为空/未知：列出农村 + 城镇两档，由录入人按实际户籍手选
+        var levels = new List<ConfigStandard>();
+
+        var rural = await BuildSubsistenceLevelAsync(TempReliefConstants.SubsistenceStandardRural, ct);
+        if (rural.IsFailure)
+            return Result.Failure<List<ConfigStandard>>(rural.ErrorCode!, rural.Message!);
+        levels.Add(rural.Value!);
+
+        var urban = await BuildSubsistenceLevelAsync(TempReliefConstants.SubsistenceStandardUrban, ct);
+        if (urban.IsFailure)
+            return Result.Failure<List<ConfigStandard>>(urban.ErrorCode!, urban.Message!);
+        levels.Add(urban.Value!);
+
+        return Result.Success(levels);
+    }
+
+    /// <summary>
+    /// 按低保月标准类型构建定额档位（标准缺失/为 0 显式失败，禁止静默归零——见 AGENTS §7）。
+    /// 档位金额随标准走：低保调标后重新打开表单即显示新值。
+    /// </summary>
+    private async Task<Result<ConfigStandard>> BuildSubsistenceLevelAsync(string standardType, CancellationToken ct)
+    {
+        var valueResult = await _standardConfigService.GetStandardValueAsync(standardType, null, null, ct);
+        if (valueResult.IsFailure)
+            return Result.Failure<ConfigStandard>(valueResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                valueResult.Message ?? "读取最低生活保障月标准失败");
+        if (valueResult.Value <= 0)
+            return Result.Failure<ConfigStandard>(ErrorCodes.CONFIG_NOT_FOUND,
+                "未配置当前生效的最低生活保障月标准，无法确定定额救助金额");
+
+        var isRural = standardType == TempReliefConstants.SubsistenceStandardRural;
+        return Result.Success(new ConfigStandard
+        {
+            StandardType = standardType,
+            StandardName = isRural ? "农村户口（低保月标准）" : "城镇户口（低保月标准）",
+            HukouType = isRural ? "Rural" : "Urban",
+            StandardValue = valueResult.Value,
+            Unit = "元/月",
+            IsActive = true,
+            EffectiveStartDate = DateTime.Today
+        });
     }
 
     #endregion
@@ -1552,6 +1656,14 @@ public class PolicyClassRow
 public class TownNameRow
 {
     public string TownName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 跨来源户籍分类查询行
+/// </summary>
+public class HukouTypeRow
+{
+    public string HukouType { get; set; } = string.Empty;
 }
 
 /// <summary>

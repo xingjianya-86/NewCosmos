@@ -122,6 +122,59 @@ public class UpdateService : BaseService, IUpdateService
         return Result.Failure<UpdateCheckResult>(ErrorCodes.NETWORK_ERROR, lastError ?? "无法连接更新服务器");
     }
 
+    #region 升级日志（changelog.json）
+
+    /// <summary>
+    /// 拉取服务端全量升级日志：与本平台清单**同目录**的 changelog.json（发布脚本在 stable/ 与 android/
+    /// 各存一份），多源按序回退、逐源超时（与清单检查同套路）。仅作展示，不参与安装决策。
+    /// </summary>
+    public async Task<Result<string>> FetchChangelogJsonAsync(CancellationToken ct = default)
+    {
+        if (EffectiveManifestUrls.Count == 0)
+            return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "未配置更新清单地址");
+
+        string? lastError = null;
+        foreach (var url in EffectiveManifestUrls)
+        {
+            var logUrl = DeriveChangelogUrl(url);
+            try
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(Options.HttpTimeoutSeconds));
+
+                var json = await _http.GetStringAsync(logUrl, timeoutCts.Token);
+
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                    return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "升级日志格式不正确");
+
+                return Result.Success(json);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return Result.Failure<string>(ErrorCodes.CANCELLED, "已取消");
+            }
+            catch (Exception ex)
+            {
+                lastError = ex.Message;
+                LogWarn($"升级日志拉取失败: {logUrl} - {ex.Message}");
+            }
+        }
+
+        return Result.Failure<string>(ErrorCodes.NETWORK_ERROR, lastError ?? "无法连接更新服务器");
+    }
+
+    /// <summary>清单地址 → 同目录 changelog.json（.../stable/update.json → .../stable/changelog.json）。</summary>
+    private static string DeriveChangelogUrl(string manifestUrl)
+    {
+        var idx = manifestUrl.LastIndexOf("update.json", StringComparison.OrdinalIgnoreCase);
+        return idx >= 0
+            ? manifestUrl[..idx] + "changelog.json"
+            : manifestUrl.TrimEnd('/') + "/changelog.json";
+    }
+
+    #endregion
+
     private async Task<Result<UpdateInfo>> TryFetchManifestAsync(string url, CancellationToken ct)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -248,8 +301,9 @@ public class UpdateService : BaseService, IUpdateService
         }
     }
 
-    /// <summary>版本比较：支持 1.1.yyyyMMdd 三段数字；解析失败回退字符串序比较</summary>
-    private static int CompareVersions(string? left, string? right)
+    /// <summary>版本比较：支持 1.1.yyyyMMdd 三段数字；解析失败回退字符串序比较。
+    /// 返回值 &gt;0 表示 left 更新（升级日志服务等同用）。</summary>
+    public static int CompareVersions(string? left, string? right)
     {
         if (Version.TryParse(NormalizeVersion(left), out var lv) && Version.TryParse(NormalizeVersion(right), out var rv))
             return lv.CompareTo(rv);

@@ -23,6 +23,54 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
         _db = db;
     }
 
+    /// <summary>
+    /// 人员维度三域聚合 CTE（**单点维护**）：低收入/高龄/临时救助 UNION → 按 $1 业务域 / $2 关键词过滤
+    /// → 按身份证聚合成 counted（业务域、代表业务ID、已传照片张数）。
+    /// 补传候选检索与 PC 插入归属人解析共用，禁止在别处另抄一份。
+    /// </summary>
+    private const string PersonCte = @"
+WITH biz AS (
+    SELECT 'ElderlyBenefits'::text AS business_type, e.id AS business_id,
+           e.name AS person_name, e.id_card
+    FROM nc_biz_elderly_applications e
+    WHERE e.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'SocialAssistance', a.id, a.applicant_name, a.applicant_id_card
+    FROM nc_biz_applications a
+    WHERE a.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'TempRelief', t.id, t.applicant_name, t.applicant_id_card
+    FROM nc_biz_temp_relief_applications t
+    WHERE t.deleted_at IS NULL
+),
+filtered AS (
+    SELECT * FROM biz
+    WHERE ($1::text = '' OR business_type = $1::text)
+      AND ($2::text = '' OR person_name ILIKE '%' || $2::text || '%' OR id_card ILIKE '%' || $2::text || '%')
+),
+people AS (
+    SELECT id_card,
+           MAX(person_name) AS person_name,
+           string_agg(DISTINCT business_type, '/' ORDER BY business_type) AS business_types,
+           MAX(business_id) AS business_id
+    FROM filtered
+    GROUP BY id_card
+),
+counted AS (
+    SELECT p.id_card, p.person_name, p.business_types, p.business_id,
+           COALESCE(c.photo_count, 0)::int AS photo_count
+    FROM people p
+    LEFT JOIN (
+        SELECT applicant_id_card, COUNT(*)::int AS photo_count
+        FROM nc_biz_archive_photos
+        GROUP BY applicant_id_card
+    ) c ON c.applicant_id_card = p.id_card
+)";
+
     public async Task<Result<long>> SavePhotoAsync(ArchivePhoto photo, CancellationToken ct = default)
     {
         if (photo == null)
@@ -153,48 +201,7 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
         pageIndex = Math.Max(1, pageIndex);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        const string cte = @"
-WITH biz AS (
-    SELECT 'ElderlyBenefits'::text AS business_type, e.id AS business_id,
-           e.name AS person_name, e.id_card
-    FROM nc_biz_elderly_applications e
-    WHERE e.deleted_at IS NULL
-
-    UNION ALL
-
-    SELECT 'SocialAssistance', a.id, a.applicant_name, a.applicant_id_card
-    FROM nc_biz_applications a
-    WHERE a.deleted_at IS NULL
-
-    UNION ALL
-
-    SELECT 'TempRelief', t.id, t.applicant_name, t.applicant_id_card
-    FROM nc_biz_temp_relief_applications t
-    WHERE t.deleted_at IS NULL
-),
-filtered AS (
-    SELECT * FROM biz
-    WHERE ($1::text = '' OR business_type = $1::text)
-      AND ($2::text = '' OR person_name ILIKE '%' || $2::text || '%' OR id_card ILIKE '%' || $2::text || '%')
-),
-people AS (
-    SELECT id_card,
-           MAX(person_name) AS person_name,
-           string_agg(DISTINCT business_type, '/' ORDER BY business_type) AS business_types,
-           MAX(business_id) AS business_id
-    FROM filtered
-    GROUP BY id_card
-),
-counted AS (
-    SELECT p.id_card, p.person_name, p.business_types, p.business_id,
-           COALESCE(c.photo_count, 0)::int AS photo_count
-    FROM people p
-    LEFT JOIN (
-        SELECT applicant_id_card, COUNT(*)::int AS photo_count
-        FROM nc_biz_archive_photos
-        GROUP BY applicant_id_card
-    ) c ON c.applicant_id_card = p.id_card
-)";
+        const string cte = PersonCte;
 
         var type = businessType ?? string.Empty;
         var kw = keyword?.Trim() ?? string.Empty;
@@ -273,6 +280,134 @@ WHERE ($1::text = '' OR applicant_id_card ILIKE '%' || $1::text || '%'
             PageIndex = pageIndex,
             PageSize = pageSize,
             TotalCount = (int)countResult.Value
+        });
+    }
+
+    /// <summary>
+    /// 解析照片插入归属人：18 位合法 + 三类业务档案中确实存在（必须指定已存在的档案人员）。
+    /// 复用 <see cref="PersonCte"/>（与补传候选同一段 SQL），按身份证精确定位到一个人。
+    /// </summary>
+    public async Task<Result<PhotoOwner>> ResolveOwnerAsync(string idCard, CancellationToken ct = default)
+    {
+        var trimmed = idCard?.Trim() ?? string.Empty;
+        if (!IdCardValidator.IsValid(trimmed))
+            return Result.Failure<PhotoOwner>(ErrorCodes.VALIDATION_FAILED, "身份证号格式不正确（需 18 位）");
+
+        // $1 业务域过滤（空 = 全部）、$2 关键词（空 = 不过滤），身份证精确定位走 $3
+        const string sql = PersonCte + @"
+SELECT id_card, person_name, business_types, business_id, photo_count
+FROM counted
+WHERE id_card = $3
+LIMIT 1";
+
+        var result = await _db.QueryAsync<PhotoBackfillCandidate>(sql, ct, string.Empty, string.Empty, trimmed);
+        if (result.IsFailure)
+        {
+            LogError($"档案人员解析失败: {result.Message}");
+            return Result.Failure<PhotoOwner>(result.ErrorCode!, result.Message!);
+        }
+
+        var hit = result.Value?.FirstOrDefault();
+        if (hit == null)
+        {
+            return Result.Failure<PhotoOwner>(ErrorCodes.NOT_FOUND,
+                "该身份证不在低收入/高龄/临时救助档案中（插入照片必须指定已存在的档案人员）");
+        }
+
+        return Result.Success(new PhotoOwner
+        {
+            IdCard = hit.IdCard,
+            PersonName = hit.PersonName,
+            BusinessTypes = hit.BusinessTypes,
+            ApplicationId = hit.BusinessId > 0 ? hit.BusinessId : null,
+            PhotoCount = hit.PhotoCount
+        });
+    }
+
+    /// <summary>
+    /// 批量插入照片（PC 端查询页按钮 / 拖拽）：逐张走 <see cref="SavePhotoAsync"/>，
+    /// 压缩、命名、体积校验与手机端采集完全同源；编号从该人该类别下一序号开始，本批内递增。
+    /// 部分失败不回滚已成功张，成败与首个原因在结果里显式带出（不吞异常、不静默跳过）。
+    /// </summary>
+    public async Task<Result<BatchPhotoInsertResult>> InsertPhotosAsync(
+        PhotoOwner owner, string category, IReadOnlyList<byte[]> files, CancellationToken ct = default)
+    {
+        if (owner is null || string.IsNullOrWhiteSpace(owner.IdCard))
+            return Result.Failure<BatchPhotoInsertResult>(ErrorCodes.VALIDATION_FAILED, "缺少照片归属人（必须指定已存在的档案人员）");
+        if (files is null || files.Count == 0)
+            return Result.Failure<BatchPhotoInsertResult>(ErrorCodes.VALIDATION_FAILED, "待插入的照片为空");
+        if (files.All(f => f == null || f.Length == 0))
+            return Result.Failure<BatchPhotoInsertResult>(ErrorCodes.VALIDATION_FAILED, "照片内容为空");
+
+        var idCard = owner.IdCard.Trim();
+        var cat = string.IsNullOrWhiteSpace(category) ? PhotoCategoryConstants.OTHER_CERT : category;
+
+        // 编号基准：该人该类别现有照片（与手机端采集同一取数与推进规则，往下递增不覆盖）
+        var existingResult = await GetByPersonAsync(idCard, cat, ct);
+        if (existingResult.IsFailure)
+            return Result.Failure<BatchPhotoInsertResult>(existingResult.ErrorCode!, existingResult.Message!);
+
+        var nextSeq = PhotoNameBuilder.NextSequence(existingResult.Value ?? new List<ArchivePhoto>());
+
+        var ids = new List<long>(files.Count);
+        var succeeded = 0;
+        string? firstError = null;
+
+        for (var i = 0; i < files.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var raw = files[i];
+            if (raw == null || raw.Length == 0)
+            {
+                firstError ??= "存在内容为空的图片文件";
+                continue;
+            }
+
+            try
+            {
+                var photo = new ArchivePhoto
+                {
+                    PhotoData = raw,
+                    ApplicantIdCard = idCard,
+                    ApplicationId = owner.ApplicationId,
+                    PhotoCategory = cat,
+                    PhotoName = PhotoNameBuilder.Build(owner.PersonName, idCard, cat, nextSeq),
+                    CreatedBy = App.CurrentUserId,
+                    CreatedByName = App.CurrentUserName
+                };
+
+                var save = await SavePhotoAsync(photo, ct);
+                if (save.IsFailure)
+                {
+                    firstError ??= save.Message;
+                    LogWarn($"插入照片失败: {save.ErrorCode} {save.Message}");
+                    continue;
+                }
+
+                ids.Add(save.Value);
+                succeeded++;
+                nextSeq++;
+                LogInfo($"插入照片成功: Id={save.Value}, Category={cat}, Name={photo.PhotoName}, " +
+                        $"Original={raw.Length}B, Stored={photo.FileSize}B");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                firstError ??= ex.Message;
+                LogWarn($"插入照片异常: {ex.Message}");
+            }
+        }
+
+        return Result.Success(new BatchPhotoInsertResult
+        {
+            Total = files.Count,
+            Succeeded = succeeded,
+            FirstError = firstError,
+            PhotoIds = ids
         });
     }
 }

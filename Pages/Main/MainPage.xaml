@@ -527,6 +527,10 @@
                                 HeightRequest="26" Padding="10,0" MinimumWidthRequest="0"
                                 VerticalOptions="Center" Margin="6,0,0,0"
                                 Command="{Binding CheckForUpdatesCommand}"/>
+                        <Button Text="更新日志" Style="{StaticResource ButtonOutline}" FontSize="14"
+                                HeightRequest="26" Padding="10,0" MinimumWidthRequest="0"
+                                VerticalOptions="Center" Margin="6,0,0,0"
+                                Command="{Binding NavigateCommand}" CommandParameter="UpdateLog"/>
                     </HorizontalStackLayout>
                 </HorizontalStackLayout>
                 <Label Grid.Column="2" Text="© 2026 帝皇权杖δ-me13 社会救助管理系统" FontSize="16" TextColor="{StaticResource TextTertiary}" HorizontalOptions="End"/>

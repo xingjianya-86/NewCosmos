@@ -8,9 +8,9 @@ tables:
     data:
       # ==================== 收入标准 ====================
       - { standard_type: "RuralSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Rural", support_mode: null, standard_value: 585.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2025-12-31", description: "2025年最低生活保障标准（农村）" }
-      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 780.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2025-12-31", description: "2025年最低生活保障标准（城市）" }
+      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 827.00, unit: "元/月", effective_start_date: "2025-01-01", effective_end_date: "2025-12-31", description: "2025年最低生活保障标准（城市）" }
       - { standard_type: "RuralSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Rural", support_mode: null, standard_value: 632.00, unit: "元/月", effective_start_date: "2026-04-01", effective_end_date: "2026-12-31", description: "2026年4月后最低生活保障标准（农村）" }
-      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 832.00, unit: "元/月", effective_start_date: "2026-04-01", effective_end_date: "2026-12-31", description: "2026年4月后最低生活保障标准（城市）" }
+      - { standard_type: "UrbanSubsistenceStandard", standard_name: "最低生活保障标准", hukou_type: "Urban", support_mode: null, standard_value: 827.00, unit: "元/月", effective_start_date: "2026-04-01", effective_end_date: "2026-12-31", description: "2026年4月后最低生活保障标准（城市）" }
       
       # ==================== 分类补贴标准 ====================
       - { standard_type: "ClassifiedSubsidyStandard", standard_name: "分类补贴标准", hukou_type: "Rural", support_mode: null, standard_value: 104.00, unit: "元/人/月", effective_start_date: "2025-01-01", effective_end_date: "2026-12-31", description: "最低生活保障分类施保每人补贴金额（农村）" }

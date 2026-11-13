@@ -22,7 +22,7 @@ public class TimelineResult
     public DateTime PublicityEndDate { get; set; }
     public DateTime AuditDate { get; set; }
 
-    /// <summary>C线：入户调查窗口起日（验收日前5天；2026-10-22 起遇非工作日顺延至其后最近工作日，长假越界时钳到公示起日）</summary>
+    /// <summary>C线：入户调查窗口起日（逐笔曲线下 = 申请日；存量档按库中公示起回放时仍为申请日）</summary>
     public DateTime InvestigationStartDate { get; set; }
 
     /// <summary>C线：入户调查窗口截止日（= 公示起日）</summary>
@@ -67,9 +67,10 @@ public interface IBusinessTimelineService
     TimelineResult GetTimelineForApplicationDate(DateTime applicationDate, TimelineType type);
 
     /// <summary>
-    /// C线（临时救助验收线）：按年月直算。验收日固定每月13号（非工作日顺延至其后最近工作日），
-    /// 公示止=验收日前1天、公示起=验收日前3天（均日历日，公示期不规避）；
-    /// 入户调查窗口=[验收日前5天, 公示起]，起日遇非工作日顺延至其后最近工作日。
+    /// C线（临时救助验收线）：按年月直算，仅用于<b>月度批次标签与补打窗口</b>：
+    /// 验收日锚点 = 每月13号（非工作日顺延至其后最近工作日）。
+    /// 2026-11-13 起公示/验收不再取本方法窗口（改逐笔 5 天曲线，见 <see cref="BuildTempReliefCurve"/>）；
+    /// 本方法保留仅为「申请日 ≤ A 归本月」批次归属与补打窗口 (上月A, 本月A]。
     /// </summary>
     Task<TimelineResult> CalculateTempReliefAsync(int year, int month);
 
@@ -77,16 +78,26 @@ public interface IBusinessTimelineService
     Task<TimelineResult> GetCurrentTempReliefAsync();
 
     /// <summary>
-    /// 临时救助验收日期 = 公示起止所属月份的 C 线验收日（13号，非工作日顺延至其后最近工作日）；
-    /// 公示结束为空时回退当前C线窗口的验收日。
+    /// 临时救助验收日期 = <b>公示止次日历日</b>（2026-11-13 起逐笔推导；旧口径公示止 = A−1 时结果恒等于 A，
+    /// 存量档案零漂移）；公示结束为空时回退当前C线窗口的验收日。
     /// </summary>
     DateTime GetTempReliefAcceptanceDate(DateTime? publicizeEnd);
 
     /// <summary>
-    /// 按申请日期归属 C 线窗口：取申请日期所在月起第一个「申请日期 ≤ 该月验收日 A」的 C 线窗口；
+    /// C线逐笔时间曲线（2026-11-13 起）：以申请日 D 为锚，全周期 5 天——
+    /// 公示起 = D+1、公示止 = D+3（恒 3 天）、验收日 = D+4（公示止次日历日）；
+    /// 入户调查窗口 = [D, 公示起]（CycleStart = D、CycleEnd = 验收日）。
+    /// 传入 <paramref name="publicityStart"/> 时以实际公示起为准（打印/存量档回放），公示止与验收日随之推导。
+    /// 与月度批次（申请日 ≤ 当月13号归本月，仅作标签）解耦。
+    /// </summary>
+    TimelineResult BuildTempReliefCurve(DateTime applyDate, DateTime? publicityStart = null);
+
+    /// <summary>
+    /// 按申请日期归属 C 线<b>月度批次</b>标签：取申请日期所在月起第一个「申请日期 ≤ 该月验收日 A」的 C 线窗口；
     /// 超过当月验收日（13 号，非工作日顺延）→ 顺延下一个月，跨年自动接续（2026-10-20 口径，
     /// 废止 2026-10-18 的"不滚月 + 越界钳回"）。申请日期原样返回给表单，本方法不改写申请日期。
-    /// 归属月确定后，公示起止 / 入户调查窗口 / 验收日均取该月窗口。
+    /// 2026-11-13 起该结果仅用于批次标签与补打窗口 (上月A, 本月A]，不再承载公示/验收日期
+    /// （公示/验收见逐笔 5 天曲线 <see cref="BuildTempReliefCurve"/>）。
     /// </summary>
     Task<TimelineResult> CalculateTempReliefForApplyDateAsync(DateTime applyDate);
 
@@ -94,10 +105,10 @@ public interface IBusinessTimelineService
     TimelineResult CalculateTempReliefForApplyDate(DateTime applyDate);
 
     /// <summary>
-    /// C线文书「入户调查时间」= clamp(今日的最近工作日, [该窗口入户调查窗口起日, 窗口截止=公示起日])。
-    /// 今日为工作日取今日；今日为周末/节假日往回取过去最近工作日；早于窗口起日（窗口未开启）取起日
-    /// （起日 2026-10-22 起已顺延为工作日，该分支必出工作日；仅长假越界被钳到公示起日的极窄窗口除外）；
-    /// 晚于窗口截止（补打历史档案）兜底为截止日（截止 = 公示起日不规避，可能为休息日）。
+    /// C线文书「入户调查时间」= clamp(今日的最近工作日, [申请日, 公示起])。
+    /// 今日为工作日取今日；今日为周末/节假日往回取过去最近工作日；早于申请日（窗口未开启）取申请日；
+    /// 晚于窗口截止（补打历史档案）兜底为公示起日（截止不规避，可能为休息日）。
+    /// 存量「公示早于申请」倒挂档：起日钳到截止日，保证返回值不早于公示起。
     /// </summary>
     DateTime GetTempReliefInvestigationPrintDate(TimelineResult cLine);
 
@@ -122,11 +133,15 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     private const int B_ACCEPTANCE_DEADLINE_OFFSET = -3;  // 会议前3个工作日
     private const int B_PUBLICITY_DAYS = 7;
 
-    // C线参数（临时救助验收线）
-    private const int C_ACCEPTANCE_DAY = 13;             // 验收日固定日历日（非工作日顺延至其后最近工作日）
-    private const int C_PUBLICITY_END_OFFSET = -1;       // 公示止 = 验收日 − 1（日历日，不排工作日）
-    private const int C_PUBLICITY_START_OFFSET = -3;     // 公示起 = 验收日 − 3（日历日，不排工作日）
-    private const int C_INVESTIGATION_START_OFFSET = -5; // 入户调查窗口起日 = 验收日 − 5（日历日，非工作日顺延至其后最近工作日）
+    // C线参数（临时救助逐笔 5 天曲线，2026-11-13 起：公示期不再锚定每月 13 号）
+    // 以申请日 D 为锚：公示起 = D+1、公示止 = D+3（恒 3 天）、验收日 = D+4（公示止次日历日）。
+    private const int C_PUBLICITY_START_OFFSET = 1;      // 公示起 = 申请日 + 1（日历日）
+    private const int C_PUBLICITY_DAYS = 3;              // 公示恒 3 天（起止均含端点）
+    private const int C_ACCEPTANCE_OFFSET = 4;           // 验收日 = 申请日 + 4（= 公示止 + 1 日历日）
+
+    // 月度批次/补打窗口锚点（仅作标签与补打过滤：申请日 ≤ 当月 13 号归本月；窗口 (上月A, 本月A]）
+    private const int C_ACCEPTANCE_DAY = 13;
+    private const int C_BATCH_START_OFFSET = -5;         // 批次区间展示起点 = 验收日 − 5（非工作日顺延）
 
     public BusinessTimelineService(IHolidayService holidayService, ILoggerService logger)
         : base(logger)
@@ -175,10 +190,41 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     public DateTime GetTempReliefAcceptanceDate(DateTime? publicizeEnd)
     {
         if (publicizeEnd.HasValue && publicizeEnd.Value.Date != DateTime.MinValue.Date)
-            return CalculateCLine(publicizeEnd.Value.Year, publicizeEnd.Value.Month).AuditDate;
+            return publicizeEnd.Value.Date.AddDays(1);   // 公示止次日历日（存量 A−1 → A，零漂移）
 
         // 公示结束为空：回退当前C线窗口的验收日
         return GetCurrentTempReliefCore().AuditDate;
+    }
+
+    /// <inheritdoc />
+    public TimelineResult BuildTempReliefCurve(DateTime applyDate, DateTime? publicityStart = null)
+        => BuildTempReliefCurveCore(applyDate, publicityStart);
+
+    /// <summary>
+    /// 逐笔 5 天曲线纯计算（唯一实现，供服务与测试共用）：
+    /// 公示起 = 传入值 ?? 申请日+1；公示止 = 公示起+2（恒 3 天）；验收日 = 公示止+1（日历日）；
+    /// 入户调查窗口 = [申请日, 公示起]。
+    /// </summary>
+    public static TimelineResult BuildTempReliefCurveCore(DateTime applyDate, DateTime? publicityStart = null)
+    {
+        var d = applyDate.Date;
+        var start = publicityStart?.Date ?? d.AddDays(C_PUBLICITY_START_OFFSET);
+        var end = start.AddDays(C_PUBLICITY_DAYS - 1);   // 恒 +2 天（3 天整）
+        var acceptance = start.AddDays(C_ACCEPTANCE_OFFSET - C_PUBLICITY_START_OFFSET); // 公示止 + 1；默认 = D+4
+
+        return new TimelineResult
+        {
+            Year = d.Year,
+            Month = d.Month,
+            Type = TimelineType.TempRelief,
+            CycleStartDate = d,
+            CycleEndDate = acceptance,
+            PublicityStartDate = start,
+            PublicityEndDate = end,
+            InvestigationStartDate = d,
+            InvestigationDeadline = start,
+            AuditDate = acceptance
+        };
     }
 
     /// <inheritdoc />
@@ -190,11 +236,21 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
             ? today
             : _holidayService.GetPreviousWorkDay(today);
 
-        // 钳入窗口 [起日=验收日前5天, 截止=公示起日]：
+        // 钳入窗口 [申请日, 公示起日]（逐笔曲线：调查不早于申请、不晚于公示起）：
         // 早于起日（窗口未开启）取起日；晚于截止（补打历史档案）兜底为截止日。
         var start = cLine.InvestigationStartDate.Date;
         var deadline = cLine.InvestigationDeadline.Date;
-        if (recentWorkday < start) return start;
+        // 存量倒挂档（历史规则允许公示早于申请）防御：起日不得晚于截止日
+        if (start > deadline) start = deadline;
+        return ClampInvestigationPrintDate(recentWorkday, start, deadline);
+    }
+
+    /// <summary>
+    /// 入户调查打印值钳制（纯函数，唯一实现）：早于窗口起日取起日、晚于截止取截止、否则取当日。
+    /// </summary>
+    public static DateTime ClampInvestigationPrintDate(DateTime recentWorkday, DateTime windowStart, DateTime deadline)
+    {
+        if (recentWorkday < windowStart) return windowStart;
         if (recentWorkday > deadline) return deadline;
         return recentWorkday;
     }
@@ -363,10 +419,9 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
     }
 
     /// <summary>
-    /// C线（临时救助验收线）：验收日固定每月13号（非工作日顺延至其后最近工作日）；
-    /// 公示止 = 验收日前1天、公示起 = 验收日前3天（均日历日，不排工作日——公示期不规避休息日）；
-    /// 入户调查窗口 = [验收日前5天, 公示起日]，起日 2026-10-22 起遇非工作日顺延至其后最近工作日
-    /// （截止 = 公示起日不规避；长假连休使顺延越过公示起时钳回公示起日）。
+    /// C线月度批次窗口（仅作批次标签与补打过滤，2026-11-13 起不再承载公示/验收）：
+    /// 验收日锚点 = 每月13号（非工作日顺延至其后最近工作日）；Cycle = [验收日前5天(顺延工作日), 验收日]。
+    /// 公示/验收现行口径见逐笔 5 天曲线 <see cref="BuildTempReliefCurve"/>。
     /// </summary>
     private TimelineResult CalculateCLine(int year, int month)
     {
@@ -375,31 +430,20 @@ public class BusinessTimelineService : BaseService, IBusinessTimelineService
         if (!_holidayService.IsWorkDay(acceptance))
             acceptance = _holidayService.GetNextWorkDay(acceptance);
 
-        // 公示起止：验收日前后推（日历日，不考虑工作日）
-        var publicityEnd = acceptance.AddDays(C_PUBLICITY_END_OFFSET);
-        var publicityStart = acceptance.AddDays(C_PUBLICITY_START_OFFSET);
-
-        // 入户调查窗口起日 = 验收日前5天；非工作日顺延至其后最近工作日（2026-10-22 起规避休息日，
-        // 与验收日同为"往后顺延"惯例；公示期本身不规避）
-        var investigationStart = acceptance.AddDays(C_INVESTIGATION_START_OFFSET);
-        if (!_holidayService.IsWorkDay(investigationStart))
-            investigationStart = _holidayService.GetNextWorkDay(investigationStart);
-
-        // 硬约束「不得晚于公示起日」：长假连休使顺延越过公示起时钳回公示起日（截止不规避休息日）
-        if (investigationStart > publicityStart)
-            investigationStart = publicityStart;
+        // 批次起点 = 验收日前5天（非工作日顺延至其后最近工作日），仅用于批次区间展示
+        var batchStart = acceptance.AddDays(C_BATCH_START_OFFSET);
+        if (!_holidayService.IsWorkDay(batchStart))
+            batchStart = _holidayService.GetNextWorkDay(batchStart);
+        if (batchStart > acceptance)
+            batchStart = acceptance;
 
         return new TimelineResult
         {
             Year = year,
             Month = month,
             Type = TimelineType.TempRelief,
-            CycleStartDate = investigationStart,
+            CycleStartDate = batchStart,
             CycleEndDate = acceptance,
-            PublicityStartDate = publicityStart,
-            PublicityEndDate = publicityEnd,
-            InvestigationStartDate = investigationStart,
-            InvestigationDeadline = publicityStart,
             AuditDate = acceptance
         };
     }

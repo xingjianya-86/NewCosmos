@@ -30,7 +30,7 @@ public partial class PhotoBackfillCandidate : ObservableObject
 
     /// <summary>业务域中文名（多域用「·」连接）。</summary>
     public string BusinessTypeNames => string.Join(" · ",
-        BusinessTypes.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(ToDisplayName));
+        BusinessTypes.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(ToBusinessDisplayName));
 
     /// <summary>照片状态徽章文案。</summary>
     public string PhotoStateText => PhotoCount > 0 ? $"已传 {PhotoCount} 张" : "未传";
@@ -42,7 +42,8 @@ public partial class PhotoBackfillCandidate : ObservableObject
 
     public string Subtitle => BusinessTypeNames;
 
-    private static string ToDisplayName(string code) => code switch
+    /// <summary>业务域代码 → 中文名（PhotoOwner 等同源模型复用，避免各处重抄映射）。</summary>
+    public static string ToBusinessDisplayName(string code) => code switch
     {
         "ElderlyBenefits" => "高龄津贴",
         "SocialAssistance" => "低收入人口",

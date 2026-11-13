@@ -249,6 +249,9 @@
                     <Button Text="检查更新" Command="{Binding CheckForUpdatesCommand}"
                             BackgroundColor="#EFF6FF" TextColor="#1a73e8"
                             FontSize="16" HeightRequest="50" CornerRadius="12" />
+                    <Button Text="更新日志" Command="{Binding OpenUpdateLogCommand}"
+                            BackgroundColor="#F0F9FF" TextColor="#6d6354"
+                            FontSize="16" HeightRequest="50" CornerRadius="12" />
                 </VerticalStackLayout>
             </ScrollView>
 

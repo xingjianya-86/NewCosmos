@@ -42,7 +42,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     [ObservableProperty] private string _applicantName = string.Empty;
     [ObservableProperty] private long? _applicationId;
 
-    [ObservableProperty] private ObservableCollection<ArchivePhoto> _photos = new();
+    [ObservableProperty] private ObservableCollection<MobileArchivePhotoItem> _photos = new();
     [ObservableProperty] private bool _hasPhotos;
 
     /// <summary>是否显示底部「批量扫描识别」按钮（有回填上下文才可识别；无上下文只存档）。</summary>
@@ -203,11 +203,167 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
             Photos.Clear();
             foreach (var p in result.Value ?? new List<ArchivePhoto>())
-                Photos.Add(p);
+                Photos.Add(new MobileArchivePhotoItem(p));
             HasPhotos = Photos.Count > 0;
             return Result.Success();
         }, "加载照片...");
+
+        // 缩略图后台加载（不阻塞列表渲染；切类别/刷新会取消上一批）
+        SafeFireAndForget(LoadThumbnailsAsync);
     }
+
+    public override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _thumbCts?.Cancel();
+        _thumbCts?.Dispose();
+        _thumbCts = null;
+    }
+
+    #region 列表缩略图与全屏预览
+
+    /// <summary>缩略图后台加载的取消源（切类别/重新加载/离开页面时取消上一批）。</summary>
+    private CancellationTokenSource? _thumbCts;
+
+    /// <summary>全屏预览是否打开。</summary>
+    [ObservableProperty]
+    private bool _isPreviewOpen;
+
+    /// <summary>预览大图（关闭时置 null 释放内存）。</summary>
+    [ObservableProperty]
+    private ImageSource? _previewImage;
+
+    /// <summary>是否已取到预览大图（控制空态提示显隐）。</summary>
+    public bool HasPreviewImage => PreviewImage is not null;
+
+    /// <summary>预览空态（既没取到图也没在加载：读取失败/照片已删）。</summary>
+    public bool ShowPreviewEmpty => !HasPreviewImage && !IsPreviewLoading;
+
+    partial void OnPreviewImageChanged(ImageSource? value)
+    {
+        OnPropertyChanged(nameof(HasPreviewImage));
+        OnPropertyChanged(nameof(ShowPreviewEmpty));
+    }
+
+    partial void OnIsPreviewLoadingChanged(bool value) => OnPropertyChanged(nameof(ShowPreviewEmpty));
+
+    /// <summary>预览信息条（类别 · 名称 · 采集时间）。</summary>
+    [ObservableProperty]
+    private string _previewInfo = string.Empty;
+
+    /// <summary>预览大图取回/转码中。</summary>
+    [ObservableProperty]
+    private bool _isPreviewLoading;
+
+    /// <summary>点列表项 → 全屏预览（取库内二进制 → WebP 转 JPEG 适配 → 展示）。</summary>
+    [RelayCommand]
+    private async Task PreviewPhotoAsync(ArchivePhoto? photo)
+    {
+        if (photo == null) return;
+
+        PreviewImage = null;
+        PreviewInfo = $"{photo.PhotoCategoryName} · {photo.DisplayName} · {photo.CreatedAt:yyyy-MM-dd HH:mm}";
+        IsPreviewOpen = true;
+        await LoadPreviewAsync(photo);
+    }
+
+    /// <summary>关闭全屏预览并释放大图。</summary>
+    [RelayCommand]
+    private void ClosePreview()
+    {
+        IsPreviewOpen = false;
+        IsPreviewLoading = false;
+        PreviewImage = null;
+    }
+
+    private async Task LoadPreviewAsync(ArchivePhoto photo)
+    {
+        try
+        {
+            IsPreviewLoading = true;
+
+            var data = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
+            if (data.IsFailure || data.Value == null || data.Value.Length == 0)
+            {
+                PreviewInfo = "照片读取失败（可能已被删除）";
+                return;
+            }
+
+            var bytes = data.Value;
+            var format = Helpers.ImageTranscoder.DetectFormat(bytes);
+            if (string.IsNullOrEmpty(format))
+                format = photo.ImageFormat;
+
+            // WinUI 对 WebP 支持不一致：预览统一先转 JPEG（不改变库内格式），与桌面查询页同口径
+            var displayBytes = bytes;
+            if (format == PhotoFormatConstants.WebP
+                && !Helpers.ImageTranscoder.TryToJpeg(bytes, out displayBytes))
+            {
+                PreviewInfo = "照片预览失败（WebP 转码失败）";
+                return;
+            }
+
+            var source = ImageSource.FromStream(() => new MemoryStream(displayBytes));
+            await MainThread.InvokeOnMainThreadAsync(() => PreviewImage = source);
+        }
+        catch (OperationCanceledException)
+        {
+            // 离开页面/新操作顶掉：忽略
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"照片预览加载失败 Id={photo.Id}: {ex.Message}");
+            PreviewInfo = "照片预览失败";
+        }
+        finally
+        {
+            IsPreviewLoading = false;
+        }
+    }
+
+    /// <summary>为当前列表异步生成缩略图（4 路并发，切类别/刷新/离开页面时取消上一批）。</summary>
+    private async Task LoadThumbnailsAsync()
+    {
+        _thumbCts?.Cancel();
+        _thumbCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _thumbCts = cts;
+        var token = cts.Token;
+
+        var items = Photos.ToList();
+        using var gate = new SemaphoreSlim(4);
+        var tasks = items.Select(async item =>
+        {
+            await gate.WaitAsync(token);
+            try
+            {
+                var data = await _photoService.GetPhotoDataAsync(item.Id, token);
+                if (data.IsFailure || data.Value == null || data.Value.Length == 0) return;
+
+                // 输出 JPEG（该页手机/桌面都会打开，WinUI 对 WebP 支持不稳定）
+                var thumb = ImageCompressor.CreateThumbnail(data.Value, maxEdge: 160, jpeg: true);
+                if (thumb == null || token.IsCancellationRequested) return;
+
+                MainThread.BeginInvokeOnMainThread(() =>
+                    item.Thumbnail = ImageSource.FromStream(() => new MemoryStream(thumb)));
+            }
+            catch (OperationCanceledException)
+            {
+                // 切类别/重新加载：忽略
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"照片缩略图加载失败 Id={item.Id}: {ex.Message}");
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+        await Task.WhenAll(tasks);
+    }
+
+    #endregion
 
     /// <summary>拍照采集。</summary>
     [RelayCommand]
@@ -249,37 +405,140 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             if (files.Count == 0)
                 return; // 用户取消
 
-            var savedCount = 0;
-            var failedCount = 0;
-            string? firstError = null;
+            // 先把字节读全，再走与「拖入图片」完全同一条保存链路（避免两份入库逻辑）
+            var raws = new List<byte[]>(files.Count);
+            var readFailed = 0;
+            string? firstReadError = null;
+            foreach (var file in files)
+            {
+                try
+                {
+                    byte[] raw;
+                    await using (var stream = await file.OpenReadAsync())
+                    using (var ms = new MemoryStream())
+                    {
+                        await stream.CopyToAsync(ms);
+                        raw = ms.ToArray();
+                    }
 
-            // 命名规则（2026-11-04）：姓名_身份证后4位_类别_编号，编号=该人该类别内流水，往下递增不覆盖。
-            // 保存前取一次现有照片算基准号，本批内逐张递增。
-            var existingResult = await _photoService.GetByPersonAsync(
-                ApplicantIdCard.Trim(), SelectedCategoryCode, CancellationToken);
-            var nextSeq = PhotoNameBuilder.NextSequence(
-                existingResult.IsSuccess ? existingResult.Value ?? new List<ArchivePhoto>() : new List<ArchivePhoto>());
+                    if (raw.Length == 0)
+                    {
+                        readFailed++;
+                        continue;
+                    }
 
+                    raws.Add(raw);
+                }
+                catch (Exception ex)
+                {
+                    readFailed++;
+                    firstReadError ??= ex.Message;
+                    _logger.Warn($"读取所选图片失败 {file.FileName}: {ex.Message}");
+                }
+            }
+
+            await SaveRawBatchAsync(raws, readFailed, firstReadError, source: "采集");
+        }
+        catch (FeatureNotSupportedException)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "该设备不支持此功能", "确定");
+        }
+        catch (PermissionException)
+        {
+            await _dialogService.DisplayAlertAsync("权限不足", "请在系统设置中允许相机/相册访问权限", "确定");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "采集照片失败");
+            await _dialogService.DisplayAlertAsync("错误", $"采集失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 拖入图片（Windows 拖放入口，由页面 code-behind 在 UI 线程回调）：
+    /// 与「拍照 / 从相册选择」共用 <see cref="SaveRawBatchAsync"/> 的压缩、命名与入库链路。
+    /// </summary>
+    public async Task InsertFromDroppedPathsAsync(IReadOnlyList<string>? paths)
+    {
+        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "缺少身份证号关联，无法存档", "确定");
+            return;
+        }
+
+        try
+        {
+            if (paths == null || paths.Count == 0)
+            {
+                await _dialogService.DisplayAlertAsync("提示",
+                    "未检测到可拖入的图片文件（支持 jpg / jpeg / png / webp / bmp / gif）", "确定");
+                return;
+            }
+
+            var raws = new List<byte[]>(paths.Count);
+            var readFailed = 0;
+            string? firstReadError = null;
+            foreach (var path in paths)
+            {
+                try
+                {
+                    var bytes = await File.ReadAllBytesAsync(path);
+                    if (bytes.Length == 0)
+                    {
+                        readFailed++;
+                        continue;
+                    }
+
+                    raws.Add(bytes);
+                }
+                catch (Exception ex)
+                {
+                    readFailed++;
+                    firstReadError ??= ex.Message;
+                    _logger.Warn($"读取拖入图片失败 {Path.GetFileName(path)}: {ex.Message}");
+                }
+            }
+
+            await SaveRawBatchAsync(raws, readFailed, firstReadError, source: "拖入");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "拖入照片失败");
+            await _dialogService.DisplayAlertAsync("错误", $"导入失败：{ex.Message}", "确定");
+        }
+    }
+
+    /// <summary>
+    /// 批量入库（拍照 / 相册选图 / 拖入 **共用的唯一保存链路**）：
+    /// 编号基准取该人该类别现有照片（2026-11-04 命名规则，往下递增不覆盖）→ 逐张交
+    /// ArchivePhotoService 统一压缩为 WebP（单张 ≤500KB）落库 → 刷新列表 → 汇总提示。
+    /// readFailed / firstReadError 是读取阶段已失败的张数与首个原因（计入总失败数）。
+    /// </summary>
+    private async Task SaveRawBatchAsync(
+        IReadOnlyList<byte[]> raws, int readFailed, string? firstReadError, string source)
+    {
+        var savedCount = 0;
+        var failedCount = readFailed;
+        string? firstError = firstReadError;
+
+        if (raws.Count == 0 && failedCount == 0)
+            return; // 用户全部取消
+
+        // 命名规则（2026-11-04）：姓名_身份证后4位_类别_编号，编号=该人该类别内流水，往下递增不覆盖。
+        // 保存前取一次现有照片算基准号，本批内逐张递增。
+        var existingResult = await _photoService.GetByPersonAsync(
+            ApplicantIdCard.Trim(), SelectedCategoryCode, CancellationToken);
+        var nextSeq = PhotoNameBuilder.NextSequence(
+            existingResult.IsSuccess ? existingResult.Value ?? new List<ArchivePhoto>() : new List<ArchivePhoto>());
+
+        if (raws.Count > 0)
+        {
             await ExecuteAsync(async () =>
             {
-                foreach (var file in files)
+                foreach (var raw in raws)
                 {
                     try
                     {
-                        byte[] raw;
-                        await using (var stream = await file.OpenReadAsync())
-                        using (var ms = new MemoryStream())
-                        {
-                            await stream.CopyToAsync(ms);
-                            raw = ms.ToArray();
-                        }
-
-                        if (raw.Length == 0)
-                        {
-                            failedCount++;
-                            continue;
-                        }
-
                         // 原始字节交给 ArchivePhotoService 统一压缩为 WebP（单张 ≤500KB）并落库；
                         // 不在 ViewModel 里压缩，避免绕过服务层体积约束。
                         var photo = new ArchivePhoto
@@ -298,13 +557,14 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                         {
                             failedCount++;
                             firstError ??= save.Message;
-                            _logger.Warn($"照片保存失败: {file.FileName} {save.Message}");
+                            _logger.Warn($"照片保存失败: {save.Message}");
                             continue;
                         }
 
                         savedCount++;
                         nextSeq++; // 编号往下走：本批成功保存一张推进一次
                         _logger.LogBusiness("采集档案照片",
+                            ("Source", source),
                             ("ApplicationId", ApplicationId?.ToString() ?? ""),
                             ("Category", SelectedCategoryCode),
                             ("PhotoId", save.Value.ToString()),
@@ -317,41 +577,28 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                     {
                         failedCount++;
                         firstError ??= ex.Message;
-                        _logger.Warn($"照片处理失败: {file.FileName} {ex.Message}");
+                        _logger.Warn($"照片处理失败: {ex.Message}");
                     }
                 }
 
                 return Result.Success();
-            }, files.Count > 1 ? $"上传 {files.Count} 张照片..." : "保存照片...");
+            }, raws.Count > 1 ? $"上传 {raws.Count} 张照片..." : "保存照片...");
+        }
 
-            await LoadPhotosAsync();
+        await LoadPhotosAsync();
 
-            if (savedCount == 0 && failedCount == 0)
-                return; // 全部取消
+        if (savedCount == 0 && failedCount == 0)
+            return; // 全部取消
 
-            // 2026-11-04 交互改版：上传后不再逐张弹「识别询问」（原流程批量上传后要一张一张确认，
-            // 效率太低）；识别统一走底部「批量扫描识别」按钮——一次识别当前人员名下全部照片。
-            var message = failedCount == 0
-                ? $"已保存 {savedCount} 张照片（{SelectedCategoryName}）"
-                : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）" +
-                  (string.IsNullOrWhiteSpace(firstError) ? string.Empty : $"\n原因：{firstError}");
-            if (_assignContext is not null && OcrFieldKeys.GetFields(SelectedCategoryCode) is not null)
-                message += "\n\n点下方「批量扫描识别」可一次性识别全部照片。";
-            await ShowTipAsync(message);
-        }
-        catch (FeatureNotSupportedException)
-        {
-            await _dialogService.DisplayAlertAsync("提示", "该设备不支持此功能", "确定");
-        }
-        catch (PermissionException)
-        {
-            await _dialogService.DisplayAlertAsync("权限不足", "请在系统设置中允许相机/相册访问权限", "确定");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "采集照片失败");
-            await _dialogService.DisplayAlertAsync("错误", $"采集失败：{ex.Message}", "确定");
-        }
+        // 2026-11-04 交互改版：上传后不再逐张弹「识别询问」（原流程批量上传后要一张一张确认，
+        // 效率太低）；识别统一走底部「批量扫描识别」按钮——一次识别当前人员名下全部照片。
+        var message = failedCount == 0
+            ? $"已保存 {savedCount} 张照片（{SelectedCategoryName}）"
+            : $"已保存 {savedCount} 张，失败 {failedCount} 张（{SelectedCategoryName}）" +
+              (string.IsNullOrWhiteSpace(firstError) ? string.Empty : $"\n原因：{firstError}");
+        if (_assignContext is not null && OcrFieldKeys.GetFields(SelectedCategoryCode) is not null)
+            message += "\n\n点下方「批量扫描识别」可一次性识别全部照片。";
+        await ShowTipAsync(message);
     }
 
     /// <summary>
@@ -530,13 +777,22 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
     /// <summary>
     /// 导出到系统相册（Android MediaStore / Windows 图片目录）：便于外发打印或留档。
+    /// 先选导出格式：WebP（库内原图、体积小）/ JPG（民政等外部系统不支持 WebP 时选它）。
     /// </summary>
     [RelayCommand]
     private async Task ExportPhotoAsync(ArchivePhoto? photo)
     {
         if (photo == null) return;
 
+        // 取消选格式即放弃导出
+        var choice = await _dialogService.DisplayActionSheetAsync(
+            "导出格式", "取消", null,
+            new[] { "WebP（原图，体积小）", "JPG（外部系统兼容）" });
+        if (string.IsNullOrEmpty(choice) || choice == "取消") return;
+        var asJpeg = choice.StartsWith("JPG", StringComparison.Ordinal);
+
         var album = _serviceProvider.GetRequiredService<Services.Platform.IAlbumExportService>();
+        var exportedFormat = string.Empty;
 
         var result = await ExecuteAsync(async () =>
         {
@@ -544,9 +800,20 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             if (data.IsFailure || data.Value == null || data.Value.Length == 0)
                 return Result.Failure(data.ErrorCode ?? ErrorCodes.NOT_FOUND, data.Message ?? "照片读取失败");
 
-            var format = Helpers.ImageTranscoder.DetectFormat(data.Value);
+            var bytes = data.Value;
+            var format = Helpers.ImageTranscoder.DetectFormat(bytes);
             if (string.IsNullOrEmpty(format))
                 format = photo.ImageFormat;
+
+            // 导出为 JPG：已是 JPEG 透传，其余（WebP/PNG）转 JPEG q90；转码失败显式失败，不静默回退原格式
+            if (asJpeg && format != PhotoFormatConstants.Jpeg)
+            {
+                if (!Helpers.ImageTranscoder.TryToJpeg(bytes, out var jpegBytes))
+                    return Result.Failure(ErrorCodes.UNKNOWN_ERROR, "转 JPG 失败（原图无法解码）");
+                bytes = jpegBytes;
+                format = PhotoFormatConstants.Jpeg;
+            }
+
             // 文件名同步命名规则（2026-11-04）：优先用 PhotoName（姓名_身份证后4位_类别_编号），
             // 旧数据无名时回退原 NewCosmos_ 前缀格式；追加 Id 防同名覆盖。
             var baseName = PhotoNameBuilder.SanitizeFileName(photo.PhotoName);
@@ -555,10 +822,11 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                 : $"{baseName}_{photo.Id}";
             fileName += PhotoFormatConstants.GetExtension(format);
             var saved = await album.SaveToAlbumAsync(
-                fileName, data.Value, PhotoFormatConstants.GetMimeType(format), CancellationToken);
+                fileName, bytes, PhotoFormatConstants.GetMimeType(format), CancellationToken);
             if (saved.IsFailure)
                 return Result.Failure(saved.ErrorCode!, saved.Message!);
 
+            exportedFormat = format;
             _logger.LogBusiness("档案照片导出到相册",
                 ("PhotoId", photo.Id),
                 ("Category", photo.PhotoCategory),
@@ -568,7 +836,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         }, "导出到相册...");
 
         if (result.IsSuccess)
-            await ShowTipAsync("已导出到相册");
+            await ShowTipAsync($"已导出到相册（{PhotoFormatConstants.GetDisplayName(exportedFormat)}）");
     }
 
     /// <summary>删除照片（长按/按钮）。</summary>
@@ -696,4 +964,30 @@ public sealed class PhotoCategoryOption
         Code = code;
         Name = name;
     }
+}
+
+/// <summary>
+/// 手机端照片列表行：包一层实体带异步缩略图（与桌面查询页 <c>ArchivePhotoListItem</c> 同构）。
+/// 实体本身不加 UI 字段，避免污染数据映射。
+/// </summary>
+public partial class MobileArchivePhotoItem : ObservableObject
+{
+    public MobileArchivePhotoItem(ArchivePhoto photo)
+    {
+        Photo = photo;
+    }
+
+    public ArchivePhoto Photo { get; }
+
+    public long Id => Photo.Id;
+    public string DisplayName => Photo.DisplayName;
+    public DateTime CreatedAt => Photo.CreatedAt;
+
+    /// <summary>缩略图（异步加载；null = 未加载/失败，显示占位底色）。</summary>
+    [ObservableProperty]
+    private ImageSource? _thumbnail;
+
+    public bool HasThumbnail => Thumbnail is not null;
+
+    partial void OnThumbnailChanged(ImageSource? value) => OnPropertyChanged(nameof(HasThumbnail));
 }

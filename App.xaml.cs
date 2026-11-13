@@ -62,6 +62,55 @@ public partial class App : Application
         Services = services;
         CheckSingleInstance();
         SetupGlobalExceptionHandling();
+        _ = NotifyUpgradeNotesAsync(services);
+    }
+
+    /// <summary>
+    /// 升级日志：新版**首启**把升级前落盘的更新说明写入本机升级历史，并自动提示一次「本次更新内容」。
+    /// 先等启动闸门（SplashGate；未启用时立即完成）再弹，避免窗口/启动画面未就绪；
+    /// 无 pending（未升级）或文件读写异常时静默返回，不打扰正常使用。
+    /// </summary>
+    private async Task NotifyUpgradeNotesAsync(IServiceProvider services)
+    {
+        try
+        {
+            var gate = services.GetService<ISplashGate>();
+            if (gate != null)
+                await gate.WhenCompleted;
+
+            var history = services.GetService<IUpdateHistoryService>();
+            if (history == null) return;
+
+            var entry = await history.FlushPendingAsync();
+            if (entry == null) return;
+
+            Serilog.Log.Information($"[APP] 新版首启写入升级历史: {entry.Version}");
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await Task.Delay(600); // 等首屏稳定再弹
+                var dialog = services.GetService<IDialogService>();
+                if (dialog == null) return;
+
+                var body = string.IsNullOrWhiteSpace(entry.Notes)
+                    ? "本次升级未附带更新说明。"
+                    : TruncateForDialog(entry.Notes);
+                await dialog.DisplayAlertAsync($"本次更新内容 {entry.Version}", body, "知道了");
+            });
+        }
+        catch (Exception ex)
+        {
+            // 升级提示失败不能影响应用启动
+            Serilog.Log.Warning(ex, "[APP] 升级内容提示失败");
+        }
+    }
+
+    /// <summary>弹窗正文截断（过长只给摘要，完整内容在 设置 → 更新日志）。</summary>
+    private static string TruncateForDialog(string notes)
+    {
+        const int max = 800;
+        var text = notes.Trim();
+        return text.Length <= max ? text : text[..max] + "\n……（完整内容见 设置 → 更新日志）";
     }
 
     private void CheckSingleInstance()

@@ -36,4 +36,19 @@ public interface IArchivePhotoService
     /// </summary>
     Task<Result<PagedResult<ArchivePhoto>>> GetPhotosPagedAsync(
         string? keyword, string? category, int pageIndex, int pageSize, CancellationToken ct = default);
+
+    /// <summary>
+    /// 解析照片插入归属人：身份证须 18 位合法，且在低收入/高龄/临时救助任一业务域存在——
+    /// PC 端「插入照片 / 拖拽插入 / 打开采集页」的前置校验（必须指定已存在的档案人员）。
+    /// 查不到返回 NOT_FOUND，不静默放行。
+    /// </summary>
+    Task<Result<PhotoOwner>> ResolveOwnerAsync(string idCard, CancellationToken ct = default);
+
+    /// <summary>
+    /// 批量插入照片（PC 端）：与手机端采集走**同一个**保存入口
+    /// （压缩 WebP 单张 ≤500KB、命名 姓名_后4位_类别_编号、编号往下递增不覆盖），
+    /// 返回逐张成败统计；部分失败不回滚已成功张（与手机端批量采集口径一致）。
+    /// </summary>
+    Task<Result<BatchPhotoInsertResult>> InsertPhotosAsync(
+        PhotoOwner owner, string category, IReadOnlyList<byte[]> files, CancellationToken ct = default);
 }

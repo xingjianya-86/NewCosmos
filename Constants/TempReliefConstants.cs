@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace NewCosmos.Constants;
 
 /// <summary>
@@ -74,8 +76,78 @@ public static class TempReliefConstants
         "三年制", "四年制", "五年制"
     };
 
-    /// <summary>小额定额档位配置类型（nc_config_standards.standard_type）</summary>
+    /// <summary>
+    /// 小额定额档位配置类型（nc_config_standards.standard_type）。
+    /// 2026-11-13 起定额救助改为按户籍动态取低保月标准（农村 632 / 城镇 827），
+    /// 本类型三档（500/1000/2000）已停用（is_active=false，留行可回溯），代码不再读取。
+    /// </summary>
     public const string StandardType = "TEMP_RELIEF_SMALL";
+
+    /// <summary>低保月标准类型：农村（定额救助农村档取此标准）</summary>
+    public const string SubsistenceStandardRural = "RuralSubsistenceStandard";
+
+    /// <summary>低保月标准类型：城镇（定额救助城镇档取此标准）</summary>
+    public const string SubsistenceStandardUrban = "UrbanSubsistenceStandard";
+
+    /// <summary>
+    /// 户籍类型快照 → 低保月标准类型（定额救助动态取值用，唯一解析点）：
+    /// 农村/Rural → 农村标准；城镇|城市/Urban → 城镇标准；空/未知 → null（调用方兜底列出两档手选）。
+    /// 来源兼容：台账按表名固定 rural/urban、申请库 hukou_type 列 Rural/Urban、中文快照 农村/城镇。
+    /// </summary>
+    public static string? ResolveSubsistenceStandardType(string? hukouType)
+    {
+        var v = (hukouType ?? string.Empty).Trim();
+        if (v.Length == 0) return null;
+        if (v.Equals("Rural", StringComparison.OrdinalIgnoreCase)) return SubsistenceStandardRural;
+        if (v.Equals("Urban", StringComparison.OrdinalIgnoreCase)) return SubsistenceStandardUrban;
+        if (v.Contains("农村")) return SubsistenceStandardRural;
+        if (v.Contains("城镇") || v.Contains("城市")) return SubsistenceStandardUrban;
+        return null;
+    }
+
+    /// <summary>
+    /// 解析「确定金额」输入（定额救助可下调，上限=户籍对应低保月标准，如农村 632、城镇 827；例如可填 332）。
+    /// 允许携带「元」后缀；仅保留两位小数（四舍五入到分）。
+    /// </summary>
+    public static bool TryParseConfirmAmount(string? input, out decimal amount)
+    {
+        amount = 0m;
+        var text = (input ?? string.Empty).Trim();
+        if (text.EndsWith('元')) text = text[..^1].Trim();
+        if (text.Length == 0) return false;
+
+        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed)
+            && !decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out parsed))
+        {
+            return false;
+        }
+
+        if (parsed <= 0) return false;
+        amount = Math.Round(parsed, 2, MidpointRounding.AwayFromZero);
+        return amount > 0;
+    }
+
+    /// <summary>
+    /// 校验「确定金额」：须为大于 0 的数字，且不得超过户籍对应低保月标准（maxAmount&lt;=0 表示未取到标准，跳过上限校验）。
+    /// 校验消息单点维护，ViewModel 直接展示 error。
+    /// </summary>
+    public static bool TryValidateConfirmAmount(string? input, decimal maxAmount, out decimal amount, out string? error)
+    {
+        error = null;
+        if (!TryParseConfirmAmount(input, out amount))
+        {
+            error = "确定金额须为大于 0 的数字";
+            return false;
+        }
+
+        if (maxAmount > 0 && amount > maxAmount)
+        {
+            error = $"确定金额不能超过户籍对应低保月标准 {maxAmount:F2} 元";
+            return false;
+        }
+
+        return true;
+    }
 
     /// <summary>家庭人口上限（审批表成员行数）</summary>
     public const int MaxMemberRows = 5;

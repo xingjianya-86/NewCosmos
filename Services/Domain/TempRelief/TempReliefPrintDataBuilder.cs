@@ -22,8 +22,8 @@ public static class TempReliefPrintDataBuilder
     /// <param name="app">临时救助申请实体</param>
     /// <param name="members">家庭成员明细</param>
     /// <param name="contactUnitPhone">公示异议反馈电话（当前登录用户所在单位联系电话）</param>
-    /// <param name="acceptanceDate">验收日期（C线：公示结束次一个工作日；为空则回退公示结束日/当天）</param>
-    /// <param name="investigationDate">入户调查时间（动态：min(今日的最近工作日, 公示开始前一工作日)；为空则不输出）</param>
+    /// <param name="acceptanceDate">验收日期（C线：公示止次日历日；为空则回退公示结束日/当天）</param>
+    /// <param name="investigationDate">入户调查时间（动态：clamp(今日最近工作日, [申请日, 公示起])；为空则不输出）</param>
     public static Dictionary<string, string> BuildSingleFields(
         TempReliefApplication app,
         List<TempReliefMember> members,
@@ -216,21 +216,22 @@ public static class TempReliefPrintDataBuilder
     private static string FormatCnDate(DateTime? dt) => dt?.ToString("yyyy年M月d日") ?? string.Empty;
 
     /// <summary>
-    /// 解析打印用日期：验收日（= 公示止所属月份 C 线验收日，13号或其后最近工作日）与入户调查时间
-    /// （= clamp(今日的最近工作日, 窗口[A−5, 公示起])：起日 2026-10-22 起遇非工作日顺延、今日是工作日填今日、
-    /// 非工作日往回取、早于窗口起日取起日、补打超期兜底窗口截止 = 公示起日（不规避，可能为休息日））。
-    /// 月份以记录公示开始日（无则公示结束日/申请日/当天）为锚。
+    /// 解析打印用日期（2026-11-13 起逐笔 5 天曲线）：
+    /// 验收日 = 公示止 + 1 日历日（存量公示止 = A−1 时结果恒等于 A，与旧算法一致、零漂移）；
+    /// 入户调查时间 = clamp(今日的最近工作日, [申请日, 公示起])：今日是工作日填今日、非工作日往回取、
+    /// 早于申请日取申请日、补打超期兜底公示起日。
+    /// 锚点 = 申请日（无则公示起/公示止/当天）；公示起有库中值时按库中值回放（存量档不重算）。
     /// 打印调用方统一走此方法，避免各自重抄。
     /// </summary>
-    public static async Task<(DateTime Acceptance, DateTime Investigation)> ResolveScheduleAsync(
+    public static Task<(DateTime Acceptance, DateTime Investigation)> ResolveScheduleAsync(
         IBusinessTimelineService timelineService, TempReliefApplication app)
     {
         var acceptance = timelineService.GetTempReliefAcceptanceDate(app.PublicizeEndDate);
 
-        var anchor = app.PublicizeStartDate ?? app.PublicizeEndDate ?? app.ApplyDate ?? DateTime.Today;
-        var cLine = await timelineService.CalculateTempReliefAsync(anchor.Year, anchor.Month);
+        var anchor = app.ApplyDate ?? app.PublicizeStartDate ?? app.PublicizeEndDate ?? DateTime.Today;
+        var curve = timelineService.BuildTempReliefCurve(anchor, app.PublicizeStartDate);
 
-        return (acceptance, timelineService.GetTempReliefInvestigationPrintDate(cLine));
+        return Task.FromResult((acceptance, timelineService.GetTempReliefInvestigationPrintDate(curve)));
     }
 
     /// <summary>
