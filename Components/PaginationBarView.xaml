@@ -5,9 +5,6 @@
 
     <!-- 标准分页栏：直接继承页面 BindingContext（PagedSearchViewModelBase 家族），
          零配置使用：<components:PaginationBarView />
-         迷你版（无统计文案）：<components:PaginationBarView ShowStatusText="False"/> -->
-    <!-- 标准分页栏：直接继承页面 BindingContext（PagedSearchViewModelBase 家族），
-         零配置使用：<components:PaginationBarView />
          迷你版（无统计文案）：<components:PaginationBarView ShowStatusText="False"/>
          背景色经 ContentView 本体设置：BackgroundColor="{StaticResource Gray50}" -->
     <Grid Padding="16" ColumnDefinitions="*, Auto">

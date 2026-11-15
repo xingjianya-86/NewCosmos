@@ -14,7 +14,19 @@ public static class PhotoCategoryConstants
     public const string BANK_CARD = "BANK_CARD";                      // 银行卡/一卡通
     public const string INCOME_PROOF = "INCOME_PROOF";                // 收入/务工证明
     public const string PUBLICITY_CHECK = "PUBLICITY_CHECK";          // 公示/核查照片
+    public const string HOUSEHOLD_INSPECTION = "HOUSEHOLD_INSPECTION"; // 入户排查（现场入户核查照片，保存时打水印）
     public const string OTHER_CERT = "OTHER_CERT";                    // 其他证件照
+
+    /// <summary>保存时需自动打水印的类别（水印版式见 PhotoWatermarkConstants）。</summary>
+    public static readonly string[] WatermarkedCategories =
+    {
+        HOUSEHOLD_INSPECTION,
+        PUBLICITY_CHECK,
+    };
+
+    /// <summary>该类别是否需要保存时打水印。</summary>
+    public static bool RequiresWatermark(string? category) =>
+        Array.IndexOf(WatermarkedCategories, category ?? string.Empty) >= 0;
 
     /// <summary>全部有效类别（供 Picker 绑定）。</summary>
     public static readonly (string Code, string Name)[] All =
@@ -27,6 +39,7 @@ public static class PhotoCategoryConstants
         (BANK_CARD, "银行卡/一卡通"),
         (INCOME_PROOF, "收入/务工证明"),
         (PUBLICITY_CHECK, "公示/核查照片"),
+        (HOUSEHOLD_INSPECTION, "入户排查"),
         (OTHER_CERT, "其他证件照"),
     };
 
@@ -41,6 +54,7 @@ public static class PhotoCategoryConstants
         BANK_CARD => "银行卡/一卡通",
         INCOME_PROOF => "收入/务工证明",
         PUBLICITY_CHECK => "公示/核查照片",
+        HOUSEHOLD_INSPECTION => "入户排查",
         OTHER_CERT => "其他证件照",
         _ => "其他"
     };

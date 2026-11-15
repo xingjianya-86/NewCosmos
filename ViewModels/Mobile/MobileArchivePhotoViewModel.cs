@@ -100,6 +100,15 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         ApplicantName = applicantName ?? string.Empty;
     }
 
+    /// <summary>预设照片类别（补传页类别 Picker 透传）；null/未知代码 = 保持当前类别不动。</summary>
+    public void ApplyPresetCategory(string? categoryCode)
+    {
+        if (string.IsNullOrWhiteSpace(categoryCode)) return;
+        var option = CategoryOptions.FirstOrDefault(o => o.Code == categoryCode);
+        if (option == null) return;
+        SelectedCategoryOption = option; // 触发 OnSelectedCategoryOptionChanged → 更新 Code（不变则不刷新）
+    }
+
     /// <summary>注入识别回填上下文（null = 只存档不识别，如档案查询/补传入口）。</summary>
     public void ApplyAssignContext(IOcrAssignContext? context)
     {
@@ -289,21 +298,14 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                 return;
             }
 
-            var bytes = data.Value;
-            var format = Helpers.ImageTranscoder.DetectFormat(bytes);
-            if (string.IsNullOrEmpty(format))
-                format = photo.ImageFormat;
-
-            // WinUI 对 WebP 支持不一致：预览统一先转 JPEG（不改变库内格式），与桌面查询页同口径
-            var displayBytes = bytes;
-            if (format == PhotoFormatConstants.WebP
-                && !Helpers.ImageTranscoder.TryToJpeg(bytes, out displayBytes))
+            // WebP→JPEG 适配收敛到 PhotoDisplayHelper（与桌面查询页同一实现，2026-11-15）
+            var source = PhotoDisplayHelper.ToDisplaySource(data.Value, photo.ImageFormat, out var error);
+            if (source == null)
             {
-                PreviewInfo = "照片预览失败（WebP 转码失败）";
+                PreviewInfo = error ?? "照片预览失败";
                 return;
             }
 
-            var source = ImageSource.FromStream(() => new MemoryStream(displayBytes));
             await MainThread.InvokeOnMainThreadAsync(() => PreviewImage = source);
         }
         catch (OperationCanceledException)
@@ -321,46 +323,15 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         }
     }
 
-    /// <summary>为当前列表异步生成缩略图（4 路并发，切类别/刷新/离开页面时取消上一批）。</summary>
+    /// <summary>为当前列表异步生成缩略图（4 路并发，切类别/刷新/离开页面时取消上一批）——实现收敛到 <see cref="PhotoDisplayHelper"/>。</summary>
     private async Task LoadThumbnailsAsync()
     {
         _thumbCts?.Cancel();
         _thumbCts?.Dispose();
         var cts = new CancellationTokenSource();
         _thumbCts = cts;
-        var token = cts.Token;
 
-        var items = Photos.ToList();
-        using var gate = new SemaphoreSlim(4);
-        var tasks = items.Select(async item =>
-        {
-            await gate.WaitAsync(token);
-            try
-            {
-                var data = await _photoService.GetPhotoDataAsync(item.Id, token);
-                if (data.IsFailure || data.Value == null || data.Value.Length == 0) return;
-
-                // 输出 JPEG（该页手机/桌面都会打开，WinUI 对 WebP 支持不稳定）
-                var thumb = ImageCompressor.CreateThumbnail(data.Value, maxEdge: 160, jpeg: true);
-                if (thumb == null || token.IsCancellationRequested) return;
-
-                MainThread.BeginInvokeOnMainThread(() =>
-                    item.Thumbnail = ImageSource.FromStream(() => new MemoryStream(thumb)));
-            }
-            catch (OperationCanceledException)
-            {
-                // 切类别/重新加载：忽略
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn($"照片缩略图加载失败 Id={item.Id}: {ex.Message}");
-            }
-            finally
-            {
-                gate.Release();
-            }
-        });
-        await Task.WhenAll(tasks);
+        await PhotoDisplayHelper.LoadThumbnailsAsync(_photoService, Photos.ToList(), _logger, cts.Token);
     }
 
     #endregion
@@ -531,6 +502,10 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         var nextSeq = PhotoNameBuilder.NextSequence(
             existingResult.IsSuccess ? existingResult.Value ?? new List<ArchivePhoto>() : new List<ArchivePhoto>());
 
+        // 水印上下文（仅「入户排查/公示核查」类别）：整批一次 —— GPS 一次 + 户主姓名/地址补齐，
+        // 避免逐张查库/逐张定位；批次内各张共享同一拍摄时间与坐标。
+        var watermark = await BuildWatermarkContextAsync();
+
         if (raws.Count > 0)
         {
             await ExecuteAsync(async () =>
@@ -552,7 +527,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                             CreatedByName = App.CurrentUserName
                         };
 
-                        var save = await _photoService.SavePhotoAsync(photo, CancellationToken);
+                        var save = await _photoService.SavePhotoAsync(photo, watermark, CancellationToken);
                         if (save.IsFailure)
                         {
                             failedCount++;
@@ -599,6 +574,42 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         if (_assignContext is not null && OcrFieldKeys.GetFields(SelectedCategoryCode) is not null)
             message += "\n\n点下方「批量扫描识别」可一次性识别全部照片。";
         await ShowTipAsync(message);
+    }
+
+    /// <summary>
+    /// 组装水印上下文（仅「入户排查/公示核查」类别，采集路径）：时间 = 保存时刻；
+    /// GPS 定位一次（与姓名/地址查询并行，失败/无权限 → 省略经纬度行）；
+    /// 姓名缺失按户主档案补、地址整批查一次（户主档案三域聚合，不兜底单位）。
+    /// 返回 null = 当前类别不需要水印。
+    /// </summary>
+    private async Task<PhotoWatermarkInfo?> BuildWatermarkContextAsync()
+    {
+        if (!PhotoCategoryConstants.RequiresWatermark(SelectedCategoryCode)) return null;
+
+        var idCard = ApplicantIdCard.Trim();
+        var gpsTask = GeoLocationHelper.GetLocationWithJitterAsync(CancellationToken);
+
+        var name = ApplicantName?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+        {
+            var owner = await _photoService.ResolveOwnerAsync(idCard, CancellationToken);
+            if (owner.IsSuccess && !string.IsNullOrWhiteSpace(owner.Value?.PersonName))
+                name = owner.Value!.PersonName.Trim();
+        }
+
+        var address = string.Empty;
+        var addr = await _photoService.GetWatermarkAddressAsync(idCard, CancellationToken);
+        if (addr.IsSuccess)
+            address = addr.Value?.Trim() ?? string.Empty;
+
+        var gps = await gpsTask;
+        return new PhotoWatermarkInfo(
+            CapturedAt: DateTime.Now,
+            Latitude: gps?.Latitude,
+            Longitude: gps?.Longitude,
+            PersonName: name,
+            IdCard: idCard,
+            Address: address);
     }
 
     /// <summary>
@@ -711,7 +722,8 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             _logger.LogBusiness("证件 OCR 回填返回档案照片页",
                 ("Applicant", DataMasker.MaskName(ApplicantName)),
                 ("Applied", appliedCount.ToString()));
-            await ShowSnackBarAsync($"已回填 {appliedCount} 条识别结果", Components.SnackBarType.Success);
+            // 走全局 SnackBar 宿主（本页 XAML 无页内 SnackBarView，基类 ShowSnackBarAsync 在此页不显示）
+            await _dialogService.ShowSnackBarAsync($"已回填 {appliedCount} 条识别结果", Components.SnackBarType.Success);
         }
 
         await LoadPhotosAsync();
@@ -814,13 +826,9 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
                 format = PhotoFormatConstants.Jpeg;
             }
 
-            // 文件名同步命名规则（2026-11-04）：优先用 PhotoName（姓名_身份证后4位_类别_编号），
-            // 旧数据无名时回退原 NewCosmos_ 前缀格式；追加 Id 防同名覆盖。
-            var baseName = PhotoNameBuilder.SanitizeFileName(photo.PhotoName);
-            var fileName = string.IsNullOrEmpty(baseName)
-                ? $"NewCosmos_{photo.ApplicantIdCard}_{photo.PhotoCategory}_{DateTime.Now:yyyyMMddHHmmss}_{photo.Id}"
-                : $"{baseName}_{photo.Id}";
-            fileName += PhotoFormatConstants.GetExtension(format);
+            // 文件名走共用命名规则（2026-11-04 规则，2026-11-15 收敛到 PhotoNameBuilder）：
+            // 优先 PhotoName（姓名_身份证后4位_类别_编号），旧数据回退 {类别}_{时间}_{Id}；追加 Id 防同名覆盖。
+            var fileName = PhotoNameBuilder.BuildExportFileName(photo, format, forceIdSuffix: true);
             var saved = await album.SaveToAlbumAsync(
                 fileName, bytes, PhotoFormatConstants.GetMimeType(format), CancellationToken);
             if (saved.IsFailure)
@@ -873,79 +881,43 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     {
         if (photo == null) return;
 
-        // 权限门控（复用 PRINT_FAMILYAPPLICATION，与动态管理记录打印同源）
-        var userId = App.CurrentUserId;
-        if (userId.HasValue)
-        {
-            var allowed = await _permissionService.HasPermissionAsync(
-                userId.Value, PermissionCodes.PRINT_FAMILYAPPLICATION, CancellationToken);
-            if (!allowed)
-            {
-                await ShowTipAsync("您没有打印权限（PRINT_FAMILYAPPLICATION），请联系管理员");
-                return;
-            }
-        }
+        // 权限门控（与补传页/查询页共用 PhotoPrintPushHelper，同一权限码）
+        if (!await PhotoPrintPushHelper.EnsurePrintPermissionAsync(
+                _permissionService, _dialogService, CancellationToken))
+            return;
 
-        // 选版式：证件类默认「证件原寸」，其余默认「整页」
-        var defaultLayout = photo.PhotoCategory == PhotoCategoryConstants.ID_CARD
-            ? PhotoLayoutConstants.ID_CARD
-            : PhotoLayoutConstants.FULL_PAGE;
-        var buttons = PhotoLayoutConstants.All
-            .Select(a => PhotoLayoutConstants.GetDisplayName(a.Code)).ToArray();
+        // 选版式：与档案照片查询页同款「按默认（证件原寸/整页）+ 三档强制」；取消则中止
         var choice = await _dialogService.DisplayActionSheetAsync(
-            "选择打印版式", "取消", null, buttons);
-
-        var layout = MapLayoutChoice(choice) ?? defaultLayout;
+            "选择打印版式", "取消", null, PhotoLayoutConstants.BuildChoiceButtons());
         if (choice == null || choice == "取消")
             return; // 用户取消选版式
 
-        await ExecuteAsync(async () =>
+        // null = 按默认 → 身份证原寸、其余整页（PhotoLayoutConstants 单点口径）
+        var forcedLayout = PhotoLayoutConstants.FromDisplayName(choice);
+
+        var pushResult = await ExecuteAsync(async () =>
         {
-            var dataResult = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
-            if (dataResult.IsFailure)
-                return Result.Failure(dataResult.ErrorCode!, dataResult.Message!);
+            // 取图/组任务/入队收敛到 PhotoPrintPushHelper（与补传页/查询页共用）
+            var push = await PhotoPrintPushHelper.PushAsync(
+                _photoService, _printQueueService,
+                new[] { new PhotoPrintPushHelper.PushItem(photo, ApplicationId, ApplicantName, ApplicantIdCard) },
+                forcedLayout, CancellationToken);
 
-            var request = new PrintJobRequest
-            {
-                BusinessType = PrintBusinessTypes.ArchivePhoto,
-                BusinessId = ApplicationId,
-                Classification = PhotoCategoryConstants.GetDisplayName(photo.PhotoCategory),
-                ApplicantName = ApplicantName,
-                ApplicantIdCard = ApplicantIdCard,
-                Copies = 1,
-                IsDuplex = false,
-                JobKind = PrintJobConstants.JobKindPhoto,
-                PhotoData = dataResult.Value,
-                PhotoLayout = layout,
-                PhotoCategory = photo.PhotoCategory,
-                RequestedBy = App.CurrentUserId,
-                RequestedByName = App.CurrentUserName
-            };
-
-            var enqueue = await _printQueueService.EnqueueAsync(request, CancellationToken);
-            if (enqueue.IsFailure)
-                return Result.Failure(enqueue.ErrorCode!, enqueue.Message!);
+            if (push.OkCount == 0)
+                return Result.Failure(ErrorCodes.UNKNOWN_ERROR,
+                    push.Failures.FirstOrDefault() ?? "推送打印失败");
 
             _logger.LogBusiness("推送照片打印",
                 ("PhotoId", photo.Id.ToString()),
-                ("Layout", layout),
-                ("JobNo", enqueue.Value?.JobNo ?? ""),
+                ("Layout", forcedLayout ?? "按默认"),
+                ("JobNo", push.JobNos.FirstOrDefault() ?? ""),
                 ("Applicant", DataMasker.MaskName(ApplicantName)));
             return Result.Success();
         }, "推送到打印队列...");
 
-        await ShowTipAsync("已推送到打印队列，将在 PC 端打印");
+        if (pushResult.IsSuccess)
+            await ShowTipAsync("已推送到打印队列，将在 PC 端打印");
     }
-
-    /// <summary>ActionSheet 选项名 → 版式代码。</summary>
-    private static string? MapLayoutChoice(string? choice)
-        => choice switch
-        {
-            "整页" => PhotoLayoutConstants.FULL_PAGE,
-            "半页" => PhotoLayoutConstants.HALF_PAGE,
-            "证件原寸" => PhotoLayoutConstants.ID_CARD,
-            _ => null
-        };
 
     private async Task ShowTipAsync(string message)
     {
@@ -970,7 +942,7 @@ public sealed class PhotoCategoryOption
 /// 手机端照片列表行：包一层实体带异步缩略图（与桌面查询页 <c>ArchivePhotoListItem</c> 同构）。
 /// 实体本身不加 UI 字段，避免污染数据映射。
 /// </summary>
-public partial class MobileArchivePhotoItem : ObservableObject
+public partial class MobileArchivePhotoItem : ObservableObject, Helpers.IPhotoThumbnailTarget
 {
     public MobileArchivePhotoItem(ArchivePhoto photo)
     {

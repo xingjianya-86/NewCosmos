@@ -2,7 +2,7 @@ namespace NewCosmos.Models.Results;
 
 /// <summary>
 /// 一条升级日志（应用内「更新日志」页展示）。
-/// <see cref="Source"/> 区分来源：本机升级轨迹 / 服务端全量；Notes 为发布时写入
+/// <see cref="Source"/> 区分来源：随包内置全量 / 本机升级轨迹 / 服务端全量；Notes 为发布时写入
 /// update.json、changelog.json 的说明文本（多行）。
 /// </summary>
 public sealed record UpdateHistoryItem(
@@ -17,8 +17,16 @@ public sealed record UpdateHistoryItem(
     /// <summary>服务端全量（changelog.json，跨设备可看）。</summary>
     public const string SourceRemote = "remote";
 
+    /// <summary>随包内置（安装包内嵌 CHANGELOG.md 解析出的全量日志，离线可用）。</summary>
+    public const string SourceBundled = "bundled";
+
     /// <summary>来源中文名（列表徽章）。</summary>
-    public string SourceName => Source == SourceRemote ? "在线" : "本机";
+    public string SourceName => Source switch
+    {
+        SourceRemote => "在线",
+        SourceBundled => "随包",
+        _ => "本机",
+    };
 
     /// <summary>时间展示文本（无效时间回退空串）。</summary>
     public string TimeText => UpdatedAt == DateTime.MinValue

@@ -215,6 +215,60 @@ public class AddressResolver
     }
 
     /// <summary>
+    /// 水印地址拼装（2026-11-15，纯字符串可单测）：县 + 镇 + 村 → 「林口县柳树镇XXX村村民委员会」。
+    /// 规则（各级空值跳过、已含不重复）：
+    /// ① 镇列已带村/社区（临时救助 <c>family_town</c> 存「柳树镇柞木村」形态）→ 只规范化镇列、跳过单独村列；
+    /// ② 镇列已含县名 → 跳过县列；③ 村级补委员会后缀：村→村民委员会、村委会→村村民委员会、
+    /// 社区→居民委员会；「本级」= 无村（返回空段）；已带「村民委员会/居民委员会」原样保留。
+    /// </summary>
+    public static string BuildWatermarkAddress(string? county, string? town, string? village)
+    {
+        var countyName = CleanLevel(county);
+        var townName = CleanLevel(town);
+        var villageName = CleanLevel(village);
+
+        // 村级已是「县+镇+村…」全路径形态（文本列直接存全量的兜底）→ 直接用它，清空上级避免重复
+        if (villageName.Length > 0
+            && (countyName.Length == 0 || villageName.Contains(countyName, StringComparison.Ordinal))
+            && (townName.Length > 0 && villageName.Contains(townName, StringComparison.Ordinal)))
+        {
+            return NormalizeVillageForWatermark(villageName);
+        }
+
+        // 镇列已含县名（个别数据全量形态）→ 不重复
+        if (countyName.Length > 0 && townName.Contains(countyName, StringComparison.Ordinal))
+            countyName = string.Empty;
+
+        if (townName.Length > 0 && (townName.Contains("村", StringComparison.Ordinal) ||
+                                    townName.Contains("社区", StringComparison.Ordinal)))
+        {
+            // 镇列已是「镇+村」一体形态：规范化后直接用，跳过单独村列
+            townName = NormalizeVillageForWatermark(townName);
+            villageName = string.Empty;
+        }
+        else
+        {
+            villageName = NormalizeVillageForWatermark(villageName);
+        }
+
+        return string.Concat(countyName, townName, villageName);
+    }
+
+    /// <summary>村级名规范化 + 补委员会后缀（见 <see cref="BuildWatermarkAddress"/> 规则③）。</summary>
+    private static string NormalizeVillageForWatermark(string? village)
+    {
+        var s = CleanLevel(village);
+        if (s.Length == 0) return string.Empty;
+        if (s.EndsWith("本级", StringComparison.Ordinal)) return string.Empty; // 镇直/无村社区
+        if (s.EndsWith("村民委员会", StringComparison.Ordinal) || s.EndsWith("居民委员会", StringComparison.Ordinal))
+            return s;
+        if (s.EndsWith("村委会", StringComparison.Ordinal)) return s[..^3] + "村村民委员会";
+        if (s.EndsWith("村", StringComparison.Ordinal)) return s + "村民委员会";
+        if (s.EndsWith("社区", StringComparison.Ordinal)) return s + "居民委员会";
+        return s;
+    }
+
+    /// <summary>
     /// 获取村名（去后缀）
     /// </summary>
     public string GetVillageName(string? communityCode)

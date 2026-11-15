@@ -2,7 +2,7 @@
 # 手机端采集的证件/核查照片，按人+申请+类别归档存库（bytea）。
 database: 档案照片
 version: 1.0
-description: 手机端证件/核查照片采集存档（身份证、户口本、公示核查、其他证件；公民身份敏感信息，存库不出内网）
+description: 手机端证件/核查照片采集存档（身份证、户口本、公示核查、入户排查、其他证件；公民身份敏感信息，存库不出内网）
 
 tables:
   - name: nc_biz_archive_photos
@@ -34,7 +34,7 @@ tables:
         type: character varying(30)
         nullable: false
         default: "'OTHER_CERT'"
-        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/OTHER_CERT其他证件）
+        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/HOUSEHOLD_INSPECTION入户排查/OTHER_CERT其他证件，全量取值见 PhotoCategoryConstants）
       - name: photo_name
         type: character varying(200)
         nullable: true

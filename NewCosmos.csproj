@@ -139,6 +139,12 @@
 		<None Remove="backup\**" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- 升级日志素材单一来源随包内置：本地安装包离线也能看全量更新日志
+		     （Services\Core\UpdateHistoryService 读取、Helpers\ChangelogMarkdownParser 解析） -->
+		<EmbeddedResource Include="CHANGELOG.md" LogicalName="NewCosmos.CHANGELOG.md" />
+	</ItemGroup>
+
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<AssemblyAttribute Include="System.Runtime.Versioning.SupportedOSPlatformAttribute">
 			<_Parameter1>windows10.0.17763.0</_Parameter1>

@@ -131,4 +131,47 @@ public class PhotoNameBuilderTests
         Assert.Equal(string.Empty, PhotoNameBuilder.SanitizeFileName(null));
         Assert.Equal(string.Empty, PhotoNameBuilder.SanitizeFileName("   "));
     }
+
+    // ── TryParsePersonName（2026-11-15 打印抬头回退解析）──
+
+    [Xunit.Fact]
+    public void TryParsePersonName_FullFormat_ReturnsName()
+    {
+        Assert.Equal("张三", PhotoNameBuilder.TryParsePersonName("张三_4929_身份证_01"));
+        Assert.Equal("李四", PhotoNameBuilder.TryParsePersonName("李四_5678_银行卡／一卡通_03"));
+    }
+
+    [Xunit.Fact]
+    public void TryParsePersonName_NoNameDigitsFirst_ReturnsEmpty()
+    {
+        // 无姓名格式（姓名段缺失，后4位在前）
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("4929_身份证_02"));
+    }
+
+    [Xunit.Fact]
+    public void TryParsePersonName_CategoryFirst_ReturnsEmpty()
+    {
+        // 无姓名无证件格式：类别_编号（首段是已知类别名，不能误判为姓名）
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("身份证_01"));
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("本人照片／证件照_02"));
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("其他_01"));
+    }
+
+    [Xunit.Fact]
+    public void TryParsePersonName_OldRemarkOrGarbage_ReturnsEmpty()
+    {
+        // 旧自由备注 / 单段 / 空 → 宁缺勿错
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("户口本第2页"));
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("正面"));
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName(null));
+        Assert.Equal(string.Empty, PhotoNameBuilder.TryParsePersonName("   "));
+    }
+
+    [Xunit.Fact]
+    public void TryParsePersonName_RoundTrip_WithBuild()
+    {
+        // Build → TryParse 闭环：只要 Build 时有姓名，必能反解析出来
+        var built = PhotoNameBuilder.Build("王五", "231025198001014929", "MEDICAL_RECORD", 1);
+        Assert.Equal("王五", PhotoNameBuilder.TryParsePersonName(built));
+    }
 }

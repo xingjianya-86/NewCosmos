@@ -131,7 +131,7 @@ public partial class OcrAssignViewModel : ViewModelBase
     {
         foreach (var r in Records)
             r.SelectedTarget = r.TargetOptions.FirstOrDefault(o => o.Key == OcrAssignmentPlanner.TargetKeys.Ignore);
-        await ShowSnackBarAsync("已全部标记为不使用", Components.SnackBarType.Info);
+        await _dialogService.ShowSnackBarAsync("已全部标记为不使用", Components.SnackBarType.Info);
     }
 
     /// <summary>确认回填：冲突检测 → 逐条应用 → 回传条数</summary>

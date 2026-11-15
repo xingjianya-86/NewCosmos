@@ -87,7 +87,7 @@ tables:
       - name: photo_category
         type: character varying(30)
         nullable: true
-        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/OTHER_CERT其他证件，展示/留痕用）
+        comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/HOUSEHOLD_INSPECTION入户排查/OTHER_CERT其他证件，展示/留痕用）
       - name: status
         type: character varying(20)
         nullable: false

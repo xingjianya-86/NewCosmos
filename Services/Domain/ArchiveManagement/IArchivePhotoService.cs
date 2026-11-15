@@ -10,8 +10,10 @@ namespace NewCosmos.Services.Domain.ArchiveManagement;
 /// </summary>
 public interface IArchivePhotoService
 {
-    /// <summary>保存一张照片，返回新记录 ID。</summary>
-    Task<Result<long>> SavePhotoAsync(ArchivePhoto photo, CancellationToken ct = default);
+    /// <summary>保存一张照片，返回新记录 ID。
+    /// <paramref name="watermark"/>：水印上下文——仅「入户排查 / 公示核查」类别在压缩前烧进图片，
+    /// null = 不打水印（其余类别与历史入口行为不变）。</summary>
+    Task<Result<long>> SavePhotoAsync(ArchivePhoto photo, PhotoWatermarkInfo? watermark = null, CancellationToken ct = default);
 
     /// <summary>列出指定人的照片元数据（不含 photo_data 二进制，列表用；按类别可选过滤）。</summary>
     Task<Result<List<ArchivePhoto>>> GetByPersonAsync(
@@ -48,7 +50,16 @@ public interface IArchivePhotoService
     /// 批量插入照片（PC 端）：与手机端采集走**同一个**保存入口
     /// （压缩 WebP 单张 ≤500KB、命名 姓名_后4位_类别_编号、编号往下递增不覆盖），
     /// 返回逐张成败统计；部分失败不回滚已成功张（与手机端批量采集口径一致）。
+    /// <paramref name="watermark"/>：水印上下文（同 SavePhotoAsync，整批同一上下文、拍摄时间一致）。
     /// </summary>
     Task<Result<BatchPhotoInsertResult>> InsertPhotosAsync(
-        PhotoOwner owner, string category, IReadOnlyList<byte[]> files, CancellationToken ct = default);
+        PhotoOwner owner, string category, IReadOnlyList<byte[]> files,
+        PhotoWatermarkInfo? watermark = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 户主档案地址（水印用）：三业务域按优先级 低收入 → 高龄 → 临时救助 取首个有地址的档案，
+    /// 拼「林口县柳树镇XXX村村民委员会」（拼装规则单点在 AddressResolver.BuildWatermarkAddress）。
+    /// 查不到返回 Success("")（水印省略地址行，不报错）；地址只取户主档案，不兜底当前用户单位。
+    /// </summary>
+    Task<Result<string>> GetWatermarkAddressAsync(string idCard, CancellationToken ct = default);
 }

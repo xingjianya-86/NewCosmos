@@ -25,12 +25,12 @@
             <VerticalStackLayout Spacing="8">
                 <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{StaticResource SpacingSmall}">
                     <Entry Grid.Column="0" Text="{Binding Keyword}" Placeholder="身份证号 / 照片名称关键词"
-                           MinimumHeightRequest="44" ReturnCommand="{Binding ApplySearchCommand}"/>
+                           MinimumHeightRequest="44" ReturnCommand="{Binding SearchCommand}"/>
                     <Picker Grid.Column="1" WidthRequest="150" MinimumHeightRequest="44"
                             ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
                             SelectedItem="{Binding SelectedCategoryOption}"/>
                     <Button Grid.Column="2" Text="查询" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
-                            Command="{Binding ApplySearchCommand}"/>
+                            Command="{Binding SearchCommand}"/>
                     <Button Grid.Column="3" Text="插入照片" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
                             Command="{Binding InsertPhotosCommand}"/>
                     <!-- 导出格式：默认 WebP（库内原图），可切 JPG（民政等外部系统不支持 WebP）；手机端收进「更多」 -->

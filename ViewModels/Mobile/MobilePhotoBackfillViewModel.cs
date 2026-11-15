@@ -44,6 +44,13 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
     [NotifyPropertyChangedFor(nameof(EmptyHint))]
     private bool _hasSearched;
 
+    /// <summary>类别选项（Code + 中文名），供搜索条 Picker 绑定；选定后透传采集页作为本次补传的预设类别。</summary>
+    public ObservableCollection<PhotoCategoryOption> CategoryOptions { get; } = new();
+
+    /// <summary>Picker 选中项（null = 不预设，采集页保持自身默认）。</summary>
+    [ObservableProperty]
+    private PhotoCategoryOption? _selectedCategoryOption;
+
     /// <summary>列表空态提示。</summary>
     public string EmptyHint => HasSearched
         ? "没有匹配的人员，换个关键词或切换业务域再试"
@@ -84,6 +91,9 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
 
     public bool IsAllSelected => Candidates.Count > 0 && Candidates.All(c => c.IsSelected);
 
+    /// <summary>「全选」按钮动态文案（与档案照片查询页/档案输出页一致：全选 ↔ 取消全选）。</summary>
+    public string SelectAllText => IsAllSelected ? "取消全选" : "全选";
+
     public MobilePhotoBackfillViewModel(
         IArchivePhotoService photoService,
         IPrintQueueService printQueueService,
@@ -101,6 +111,11 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
 
         PageSize = 20;
         Title = "照片补传";
+
+        // 类别预设默认 = 身份证（与采集页默认一致，不改变既有行为）
+        foreach (var (code, name) in PhotoCategoryConstants.All)
+            CategoryOptions.Add(new PhotoCategoryOption(code, name));
+        _selectedCategoryOption = CategoryOptions.FirstOrDefault(o => o.Code == PhotoCategoryConstants.ID_CARD);
     }
 
     public override async Task OnAppearingAsync()
@@ -161,10 +176,10 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
     private void NotifySelectionChanged()
     {
         OnPropertyChanged(nameof(SelectedCount));
-        OnPropertyChanged(nameof(SelectedWithPhotoCount));
         OnPropertyChanged(nameof(BackfillButtonText));
         OnPropertyChanged(nameof(PrintButtonText));
         OnPropertyChanged(nameof(IsAllSelected));
+        OnPropertyChanged(nameof(SelectAllText));
     }
 
     #endregion
@@ -192,11 +207,13 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
         NotifySelectionChanged();
     }
 
+    /// <summary>清空勾选（与档案照片查询页 ClearSelection 同口径）。</summary>
     [RelayCommand]
-    private async Task ApplySearchAsync()
+    private void ClearSelection()
     {
-        PageIndex = 1;
-        await LoadDataAsync();
+        foreach (var item in Candidates)
+            item.IsSelected = false;
+        NotifySelectionChanged();
     }
 
     /// <summary>单人查看/补传（行内「查看」按钮）。</summary>
@@ -205,7 +222,8 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
     {
         if (candidate == null) return;
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(candidate.IdCard, candidate.BusinessId, candidate.PersonName));
+            new ArchivePhotoParameter(candidate.IdCard, candidate.BusinessId, candidate.PersonName,
+                PresetCategory: SelectedCategoryOption?.Code));
     }
 
     /// <summary>补传照片：把勾选人员组成会话队列，进入照片页后可连续"下一位"采集。</summary>
@@ -228,7 +246,8 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
             ("Domain", string.IsNullOrEmpty(SelectedDomain) ? "全部" : SelectedDomain));
 
         await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
-            new ArchivePhotoParameter(queue[0].IdCard, queue[0].ApplicationId, queue[0].Name, queue, 0));
+            new ArchivePhotoParameter(queue[0].IdCard, queue[0].ApplicationId, queue[0].Name, queue, 0,
+                PresetCategory: SelectedCategoryOption?.Code));
     }
 
     /// <summary>
@@ -252,35 +271,29 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
             return;
         }
 
-        // 权限门控（与单人照片打印同源）
-        var userId = App.CurrentUserId;
-        if (userId.HasValue)
-        {
-            var allowed = await _permissionService.HasPermissionAsync(
-                userId.Value, PermissionCodes.PRINT_FAMILYAPPLICATION, CancellationToken);
-            if (!allowed)
-            {
-                await _dialogService.DisplayAlertAsync("提示", "您没有打印权限（PRINT_FAMILYAPPLICATION），请联系管理员", "确定");
-                return;
-            }
-        }
+        // 权限门控（与采集页/查询页共用 PhotoPrintPushHelper，同一权限码）
+        if (!await PhotoPrintPushHelper.EnsurePrintPermissionAsync(
+                _permissionService, _dialogService, CancellationToken))
+            return;
 
         var skipHint = skipped > 0 ? $"（{skipped} 人无照片将跳过）" : string.Empty;
         var confirm = await _dialogService.DisplayAlertAsync("确认打印",
             $"将为 {withPhoto.Count} 人推送照片打印{skipHint}，任务由电脑端执行。", "继续", "取消");
         if (!confirm) return;
 
-        var buttons = PhotoLayoutConstants.All
-            .Select(a => PhotoLayoutConstants.GetDisplayName(a.Code)).ToArray();
-        var choice = await _dialogService.DisplayActionSheetAsync("选择打印版式", "取消", null, buttons);
+        // 选版式：与档案照片查询页同款「按默认 + 三档强制」；取消则中止
+        var choice = await _dialogService.DisplayActionSheetAsync(
+            "选择打印版式", "取消", null, PhotoLayoutConstants.BuildChoiceButtons());
         if (string.IsNullOrEmpty(choice) || choice == "取消") return;
 
-        var layout = MapLayoutChoice(choice) ?? PhotoLayoutConstants.FULL_PAGE;
+        // null = 按默认 → 逐张按类别取默认版式（身份证原寸，其余整页）
+        var forcedLayout = PhotoLayoutConstants.FromDisplayName(choice);
 
         await ExecuteAsync(async () =>
         {
-            var successPhotos = 0;
+            // 按人取照片 → 组推送项（取图/组任务/入队循环收敛到 PhotoPrintPushHelper，与查询页共用）
             var failedPeople = new List<string>();
+            var items = new List<PhotoPrintPushHelper.PushItem>();
 
             foreach (var person in withPhoto)
             {
@@ -295,29 +308,12 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
 
                     foreach (var photo in photosResult.Value)
                     {
-                        var dataResult = await _photoService.GetPhotoDataAsync(photo.Id, CancellationToken);
-                        if (dataResult.IsFailure || dataResult.Value == null || dataResult.Value.Length == 0)
-                            continue;
-
-                        var request = new PrintJobRequest
-                        {
-                            BusinessType = PrintBusinessTypes.ArchivePhoto,
-                            BusinessId = person.BusinessId,
-                            Classification = PhotoCategoryConstants.GetDisplayName(photo.PhotoCategory),
-                            ApplicantName = person.PersonName,
-                            ApplicantIdCard = person.IdCard,
-                            Copies = 1,
-                            IsDuplex = false,
-                            JobKind = PrintJobConstants.JobKindPhoto,
-                            PhotoData = dataResult.Value,
-                            PhotoLayout = layout,
-                            PhotoCategory = photo.PhotoCategory,
-                            RequestedBy = App.CurrentUserId,
-                            RequestedByName = App.CurrentUserName
-                        };
-
-                        var enqueue = await _printQueueService.EnqueueAsync(request, CancellationToken);
-                        if (enqueue.IsSuccess) successPhotos++;
+                        items.Add(new PhotoPrintPushHelper.PushItem(
+                            Photo: photo,
+                            BusinessId: person.BusinessId,
+                            ApplicantName: person.PersonName,
+                            ApplicantIdCard: person.IdCard,
+                            FailureLabel: person.PersonName));
                     }
                 }
                 catch (Exception ex)
@@ -327,27 +323,29 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
                 }
             }
 
+            var push = await PhotoPrintPushHelper.PushAsync(
+                _photoService, _printQueueService, items, forcedLayout, CancellationToken);
+            var successPhotos = push.OkCount;
+
             _logger.LogBusiness("历史档案照片补传-推送打印",
                 ("People", withPhoto.Count),
                 ("Photos", successPhotos),
-                ("Layout", layout));
+                ("Layout", forcedLayout ?? "按默认"));
+
+            // 失败汇总：取图阶段失败的人 + 逐张入队失败（label = 人员姓名），去重后按人展示
+            var failedAll = failedPeople
+                .Concat(push.Failures.Select(f => f.Split('：')[0]))
+                .Distinct()
+                .ToList();
 
             var message = $"已推送 {successPhotos} 张照片打印，电脑端登录后自动打印。";
             if (skipped > 0) message += $"\n{skipped} 人无照片已跳过。";
-            if (failedPeople.Count > 0) message += $"\n失败 {failedPeople.Count} 人：{string.Join("、", failedPeople.Take(5))}";
+            if (failedAll.Count > 0) message += $"\n失败 {failedAll.Count} 人：{string.Join("、", failedAll.Take(5))}";
 
             await _dialogService.DisplayAlertAsync(successPhotos > 0 ? "已推送打印" : "推送失败", message, "确定");
             return Result.Success();
         }, "推送照片打印...");
     }
-
-    private static string? MapLayoutChoice(string? choice) => choice switch
-    {
-        "整页" => PhotoLayoutConstants.FULL_PAGE,
-        "半页" => PhotoLayoutConstants.HALF_PAGE,
-        "证件原寸" => PhotoLayoutConstants.ID_CARD,
-        _ => null
-    };
 
     #endregion
 }

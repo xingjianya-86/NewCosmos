@@ -123,8 +123,9 @@ public static class ImageCompressor
         }
     }
 
-    /// <summary>解码为位图：优先 SkiaSharp；失败时用平台解码器（兼容 HEIC/HEIF）转 PNG 再交给 SkiaSharp。</summary>
-    private static SKBitmap? DecodeBitmap(byte[] source)
+    /// <summary>解码为位图：优先 SkiaSharp；失败时用平台解码器（兼容 HEIC/HEIF）转 PNG 再交给 SkiaSharp。
+    /// 公开给 <see cref="PhotoWatermarkHelper"/> 复用（解码兜底单点，勿在别处另抄）。</summary>
+    public static SKBitmap? DecodeBitmap(byte[] source)
     {
         try
         {

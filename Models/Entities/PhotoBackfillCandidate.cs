@@ -9,7 +9,7 @@ namespace NewCosmos.Models.Entities;
 /// </summary>
 public partial class PhotoBackfillCandidate : ObservableObject
 {
-    /// <summary>列表勾选状态（手工选择后批量补传/打印/导出）。</summary>
+    /// <summary>列表勾选状态（手工选择后批量补传/打印）。</summary>
     [ObservableProperty]
     private bool _isSelected;
 

@@ -24,6 +24,26 @@ public static class PhotoLayoutConstants
         (ID_CARD, "证件原寸"),
     };
 
+    /// <summary>「按默认」选项文案（逐张按类别：证件原寸/整页），三端推送打印 ActionSheet 共用首项。</summary>
+    public const string DefaultChoiceText = "按默认（证件原寸/整页）";
+
+    /// <summary>推送打印选版式 ActionSheet 的选项组（按默认 + 全部版式），补传页/采集页/查询页共用。</summary>
+    public static string[] BuildChoiceButtons() =>
+        new[] { DefaultChoiceText }.Concat(All.Select(a => a.Name)).ToArray();
+
+    /// <summary>ActionSheet 选项名 → 版式代码；「按默认」/未知选项返回 null（调用方按类别取默认版式）。</summary>
+    public static string? FromDisplayName(string? choice) => choice switch
+    {
+        "整页" => FULL_PAGE,
+        "半页" => HALF_PAGE,
+        "证件原寸" => ID_CARD,
+        _ => null
+    };
+
+    /// <summary>类别 → 打印默认版式：身份证证件原寸，其余整页（查询页/采集页/补传页同一口径）。</summary>
+    public static string DefaultForCategory(string? category) =>
+        category == PhotoCategoryConstants.ID_CARD ? ID_CARD : FULL_PAGE;
+
     /// <summary>版式代码 → 中文显示名。</summary>
     public static string GetDisplayName(string? layout) => layout switch
     {
