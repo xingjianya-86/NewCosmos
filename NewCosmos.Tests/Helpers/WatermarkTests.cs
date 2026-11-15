@@ -82,51 +82,22 @@ public class WatermarkTests
         Assert.Equal("入户排查 · 王五", lines[0]);
     }
 
-    // ── PhotoWatermarkHelper.ApplyJitter（±GpsJitterMeters 米均匀偏差） ──
-
     [Fact]
-    public void ApplyJitter_StayWithinConfiguredRadius()
+    public void 水印信息条_首行无抬头仍可区分_组合身份()
     {
-        var origin = (Lat: 45.21354, Lng: 126.54321);
-        var maxMeters = PhotoWatermarkConstants.GpsJitterMeters;
+        // 抬头口径回归锚点：首行为组合身份（分类·姓名·身份证自带分隔），其余行必须带中文冒号抬头
+        var info = new PhotoWatermarkInfo(
+            CapturedAt: new DateTime(2026, 11, 15, 14, 30, 0),
+            Latitude: 45.1, Longitude: 126.5,
+            PersonName: "张三", IdCard: "231025198001014929",
+            Address: "林口县柳树镇复兴村村民委员会");
 
-        for (var i = 0; i < 2000; i++)
-        {
-            var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(origin.Lat, origin.Lng, maxMeters);
-            var distance = DistanceMeters(origin.Lat, origin.Lng, lat, lng);
-            Assert.True(distance <= maxMeters + 0.5,
-                $"偏差 {distance:F1} 米超过配置半径 {maxMeters} 米");
-        }
-    }
+        var lines = info.BuildInfoLines("入户排查");
 
-    [Fact]
-    public void ApplyJitter_ZeroRadius_ReturnsOriginal()
-    {
-        var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(45.2, 126.5, 0);
-        Assert.Equal(45.2, lat, 10);
-        Assert.Equal(126.5, lng, 10);
-    }
-
-    [Fact]
-    public void ApplyJitter_NotAlwaysIdentity()
-    {
-        // 2000 次全落原点即视为偏差未生效（概率可忽略）
-        var origin = (Lat: 45.21354, Lng: 126.54321);
-        var moved = false;
-        for (var i = 0; i < 2000 && !moved; i++)
-        {
-            var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(origin.Lat, origin.Lng, 30);
-            moved = lat != origin.Lat || lng != origin.Lng;
-        }
-        Assert.True(moved);
-    }
-
-    /// <summary>平面近似距离（当地尺度下足够判定半径约束）。</summary>
-    private static double DistanceMeters(double lat1, double lng1, double lat2, double lng2)
-    {
-        var dLat = (lat2 - lat1) * 111320.0;
-        var dLng = (lng2 - lng1) * 111320.0 * Math.Cos(lat1 * Math.PI / 180.0);
-        return Math.Sqrt(dLat * dLat + dLng * dLng);
+        Assert.DoesNotContain("：", lines[0]);
+        Assert.StartsWith("地址：", lines[1]);
+        Assert.StartsWith("时间：", lines[2]);
+        Assert.StartsWith("经纬度：", lines[3]);
     }
 
     // ── 需水印类别集合（PhotoCategoryConstants） ────────────────────

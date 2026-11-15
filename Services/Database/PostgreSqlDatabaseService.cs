@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -615,6 +616,11 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
         if (IsSimpleType(type))
             return null;
 
+        // 元组无公共属性：返回 null 避免逐列「缺少映射属性」告警刷屏
+        // （真实映射在 MapRow 的 TupleRowMapper 分支，按列序位置赋值）
+        if (TupleRowMapper.IsValueTuple(type))
+            return null;
+
         var properties = _propertyCache.GetOrAdd(type, t =>
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanWrite)
@@ -647,6 +653,10 @@ public class PostgreSqlDatabaseService : BaseService, IDatabaseService, IDisposa
     private T? MapRow<T>(NpgsqlDataReader reader, PropertyInfo?[]? columnMap)
     {
         var type = typeof(T);
+
+        // ValueTuple：按 SELECT 列序位置映射（2026-11-15 修复：元组无可写公共属性，
+        // 实体路径 GetProperties 取空 → 元组查询此前恒返回默认值）。须先于其余两条路径判定。
+        if (TupleRowMapper.IsValueTuple(type)) return TupleRowMapper.MapRow<T>(reader);
 
         // 简单类型（string, int, decimal, bool, DateTime, long, double, byte[] 等）：取第 0 列
         if (columnMap == null)

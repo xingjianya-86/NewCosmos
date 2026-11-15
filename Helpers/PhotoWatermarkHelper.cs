@@ -16,27 +16,6 @@ public static class PhotoWatermarkHelper
     private const char CjkProbeChar = '入';
 
     /// <summary>
-    /// 坐标随机偏差：以给定坐标为圆心叠加半径 <paramref name="jitterMeters"/> 米内的均匀随机偏差
-    /// （水印二改：村屯坐标同样叠加小幅度偏差）。半径按 sqrt(U) 分布保证平面均匀；公开供单测。
-    /// </summary>
-    public static (double Latitude, double Longitude) ApplyJitter(
-        double latitude, double longitude, double jitterMeters)
-    {
-        if (jitterMeters <= 0) return (latitude, longitude);
-
-        var radius = jitterMeters * Math.Sqrt(Random.Shared.NextDouble());
-        var theta = Random.Shared.NextDouble() * 2 * Math.PI;
-
-        const double metersPerDegreeLat = 111320.0;
-        var cosLat = Math.Cos(latitude * Math.PI / 180.0);
-        if (Math.Abs(cosLat) < 1e-9) return (latitude, longitude);
-
-        var dLat = radius * Math.Cos(theta) / metersPerDegreeLat;
-        var dLng = radius * Math.Sin(theta) / (metersPerDegreeLat * Math.Abs(cosLat));
-        return (latitude + dLat, longitude + dLng);
-    }
-
-    /// <summary>
     /// 整图水印：解码 → 绘制 → JPEG q95 中间字节（随后仍会走 ImageCompressor 统一压缩为 WebP）。
     /// 失败返回 null（调用方按原图入库并记日志）。
     /// </summary>

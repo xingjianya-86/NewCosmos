@@ -5,10 +5,9 @@ namespace NewCosmos.Models.Entities;
 
 /// <summary>
 /// 照片水印上下文（2026-11-15，仅「入户排查 / 公示核查」类别在保存时烧进图片）。
-/// 采集/插入端只提供拍摄时刻与已知姓名/身份证；**地址、村屯坐标（区划坐标列/在线定位回写）、
-/// 档案时间轴时间**由 <c>ArchivePhotoService.FillWatermarkContextAsync</c> 按批一次补齐
-/// （经纬度已含 ±<see cref="PhotoWatermarkConstants.GpsJitterMeters"/> 米随机偏差）。
-/// 地址只取户主档案，不兜底单位；IsResolved = 已补齐，逐张保存不再查库。
+/// 采集/插入端只提供拍摄时刻与已知姓名/身份证；**地址、村屯坐标（区划坐标列/在线定位回写的
+/// 固定地理编码值）、档案时间轴时间**由 <c>ArchivePhotoService.FillWatermarkContextAsync</c>
+/// 按批一次补齐。地址只取户主档案，不兜底单位；IsResolved = 已补齐，逐张保存不再查库。
 /// </summary>
 public sealed record PhotoWatermarkInfo(
     DateTime CapturedAt,
