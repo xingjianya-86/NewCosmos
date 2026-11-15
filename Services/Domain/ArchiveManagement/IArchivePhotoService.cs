@@ -58,8 +58,18 @@ public interface IArchivePhotoService
 
     /// <summary>
     /// 户主档案地址（水印用）：三业务域按优先级 低收入 → 高龄 → 临时救助 取首个有地址的档案，
-    /// 拼「林口县柳树镇XXX村村民委员会」（拼装规则单点在 AddressResolver.BuildWatermarkAddress）。
+    /// 拼「林口县柳树镇XXX村村民委员会」（拼装规则单点在 AddressResolver.BuildWatermarkAddress；
+    /// 低收入/高龄按区划代号 JOIN 区划表转名称，临时救助回退名称文本）。
     /// 查不到返回 Success("")（水印省略地址行，不报错）；地址只取户主档案，不兜底当前用户单位。
     /// </summary>
     Task<Result<string>> GetWatermarkAddressAsync(string idCard, CancellationToken ct = default);
+
+    /// <summary>
+    /// 水印上下文按批补齐（2026-11-15 二改，一次到位后逐张保存不再查库）：
+    /// 姓名 ← 户主档案聚合；地址 ← 档案区划；经纬度 ← **所在村屯查询信息**（区划坐标列，
+    /// 缺失在线地理编码回写，不取设备 GPS）；时间 ← **档案时间轴时间**（入户调查日/公示起日）
+    /// + 记录创建时分，全取不到回退入参的采集时刻。返回值 IsResolved=true。
+    /// </summary>
+    Task<PhotoWatermarkInfo> FillWatermarkContextAsync(
+        PhotoWatermarkInfo watermark, string idCard, string category, CancellationToken ct = default);
 }

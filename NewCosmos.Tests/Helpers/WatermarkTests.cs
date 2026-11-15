@@ -6,8 +6,8 @@ using Xunit;
 namespace NewCosmos.Tests.Helpers;
 
 /// <summary>
-/// 水印上下文与经纬度偏差测试（2026-11-15 入户排查/公示核查水印）：
-/// 信息条文本行组装（缺项省略）与 GPS 小幅度随机偏差（±30 米）的范围约束。
+/// 水印上下文与坐标偏差测试（2026-11-15 入户排查/公示核查水印，二改）：
+/// 信息条文本行组装（区分抬头/缺项省略）与坐标小幅度随机偏差（±30 米）的范围约束。
 /// </summary>
 public class WatermarkTests
 {
@@ -28,9 +28,9 @@ public class WatermarkTests
 
         Assert.Equal(4, lines.Count);
         Assert.Equal("入户排查 · 张三 · 231025198001014929", lines[0]);
-        Assert.Equal("林口县柳树镇复兴村村民委员会", lines[1]);
-        Assert.Equal("2026年11月15日 14时30分", lines[2]);
-        Assert.Equal("北纬45.12345° 东经126.54321°", lines[3]);
+        Assert.Equal("地址：林口县柳树镇复兴村村民委员会", lines[1]);
+        Assert.Equal("时间：2026年11月15日 14时30分", lines[2]);
+        Assert.Equal("经纬度：北纬45.12345° 东经126.54321°", lines[3]);
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public class WatermarkTests
         // 地址缺失 → 省略地址行；无经纬度 → 省略坐标行（仅表头 + 时间 2 行）
         Assert.Equal(2, lines.Count);
         Assert.Equal("公示/核查照片 · 李四 · 123456789012345678", lines[0]);
-        Assert.Equal("2026年11月15日 08时05分", lines[1]);
-        Assert.DoesNotContain(lines, l => l.StartsWith("北纬", StringComparison.Ordinal));
+        Assert.Equal("时间：2026年11月15日 08时05分", lines[1]);
+        Assert.DoesNotContain(lines, l => l.StartsWith("经纬度：", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class WatermarkTests
 
         Assert.Equal(2, lines.Count);
         Assert.Equal("入户排查", lines[0]);
-        Assert.Equal("2026年1月2日 03时04分", lines[1]);
+        Assert.Equal("时间：2026年1月2日 03时04分", lines[1]);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class WatermarkTests
         Assert.Equal("入户排查 · 王五", lines[0]);
     }
 
-    // ── GeoLocationHelper.ApplyJitter（±GpsJitterMeters 米均匀偏差） ──
+    // ── PhotoWatermarkHelper.ApplyJitter（±GpsJitterMeters 米均匀偏差） ──
 
     [Fact]
     public void ApplyJitter_StayWithinConfiguredRadius()
@@ -92,7 +92,7 @@ public class WatermarkTests
 
         for (var i = 0; i < 2000; i++)
         {
-            var (lat, lng) = GeoLocationHelper.ApplyJitter(origin.Lat, origin.Lng, maxMeters);
+            var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(origin.Lat, origin.Lng, maxMeters);
             var distance = DistanceMeters(origin.Lat, origin.Lng, lat, lng);
             Assert.True(distance <= maxMeters + 0.5,
                 $"偏差 {distance:F1} 米超过配置半径 {maxMeters} 米");
@@ -102,7 +102,7 @@ public class WatermarkTests
     [Fact]
     public void ApplyJitter_ZeroRadius_ReturnsOriginal()
     {
-        var (lat, lng) = GeoLocationHelper.ApplyJitter(45.2, 126.5, 0);
+        var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(45.2, 126.5, 0);
         Assert.Equal(45.2, lat, 10);
         Assert.Equal(126.5, lng, 10);
     }
@@ -115,7 +115,7 @@ public class WatermarkTests
         var moved = false;
         for (var i = 0; i < 2000 && !moved; i++)
         {
-            var (lat, lng) = GeoLocationHelper.ApplyJitter(origin.Lat, origin.Lng, 30);
+            var (lat, lng) = PhotoWatermarkHelper.ApplyJitter(origin.Lat, origin.Lng, 30);
             moved = lat != origin.Lat || lng != origin.Lng;
         }
         Assert.True(moved);

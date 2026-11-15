@@ -3,10 +3,6 @@
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
-	<!-- 照片水印经纬度（入户排查/公示核查）：运行时经 Permissions.LocationWhenInUse 请求，
-	     拒绝/超时只是水印省略经纬度行，不影响照片保存 -->
-	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<!-- 身份证 OCR 拍照读取（required=false：无相机设备仍可安装，走相册兜底） -->
 	<uses-permission android:name="android.permission.CAMERA" />
 	<uses-feature android:name="android.hardware.camera" android:required="false" />

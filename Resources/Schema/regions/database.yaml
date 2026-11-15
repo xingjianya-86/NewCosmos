@@ -162,6 +162,14 @@ tables:
         type: character varying(20)
         nullable: true
         comment: 类型：村委会/居委会
+      - name: longitude
+        type: numeric(10,6)
+        nullable: true
+        comment: 村屯中心经度（照片水印「经纬度」用；区划坐标列缺失时在线地理编码回写，见 ArchivePhotoService.LookupVillageCoordinateAsync；迁移 docs/migrations/20261115_village_coordinates.sql）
+      - name: latitude
+        type: numeric(10,6)
+        nullable: true
+        comment: 村屯中心纬度（同上）
       - name: sort_order
         type: integer
         nullable: true

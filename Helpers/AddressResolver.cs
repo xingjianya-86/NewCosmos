@@ -90,7 +90,8 @@ public class AddressResolver
             .Replace("社区", "");
 
     /// <summary>
-    /// 规范化村级名称（**地址用途专用**，与 <see cref="StripVillageSuffix"/> 分工不同，勿混用）：
+    /// 规范化村级名称（地址用途专用，与 <see cref="StripVillageSuffix"/> 分工不同，勿混用；
+    /// 地址拼装与水印村屯坐标查找共用）：
     /// <list type="bullet">
     /// <item><c>柞木村村民委员会</c> → <c>柞木村</c>（去掉「村民委员会」，村字已在其前）</item>
     /// <item><c>土甸子村委会</c> → <c>土甸子村</c>（「村委会」→「村」，否则丢掉「村」字）</item>
@@ -102,7 +103,7 @@ public class AddressResolver
     /// 故地址拼装不得走它；它只服务「村名缓存」这一既有口径。
     /// 只处理**结尾**后缀，地址中段的「XX村」不动。
     /// </summary>
-    private static string NormalizeVillageForAddress(string? name)
+    public static string NormalizeVillageForAddress(string? name)
     {
         var s = name?.Trim() ?? string.Empty;
         if (s.EndsWith("村民委员会", StringComparison.Ordinal)) return s[..^5];
