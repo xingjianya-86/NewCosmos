@@ -221,10 +221,9 @@ counted AS (
                 var coords = await LookupVillageCoordinateAsync(parts, ct);
                 if (coords.HasValue)
                 {
-                    var (jLat, jLng) = PhotoWatermarkHelper.ApplyJitter(
-                        coords.Value.Latitude, coords.Value.Longitude, PhotoWatermarkConstants.GpsJitterMeters);
-                    lat = jLat;
-                    lng = jLng;
+                    // 固定地理编码值（2026-11-15 定稿）：同村屯恒同坐标，不叠加随机偏差
+                    lat = coords.Value.Latitude;
+                    lng = coords.Value.Longitude;
                 }
             }
 
