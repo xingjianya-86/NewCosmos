@@ -577,39 +577,22 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 组装水印上下文（仅「入户排查/公示核查」类别，采集路径）：时间 = 保存时刻；
-    /// GPS 定位一次（与姓名/地址查询并行，失败/无权限 → 省略经纬度行）；
-    /// 姓名缺失按户主档案补、地址整批查一次（户主档案三域聚合，不兜底单位）。
-    /// 返回 null = 当前类别不需要水印。
+    /// 组装水印上下文（仅「入户排查/公示核查」类别，采集路径）：本方法只给采集时刻与已知姓名；
+    /// 地址、村屯坐标（区划坐标列 → 缺失在线定位回写）、档案时间轴时间由服务
+    /// <see cref="IArchivePhotoService.FillWatermarkContextAsync"/> 按批一次补齐
+    /// （IsResolved 置位后逐张保存不再查库）。返回 null = 当前类别不需要水印。
     /// </summary>
     private async Task<PhotoWatermarkInfo?> BuildWatermarkContextAsync()
     {
         if (!PhotoCategoryConstants.RequiresWatermark(SelectedCategoryCode)) return null;
 
         var idCard = ApplicantIdCard.Trim();
-        var gpsTask = GeoLocationHelper.GetLocationWithJitterAsync(CancellationToken);
-
-        var name = ApplicantName?.Trim() ?? string.Empty;
-        if (name.Length == 0)
-        {
-            var owner = await _photoService.ResolveOwnerAsync(idCard, CancellationToken);
-            if (owner.IsSuccess && !string.IsNullOrWhiteSpace(owner.Value?.PersonName))
-                name = owner.Value!.PersonName.Trim();
-        }
-
-        var address = string.Empty;
-        var addr = await _photoService.GetWatermarkAddressAsync(idCard, CancellationToken);
-        if (addr.IsSuccess)
-            address = addr.Value?.Trim() ?? string.Empty;
-
-        var gps = await gpsTask;
-        return new PhotoWatermarkInfo(
+        var seed = new PhotoWatermarkInfo(
             CapturedAt: DateTime.Now,
-            Latitude: gps?.Latitude,
-            Longitude: gps?.Longitude,
-            PersonName: name,
-            IdCard: idCard,
-            Address: address);
+            PersonName: ApplicantName?.Trim() ?? string.Empty,
+            IdCard: idCard);
+
+        return await _photoService.FillWatermarkContextAsync(seed, idCard, SelectedCategoryCode, CancellationToken);
     }
 
     /// <summary>

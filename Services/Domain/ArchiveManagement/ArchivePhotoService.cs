@@ -4,6 +4,10 @@ using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Database;
+using NewCosmos.Services.Utilities;
+using NewCosmos.Models.Enums;
+using System.Collections.Concurrent;
+using ApplicationEntity = NewCosmos.Models.Entities.Application;
 
 namespace NewCosmos.Services.Domain.ArchiveManagement;
 
@@ -17,10 +21,33 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
     protected override string ServiceName => "ArchivePhotoService";
 
     private readonly IDatabaseService _db;
+    private readonly IBusinessTimelineService _timeline;
 
-    public ArchivePhotoService(IDatabaseService db, ILoggerService logger) : base(logger)
+    /// <summary>村屯坐标进程内缓存（键=县|镇|村；null=负缓存，本进程失败不再反复打网络）。</summary>
+    private readonly ConcurrentDictionary<string, (double Longitude, double Latitude)?> _geoCoordinateCache = new();
+
+    /// <summary>地理编码复用的 HttpClient（Singleton 服务内共享，线程安全；惯例同 HolidayManageService）。</summary>
+    private static readonly HttpClient _geoHttpClient = CreateGeoHttpClient();
+
+    private static HttpClient CreateGeoHttpClient()
+    {
+        var client = new HttpClient(new SocketsHttpHandler
+        {
+            AutomaticDecompression = global::System.Net.DecompressionMethods.All,
+            ConnectTimeout = TimeSpan.FromSeconds(PhotoWatermarkConstants.GeocodeTimeoutSeconds)
+        });
+        client.Timeout = TimeSpan.FromSeconds(PhotoWatermarkConstants.GeocodeTimeoutSeconds);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(PhotoWatermarkConstants.GeocodeUserAgent);
+        return client;
+    }
+
+    public ArchivePhotoService(
+        IDatabaseService db,
+        IBusinessTimelineService timeline,
+        ILoggerService logger) : base(logger)
     {
         _db = db;
+        _timeline = timeline;
     }
 
     /// <summary>
@@ -88,7 +115,7 @@ counted AS (
             : photo.PhotoCategory;
         if (watermark != null && PhotoCategoryConstants.RequiresWatermark(category))
         {
-            var filled = await FillWatermarkAsync(photo.ApplicantIdCard.Trim(), watermark, ct);
+            var filled = await FillWatermarkContextAsync(watermark, photo.ApplicantIdCard.Trim(), category, ct);
             var displayName = PhotoCategoryConstants.GetDisplayName(category);
             var watermarked = await Task.Run(
                 () => PhotoWatermarkHelper.Apply(bytes, filled, displayName), ct);
@@ -157,34 +184,345 @@ counted AS (
     }
 
     /// <summary>
-    /// 补齐水印上下文中调用方未提供的字段（只取**户主档案**，不兜底当前用户单位）：
-    /// 姓名 ← ResolveOwnerAsync（三域人员聚合）、地址 ← <see cref="GetWatermarkAddressAsync"/>、
-    /// 身份证 ← 照片本身。任一查询失败只回填可用部分（对应水印行省略），不阻断保存。
-    /// 调用方按批预补齐（InsertPhotosAsync / 采集页各一次），此处对已补齐上下文是无查询的直通。
+    /// 水印上下文按批补齐（2026-11-15 二改）：姓名 ← 户主档案聚合；地址 ← 档案区划代号 JOIN 区划表；
+    /// 经纬度 ← **所在村屯查询信息**（区划坐标列，缺失在线地理编码回写；不再取设备 GPS）；
+    /// 时间 ← **档案时间轴时间**（入户调查日/公示起日）+ 对应记录创建时分，全取不到回退采集时刻。
+    /// 快照语义：<see cref="PhotoWatermarkInfo.IsResolved"/> 置位后逐张保存不再查库（§8 批内禁 N+1）；
+    /// 补齐失败也置位并记 Warn——缺失字段对应水印行省略，绝不阻断照片保存。
     /// </summary>
-    private async Task<PhotoWatermarkInfo> FillWatermarkAsync(
-        string idCard, PhotoWatermarkInfo watermark, CancellationToken ct)
+    public async Task<PhotoWatermarkInfo> FillWatermarkContextAsync(
+        PhotoWatermarkInfo watermark, string idCard, string category, CancellationToken ct = default)
     {
-        var name = watermark.PersonName?.Trim() ?? string.Empty;
-        var address = watermark.Address?.Trim() ?? string.Empty;
-        var id = string.IsNullOrWhiteSpace(watermark.IdCard) ? idCard.Trim() : watermark.IdCard.Trim();
+        if (watermark.IsResolved) return watermark;
 
-        if (string.IsNullOrEmpty(name))
+        if (!PhotoCategoryConstants.RequiresWatermark(category) || string.IsNullOrWhiteSpace(idCard))
+            return watermark with { IsResolved = true };
+
+        try
         {
-            var owner = await ResolveOwnerAsync(idCard, ct);
-            if (owner.IsSuccess && !string.IsNullOrWhiteSpace(owner.Value?.PersonName))
-                name = owner.Value!.PersonName.Trim();
-        }
+            var name = watermark.PersonName?.Trim() ?? string.Empty;
+            if (name.Length == 0)
+            {
+                var owner = await ResolveOwnerAsync(idCard, ct);
+                if (owner.IsSuccess && !string.IsNullOrWhiteSpace(owner.Value?.PersonName))
+                    name = owner.Value!.PersonName.Trim();
+            }
 
-        if (string.IsNullOrEmpty(address))
+            var address = watermark.Address?.Trim() ?? string.Empty;
+            double? lat = null, lng = null;
+
+            var partsResult = await GetWatermarkAddressPartsAsync(idCard, ct);
+            var parts = partsResult.IsSuccess ? partsResult.Value : null;
+            if (parts != null)
+            {
+                if (address.Length == 0)
+                    address = AddressResolver.BuildWatermarkAddress(parts.County, parts.Town, parts.Village);
+
+                var coords = await LookupVillageCoordinateAsync(parts, ct);
+                if (coords.HasValue)
+                {
+                    var (jLat, jLng) = PhotoWatermarkHelper.ApplyJitter(
+                        coords.Value.Latitude, coords.Value.Longitude, PhotoWatermarkConstants.GpsJitterMeters);
+                    lat = jLat;
+                    lng = jLng;
+                }
+            }
+
+            var eventTime = await ResolveWatermarkTimeAsync(idCard, category, watermark.CapturedAt, ct);
+
+            return watermark with
+            {
+                PersonName = name,
+                IdCard = string.IsNullOrWhiteSpace(watermark.IdCard) ? idCard.Trim() : watermark.IdCard.Trim(),
+                Address = address,
+                CapturedAt = eventTime,
+                Latitude = lat,
+                Longitude = lng,
+                IsResolved = true,
+            };
+        }
+        catch (Exception ex)
         {
-            var addr = await GetWatermarkAddressAsync(idCard, ct);
-            if (addr.IsSuccess)
-                address = addr.Value?.Trim() ?? string.Empty;
+            LogWarn($"水印上下文补齐失败（按已有字段入库，缺失行省略）: {ex.Message}");
+            return watermark with { IsResolved = true };
         }
-
-        return watermark with { PersonName = name, IdCard = id, Address = address };
     }
+
+    // ── 水印取数行类（实体映射路径，带属性才可映射；禁止改回元组查询） ──
+
+    private sealed class WatermarkAddressRow
+    {
+        public string? County { get; set; }
+        public string? Town { get; set; }
+        public string? Village { get; set; }
+        public string? AltTown { get; set; }
+        public long? VillageId { get; set; }
+    }
+
+    private sealed class VillageGeoRow
+    {
+        public long Id { get; set; }
+        public double? Longitude { get; set; }
+        public double? Latitude { get; set; }
+    }
+
+    private sealed class SurveyRow
+    {
+        public DateTime? SurveyDate { get; set; }
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    private sealed class PublicityRow
+    {
+        public DateTime? PublicizeStartDate { get; set; }
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    /// <summary>地址/坐标共用的区划部件（临时救助镇列回退已在构造时并入 Town）。</summary>
+    private sealed record WatermarkAddressParts(string? County, string? Town, string? Village, long? VillageId);
+
+    // 三域按优先级取首个有地址的档案：① 低收入 —— 优先区划代号列 JOIN nc_regions_* 转名称
+    // （区划表为名称单一事实来源），该级代号为空才回退同级名称文本列；② 高龄 —— family_* 代号 JOIN；
+    // ③ 临时救助 —— 无区划代号列读名称文本（镇列回退 family_town）。值全部参数化，表名静态常量。
+    private const string WatermarkAddressSql = @"
+WITH addr AS (
+    SELECT 1 AS prio,
+           COALESCE(NULLIF(rc.county_name, ''), NULLIF(a.district, '')) AS county,
+           COALESCE(NULLIF(rt.town_name, ''), NULLIF(a.town, '')) AS town,
+           COALESCE(NULLIF(rv.village_name, ''), NULLIF(a.community, '')) AS village,
+           NULL::text AS alt_town,
+           a.village_id
+    FROM nc_biz_applications a
+    LEFT JOIN nc_regions_counties rc ON rc.id = a.county_id
+    LEFT JOIN nc_regions_towns rt ON rt.id = a.town_id
+    LEFT JOIN nc_regions_villages rv ON rv.id = a.village_id
+    WHERE a.applicant_id_card = $1 AND a.deleted_at IS NULL
+    UNION ALL
+    SELECT 2, NULLIF(rc.county_name, ''), NULLIF(rt.town_name, ''), NULLIF(rv.village_name, ''), NULL::text, rv.id
+    FROM nc_biz_elderly_applications e
+    LEFT JOIN nc_regions_counties rc ON rc.id = e.family_county_id
+    LEFT JOIN nc_regions_towns rt ON rt.id = e.family_town_id
+    LEFT JOIN nc_regions_villages rv ON rv.id = e.family_village_id
+    WHERE e.id_card = $1 AND e.deleted_at IS NULL
+    UNION ALL
+    SELECT 3, NULLIF(t.family_district, ''), NULLIF(t.town, ''), NULLIF(t.village, ''), NULLIF(t.family_town, ''), NULL::bigint
+    FROM nc_biz_temp_relief_applications t
+    WHERE t.applicant_id_card = $1 AND t.deleted_at IS NULL
+)
+SELECT county, town, village, alt_town, village_id
+FROM addr
+WHERE COALESCE(county, '') <> '' OR COALESCE(town, '') <> '' OR COALESCE(village, '') <> ''
+ORDER BY prio
+LIMIT 1";
+
+    /// <summary>入户调查记录（低收入域，最新一条）：日期=survey_date，时分=记录创建时刻。</summary>
+    private const string WatermarkSurveySql = @"
+SELECT s.survey_date, s.created_at
+FROM nc_biz_household_surveys s
+JOIN nc_biz_applications a ON a.id = s.application_id
+WHERE a.applicant_id_card = $1 AND a.deleted_at IS NULL AND s.deleted_at IS NULL
+ORDER BY s.id DESC
+LIMIT 1";
+
+    /// <summary>临时救助公示起日（直存列，最新一条）。</summary>
+    private const string WatermarkPublicitySql = @"
+SELECT publicize_start_date, created_at
+FROM nc_biz_temp_relief_applications
+WHERE applicant_id_card = $1 AND deleted_at IS NULL
+ORDER BY id DESC
+LIMIT 1";
+
+    /// <summary>低收入档案锚点行（ArchiveAnchorHelper 解析申请日期所需列，最新一条）。</summary>
+    private const string WatermarkAppAnchorSql = @"
+SELECT application_no, created_at, first_approved_at, data_completed_at, updated_at
+FROM nc_biz_applications
+WHERE applicant_id_card = $1 AND deleted_at IS NULL
+ORDER BY id DESC
+LIMIT 1";
+
+    private async Task<Result<WatermarkAddressParts?>> GetWatermarkAddressPartsAsync(string idCard, CancellationToken ct)
+    {
+        var result = await _db.QuerySingleAsync<WatermarkAddressRow>(WatermarkAddressSql, ct, idCard.Trim());
+        if (result.IsFailure)
+            return Result.Failure<WatermarkAddressParts?>(result.ErrorCode!, result.Message!);
+
+        var row = result.Value;
+        if (row == null ||
+            (string.IsNullOrWhiteSpace(row.County) && string.IsNullOrWhiteSpace(row.Town) &&
+             string.IsNullOrWhiteSpace(row.Village) && string.IsNullOrWhiteSpace(row.AltTown)))
+        {
+            return Result.Success<WatermarkAddressParts?>(null);   // 三域均无地址记录：水印省略地址行
+        }
+
+        var town = string.IsNullOrWhiteSpace(row.Town) ? row.AltTown : row.Town;
+        return Result.Success<WatermarkAddressParts?>(
+            new WatermarkAddressParts(row.County, town, row.Village, row.VillageId));
+    }
+
+    /// <summary>
+    /// 村屯坐标：① 区划坐标列（有代号按 id 直查，无代号按 县/镇/村 名称匹配）；
+    /// ② 列无坐标 → 在线地理编码（Nominatim，超时 <see cref="PhotoWatermarkConstants.GeocodeTimeoutSeconds"/>）
+    /// 命中村行则**回写坐标列**（此后本机/全服不再联网）；③ 失败 → 省略水印经纬度行（负缓存不反复打网络）。
+    /// </summary>
+    private async Task<(double Longitude, double Latitude)?> LookupVillageCoordinateAsync(
+        WatermarkAddressParts parts, CancellationToken ct)
+    {
+        var village = AddressResolver.NormalizeVillageForAddress(parts.Village);
+        if (string.IsNullOrEmpty(village)) return null;   // 镇直/「本级」：无村级单位，不出坐标行
+
+        var key = $"{parts.County}|{parts.Town}|{village}";
+        if (_geoCoordinateCache.TryGetValue(key, out var cached)) return cached;
+
+        (double Longitude, double Latitude)? result = null;
+        try
+        {
+            long rowId = 0;
+            double? rowLng = null, rowLat = null;
+
+            if (parts.VillageId.HasValue)
+            {
+                var byId = await _db.QuerySingleAsync<VillageGeoRow>(
+                    "SELECT id, longitude::double precision, latitude::double precision FROM nc_regions_villages WHERE id = $1",
+                    ct, parts.VillageId.Value);
+                if (byId.Value != null)
+                    (rowId, rowLng, rowLat) = (byId.Value.Id, byId.Value.Longitude, byId.Value.Latitude);
+            }
+            else
+            {
+                const string byNameSql = @"
+SELECT v.id, v.longitude::double precision, v.latitude::double precision
+FROM nc_regions_villages v
+JOIN nc_regions_towns t ON t.id = v.town_id
+JOIN nc_regions_counties c ON c.id = t.county_id
+WHERE v.village_name = $1
+  AND ($2::text = '' OR t.town_name = $2)
+  AND ($3::text = '' OR c.county_name LIKE '%' || $3)
+  AND v.is_active = TRUE
+ORDER BY v.id
+LIMIT 1";
+                var byName = await _db.QuerySingleAsync<VillageGeoRow>(
+                    byNameSql, ct, village, parts.Town?.Trim() ?? string.Empty, parts.County?.Trim() ?? string.Empty);
+                if (byName.Value != null)
+                    (rowId, rowLng, rowLat) = (byName.Value.Id, byName.Value.Longitude, byName.Value.Latitude);
+            }
+
+            if (rowLng.HasValue && rowLat.HasValue)
+            {
+                result = (rowLng.Value, rowLat.Value);
+            }
+            else
+            {
+                var url = NominatimGeocoder.BuildSearchUrl(parts.County, parts.Town, village);
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(PhotoWatermarkConstants.GeocodeTimeoutSeconds));
+                var json = await _geoHttpClient.GetStringAsync(url, timeoutCts.Token);
+                var geo = NominatimGeocoder.ParseSearchResponse(json);
+                if (geo.HasValue)
+                {
+                    result = geo;
+                    if (rowId > 0)
+                    {
+                        var updated = await _db.ExecuteNonQueryAsync(
+                            "UPDATE nc_regions_villages SET longitude = $1, latitude = $2 WHERE id = $3",
+                            ct, geo.Value.Longitude, geo.Value.Latitude, rowId);
+                        if (updated.IsSuccess)
+                            LogInfo($"村屯坐标已在线定位并回写: {village} → {geo.Value.Longitude:F6},{geo.Value.Latitude:F6}");
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;   // 页面离开/令牌取消：不缓存、不留痕
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"村屯坐标定位失败（水印省略经纬度行）: {village}: {ex.Message}");
+        }
+
+        _geoCoordinateCache[key] = result;   // null 也缓存（负缓存）
+        return result;
+    }
+
+    /// <summary>
+    /// 水印时间（2026-11-15 二改：档案时间轴时间 + 记录创建时分）：
+    /// 入户排查 → ① 入户调查记录日期+其创建时分 → ② B线时间轴「入户调查日期」（SurveyDateResolver
+    /// 与档案产出同口径）+ 档案记录创建时分；公示核查 → ① 临时救助公示起日+其创建时分 →
+    /// ② B线时间轴公示起日 + 档案记录创建时分；全取不到回退采集时刻（带时分）。
+    /// </summary>
+    private async Task<DateTime> ResolveWatermarkTimeAsync(
+        string idCard, string category, DateTime captureTime, CancellationToken ct)
+    {
+        try
+        {
+            if (category == PhotoCategoryConstants.HOUSEHOLD_INSPECTION)
+            {
+                var survey = await _db.QuerySingleAsync<SurveyRow>(WatermarkSurveySql, ct, idCard);
+                var surveyDate = survey.Value?.SurveyDate ?? survey.Value?.CreatedAt?.Date;
+                if (surveyDate.HasValue)
+                    return CombineDateAndTime(surveyDate.Value,
+                        survey.Value!.CreatedAt?.TimeOfDay ?? captureTime.TimeOfDay);
+
+                var (businessDate, tl, recordTime) = await ResolveBusinessTimelineAsync(idCard, captureTime, ct);
+                if (businessDate.HasValue && tl != null)
+                    return CombineDateAndTime(
+                        SurveyDateResolver.Resolve(tl, null, businessDate.Value),
+                        recordTime ?? captureTime.TimeOfDay);
+            }
+            else if (category == PhotoCategoryConstants.PUBLICITY_CHECK)
+            {
+                var pr = await _db.QuerySingleAsync<PublicityRow>(WatermarkPublicitySql, ct, idCard);
+                if (pr.Value?.PublicizeStartDate.HasValue == true)
+                    return CombineDateAndTime(pr.Value.PublicizeStartDate.Value,
+                        pr.Value.CreatedAt?.TimeOfDay ?? captureTime.TimeOfDay);
+
+                var (_, tl, recordTime) = await ResolveBusinessTimelineAsync(idCard, captureTime, ct);
+                if (tl != null && tl.PublicityStartDate != default)
+                    return CombineDateAndTime(tl.PublicityStartDate, recordTime ?? captureTime.TimeOfDay);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"水印时间取档案时间轴失败，回退采集时刻: {ex.Message}");
+        }
+
+        return captureTime;
+    }
+
+    /// <summary>
+    /// 业务锚点 + B 线时间轴（复用 ArchiveAnchorHelper / SurveyDateResolver / IBusinessTimelineService
+    /// 单点口径，与档案产出同源，禁止另抄）：返回业务锚点日期、B线时间轴与档案记录创建时分。
+    /// </summary>
+    private async Task<(DateTime? BusinessDate, TimelineResult? Timeline, TimeSpan? RecordTime)> ResolveBusinessTimelineAsync(
+        string idCard, DateTime fallbackTime, CancellationToken ct)
+    {
+        var appResult = await _db.QuerySingleAsync<ApplicationEntity>(WatermarkAppAnchorSql, ct, idCard);
+        var app = appResult.Value;
+        if (app == null) return (null, null, null);
+
+        var applicationDate = ArchiveAnchorHelper.ResolveApplicationDate(app);
+
+        DateTime? surveyDate = null;
+        var survey = await _db.QuerySingleAsync<SurveyRow>(WatermarkSurveySql, ct, idCard);
+        if (survey.Value?.SurveyDate is { } sd && sd != default)
+            surveyDate = sd;
+
+        var appCycle = _timeline.GetTimelineForDate(applicationDate, TimelineType.BusinessProcess);
+        var surveyCycle = (0, 0);
+        if (surveyDate is { } s2 && s2 != default)
+        {
+            var sc = _timeline.GetTimelineForDate(s2.Date, TimelineType.BusinessProcess);
+            surveyCycle = (sc.Year, sc.Month);
+        }
+
+        var businessDate = ArchiveAnchorHelper.ResolveBusinessAnchorDate(
+            applicationDate, surveyDate, (appCycle.Year, appCycle.Month), surveyCycle);
+        var tl = _timeline.GetTimelineForApplicationDate(businessDate, TimelineType.BusinessProcess);
+        var recordTime = app.CreatedAt != default ? app.CreatedAt.TimeOfDay : fallbackTime.TimeOfDay;
+        return (businessDate, tl, recordTime);
+    }
+
+    private static DateTime CombineDateAndTime(DateTime date, TimeSpan time) => date.Date.Add(time);
 
     /// <inheritdoc/>
     public async Task<Result<string>> GetWatermarkAddressAsync(string idCard, CancellationToken ct = default)
@@ -192,54 +530,15 @@ counted AS (
         if (string.IsNullOrWhiteSpace(idCard))
             return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "身份证号不能为空");
 
-        // 三域按优先级取首个有地址的档案：
-        // ① 低收入 —— **优先区划代号列 JOIN nc_regions_* 转名称**（区划表为名称单一事实来源），
-        //    该级代号为空才回退同级名称文本列（district/town/community，老数据只填文本的兜底）；
-        // ② 高龄 —— family_* 区划代号 JOIN 三张区划表转名称；
-        // ③ 临时救助 —— 无区划代号列，只能读名称文本（镇列回退 family_town 拼接列）。
-        // 值全部来自库内列与位置参数，无插值；表名为静态常量（非动态白名单场景）。
-        const string sql = @"
-WITH addr AS (
-    SELECT 1 AS prio,
-           COALESCE(NULLIF(rc.county_name, ''), NULLIF(a.district, '')) AS county,
-           COALESCE(NULLIF(rt.town_name, ''), NULLIF(a.town, '')) AS town,
-           COALESCE(NULLIF(rv.village_name, ''), NULLIF(a.community, '')) AS village,
-           NULL::text AS alt_town
-    FROM nc_biz_applications a
-    LEFT JOIN nc_regions_counties rc ON rc.id = a.county_id
-    LEFT JOIN nc_regions_towns rt ON rt.id = a.town_id
-    LEFT JOIN nc_regions_villages rv ON rv.id = a.village_id
-    WHERE a.applicant_id_card = $1 AND a.deleted_at IS NULL
-    UNION ALL
-    SELECT 2, NULLIF(rc.county_name, ''), NULLIF(rt.town_name, ''), NULLIF(rv.village_name, ''), NULL::text
-    FROM nc_biz_elderly_applications e
-    LEFT JOIN nc_regions_counties rc ON rc.id = e.family_county_id
-    LEFT JOIN nc_regions_towns rt ON rt.id = e.family_town_id
-    LEFT JOIN nc_regions_villages rv ON rv.id = e.family_village_id
-    WHERE e.id_card = $1 AND e.deleted_at IS NULL
-    UNION ALL
-    SELECT 3, NULLIF(t.family_district, ''), NULLIF(t.town, ''), NULLIF(t.village, ''), NULLIF(t.family_town, '')
-    FROM nc_biz_temp_relief_applications t
-    WHERE t.applicant_id_card = $1 AND t.deleted_at IS NULL
-)
-SELECT county, town, village, alt_town
-FROM addr
-WHERE COALESCE(county, '') <> '' OR COALESCE(town, '') <> '' OR COALESCE(village, '') <> ''
-ORDER BY prio
-LIMIT 1";
-
-        var result = await _db.QuerySingleAsync<(string? County, string? Town, string? Village, string? AltTown)>(
-            sql, ct, idCard.Trim());
-        if (result.IsFailure)
-            return Result.Failure<string>(result.ErrorCode!, result.Message!);
-
-        var row = result.Value;
-        if (row.County is null && row.Town is null && row.Village is null && row.AltTown is null)
+        // 地址部件查询单点（含区划代号 JOIN 转名称 + 名称文本兕底 + 村代号），此处只负责拼装展示串
+        var partsResult = await GetWatermarkAddressPartsAsync(idCard, ct);
+        if (partsResult.IsFailure)
+            return Result.Failure<string>(partsResult.ErrorCode!, partsResult.Message!);
+        if (partsResult.Value == null)
             return Result.Success(string.Empty); // 三域均无地址记录：水印省略地址行
 
-        // 临时救助主镇列为空时回退拼接列（family_town 存「镇+社区」形态）
-        var town = string.IsNullOrWhiteSpace(row.Town) ? row.AltTown : row.Town;
-        return Result.Success(AddressResolver.BuildWatermarkAddress(row.County, town, row.Village));
+        var parts = partsResult.Value;
+        return Result.Success(AddressResolver.BuildWatermarkAddress(parts.County, parts.Town, parts.Village));
     }
 
     public async Task<Result<List<ArchivePhoto>>> GetByPersonAsync(
@@ -451,9 +750,9 @@ LIMIT 1";
         var idCard = owner.IdCard.Trim();
         var cat = string.IsNullOrWhiteSpace(category) ? PhotoCategoryConstants.OTHER_CERT : category;
 
-        // 水印上下文整批只补齐一次（姓名/地址查询不进逐张循环，避免 N+1）
-        if (watermark != null && PhotoCategoryConstants.RequiresWatermark(cat))
-            watermark = await FillWatermarkAsync(idCard, watermark, ct);
+        // 水印上下文整批只补齐一次（姓名/地址/村屯坐标/档案时间不进逐张循环，避免 N+1）
+        if (watermark != null)
+            watermark = await FillWatermarkContextAsync(watermark, idCard, cat, ct);
 
         // 编号基准：该人该类别现有照片（与手机端采集同一取数与推进规则，往下递增不覆盖）
         var existingResult = await GetByPersonAsync(idCard, cat, ct);

@@ -16,6 +16,27 @@ public static class PhotoWatermarkHelper
     private const char CjkProbeChar = '入';
 
     /// <summary>
+    /// 坐标随机偏差：以给定坐标为圆心叠加半径 <paramref name="jitterMeters"/> 米内的均匀随机偏差
+    /// （水印二改：村屯坐标同样叠加小幅度偏差）。半径按 sqrt(U) 分布保证平面均匀；公开供单测。
+    /// </summary>
+    public static (double Latitude, double Longitude) ApplyJitter(
+        double latitude, double longitude, double jitterMeters)
+    {
+        if (jitterMeters <= 0) return (latitude, longitude);
+
+        var radius = jitterMeters * Math.Sqrt(Random.Shared.NextDouble());
+        var theta = Random.Shared.NextDouble() * 2 * Math.PI;
+
+        const double metersPerDegreeLat = 111320.0;
+        var cosLat = Math.Cos(latitude * Math.PI / 180.0);
+        if (Math.Abs(cosLat) < 1e-9) return (latitude, longitude);
+
+        var dLat = radius * Math.Cos(theta) / metersPerDegreeLat;
+        var dLng = radius * Math.Sin(theta) / (metersPerDegreeLat * Math.Abs(cosLat));
+        return (latitude + dLat, longitude + dLng);
+    }
+
+    /// <summary>
     /// 整图水印：解码 → 绘制 → JPEG q95 中间字节（随后仍会走 ImageCompressor 统一压缩为 WebP）。
     /// 失败返回 null（调用方按原图入库并记日志）。
     /// </summary>
@@ -115,7 +136,7 @@ public static class PhotoWatermarkHelper
         }
     }
 
-    /// <summary>图片中央两行水印（现场拍照 / cosmos）：半透明白字 + 深色描边保证明暗底都可读。</summary>
+    /// <summary>图片中央两行水印（现场拍照 / cosmos）：半透明白字，无描边（2026-11-15 按需求去掉深色描边）。</summary>
     private static void DrawCenterMark(SKCanvas canvas, int width, int height, SKTypeface? typeface)
     {
         var fontSize = (float)(width * PhotoWatermarkConstants.CenterTextRatio);
@@ -125,13 +146,6 @@ public static class PhotoWatermarkHelper
         var alpha = (byte)Math.Clamp((int)(PhotoWatermarkConstants.CenterAlpha * 255), 0, 255);
 
         using var fillPaint = new SKPaint { IsAntialias = true, Color = SKColors.White.WithAlpha(alpha), Style = SKPaintStyle.Fill };
-        using var outlinePaint = new SKPaint
-        {
-            IsAntialias = true,
-            Color = SKColors.Black.WithAlpha((byte)(alpha * 2 / 3)),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = Math.Max(1f, fontSize * 0.06f),
-        };
 
         var lineHeight = fontSize * 1.15f;
         var top1 = PhotoWatermarkConstants.CenterLineTop;
@@ -141,15 +155,13 @@ public static class PhotoWatermarkHelper
         var x = (width - maxWidth) / 2f;
         var baseline1 = (height - lineHeight * 2) / 2f + fontSize;
 
-        DrawOutlinedLine(canvas, top1, x, baseline1, font, fillPaint, outlinePaint);
-        DrawOutlinedLine(canvas, bottom2, x, baseline1 + lineHeight, font, fillPaint, outlinePaint);
+        DrawCenterLine(canvas, top1, x, baseline1, font, fillPaint);
+        DrawCenterLine(canvas, bottom2, x, baseline1 + lineHeight, font, fillPaint);
     }
 
-    private static void DrawOutlinedLine(
-        SKCanvas canvas, string text, float x, float baseline, SKFont font, SKPaint fill, SKPaint outline)
+    private static void DrawCenterLine(SKCanvas canvas, string text, float x, float baseline, SKFont font, SKPaint fill)
     {
         using var blob = SKTextBlob.Create(text, font, new SKPoint(x, baseline));
-        canvas.DrawText(blob, 0, 0, outline);
         canvas.DrawText(blob, 0, 0, fill);
     }
 

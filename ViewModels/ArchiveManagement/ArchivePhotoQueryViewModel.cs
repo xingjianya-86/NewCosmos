@@ -489,7 +489,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         await ExecuteAsync(async () =>
         {
             const int maxExport = 500;
-            var root = Path.Combine(OutputPathHelper.OutputRoot, "档案照片");
+            var root = OutputPathHelper.GetCategoryDirectory(OutputCategories.ArchivePhoto);
             var exported = 0;
             var page = 1;
 
@@ -533,7 +533,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
             return;
         }
 
-        var root = Path.Combine(OutputPathHelper.OutputRoot, "档案照片");
+        var root = OutputPathHelper.GetCategoryDirectory(OutputCategories.ArchivePhoto);
         await ExecuteAsync(async () =>
         {
             var exported = 0;
@@ -871,25 +871,16 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     }
 
     /// <summary>
-    /// 组装水印上下文（仅「入户排查/公示核查」类别，PC 插入路径）：
-    /// 时间 = 插入时刻；姓名/身份证 = 归属人；GPS = 定位一次（桌面常取不到 → 省略经纬度行）；
-    /// 地址留空由服务按户主档案整批补一次（不逐张查库）。
+    /// 组装水印上下文种子（仅「入户排查/公示核查」类别，PC 插入路径）：插入时刻 + 归属人姓名/身份证；
+    /// 地址、村屯坐标、档案时间轴时间由 InsertPhotosAsync 内 FillWatermarkContextAsync 整批补齐（不逐张查库）。
     /// </summary>
-    private async Task<PhotoWatermarkInfo?> BuildWatermarkContextAsync(PhotoOwner owner, string category)
-    {
-        if (!PhotoCategoryConstants.RequiresWatermark(category)) return null;
-
-        // 定位与后续逻辑并行：定位失败/无权限不影响插入
-        var gpsTask = GeoLocationHelper.GetLocationWithJitterAsync(CancellationToken);
-        var gps = await gpsTask;
-
-        return new PhotoWatermarkInfo(
-            CapturedAt: DateTime.Now,
-            Latitude: gps?.Latitude,
-            Longitude: gps?.Longitude,
-            PersonName: owner.PersonName ?? string.Empty,
-            IdCard: owner.IdCard ?? string.Empty);
-    }
+    private static PhotoWatermarkInfo? BuildWatermarkContext(PhotoOwner owner, string category)
+        => PhotoCategoryConstants.RequiresWatermark(category)
+            ? new PhotoWatermarkInfo(
+                CapturedAt: DateTime.Now,
+                PersonName: owner.PersonName ?? string.Empty,
+                IdCard: owner.IdCard ?? string.Empty)
+            : null;
 
     /// <summary>批量入库 → 记业务日志 → 刷新列表与待转计数 → 汇总提示（成功/失败张数 + 首个原因）。</summary>
     private async Task InsertBytesAsync(PhotoOwner owner, string category, List<byte[]> files, string source)
@@ -902,8 +893,8 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
         var result = await ExecuteAsync(async () =>
         {
-            // 水印上下文（仅「入户排查/公示核查」类别；姓名/身份证取归属人，地址由服务按户主档案整批补一次）
-            var watermark = await BuildWatermarkContextAsync(owner, category);
+            // 水印上下文（仅「入户排查/公示核查」类别；姓名/身份证取归属人，地址/坐标/档案时间由服务整批补齐）
+            var watermark = BuildWatermarkContext(owner, category);
             var insert = await _photoService.InsertPhotosAsync(owner, category, files, watermark, CancellationToken);
             if (insert.IsFailure)
                 return Result.Failure<BatchPhotoInsertResult>(insert.ErrorCode!, insert.Message!);

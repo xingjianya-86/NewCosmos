@@ -1,9 +1,12 @@
 namespace NewCosmos.Constants;
 
 /// <summary>
-/// 照片水印常量（2026-11-15）：仅「入户排查 / 公示核查」类别在保存时把水印烧进图片，
-/// 版式 = 左下角半透明信息条（分类·户主姓名·身份证 / 地址 / 时间 / 经纬度）
-/// + 图片中央两行水印（现场拍照 / cosmos）。
+/// 照片水印常量（2026-11-15，11-15 二改）：仅「入户排查 / 公示核查」类别在保存时把水印烧进图片，
+/// 版式 = 左下角信息条（分类·户主·身份证 / 地址： / 时间： / 经纬度：）
+/// + 图片中央两行水印（现场拍照 / cosmos，半透明白字无描边）。
+/// 坐标口径（2026-11-15 二改）：不取设备 GPS，按**所在村屯查询信息**（区划表坐标列，
+/// 缺失时在线地理编码回写）± <see cref="GpsJitterMeters"/> 米随机偏差。
+/// 时间口径：取档案时间轴时间（入户调查日 / 公示起日）+ 对应记录创建时分，取不到回退采集时刻。
 /// 字号与边距全部按图片尺寸比例（各分辨率观感一致），阈值集中在本文件单点维护。
 /// </summary>
 public static class PhotoWatermarkConstants
@@ -14,11 +17,19 @@ public static class PhotoWatermarkConstants
     /// <summary>中央水印第二行。</summary>
     public const string CenterLineBottom = "cosmos";
 
-    /// <summary>经纬度随机偏差半径（米，±均匀分布；按需求「小幅度偏差」定为 30 米）。</summary>
+    /// <summary>水印坐标随机偏差半径（米，±均匀分布；村屯级坐标再叠一点小幅度偏差）。</summary>
     public const double GpsJitterMeters = 30;
 
-    /// <summary>单次定位超时（秒），超时/无权限则省略水印经纬度行，不阻断保存。</summary>
-    public const double GpsTimeoutSeconds = 10;
+    // ── 村屯在线地理编码（区划表坐标缺失时回写；有坐标后不再联网） ──
+
+    /// <summary>地理编码服务端点（Nominatim / OpenStreetMap，免费无需密钥；超时见 <see cref="GeocodeTimeoutSeconds"/>）。</summary>
+    public const string GeocodeApiUrl = "https://nominatim.openstreetmap.org/search";
+
+    /// <summary>地理编码请求 User-Agent（Nominatim 使用政策要求可识别的 UA）。</summary>
+    public const string GeocodeUserAgent = "NewCosmos-PhotoWatermark/1.0";
+
+    /// <summary>单次地理编码超时（秒）：超时/断网仅省略水印经纬度行，不阻断保存。</summary>
+    public const double GeocodeTimeoutSeconds = 8;
 
     /// <summary>信息条字号 = min(宽,高) × 该比例。</summary>
     public const double InfoTextRatio = 0.030;
@@ -32,7 +43,7 @@ public static class PhotoWatermarkConstants
     /// <summary>中央水印字号 = 宽 × 该比例。</summary>
     public const double CenterTextRatio = 0.11;
 
-    /// <summary>中央水印不透明度（0~1）。</summary>
+    /// <summary>中央水印不透明度（0~1；无描边，浅色底观感偏淡时可调高）。</summary>
     public const float CenterAlpha = 0.55f;
 
     /// <summary>信息条背景色 ARGB（半透明黑，白字可读）。</summary>
