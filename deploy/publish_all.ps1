@@ -67,10 +67,10 @@ function Get-ChangelogSection([string]$Ver) {
     if (-not (Test-Path -LiteralPath $cl)) { return @{ Text = ""; Source = "missing" } }
     try { $text = [IO.File]::ReadAllText($cl, [Text.Encoding]::UTF8) } catch { return @{ Text = ""; Source = "missing" } }
 
-    $m = [regex]::Match($text, "(?ms)" + [regex]::Escape("## [$Ver]") + "[^\r\n]*\r?\n.*?(?=^## \[|\z)")
+    $m = [regex]::Match($text, "(?ms)^\s*" + [regex]::Escape("## [$Ver]") + "[^\r\n]*\r?\n.*?(?=^## \[|^---\s*$|\z)")
     if ($m.Success) { return @{ Text = $m.Value.Trim(); Source = "exact" } }
 
-    $m = [regex]::Match($text, "(?ms)" + [regex]::Escape("## [未发布]") + "[^\r\n]*\r?\n.*?(?=^## \[|\z)")
+    $m = [regex]::Match($text, "(?ms)^\s*" + [regex]::Escape("## [未发布]") + "[^\r\n]*\r?\n.*?(?=^## \[|^---\s*$|\z)")
     if ($m.Success) { return @{ Text = $m.Value.Trim(); Source = "unreleased" } }
 
     return @{ Text = ""; Source = "missing" }
