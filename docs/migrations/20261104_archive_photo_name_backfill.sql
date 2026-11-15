@@ -58,6 +58,7 @@ cat_map(code, cn) AS (
         ('BANK_CARD', '银行卡／一卡通'),
         ('INCOME_PROOF', '收入／务工证明'),
         ('PUBLICITY_CHECK', '公示／核查照片'),
+        ('HOUSEHOLD_INSPECTION', '入户排查'),
         ('OTHER_CERT', '其他证件照')
 )
 UPDATE nc_biz_archive_photos p

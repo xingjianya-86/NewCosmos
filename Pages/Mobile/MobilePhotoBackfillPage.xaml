@@ -66,18 +66,24 @@
             </HorizontalStackLayout>
         </ScrollView>
 
-        <!-- ③ 搜索 + 只看未传 -->
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="12,6" BackgroundColor="White">
+        <!-- ③ 搜索 + 预设照片类别（与档案照片查询页同构：关键词 + 类别 + 查询按钮；
+             类别 = 本次补传要采集的照片类别，经 ArchivePhotoParameter 透传给采集页，不再每次重置为身份证） -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,140,Auto" ColumnSpacing="8" Padding="12,6" BackgroundColor="White">
             <Entry Grid.Column="0" Placeholder="搜索姓名、身份证号..." Text="{Binding Keyword}"
-                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding ApplySearchCommand}"/>
-            <Button Grid.Column="1" Text="搜索" FontSize="14" Padding="14,0" MinimumHeightRequest="48"
-                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8"
-                    Command="{Binding ApplySearchCommand}"/>
+                   MinimumHeightRequest="48" FontSize="15" ReturnCommand="{Binding SearchCommand}"/>
+            <Picker Grid.Column="1" Title="照片类别" MinimumHeightRequest="48" FontSize="14"
+                    ItemsSource="{Binding CategoryOptions}" ItemDisplayBinding="{Binding Name}"
+                    SelectedItem="{Binding SelectedCategoryOption}"/>
+            <Button Grid.Column="2" Text="搜索" Style="{StaticResource ButtonPrimary}" HeightRequest="48" Padding="14,0"
+                    Command="{Binding SearchCommand}"/>
         </Grid>
 
-        <!-- ④ 列表 -->
-        <Grid Grid.Row="3">
-            <CollectionView ItemsSource="{Binding Candidates}" SelectionMode="None" Margin="12,8">
+        <!-- ④ 列表（卡片容器与档案照片查询页同款 CardBorder + 区块标题） -->
+        <Grid Grid.Row="3" Padding="12,8">
+            <Border Style="{StaticResource CardBorder}">
+                <Grid RowDefinitions="Auto,*" RowSpacing="6">
+                    <Label Text="人员清单" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                    <CollectionView Grid.Row="1" ItemsSource="{Binding Candidates}" SelectionMode="None">
                 <CollectionView.EmptyView>
                     <Label Text="{Binding EmptyHint}"
                            Style="{StaticResource EmptyStateLabel}" Padding="0,24" HorizontalTextAlignment="Center"/>
@@ -123,6 +129,8 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+                </Grid>
+            </Border>
 
             <!-- 加载蒙版 -->
             <Border BackgroundColor="#80000000" IsVisible="{Binding IsBusy}" InputTransparent="True">
@@ -134,35 +142,32 @@
             </Border>
         </Grid>
 
-        <!-- ⑤ 分页 -->
+        <!-- ⑤ 分页（样式与档案照片查询页一致：ButtonOutline + OnPlatform 字号） -->
         <Border Grid.Row="4" BackgroundColor="White" StrokeThickness="0" Padding="12,6">
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="12">
-                <Button Text="上一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
-                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
-                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                <Button Text="上一页" Style="{StaticResource ButtonOutline}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="36"
                         Command="{Binding PreviousPageCommand}" IsEnabled="{Binding CanGoPrevious}"/>
-                <Label Text="{Binding PageStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
-                <Button Text="下一页" FontSize="14" Padding="14,0" HeightRequest="38" CornerRadius="8"
-                        BackgroundColor="Transparent" TextColor="{StaticResource TextSecondary}"
-                        BorderColor="{StaticResource Gray200}" BorderWidth="1"
+                <Label Text="{Binding PageStatusText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Text="下一页" Style="{StaticResource ButtonOutline}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="36"
                         Command="{Binding NextPageCommand}" IsEnabled="{Binding CanGoNext}"/>
             </HorizontalStackLayout>
         </Border>
 
-        <!-- ⑥ 底部：全选 / 补传 / 打印 -->
+        <!-- ⑥ 底部：全选(动态) / 清空勾选 / 补传 / 打印（统一走 ButtonOutline/ButtonPrimary/ButtonSuccess 共享样式） -->
         <Border Grid.Row="5" BackgroundColor="White" StrokeThickness="0" Padding="10,8,10,14">
-            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
-                <Button Grid.Column="0" Text="全选" FontSize="14" HeightRequest="46" CornerRadius="8" Padding="12,0"
-                        BackgroundColor="{StaticResource Gray100}" TextColor="{StaticResource TextSecondary}"
+            <Grid ColumnDefinitions="Auto,Auto,*,*" ColumnSpacing="6">
+                <Button Grid.Column="0" Text="{Binding SelectAllText}"
+                        Style="{StaticResource ButtonOutline}" Padding="12,0"
                         Command="{Binding ToggleSelectAllCommand}"/>
-                <Button Grid.Column="1" Text="{Binding BackfillButtonText}"
-                        Command="{Binding BackfillSelectedCommand}"
-                        FontSize="14" HeightRequest="46" CornerRadius="8" Padding="0"
-                        BackgroundColor="{StaticResource Primary}" TextColor="White"/>
-                <Button Grid.Column="2" Text="{Binding PrintButtonText}"
-                        Command="{Binding PrintSelectedCommand}"
-                        FontSize="14" HeightRequest="46" CornerRadius="8" Padding="0"
-                        BackgroundColor="{StaticResource Warning}" TextColor="White"/>
+                <Button Grid.Column="1" Text="清空勾选"
+                        Style="{StaticResource ButtonOutline}" Padding="12,0"
+                        Command="{Binding ClearSelectionCommand}"/>
+                <Button Grid.Column="2" Text="{Binding BackfillButtonText}"
+                        Style="{StaticResource ButtonPrimary}" Padding="8,0"
+                        Command="{Binding BackfillSelectedCommand}"/>
+                <Button Grid.Column="3" Text="{Binding PrintButtonText}"
+                        Style="{StaticResource ButtonSuccess}" Padding="8,0"
+                        Command="{Binding PrintSelectedCommand}"/>
             </Grid>
         </Border>
 

@@ -71,7 +71,7 @@ counted AS (
     ) c ON c.applicant_id_card = p.id_card
 )";
 
-    public async Task<Result<long>> SavePhotoAsync(ArchivePhoto photo, CancellationToken ct = default)
+    public async Task<Result<long>> SavePhotoAsync(ArchivePhoto photo, PhotoWatermarkInfo? watermark = null, CancellationToken ct = default)
     {
         if (photo == null)
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "照片数据不能为空");
@@ -80,9 +80,31 @@ counted AS (
         if (string.IsNullOrWhiteSpace(photo.ApplicantIdCard))
             return Result.Failure<long>(ErrorCodes.VALIDATION_FAILED, "照片缺少身份证号关联");
 
+        // 水印（仅「入户排查/公示核查」类别，且调用方给了上下文）：先烧水印、再统一压缩——
+        // 保证水印后的字节仍走 500KB 硬校验；绘制失败按原图继续保存并记 Warn（保照片优先于水印）。
+        var bytes = photo.PhotoData;
+        var category = string.IsNullOrWhiteSpace(photo.PhotoCategory)
+            ? PhotoCategoryConstants.OTHER_CERT
+            : photo.PhotoCategory;
+        if (watermark != null && PhotoCategoryConstants.RequiresWatermark(category))
+        {
+            var filled = await FillWatermarkAsync(photo.ApplicantIdCard.Trim(), watermark, ct);
+            var displayName = PhotoCategoryConstants.GetDisplayName(category);
+            var watermarked = await Task.Run(
+                () => PhotoWatermarkHelper.Apply(bytes, filled, displayName), ct);
+            if (watermarked != null && watermarked.Length > 0)
+            {
+                bytes = watermarked;
+            }
+            else
+            {
+                LogWarn($"照片水印绘制失败，按原图入库: Category={category}, IdCard尾4={PhotoNameBuilder.IdCardLast4(photo.ApplicantIdCard)}");
+            }
+        }
+
         // 唯一写入收口：统一压缩为 WebP 并校验 500KB 硬上限，禁止原图旁路入库。
         var compressResult = await Task.Run(
-            () => ImageCompressor.CompressToWebP(photo.PhotoData, photo.PhotoCategory), ct);
+            () => ImageCompressor.CompressToWebP(bytes, photo.PhotoCategory), ct);
         if (compressResult.IsFailure)
         {
             LogWarn($"照片压缩失败: {compressResult.Message}");
@@ -132,6 +154,92 @@ counted AS (
                 $"Size={photo.FileSize}B, Original={compressed.OriginalBytes}B, " +
                 $"{compressed.Width}x{compressed.Height}, Q={compressed.Quality}");
         return Result.Success(result.Value);
+    }
+
+    /// <summary>
+    /// 补齐水印上下文中调用方未提供的字段（只取**户主档案**，不兜底当前用户单位）：
+    /// 姓名 ← ResolveOwnerAsync（三域人员聚合）、地址 ← <see cref="GetWatermarkAddressAsync"/>、
+    /// 身份证 ← 照片本身。任一查询失败只回填可用部分（对应水印行省略），不阻断保存。
+    /// 调用方按批预补齐（InsertPhotosAsync / 采集页各一次），此处对已补齐上下文是无查询的直通。
+    /// </summary>
+    private async Task<PhotoWatermarkInfo> FillWatermarkAsync(
+        string idCard, PhotoWatermarkInfo watermark, CancellationToken ct)
+    {
+        var name = watermark.PersonName?.Trim() ?? string.Empty;
+        var address = watermark.Address?.Trim() ?? string.Empty;
+        var id = string.IsNullOrWhiteSpace(watermark.IdCard) ? idCard.Trim() : watermark.IdCard.Trim();
+
+        if (string.IsNullOrEmpty(name))
+        {
+            var owner = await ResolveOwnerAsync(idCard, ct);
+            if (owner.IsSuccess && !string.IsNullOrWhiteSpace(owner.Value?.PersonName))
+                name = owner.Value!.PersonName.Trim();
+        }
+
+        if (string.IsNullOrEmpty(address))
+        {
+            var addr = await GetWatermarkAddressAsync(idCard, ct);
+            if (addr.IsSuccess)
+                address = addr.Value?.Trim() ?? string.Empty;
+        }
+
+        return watermark with { PersonName = name, IdCard = id, Address = address };
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<string>> GetWatermarkAddressAsync(string idCard, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idCard))
+            return Result.Failure<string>(ErrorCodes.VALIDATION_FAILED, "身份证号不能为空");
+
+        // 三域按优先级取首个有地址的档案：
+        // ① 低收入 —— **优先区划代号列 JOIN nc_regions_* 转名称**（区划表为名称单一事实来源），
+        //    该级代号为空才回退同级名称文本列（district/town/community，老数据只填文本的兜底）；
+        // ② 高龄 —— family_* 区划代号 JOIN 三张区划表转名称；
+        // ③ 临时救助 —— 无区划代号列，只能读名称文本（镇列回退 family_town 拼接列）。
+        // 值全部来自库内列与位置参数，无插值；表名为静态常量（非动态白名单场景）。
+        const string sql = @"
+WITH addr AS (
+    SELECT 1 AS prio,
+           COALESCE(NULLIF(rc.county_name, ''), NULLIF(a.district, '')) AS county,
+           COALESCE(NULLIF(rt.town_name, ''), NULLIF(a.town, '')) AS town,
+           COALESCE(NULLIF(rv.village_name, ''), NULLIF(a.community, '')) AS village,
+           NULL::text AS alt_town
+    FROM nc_biz_applications a
+    LEFT JOIN nc_regions_counties rc ON rc.id = a.county_id
+    LEFT JOIN nc_regions_towns rt ON rt.id = a.town_id
+    LEFT JOIN nc_regions_villages rv ON rv.id = a.village_id
+    WHERE a.applicant_id_card = $1 AND a.deleted_at IS NULL
+    UNION ALL
+    SELECT 2, NULLIF(rc.county_name, ''), NULLIF(rt.town_name, ''), NULLIF(rv.village_name, ''), NULL::text
+    FROM nc_biz_elderly_applications e
+    LEFT JOIN nc_regions_counties rc ON rc.id = e.family_county_id
+    LEFT JOIN nc_regions_towns rt ON rt.id = e.family_town_id
+    LEFT JOIN nc_regions_villages rv ON rv.id = e.family_village_id
+    WHERE e.id_card = $1 AND e.deleted_at IS NULL
+    UNION ALL
+    SELECT 3, NULLIF(t.family_district, ''), NULLIF(t.town, ''), NULLIF(t.village, ''), NULLIF(t.family_town, '')
+    FROM nc_biz_temp_relief_applications t
+    WHERE t.applicant_id_card = $1 AND t.deleted_at IS NULL
+)
+SELECT county, town, village, alt_town
+FROM addr
+WHERE COALESCE(county, '') <> '' OR COALESCE(town, '') <> '' OR COALESCE(village, '') <> ''
+ORDER BY prio
+LIMIT 1";
+
+        var result = await _db.QuerySingleAsync<(string? County, string? Town, string? Village, string? AltTown)>(
+            sql, ct, idCard.Trim());
+        if (result.IsFailure)
+            return Result.Failure<string>(result.ErrorCode!, result.Message!);
+
+        var row = result.Value;
+        if (row.County is null && row.Town is null && row.Village is null && row.AltTown is null)
+            return Result.Success(string.Empty); // 三域均无地址记录：水印省略地址行
+
+        // 临时救助主镇列为空时回退拼接列（family_town 存「镇+社区」形态）
+        var town = string.IsNullOrWhiteSpace(row.Town) ? row.AltTown : row.Town;
+        return Result.Success(AddressResolver.BuildWatermarkAddress(row.County, town, row.Village));
     }
 
     public async Task<Result<List<ArchivePhoto>>> GetByPersonAsync(
@@ -330,7 +438,8 @@ LIMIT 1";
     /// 部分失败不回滚已成功张，成败与首个原因在结果里显式带出（不吞异常、不静默跳过）。
     /// </summary>
     public async Task<Result<BatchPhotoInsertResult>> InsertPhotosAsync(
-        PhotoOwner owner, string category, IReadOnlyList<byte[]> files, CancellationToken ct = default)
+        PhotoOwner owner, string category, IReadOnlyList<byte[]> files,
+        PhotoWatermarkInfo? watermark = null, CancellationToken ct = default)
     {
         if (owner is null || string.IsNullOrWhiteSpace(owner.IdCard))
             return Result.Failure<BatchPhotoInsertResult>(ErrorCodes.VALIDATION_FAILED, "缺少照片归属人（必须指定已存在的档案人员）");
@@ -341,6 +450,10 @@ LIMIT 1";
 
         var idCard = owner.IdCard.Trim();
         var cat = string.IsNullOrWhiteSpace(category) ? PhotoCategoryConstants.OTHER_CERT : category;
+
+        // 水印上下文整批只补齐一次（姓名/地址查询不进逐张循环，避免 N+1）
+        if (watermark != null && PhotoCategoryConstants.RequiresWatermark(cat))
+            watermark = await FillWatermarkAsync(idCard, watermark, ct);
 
         // 编号基准：该人该类别现有照片（与手机端采集同一取数与推进规则，往下递增不覆盖）
         var existingResult = await GetByPersonAsync(idCard, cat, ct);
@@ -377,7 +490,7 @@ LIMIT 1";
                     CreatedByName = App.CurrentUserName
                 };
 
-                var save = await SavePhotoAsync(photo, ct);
+                var save = await SavePhotoAsync(photo, watermark, ct);
                 if (save.IsFailure)
                 {
                     firstError ??= save.Message;

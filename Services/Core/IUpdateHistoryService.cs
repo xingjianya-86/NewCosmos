@@ -3,7 +3,8 @@ using NewCosmos.Models.Results;
 namespace NewCosmos.Services.Core;
 
 /// <summary>
-/// 升级日志服务：本机升级轨迹（升级前落 pending、新版首启 flush 成历史）+ 服务端全量拉取合并。
+/// 升级日志服务：随包内置全量（安装包内嵌 CHANGELOG.md，离线可用）+ 本机升级轨迹
+/// （升级前落 pending、新版首启 flush 成历史）+ 服务端全量拉取合并。
 /// 条目模型见 <see cref="Models.Results.UpdateHistoryItem"/>；状态文件与 update_skip.json 同目录。
 /// 服务端 changelog.json 仅作展示，不参与安装决策（安装仍走签名清单 update.json）。
 /// </summary>
@@ -18,12 +19,13 @@ public interface IUpdateHistoryService
     /// </summary>
     Task<UpdateHistoryItem?> FlushPendingAsync(CancellationToken ct = default);
 
-    /// <summary>本机升级历史（新 → 旧，最多保留 100 条）；读取失败返回 Failure（不吞，避免被当成空数据回写）。</summary>
+    /// <summary>本机升级历史 ∪ 随包内置全量日志（新 → 旧，本机最多保留 100 条）；
+    /// 读取失败返回 Failure（不吞，避免被当成空数据回写）。</summary>
     Task<Result<IReadOnlyList<UpdateHistoryItem>>> GetHistoryAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 拉服务端全量 changelog.json 并与本机历史合并去重（本机轨迹优先保留），
-    /// 按版本新 → 旧返回；拉取失败返回 Failure（显式失败，不吞）。
+    /// 拉服务端全量 changelog.json，与随包内置、本机历史分层合并去重（随包为底 → 服务端 → 本机优先），
+    /// 按版本新 → 旧返回；拉取失败返回 Failure（显式失败，不吞——页面已预载随包+本机完整日志）。
     /// </summary>
     Task<Result<IReadOnlyList<UpdateHistoryItem>>> FetchMergedAsync(CancellationToken ct = default);
 }

@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Results;
 using System.Text;
 using System.Text.Json;
@@ -7,6 +8,8 @@ namespace NewCosmos.Services.Core;
 
 /// <summary>
 /// 升级日志服务实现。
+/// · <b>随包内置</b>：安装包内嵌 <c>CHANGELOG.md</c>（唯一素材来源）解析出的全量日志，
+///   离线/未连服务端时更新日志页也能展示完整历史（<see cref="Helpers.ChangelogMarkdownParser"/>）。
 /// · <b>本机轨迹</b>：升级前由 <c>AppUpdateCoordinator</c> 写 update_pending.json（更新说明此刻在手，升级后不丢）
 ///   → 新版首启 <see cref="FlushPendingAsync"/> 写入 update_history.json 并返回该条（"本次更新内容"只提示一次）。
 /// · <b>服务端全量</b>：<see cref="IUpdateService.FetchChangelogJsonAsync"/> 拉同目录 changelog.json，
@@ -20,6 +23,9 @@ public class UpdateHistoryService : BaseService, IUpdateHistoryService
     /// <summary>本机历史最多保留条数（升级日志页只展示近期）。</summary>
     private const int MaxHistory = 100;
 
+    /// <summary>随包内置 CHANGELOG.md 的嵌入资源名（NewCosmos.csproj 显式 LogicalName）。</summary>
+    private const string BundledChangelogResource = "NewCosmos.CHANGELOG.md";
+
     // 与 UpdateService.StateRoot 同一目录（LocalApplicationData\NewCosmos）
     private static readonly string StateRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NewCosmos");
@@ -27,6 +33,9 @@ public class UpdateHistoryService : BaseService, IUpdateHistoryService
     private static readonly string PendingFile = Path.Combine(StateRoot, "update_pending.json");
 
     private static readonly UTF8Encoding Utf8NoBom = new(false);
+
+    /// <summary>随包内置全量日志（解析一次缓存）；资源缺失/损坏返回空表，不阻断任何流程。</summary>
+    private static readonly Lazy<IReadOnlyList<UpdateHistoryItem>> Bundled = new(LoadBundled);
 
     private readonly IUpdateService _updateService;
 
@@ -132,12 +141,15 @@ public class UpdateHistoryService : BaseService, IUpdateHistoryService
         if (!readOk)
             return Result.Failure<IReadOnlyList<UpdateHistoryItem>>(ErrorCodes.UNKNOWN_ERROR, "本机升级历史读取失败（文件可能损坏）");
 
-        return Result.Success<IReadOnlyList<UpdateHistoryItem>>(history);
+        // 本机轨迹 ∪ 随包内置全量：本地安装包首次打开更新日志页即有完整历史（不依赖服务端）
+        var merged = MergeByVersion(Bundled.Value, history);
+        return Result.Success<IReadOnlyList<UpdateHistoryItem>>(merged);
     }
 
     public async Task<Result<IReadOnlyList<UpdateHistoryItem>>> FetchMergedAsync(CancellationToken ct = default)
     {
         var (local, _) = await LoadHistoryAsync(ct);
+        var bundled = Bundled.Value;
 
         var json = await _updateService.FetchChangelogJsonAsync(ct);
         if (json.IsFailure)
@@ -154,18 +166,46 @@ public class UpdateHistoryService : BaseService, IUpdateHistoryService
             return Result.Failure<IReadOnlyList<UpdateHistoryItem>>(ErrorCodes.VALIDATION_FAILED, "升级日志格式不正确");
         }
 
-        // 同版本本机优先（标记该版本已在本机升级过）
-        var byVersion = new Dictionary<string, UpdateHistoryItem>(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in remote) byVersion[item.Version] = item;
-        foreach (var item in local) byVersion[item.Version] = item;
+        // 分层合并（同版本后者覆盖）：随包内置为底 → 服务端全量（新发布/权威）→ 本机轨迹优先
+        var merged = MergeByVersion(bundled, remote, local);
 
-        var merged = byVersion.Values
+        LogInfo($"升级日志合并完成: 随包 {bundled.Count} 条 + 服务端 {remote.Count} 条 + 本机 {local.Count} 条 → {merged.Count} 条");
+        return Result.Success<IReadOnlyList<UpdateHistoryItem>>(merged);
+    }
+
+    /// <summary>按版本分层合并去重（同版本后者覆盖前者），按版本新 → 旧排序（「未发布」等非数字段排最前）。</summary>
+    private static List<UpdateHistoryItem> MergeByVersion(params IEnumerable<UpdateHistoryItem>[] layers)
+    {
+        var byVersion = new Dictionary<string, UpdateHistoryItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layer in layers)
+        {
+            foreach (var item in layer)
+                byVersion[item.Version] = item;
+        }
+
+        return byVersion.Values
             .OrderByDescending(x => x.Version, Comparer<string>.Create(
                 (a, b) => UpdateService.CompareVersions(a, b)))
             .ToList();
+    }
 
-        LogInfo($"升级日志合并完成: 服务端 {remote.Count} 条 + 本机 {local.Count} 条 → {merged.Count} 条");
-        return Result.Success<IReadOnlyList<UpdateHistoryItem>>(merged);
+    /// <summary>读取并解析随包内置 CHANGELOG.md（嵌入资源）；缺失/异常返回空表（内置日志只作展示）。</summary>
+    private static IReadOnlyList<UpdateHistoryItem> LoadBundled()
+    {
+        try
+        {
+            using var stream = typeof(UpdateHistoryService).Assembly
+                .GetManifestResourceStream(BundledChangelogResource);
+            if (stream == null) return Array.Empty<UpdateHistoryItem>();
+
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var items = ChangelogMarkdownParser.Parse(reader.ReadToEnd());
+            return items;
+        }
+        catch (Exception)
+        {
+            return Array.Empty<UpdateHistoryItem>();
+        }
     }
 
     #endregion

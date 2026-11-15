@@ -59,6 +59,7 @@ public sealed record ApplicationArchiveParameter(long ApplicationId);
 /// SessionQueue/SessionIndex：补传会话模式（历史档案批量补传），提供"下一位"连续采集；
 /// 从各业务表单单人进入时为 null。
 /// AssignContext：识别结果回填上下文（表单 VM 实现）；null = 只存档不识别（档案查询/补传入口）。
+/// PresetCategory：预设照片类别（补传页类别 Picker 传入，进采集页即选中）；null = 采集页保持默认身份证。
 /// </summary>
 public sealed record ArchivePhotoParameter(
     string ApplicantIdCard,
@@ -66,7 +67,8 @@ public sealed record ArchivePhotoParameter(
     string? ApplicantName = null,
     IReadOnlyList<NewCosmos.Models.Entities.PhotoBackfillPerson>? SessionQueue = null,
     int SessionIndex = 0,
-    NewCosmos.Services.Platform.IOcrAssignContext? AssignContext = null);
+    NewCosmos.Services.Platform.IOcrAssignContext? AssignContext = null,
+    string? PresetCategory = null);
 
 /// <summary>
 /// 档案产出页初始化来源参数：复核/成员变更归档。
