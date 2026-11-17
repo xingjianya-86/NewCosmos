@@ -31,6 +31,9 @@ public class PhotoPrintService : IPhotoPrintService
         string? printerName,
         bool isDuplex,
         int copies,
+        string? captionName,
+        string? captionIdCard,
+        string? captionCategory,
         CancellationToken ct = default)
     {
         if (photoData == null || photoData.Length == 0)
@@ -38,6 +41,10 @@ public class PhotoPrintService : IPhotoPrintService
 
         if (!ImageTranscoder.TryToJpeg(photoData, out var printJpeg))
             return Result.Failure(ErrorCodes.PRINT_FAILED, "照片格式无法转换为打印格式");
+
+        // 纸面抬头（2026-11-15）：姓名 ｜ 身份证号 ｜ 照片类别；三者全空 → 不插行，行为与旧版一致
+        var caption = BuildCaption(captionName, captionIdCard, captionCategory);
+        var hasCaption = caption.Length > 0;
 
         var imgPath = string.Empty;
         var docxPath = string.Empty;
@@ -47,10 +54,12 @@ public class PhotoPrintService : IPhotoPrintService
             imgPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".jpg", prefix: "photo_");
             await File.WriteAllBytesAsync(imgPath, printJpeg, ct);
 
-            // 2) 建空白文档 → 插图 → 按版式缩放 → 存临时 docx（COM 在 STA worker 上串行执行）
+            // 2) 建空白文档 → 抬头行 → 插图 → 按版式缩放 → 存临时 docx（COM 在 STA worker 上串行执行）
             docxPath = TemplateEngineHelpers.NewTempFilePath(_storageOptions, ".docx", prefix: "photo_print_");
             var fullDocx = Path.GetFullPath(docxPath);
             var (boxW, boxH) = PhotoLayoutConstants.GetBox(layout);
+            // 有抬头时给照片预留抬头行高（≈30 点），避免整页版式加行后照片被挤到第二页
+            var effectiveBoxH = hasCaption ? Math.Max(boxH - 30f, 100f) : boxH;
 
             await OfficeComWorker.Instance.InvokeAsync<object?>("照片打印排版", OfficeAppKind.Word, ctx =>
             {
@@ -74,8 +83,25 @@ public class PhotoPrintService : IPhotoPrintService
                         // 页边距设置失败不影响出图（用文档默认边距）
                     }
 
-                    // 在文档起始处插入图片（Range(0,0) = 文首空位）
-                    dynamic range = doc.Range(0, 0);
+                    // 文首插入抬头行（居中加粗 12pt；格式化失败仅降级为普通文本，不阻断出图）
+                    if (hasCaption)
+                    {
+                        try
+                        {
+                            dynamic capRange = doc.Range(0, 0);
+                            capRange.InsertAfter(caption + "\r");
+                            capRange.ParagraphFormat.Alignment = 1;  // wdAlignParagraphCenter
+                            capRange.Font.Bold = true;
+                            capRange.Font.Size = 12;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Warn($"照片打印：抬头行插入失败（继续出图）: {ex.Message}");
+                        }
+                    }
+
+                    // 照片插到文末（有抬头时即抬头之后的下一行）
+                    dynamic range = doc.Range(doc.Content.End - 1, doc.Content.End - 1);
                     shape = doc.InlineShapes.AddPicture(imgPath, false, true, range);
 
                     // 按版式包围盒等比缩放（不放大失真由调用方保证照片分辨率；此处统一 fit-in-box）
@@ -85,7 +111,7 @@ public class PhotoPrintService : IPhotoPrintService
                         float h = shape.Height;
                         if (w > 0 && h > 0)
                         {
-                            float scale = Math.Min(boxW / w, boxH / h);
+                            float scale = Math.Min(boxW / w, effectiveBoxH / h);
                             shape.Width = w * scale;
                             shape.Height = h * scale;
                         }
@@ -136,6 +162,19 @@ public class PhotoPrintService : IPhotoPrintService
             TemplateEngineHelpers.TryDeleteFile(imgPath, _logger, "PhotoPrintService");
             TemplateEngineHelpers.TryDeleteFile(docxPath, _logger, "PhotoPrintService");
         }
+    }
+
+    /// <summary>
+    /// 纸面抬头文本：姓名 ｜ 身份证号 ｜ 照片类别——只拼有值字段；
+    /// 三者全空返回空串（调用方据此不插抬头行，维持旧版行为）。
+    /// </summary>
+    private static string BuildCaption(string? name, string? idCard, string? category)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(name)) parts.Add($"姓名：{name.Trim()}");
+        if (!string.IsNullOrWhiteSpace(idCard)) parts.Add($"身份证号：{idCard.Trim()}");
+        if (!string.IsNullOrWhiteSpace(category)) parts.Add($"照片类别：{category.Trim()}");
+        return string.Join(" ｜ ", parts);
     }
 }
 #endif

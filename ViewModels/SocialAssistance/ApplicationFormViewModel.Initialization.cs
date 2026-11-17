@@ -888,6 +888,13 @@ public partial class ApplicationFormViewModel
                 CaregiverSubsidyAmount = app.CaregiverSubsidyAmount;
                 TotalGuaranteeAmount = app.TotalGuaranteeAmount;
                 IsEligible = app.IsEligible;
+                // 一事一议标记：审议已定分类 → Step5 分类判定加锁（见 DetermineClassificationAsync）
+                _isSpecialApproval = app.IsSpecialApproval;
+                OnPropertyChanged(nameof(CanResetClassification));
+                // 一事一议档案：判定依据随加载回显（该字段不落库；判定按钮锁定后结果区须常显审议结论，
+                // 而不是让用户去点按钮吃弹窗——2026-11-17 用户反馈）
+                if (_isSpecialApproval)
+                    DeterminationBasis = $"一事一议审议指定：经乡镇集体研究决定，按「{ClassificationConstants.ConvertFromCode(app.ClassificationResult ?? string.Empty)}」施保";
 
                 // 渐退期：主表列已迁移到独立表 nc_biz_grace_periods
                 var graceRes = await _gracePeriodService.GetActiveAsync(applicationId, ct);
@@ -967,6 +974,13 @@ public partial class ApplicationFormViewModel
                 {
                     IsClassificationDone = true;
                     OnPropertyChanged(nameof(IsClassificationLocked));
+                }
+
+                // 一事一议档案：审议已给出分类结论，与单人保/补全同理视为"已判定"——
+                // 否则提交按钮灰禁"请先完成分类判定"、而判定入口又被锁定 → 流程死锁（2026-11-17 实测）
+                if (_isSpecialApproval && !string.IsNullOrEmpty(ClassificationResult))
+                {
+                    IsClassificationDone = true;
                 }
 
                 // 通知补全/复核模式相关属性刷新（OperationMode 变化后依赖属性需手动通知）

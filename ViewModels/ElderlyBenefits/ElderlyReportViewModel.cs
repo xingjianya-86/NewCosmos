@@ -278,8 +278,8 @@ public partial class ElderlyReportViewModel : ViewModelBase
         }
 
         // 输出固定到 config\document_output.yaml 的 output.base_directory（不再弹目录选择）
-        var folder = Path.Combine(OutputPathHelper.OutputRoot, "高龄月报", $"{SelectedYear:D4}{SelectedMonth:D2}");
-        Directory.CreateDirectory(folder);
+        var folder = OutputPathHelper.GetPeriodDirectory(
+            OutputCategories.ElderlyReport, $"{SelectedYear:D4}{SelectedMonth:D2}");
 
         var savedFiles = new List<string>();
         var skipped = new List<string>();

@@ -17,7 +17,13 @@ public class LotteryDataService : ILotteryDataService
     private readonly IConfigService _configService;
 
     private static readonly string ScriptsDir = Path.Combine(AppContext.BaseDirectory, "Scripts", "Lottery");
-    private static readonly string DataDir = Path.Combine(AppContext.BaseDirectory, "Data", "Lottery");
+
+    /// <summary>
+    /// 开奖历史数据（json/csv）落 AppData：原用 AppContext.BaseDirectory，安装到 Program Files
+    /// 时会因无写权限直接失败。属程序内部中间数据（读回后入库即用），不入用户可见的输出根。
+    /// </summary>
+    private static readonly string DataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NewCosmos", "Lottery", "Data");
 
     public LotteryDataService(
         IDatabaseService db,

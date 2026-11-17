@@ -16,6 +16,8 @@ namespace NewCosmos.Services.Domain.TempRelief;
 ///  1. 申请人来源仅限导入台账库（5 个）与低保申请库（nc_biz_applications），不可自由录入
 ///  2. 大额救助金额不填写；小额救助从配置档位选定额
 ///  3. 同一身份证同一年度仅一条申请（终止也占名额；软删除释放名额）
+///  4. 跨来源检索一律**当前库优先、历史台账在后**（候选人排序去重见 TempReliefCandidateRanker，
+///     户籍解析见 ResolveHukouTypeAsync，政策清单见 GetPolicySnapshotAsync）
 /// </summary>
 public class TempReliefService : BaseService, ITempReliefService
 {
@@ -79,12 +81,43 @@ public class TempReliefService : BaseService, ITempReliefService
             results.AddRange(result.Value);
         }
 
-        // 姓名/身份证精确命中排序在前
-        return Result.Success(results
-            .OrderByDescending(c => string.Equals(c.IdCard, kw, StringComparison.OrdinalIgnoreCase))
-            .ThenBy(c => c.Name)
-            .Take(50)
-            .ToList());
+        // ① 已在当前库建档的申请人：剔除其台账重复行（台账是旧快照，选中会带出错误的家庭类别/银行/家庭人数）。
+        //    批查失败 → 降级不去重（留 warn、不挡检索），顺序仍由 ② 保证当前库在前。
+        var filed = await LoadFiledApplicantIdCardsAsync(results, ct);
+        if (filed.IsSuccess)
+            results = TempReliefCandidateRanker.ExcludeFiledLedgerRows(results, filed.Value);
+        else
+            LogWarn($"当前库已建档身份证批查失败，跳过台账去重: {filed.Message}");
+
+        // ② 当前库在前 → 历史台账在后 → 身份证精确命中 → 姓名 → 记录 ID 较新在前（见 TempReliefCandidateRanker）
+        var ordered = TempReliefCandidateRanker.Order(results, kw);
+        return Result.Success(ordered.Count > 50 ? ordered.GetRange(0, 50) : ordered);
+    }
+
+    /// <summary>
+    /// 批查候选里「已是当前库申请人」的身份证（台账候选去重用）。
+    /// 无台账候选 → 直接 Success 空集（0 往返）；查询失败如实返回 Failure，由调用方决定降级（§7）。
+    /// [SQL 白名单背书] 表名是硬编码常量，值走 = ANY($1) 数组参数。
+    /// </summary>
+    private async Task<Result<List<string>>> LoadFiledApplicantIdCardsAsync(
+        IReadOnlyList<TempReliefCandidate> candidates, CancellationToken ct)
+    {
+        var ledgerIdCards = candidates
+            .Where(c => !string.Equals(c.SourceTable, TempReliefConstants.CurrentSourceTable, StringComparison.Ordinal))
+            .Select(c => c.IdCard)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (ledgerIdCards.Length == 0)
+            return Result.Success(new List<string>());
+
+        const string sql = @"SELECT DISTINCT applicant_id_card
+                             FROM nc_biz_applications
+                             WHERE applicant_id_card = ANY($1) AND deleted_at IS NULL";
+        var result = await _db.QueryAsync<string>(sql, ct, ledgerIdCards);
+        if (result.IsFailure)
+            return Result.Failure<List<string>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<string>());
     }
 
     private async Task<Result<List<TempReliefCandidate>>> SearchCandidatesInTableAsync(string table, string keyword, string? excludeIdCard, CancellationToken ct)
@@ -650,6 +683,7 @@ public class TempReliefService : BaseService, ITempReliefService
     /// <summary>
     /// 按身份证检索其已享受/在申的救助政策清单（遍历白名单来源表精确匹配）
     /// 返回值如：["享受农村最低生活保障", "正在申请最低生活保障"]
+    /// 顺序口径（2026-11-15）：**当前库在申/在享在前、历史导入台账在后**，与候选人检索同源。
     /// 2026-11 性能收口：原 7 表逐表 SELECT 1（选人后自动填充路径 = 7 次串行往返）→
     /// ① 表存在性批量检查（information_schema ANY + 进程缓存，首查后免查）；
     /// ② 存在的台账表合成一条 UNION ALL 批查；③ nc_biz_applications 的存在性检查冗余
@@ -661,14 +695,16 @@ public class TempReliefService : BaseService, ITempReliefService
         if (string.IsNullOrWhiteSpace(idCard))
             return Result.Success(new List<string>());
 
-        var result = new List<string>();
+        // 台账命中与当前库命中分开累积，最后按「当前库在前、历史台账在后」合并（与候选人检索同口径）
+        var ledgerResult = new List<string>();
+        var currentResult = new List<string>();
         try
         {
             // 台账表（除 nc_biz_applications 外）批量存在性检查 + UNION ALL 批查。
             // [SQL 白名单背书] 表名全部取自 TempReliefConstants.AllowedSourceTables 硬编码常量
             // （check_standards SQL1 豁免 table），无外部输入。
             var ledgerTables = TempReliefConstants.AllowedSourceTables
-                .Where(t => t != "nc_biz_applications").ToArray();
+                .Where(t => t != TempReliefConstants.CurrentSourceTable).ToArray();
             var existingTables = new List<string>();
             foreach (var table in ledgerTables)
             {
@@ -688,20 +724,21 @@ public class TempReliefService : BaseService, ITempReliefService
                 var matched = await _db.QueryAsync<string>(unionSql, ct, idCard);
                 if (matched.IsSuccess && matched.Value != null)
                 {
-                    foreach (var tbl in matched.Value)
-                        result.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(tbl));
+                    // UNION ALL 返回序无保证 → 按白名单表序回排，台账之间顺序稳定
+                    foreach (var tbl in matched.Value.OrderBy(t => Array.IndexOf(ledgerTables, t)))
+                        ledgerResult.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(tbl));
                 }
                 else if (matched.IsFailure)
                 {
                     // 批查失败（如存量库缺某表）：回退逐表路径，保持原容错语义
                     LogWarn($"政策清单批查失败，回退逐表: {matched.Message}");
-                    result.Clear();
+                    ledgerResult.Clear();
                     foreach (var table in existingTables)
                     {
                         var exists = await _db.ExecuteScalarAsync<long>(
                             "SELECT 1 FROM " + table + " WHERE applicant_id_card = $1 LIMIT 1", ct, idCard);
                         if (exists.IsSuccess && exists.Value > 0)
-                            result.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(table));
+                            ledgerResult.Add("享受" + TempReliefConstants.GetFamilyCategoryByTable(table));
                     }
                 }
             }
@@ -731,7 +768,7 @@ public class TempReliefService : BaseService, ITempReliefService
             {
                 var isEnjoying = cls.Value.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
                 var name = ClassificationConstants.ConvertFromCode(cls.Value.ClassificationResult);
-                result.Add((isEnjoying ? "享受" : "正在申请") + name);
+                currentResult.Add((isEnjoying ? "享受" : "正在申请") + name);
             }
         }
         catch (Exception ex)
@@ -739,6 +776,10 @@ public class TempReliefService : BaseService, ITempReliefService
             LogException(ex, "检索政策救助情况失败");
         }
 
+        // 顺序口径：当前库（在申/在享）在前、历史导入台账在后——与候选人检索（TempReliefCandidateRanker）同源
+        var result = new List<string>(currentResult.Count + ledgerResult.Count);
+        result.AddRange(currentResult);
+        result.AddRange(ledgerResult);
         return Result.Success(result);
     }
 

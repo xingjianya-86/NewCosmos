@@ -1021,6 +1021,12 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             // "停止/停止享受"告知书（理由复用现有户主死亡句式）。走最前——死亡停保最具体，优先于通用分支。
             var deathStopResult = await _changeService.GetLatestHouseholdDeathStopRecordAsync(applicationId, CancellationToken);
             var deathStopRecord = deathStopResult.IsSuccess ? deathStopResult.Value : null;
+
+            // 核验停止（动态管理「拒绝配合核验工作」）记录：无 CategoryStop、分类未变（非停保码），
+            // 走专用分支装配"停止/停止享受"告知书
+            var verifyStopResult = await _changeService.GetLatestVerifyStopRecordAsync(applicationId, CancellationToken);
+            var verifyStopRecord = verifyStopResult.IsSuccess ? verifyStopResult.Value : null;
+
             if (deathStopRecord != null)
             {
                 _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "停止";
@@ -1039,6 +1045,29 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 _logger.LogBusiness("户主死亡整户停止告知书字段已装配",
                     ("ApplicationId", applicationId.ToString()),
                     ("DeathDate", deathStopRecord.DeathDate.ToString("yyyy-MM-dd")));
+            }
+            else if (verifyStopRecord != null)
+            {
+                // 核验停止（拒绝配合核验工作）：分类未变、无 CategoryStop 记录，按核验事实装配
+                // "停止/停止享受"告知书。顺序置于死亡之后、停保/不予认定之前——本记录是链上最新停保事件
+                //（恢复保障后再次核验停止场景），先判可避免被历史 CategoryStop 记录抢走方向。
+                _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = "停止";
+                _fieldData[FieldKeys.COMMUNITY] = app.Community ?? "";
+                _fieldData[FieldKeys.NOTICE_FAMILY_SIZE_TEXT] = $"{app.FamilySize}人";
+                _fieldData[FieldKeys.NOTICE_HANDLING_CATEGORY] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
+                _fieldData[FieldKeys.NOTICE_BENEFIT_TYPE] = "停止享受";
+                _fieldData[FieldKeys.NOTICE_BENEFIT_RESULT] = "社会救助保障待遇";
+                // 模板 241 正文「具体原因：{具体原因}。」自带收尾句号，文案不带尾句号（防「。。」）
+                _fieldData[FieldKeys.NOTICE_DETAILED_REASON] =
+                    $"于{verifyStopRecord.StopDate:yyyy年MM月dd日}经核验，你户拒绝配合核验工作，依据相关规定，经批准，予以停止保障";
+                _fieldData[FieldKeys.NOTICE_CUSTOM_REASON] = "";
+                _fieldData[FieldKeys.NOTICE_DELIVERER] = App.CurrentUserFullName ?? "";
+                _fieldData[FieldKeys.NOTICE_ORG_UNIT] = orgInfo.OperatorUnitName ?? "";
+                _fieldData[FieldKeys.NOTICE_DATE] = DateTime.Now.ToString("yyyy年MM月dd日");
+
+                _logger.LogBusiness("核验停止告知书字段已装配",
+                    ("ApplicationId", applicationId.ToString()),
+                    ("StopDate", verifyStopRecord.StopDate.ToString("yyyy-MM-dd")));
             }
             else if (!string.IsNullOrEmpty(stopNewClassification))
             {

@@ -834,9 +834,11 @@ public partial class MonthlyReportService
             var accidents = accidentsByApp.GetValueOrDefault(r.ReliefId) ?? new List<TempReliefAccident>();
             var educations = educationsByApp.GetValueOrDefault(r.ReliefId) ?? new List<TempReliefEducation>();
 
-            var isSmall = string.Equals(r.ReliefType, TempReliefConstants.ReliefTypeSmall, StringComparison.Ordinal);
+            // 分段判定单点实现（IsFixedQuotaType）：小额=有额度 → 救助金额/审批时间两列才填，大额一律留空
+            var isSmall = TempReliefConstants.IsFixedQuotaType(r.ReliefType);
             rows.Add(new MonthlyTempReliefRow
             {
+                ReliefType = r.ReliefType ?? TempReliefConstants.ReliefTypeLarge,
                 Name = r.ApplicantName ?? "",
                 IdCard = r.ApplicantIdCard ?? "",
                 Age = r.Age?.ToString() ?? "",
@@ -1001,33 +1003,92 @@ public partial class MonthlyReportService
         var t = string.IsNullOrEmpty(town) ? "全部" : town;
         var result = await _db.QuerySingleAsync<MonthlyMeeting>(
             "SELECT * FROM nc_biz_monthly_meetings WHERE year = $1 AND month = $2 AND town = $3", ct, year, month, t);
-        if (result.IsSuccess && result.Value != null)
+        var meeting = result.IsSuccess && result.Value != null
+            ? result.Value
+            : new MonthlyMeeting { Year = year, Month = month, Town = t };
+
+        // 决议段/申请分类：与周期内新增明细同源自动带出（member_info 库中为空时）
+        var autoResult = await BuildMeetingAutoFieldsAsync(year, month, t, specialApproval, ct);
+        var specialAttendees = string.Empty;
+        if (autoResult.IsSuccess)
         {
-            // 库中记录已保存但新增成员信息为空时：自动带出，避免用户看不到新增成员
-            var autoResult = await BuildMeetingAutoFieldsAsync(year, month, t, specialApproval, ct);
-            if (autoResult.IsSuccess)
+            if (string.IsNullOrWhiteSpace(meeting.MemberInfo))
             {
-                if (string.IsNullOrWhiteSpace(result.Value.MemberInfo))
-                {
-                    result.Value.MemberInfo = autoResult.Value.MemberInfo;
-                    result.Value.ApplyCategory = autoResult.Value.ApplyCategory;
-                }
-                // 决议段姓名列表始终以周期内新增明细为准（与自动带出的成员信息同源）
-                result.Value.MemberNames = autoResult.Value.NameList;
+                meeting.MemberInfo = autoResult.Value.MemberInfo;
+                meeting.ApplyCategory = autoResult.Value.ApplyCategory;
             }
-            return Result.Success(result.Value);
+            // 决议段姓名列表始终以周期内新增明细为准（与自动带出的成员信息同源）
+            meeting.MemberNames = autoResult.Value.NameList;
+            specialAttendees = autoResult.Value.SpecialAttendees;
         }
 
-        // 不存在：返回空记录，新增成员信息/申请分类自动从周期内新增明细带出
-        var meeting = new MonthlyMeeting { Year = year, Month = month, Town = t };
-        var added = await BuildMeetingAutoFieldsAsync(year, month, t, specialApproval, ct);
-        if (added.IsSuccess)
-        {
-            meeting.MemberInfo = added.Value.MemberInfo;
-            meeting.ApplyCategory = added.Value.ApplyCategory;
-            meeting.MemberNames = added.Value.NameList;
-        }
+        // 字段兜底：行不存在/字段为空时按月报页同源默认补齐——否则"直接生成"时间/主持人/记录人/出席/缺席全出 "-"
+        //（2026-11-17 实测：11 月无会议记录行；月报页 LoadMeetingAsync 算好的默认值原本不进生成链）
+        await FillMeetingDefaultsAsync(meeting, year, month, t, ct);
+
+        // 一事一议模板：出席人员改读申报表「参会人员」；未登记则保留兜底/普通值（空值回退）
+        if (specialApproval && !string.IsNullOrWhiteSpace(specialAttendees))
+            meeting.Attendees = specialAttendees;
+
         return Result.Success(meeting);
+    }
+
+    /// <summary>
+    /// 会议记录字段兜底（行不存在或字段为空时；已有值不覆盖）：会议时间=B线会议日带星期、
+    /// 主持人=本单位民政助理、记录人=当前登录用户、出席/缺席=最近一次出席历史——
+    /// 与月报页 LoadMeetingAsync / 申报表参会人员默认同一数据源（"重新录入"保存过的值优先）。
+    /// </summary>
+    private async Task FillMeetingDefaultsAsync(MonthlyMeeting meeting, int year, int month, string town, CancellationToken ct)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(meeting.MeetingTime))
+            {
+                var timeline = await _timelineService.CalculateTimelineAsync(year, month, Models.Enums.TimelineType.BusinessProcess);
+                if (timeline != null)
+                {
+                    var d = timeline.MeetingDate;
+                    var weekday = new[] { "日", "一", "二", "三", "四", "五", "六" }[(int)d.DayOfWeek];
+                    meeting.MeetingTime = $"{d.Year}年{d.Month}月{d.Day}日 星期{weekday}";
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(meeting.Host))
+                meeting.Host = await GetCivilAssistantNameAsync();
+
+            if (string.IsNullOrWhiteSpace(meeting.Recorder))
+                meeting.Recorder = App.CurrentUserFullName;
+
+            if (string.IsNullOrWhiteSpace(meeting.Attendees) || string.IsNullOrWhiteSpace(meeting.Absentees))
+            {
+                var latest = await GetLatestMeetingAttendanceByTownAsync(town, ct);
+                if (latest.IsFailure)
+                {
+                    LogWarn($"会议记录出席/缺席兜底读取失败（不影响生成）: {latest.Message}");
+                }
+                else if (latest.Value != null)
+                {
+                    if (string.IsNullOrWhiteSpace(meeting.Attendees))
+                        meeting.Attendees = latest.Value.Attendees;
+                    if (string.IsNullOrWhiteSpace(meeting.Absentees))
+                        meeting.Absentees = latest.Value.Absentees;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogWarn($"会议记录字段兜底失败（不影响生成）: {ex.Message}");
+        }
+    }
+
+    /// <summary>当前单位职位为"民政助理"的用户姓名（与月报页 GetCivilAssistantNameAsync 同源）；未配置返回空</summary>
+    private async Task<string> GetCivilAssistantNameAsync()
+    {
+        var orgId = App.CurrentUserOrganizationId;
+        if (!orgId.HasValue) return string.Empty;
+        var usersResult = await _userService.GetByOrganizationAsync(orgId.Value);
+        if (usersResult.IsFailure || usersResult.Value == null) return string.Empty;
+        return usersResult.Value.FirstOrDefault(u => u.Position == NewCosmos.Constants.PositionTitles.CivilAssistant)?.FullName ?? string.Empty;
     }
 
     /// <summary>
@@ -1036,14 +1097,14 @@ public partial class MonthlyReportService
     /// false：普通会议记录 = 非一事一议申请。
     /// member_info 每行格式：柳树镇X村村民 姓名 家庭情况说明：{申请原因详情}（分类）。
     /// </summary>
-    private async Task<Result<(string MemberInfo, string ApplyCategory, string NameList)>> BuildMeetingAutoFieldsAsync(
+    private async Task<Result<(string MemberInfo, string ApplyCategory, string NameList, string SpecialAttendees)>> BuildMeetingAutoFieldsAsync(
         int year, int month, string town, bool onlySpecialApproval, CancellationToken ct = default)
     {
         // 会议记录表用 "全部" 存库，而 GetAddedRowsAsync 以 $3='' 表示不过滤乡镇——须归一化
         var queryTown = town == "全部" ? "" : town;
         var addedResult = await GetAddedRowsAsync(year, month, queryTown, null, ct);
         if (addedResult.IsFailure)
-            return Result.Failure<(string, string, string)>(addedResult.ErrorCode!, addedResult.Message!);
+            return Result.Failure<(string, string, string, string)>(addedResult.ErrorCode!, addedResult.Message!);
 
         // 一事一议标记：关联 nc_biz_special_approvals（申请层面标记），命中则分流到一事一议模板
         var specialIds = new HashSet<long>();
@@ -1059,17 +1120,82 @@ public partial class MonthlyReportService
                 ? r.ApplicationId > 0 && specialIds.Contains(r.ApplicationId)
                 : !(r.ApplicationId > 0 && specialIds.Contains(r.ApplicationId))).ToList();
 
-        var memberInfo = string.Join(Environment.NewLine, candidates.Select(BuildMemberInfoLine));
+        // 一事一议纪要成员行补「一事一议事由」：申报表有"情况介绍+事由"两个字段，
+        // 纪要行原来只有情况介绍（2026-11-17 用户反馈"书写不够完善"）。仅一事一议模板取数，
+        // 与 specialAttendees 同批候选、= ANY($1) 批查（§8）；读取失败只降级为不带事由，不阻断。
+        var mattersMap = new Dictionary<long, string>();
+        if (onlySpecialApproval)
+        {
+            var matterIds = candidates.Select(r => r.ApplicationId).Where(id => id > 0).Distinct().ToArray();
+            if (matterIds.Length > 0)
+            {
+                var mResult = await _db.QueryAsync<SpecialMattersRow>(
+                    @"SELECT application_id, special_matters FROM nc_biz_special_approval_forms
+                      WHERE deleted_at IS NULL AND application_id = ANY($1)", ct, new object[] { matterIds });
+                if (mResult.IsFailure)
+                {
+                    LogWarn($"一事一议事由读取失败（纪要行仅显示情况介绍）: {mResult.Message}");
+                }
+                else if (mResult.Value != null)
+                {
+                    foreach (var row in mResult.Value)
+                    {
+                        if (row.ApplicationId is long appId && !string.IsNullOrWhiteSpace(row.SpecialMatters))
+                            mattersMap[appId] = row.SpecialMatters.Trim();
+                    }
+                }
+            }
+        }
+
+        var memberInfo = string.Join(Environment.NewLine,
+            candidates.Select(r => BuildMemberInfoLine(
+                r, mattersMap.TryGetValue(r.ApplicationId, out var matters) ? matters : null)));
         var applyCategory = string.Join("、", candidates.Select(r => r.Classification).Distinct());
         var nameList = string.Join("、", candidates.Select(r => r.Name));
-        return Result.Success((memberInfo, applyCategory, nameList));
+
+        // 一事一议会议记录的「出席人员」= 本期候选人（与决议名单同一批）申报表「会议审议→参会人员」
+        // （nc_biz_special_approvals.meeting_members，审议时落库）合并去重；未登记/读取失败 → 空，
+        // 由 GetMeetingAsync 回退普通会议出席值（空值回退约定）。
+        var specialAttendees = string.Empty;
+        if (onlySpecialApproval)
+        {
+            var ids = candidates.Select(r => r.ApplicationId).Where(id => id > 0).Distinct().ToArray();
+            if (ids.Length > 0)
+            {
+                var spResult = await _db.QueryAsync<SpecialMeetingMembersRow>(
+                    @"SELECT meeting_members FROM nc_biz_special_approvals
+                      WHERE deleted_at IS NULL AND application_id = ANY($1)", ct, new object[] { ids });
+                if (spResult.IsFailure)
+                {
+                    // 默认值语义：读取失败不阻断输出，回退普通出席值
+                    LogWarn($"一事一议会议出席人员读取失败（回退普通会议值）: {spResult.Message}");
+                }
+                else if (spResult.Value != null)
+                {
+                    var seen = new HashSet<string>(StringComparer.Ordinal);
+                    var merged = new List<string>();
+                    foreach (var row in spResult.Value)
+                    {
+                        foreach (var line in (row.MeetingMembers ?? string.Empty)
+                                     .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            if (seen.Add(line))
+                                merged.Add(line);
+                        }
+                    }
+                    specialAttendees = string.Join(Environment.NewLine, merged);
+                }
+            }
+        }
+        return Result.Success((memberInfo, applyCategory, nameList, specialAttendees));
     }
 
     /// <summary>
     /// 拼装会议记录"家庭情况说明"整段：柳树镇{村}村民 {姓名} 家庭情况说明：{申请原因详情}（分类）。
+    /// 一事一议模板额外追加「一事一议事由：{申报表 special_matters}」（情况介绍+理由成对，2026-11-17）。
     /// 村名取 community 去"村委会/村民委员会/社区"后缀；申请原因详情去尾句号避免双句号。
     /// </summary>
-    private static string BuildMemberInfoLine(MonthlyAddedRow r)
+    private static string BuildMemberInfoLine(MonthlyAddedRow r, string? oneAffairMatters = null)
     {
         var village = TrimVillageSuffix(r.Community);
         var townPrefix = string.IsNullOrWhiteSpace(r.Town) ? string.Empty : r.Town;
@@ -1087,11 +1213,16 @@ public partial class MonthlyReportService
             ? FamilySituationTextBuilder.Build(r.FamilyContext).TrimEnd('。')
             : (string.IsNullOrWhiteSpace(r.ReasonDetail) ? string.Empty : r.ReasonDetail.TrimEnd('。'));
         var category = ClassificationConstants.ConvertFromCode(r.CategoryCode);
+        string line;
         if (string.IsNullOrWhiteSpace(category))
-            return string.IsNullOrWhiteSpace(reasonDetail) ? r.Name : $"{head}{reasonDetail}。";
-        if (string.IsNullOrWhiteSpace(reasonDetail))
-            return head;
-        return $"{head}{reasonDetail}（{category}）。";
+            line = string.IsNullOrWhiteSpace(reasonDetail) ? r.Name : $"{head}{reasonDetail}。";
+        else if (string.IsNullOrWhiteSpace(reasonDetail))
+            line = head;
+        else
+            line = $"{head}{reasonDetail}（{category}）。";
+        return string.IsNullOrWhiteSpace(oneAffairMatters)
+            ? line
+            : $"{line}一事一议事由：{oneAffairMatters}";
     }
 
     /// <summary>
@@ -1175,6 +1306,23 @@ public partial class MonthlyReportService
         if (result.IsFailure)
             return Result.Failure<MonthlyMeetingAttendance>(result.ErrorCode!, result.Message!);
         return Result.Success(result.Value ?? new MonthlyMeetingAttendance { Year = year, Month = month, Town = t });
+    }
+
+    public async Task<Result<MonthlyMeetingAttendance>> GetLatestMeetingAttendanceByTownAsync(
+        string town, CancellationToken ct = default)
+    {
+        var t = string.IsNullOrEmpty(town) ? "全部" : town;
+        // 不限月份：当月尚未生成会议记录时也要能回填最近一次（否则默认值恒空）；
+        // 同乡镇优先于「全部」（town 归一与 GetLatestMeetingAttendanceAsync 同口径）。
+        var result = await _db.QuerySingleAsync<MonthlyMeetingAttendance>(
+            @"SELECT id, year, month, town, attendees, absentees, created_by, created_at
+              FROM nc_biz_meeting_attendance_history
+              WHERE town = $1 OR town = '全部'
+              ORDER BY (town = $1) DESC, created_at DESC, id DESC
+              LIMIT 1", ct, t);
+        if (result.IsFailure)
+            return Result.Failure<MonthlyMeetingAttendance>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new MonthlyMeetingAttendance { Town = t });
     }
 
     // ─────────────────── 导出 ───────────────────
@@ -1274,6 +1422,19 @@ public partial class MonthlyReportService
     private class SpecialApprovalIdRow
     {
         public long? ApplicationId { get; set; }
+    }
+
+    /// <summary>一事一议会议出席人员读取行（nc_biz_special_approvals.meeting_members）</summary>
+    private class SpecialMeetingMembersRow
+    {
+        public string? MeetingMembers { get; set; }
+    }
+
+    /// <summary>一事一议申报表事由读取行（纪要成员行「一事一议事由」补充用）</summary>
+    private class SpecialMattersRow
+    {
+        public long? ApplicationId { get; set; }
+        public string? SpecialMatters { get; set; }
     }
 
     private class SickMemberRow

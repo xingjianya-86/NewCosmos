@@ -284,8 +284,7 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             var publicityPeriod = $"{year}年{month}月1日至{year}年{month}月{daysInMonth}日";
 
             var groups = GroupByVillage(families);
-            var outputDir = Path.GetFullPath(Path.Combine(OutputPathHelper.OutputRoot, "公示文件", $"{year:D4}-{month:D2}"));
-            Directory.CreateDirectory(outputDir);
+            var outputDir = OutputPathHelper.GetPeriodDirectory(OutputCategories.PublicityFile, $"{year:D4}-{month:D2}");
 
             var result = new PublicityGenerateResult { OutputDirectory = outputDir, VillageCount = groups.Count };
 

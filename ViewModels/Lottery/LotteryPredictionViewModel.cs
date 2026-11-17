@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Lottery;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -200,17 +201,17 @@ public partial class LotteryPredictionViewModel : ViewModelBase
             // 1. 复制到剪贴板
             await Clipboard.SetTextAsync(content);
 
-            // 2. 保存到文件
+            // 2. 保存到文件：用户主动保存的导出件 → 落输出根（与其它导出同一目录口径），
+            //    原 AppContext.BaseDirectory 在 Program Files 下无写权限会直接失败
             var fileName = $"lottery_{SelectedLotteryType.ToString().ToLower()}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
-            var filePath = Path.Combine(AppContext.BaseDirectory, "Data", "Lottery", fileName);
-            var dir = Path.GetDirectoryName(filePath);
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir!);
+            var dir = OutputPathHelper.GetCategoryDirectory(OutputCategories.LotteryPrediction);
+            var filePath = Path.Combine(dir, fileName);
             await File.WriteAllTextAsync(filePath, content);
 
             // 注：购彩记录已在「生成预测」时自动入库，此处仅导出，避免重复入库
+            Logger.LogBusiness("导出彩票预测", ("Directory", dir), ("File", fileName));
             await _dialogService.DisplayAlertAsync("保存成功",
-                $"已复制到剪贴板\n已保存到文件: {fileName}",
+                $"已复制到剪贴板\n已保存到文件:\n{filePath}",
                 "确定");
         }
         catch (Exception ex)

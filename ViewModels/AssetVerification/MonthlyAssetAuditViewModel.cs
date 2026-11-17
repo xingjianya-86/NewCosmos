@@ -936,8 +936,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
                 return;
             }
 
-            var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
-            Directory.CreateDirectory(reportDir);
+            var reportDir = OutputPathHelper.GetCategoryDirectory(OutputCategories.VerificationReport);
             var reportPath = Path.Combine(reportDir,
                 $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}_v{version.Version}.pdf");
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
@@ -1022,8 +1021,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             return null;
         }
 
-        var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
-        Directory.CreateDirectory(reportDir);
+        var reportDir = OutputPathHelper.GetCategoryDirectory(OutputCategories.VerificationReport);
         var reportPath = Path.Combine(reportDir, $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}.pdf");
         await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, ct);
         return reportPath;

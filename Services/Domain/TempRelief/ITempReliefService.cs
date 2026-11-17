@@ -9,7 +9,10 @@ namespace NewCosmos.Services.Domain.TempRelief;
 public interface ITempReliefService
 {
     /// <summary>
-    /// 检索申请人候选人（跨 5 个导入台账库 + 低保申请库；姓名/身份证模糊匹配）
+    /// 检索申请人候选人（跨 5 个导入台账库 + 低保申请库；姓名/身份证模糊匹配）。
+    /// 顺序口径：**当前库（低保申请库）在前、历史导入台账在后** → 身份证精确命中 → 姓名 → 记录 ID 较新在前；
+    /// 已在当前库建档为申请人的，其台账重复行不再列出（批查失败降级不去重，仅告警、不挡检索）。
+    /// 排序/去重唯一实现见 <see cref="TempReliefCandidateRanker"/>。
     /// </summary>
     Task<Result<List<TempReliefCandidate>>> SearchCandidatesAsync(string keyword, string? excludeIdCard = null, CancellationToken ct = default);
 
@@ -110,7 +113,8 @@ public interface ITempReliefService
     Task<Result<bool>> CheckAnnualExistsAsync(string idCard, string applyYear, long? excludeId = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 按身份证检索已享受/在申的救助政策清单（遍历白名单来源表）
+    /// 按身份证检索已享受/在申的救助政策清单（遍历白名单来源表精确匹配）。
+    /// 顺序口径：**当前库（在申/在享）在前、历史导入台账在后**（台账之间按白名单表序）。
     /// </summary>
     Task<Result<List<string>>> GetPolicySnapshotAsync(string idCard, CancellationToken ct = default);
 

@@ -15,11 +15,17 @@ public interface IPhotoPrintService
     /// <param name="printerName">目标打印机（空=系统默认）</param>
     /// <param name="isDuplex">是否双面</param>
     /// <param name="copies">份数</param>
+    /// <param name="captionName">抬头-姓名（空则该段省略；2026-11-15 纸面留痕）</param>
+    /// <param name="captionIdCard">抬头-身份证号（完整 18 位，空则省略）</param>
+    /// <param name="captionCategory">抬头-照片类别显示名（空则省略；三者全空不插抬头行）</param>
     Task<Result> PrintPhotoAsync(
         byte[] photoData,
         string? layout,
         string? printerName,
         bool isDuplex,
         int copies,
+        string? captionName,
+        string? captionIdCard,
+        string? captionCategory,
         CancellationToken ct = default);
 }

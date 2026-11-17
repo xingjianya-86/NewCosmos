@@ -24,8 +24,8 @@ public class ArchiveService : BaseService, IArchiveService
     {
         archive.ArchivedAt = DateTime.Now;
 
-        var sql = @"INSERT INTO nc_biz_archives (application_id, archive_no, archive_type, classification_result, archived_by, output_files)
-                     VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id";
+        var sql = @"INSERT INTO nc_biz_archives (application_id, archive_no, archive_type, classification_result, archived_by, output_files, archived_at)
+                     VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7) RETURNING id";
 
         // archive_no 追加 3 位随机尾号：纯毫秒时间戳在批量归档时同一毫秒内必撞
         // UNIQUE 约束。加随机尾号后仍撞车（1/1000）则重新生成后再试，最多 3 次。
@@ -38,7 +38,12 @@ public class ArchiveService : BaseService, IArchiveService
 
             var result = await _db.ExecuteScalarAsync(sql, ct,
                 archive.ApplicationId, archive.ArchiveNo, archive.ArchiveType,
-                archive.ClassificationResult, archive.ArchivedBy, archive.OutputFiles);
+                archive.ClassificationResult, archive.ArchivedBy,
+                // output_files 为 jsonb：空串非合法 JSON（''::jsonb 抛 22P02 建档失败并回滚全流程）
+                string.IsNullOrWhiteSpace(archive.OutputFiles) ? "[]" : archive.OutputFiles,
+                // archived_at 实表 NOT NULL 且无默认值（建表走 SchemaService，SyncSchema 的 DEFAULT 因
+                // IF NOT EXISTS 不会补）——必须显式传入，否则 23502 not-null 违约（2026-11-17 实测）
+                archive.ArchivedAt);
 
             if (result.IsSuccess)
             {

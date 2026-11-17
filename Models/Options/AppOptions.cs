@@ -66,6 +66,18 @@ public class AppOptions
     public int SplashTimeoutSeconds { get; set; } = SplashConstants.DefaultTimeoutSeconds;
 
     /// <summary>
+    /// 登录页形态（app.ini LoginStyle，默认 sequence）：
+    /// - sequence：整页 WebView 验证序列登录（启动动画五步授权序列即登录流程）；
+    /// - classic：经典原生登录页（LoginPage XAML）。
+    /// sequence 下 WebView 初始化失败 / 脚本异常 / 加载超时自动回落 classic，绝不卡死。
+    /// </summary>
+    public string LoginStyle { get; set; } = SplashConstants.LoginStyleSequence;
+
+    /// <summary>本次启动是否使用验证序列登录（LoginStyle=sequence，忽略大小写）</summary>
+    public bool IsSequenceLogin =>
+        string.Equals(LoginStyle, SplashConstants.LoginStyleSequence, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 安卓端系统栏形态（app.ini [Android] FullscreenMode，默认 Immersive）：
     /// - Immersive：沉浸式全屏，隐藏状态栏与导航栏（下滑临时呼出），内容顶到屏幕最上沿。
     /// - EdgeToEdge：状态栏透明、内容延伸到底下，但时钟/电量仍可见。

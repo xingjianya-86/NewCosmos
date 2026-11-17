@@ -17,7 +17,8 @@ public interface IPrintService
     /// <summary>
     /// 渲染月报表表单（8 张 Excel 表 + 2 张会议记录 docx，按"月报表"分类模板查名渲染）
     /// formKey：新增救助明细 / 新增救助明细_低收入 / 停保汇总表 / 停保汇总表_低收入 /
-    ///           保障金增发表 / 保障金减发表 / 分类施保金减发人员表（低保） / 人员变动_自然减员月报表 / 会议记录 / 会议记录_一事一议
+    ///           保障金增发表 / 保障金减发表 / 分类施保金减发人员表（低保） / 人员变动_自然减员月报表 / 会议记录 / 会议记录_一事一议 /
+    ///           临时救助新增汇总表（一项表单、文档内两段：无额度→报县局审批 在前，有额度→备用金发放 在后）
     /// </summary>
     Task<Result<byte[]>> RenderMonthlyFormAsync(int year, int month, string formKey, string town, CancellationToken ct = default);
 

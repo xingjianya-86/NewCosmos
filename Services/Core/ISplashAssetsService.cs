@@ -18,6 +18,9 @@ public interface ISplashAssetsService
     /// <summary>启动页 URL</summary>
     string StartUrl { get; }
 
+    /// <summary>序列登录页 URL（同虚拟主机下的 login.html；LoginStyle=sequence 时由 LoginPage 覆盖层加载）</summary>
+    string LoginUrl { get; }
+
     /// <summary>准备本次启动的资源（Windows 复制资产到 AppData 并写 config.js）</summary>
     Task PrepareAsync(CancellationToken ct = default);
 

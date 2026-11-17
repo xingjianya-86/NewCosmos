@@ -7,13 +7,10 @@
              SafeAreaEdges="None"
              BackgroundColor="Black">
 
-    <!-- 启动动画：全屏 WebView 播放 Resources\Splash 下的 dsh-startup-screen 二次开发版；
-         动画结束/跳过经 newcosmos-splash://done 通知代码后置放行 ISplashGate，
+    <!-- 启动动画：宿主是 AnimationWebViewView（code-behind 注入，构造需要 DI 依赖，
+         无法在 XAML 实例化）；虚拟主机映射、自动播放环境、桥接协议、boot 看门狗
+         都在该控件内，与序列登录页（LoginPage 覆盖层）共用同一套实现。
+         动画结束/跳过经 newcosmos-splash://done → BridgeReceived → 放行 ISplashGate，
          App 再切到登录页或主界面。SKIP 按钮与 Esc 由动画运行时自己处理。 -->
-    <Grid BackgroundColor="Black">
-        <WebView x:Name="SplashWebView"
-                 HorizontalOptions="Fill"
-                 VerticalOptions="Fill"
-                 BackgroundColor="Black" />
-    </Grid>
+    <Grid x:Name="HostPanel" BackgroundColor="Black" />
 </ContentPage>

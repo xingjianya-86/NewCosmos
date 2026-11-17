@@ -40,6 +40,16 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty]
     private bool _rememberPassword;
 
+    /// <summary>
+    /// 序列登录模式（app.ini LoginStyle=sequence）：认证成功后不立即导航，
+    /// 由 LoginPage 在终幕播完 / 收到 done 后调用 <see cref="CompleteNavigationAsync"/>。
+    /// 回落经典登录页时必须复位为 false，否则经典表单登录会卡住不进主页。
+    /// </summary>
+    public bool DeferNavigation { get; set; }
+
+    /// <summary>最近一次登录尝试是否成功（序列登录桥接据以决定进主页还是回表单重试）</summary>
+    public bool LastSignInSucceeded { get; private set; }
+
     public LoginViewModel(
         IServiceProvider serviceProvider,
         IUserService userService, 
@@ -184,6 +194,8 @@ public partial class LoginViewModel : ViewModelBase
     [RelayCommand]
     private async Task LoginAsync()
     {
+        LastSignInSucceeded = false;
+
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
         {
             ErrorMessage = "用户名和密码不能为空";
@@ -291,15 +303,11 @@ public partial class LoginViewModel : ViewModelBase
                     _logger.Warn($"启动会话心跳失败（不影响本次登录）: {ex.Message}");
                 }
 
-                if (Helpers.WindowNavigator.CurrentPage != null)
-                {
-                    // 设置导航根：桌面 MainPage / Android MobileMainPage 回退在 NavigationService 注册表内处理；
-                    // 主首页是 NavigationPage 的 root（不经 push），必须显式注册标题跟随，
-                    // 否则从模块页点系统返回按钮回主首页时标题残留（实测 BUG）
-                    await _navigationService.SetRootAsync(NavigationKeys.Main);
+                LastSignInSucceeded = true;
 
-                    _windowTitleService.SetLoginTitle();
-                }
+                // classic（DeferNavigation=false）立即导航；序列登录由 LoginPage 在终幕播完 / 收到 done 后调用
+                if (!DeferNavigation)
+                    await CompleteNavigationAsync();
             }
             else
             {
@@ -322,6 +330,23 @@ public partial class LoginViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 设置导航根 + 登录标题（classic 与序列登录共用的唯一实现）。
+    /// 序列登录在终幕播完 / done 回执 / 终幕看门狗到点时调用。
+    /// </summary>
+    public async Task CompleteNavigationAsync()
+    {
+        if (Helpers.WindowNavigator.CurrentPage != null)
+        {
+            // 设置导航根：桌面 MainPage / Android MobileMainPage 回退在 NavigationService 注册表内处理；
+            // 主首页是 NavigationPage 的 root（不经 push），必须显式注册标题跟随，
+            // 否则从模块页点系统返回按钮回主首页时标题残留（实测 BUG）
+            await _navigationService.SetRootAsync(NavigationKeys.Main);
+
+            _windowTitleService.SetLoginTitle();
         }
     }
 

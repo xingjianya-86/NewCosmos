@@ -347,6 +347,27 @@ public class HouseholdDeathContext
 }
 
 /// <summary>
+/// 核验停止上下文（动态管理「拒绝配合核验工作」：核验失败直接停止保障，只停不建新档）
+/// </summary>
+public class VerifyStopContext
+{
+    /// <summary>
+    /// 旧档案申请ID
+    /// </summary>
+    public long ApplicationId { get; set; }
+
+    /// <summary>
+    /// 停止业务日期（默认办理当日；月报停保汇总按 stop_date 落周期）
+    /// </summary>
+    public DateTime StopDate { get; set; } = DateTime.Today;
+
+    /// <summary>
+    /// 操作人
+    /// </summary>
+    public string OperatorName { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// 变更结果
 /// </summary>
 public class ChangeResult
@@ -490,6 +511,19 @@ public interface IChangeService
     Task<Result<ChangeResult>> ExecuteHouseholdHeadDeathStopOnlyAsync(HouseholdDeathContext context, CancellationToken ct = default);
 
     /// <summary>
+    /// 核验停止（动态管理「拒绝配合核验工作」按钮）：核验失败拒不配合 → 直接停止保障，只停不建新档。
+    /// 事务内：状态守卫 → 停止旧档（ApplicationStatusService 单点写入）→ 结清渐退期 → 写变更记录（VerifyStop）。
+    /// 分类与保障金列不动（保障金属审批结果，§9.7），停保后可经「恢复保障」无损逆向。
+    /// </summary>
+    Task<Result<ChangeResult>> ExecuteVerifyStopAsync(VerifyStopContext context, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询最近一条"核验停止"记录（change_type=VerifyStop；无则 Value 为 null）。
+    /// 档案输出据此追加《档案_变更告知书》并装配"停止/停止享受"字段（理由含核验日期）。
+    /// </summary>
+    Task<Result<VerifyStopRecord?>> GetLatestVerifyStopRecordAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 查询本月（当前自然月）内本档案链上发生过的变更类型项（按 change_type + change_reason_type 去重），
     /// 供变更入口"本月已办理"提示判断。
     /// </summary>
@@ -587,6 +621,7 @@ public class ChangeRecord
         DictionaryConstants.ChangeType.CATEGORY_ADD => "新类别新增",
         DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_REDUCE => "分类施保减除",
         DictionaryConstants.ChangeType.CLASSIFIED_SUBSIDY_ADD => "分类施保增加",
+        DictionaryConstants.ChangeType.VERIFY_STOP => "核验停止",
         _ => ChangeType
     };
 
@@ -617,6 +652,15 @@ public class HouseholdDeathStopRecord
 {
     /// <summary>死亡日期（= change_record.change_date，办理时写入的业务日期）</summary>
     public DateTime DeathDate { get; set; }
+}
+
+/// <summary>
+/// 核验停止记录（动态管理「拒绝配合核验工作」只停不建新档；供档案输出追加《变更告知书》并装配"停止"字段）
+/// </summary>
+public class VerifyStopRecord
+{
+    /// <summary>核验停止日期（= change_record.change_date，办理时写入的业务日期）</summary>
+    public DateTime StopDate { get; set; }
 }
 
 /// <summary>

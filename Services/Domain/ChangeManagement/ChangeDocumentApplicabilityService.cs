@@ -37,6 +37,10 @@ public sealed class ChangeDocumentFacts
     /// <summary>单人户户主死亡整户停止</summary>
     public bool IsHouseholdDeathStop { get; init; }
 
+    /// <summary>核验停止（动态管理「拒绝配合核验工作」：核验失败直接停止保障，只停不建新档、分类不变）。
+    /// 停保是真实事件，与死亡同款不受单人保排除限制。</summary>
+    public bool IsVerifyStop { get; init; }
+
     /// <summary>链上有经济复核类记录（change_type ∈ FundChange/CategoryStop/CategoryAdd——
     /// 经济复核主记录、跨类停旧建新、渐退超限减发、保障金变更登记；纯户主/成员死亡记录不算复核）。
     /// 「经济复核」分类与《档案_定期复核审批表》的适用依据。</summary>
@@ -65,6 +69,7 @@ public sealed class ChangeDocumentFacts
     /// <summary>
     /// 《档案_变更告知书》适用门（与装配端四个方向逐一对齐，**模板唯一、方向由装配端决定**）：
     ///  ① 户主死亡整户停 → IsHouseholdDeathStop；
+    ///  ①' 核验停止（拒绝配合核验工作）→ IsVerifyStop（同为客观停保事件，不受单人保排除限制）；
     ///  ② 停保/不予认定 → IsIncomeStopChange，或归档终结拒保兜底 IsArchiveRefusedStop；
     ///  ③ 待遇调整——两个**互斥**子场景，装配端按 **登记优先** 顺序判定：
     ///     a. 保障金变更登记 → HasFundChangeRegistration（②③受单人保排除：单人保不产生停保，也不写登记记录）；
@@ -75,6 +80,7 @@ public sealed class ChangeDocumentFacts
     /// </summary>
     public bool NoticeApplicable =>
         IsHouseholdDeathStop
+        || IsVerifyStop
         || IsArchiveRefusedStop
         || (!ClassificationConstants.IsCodeSingleRescue(Classification ?? string.Empty)
             && (IsIncomeStopChange || HasFundChangeRegistration || HasGrantReduce));
@@ -155,6 +161,11 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
             if (deathRes.IsFailure)
                 return Result.Failure<ChangeDocumentFacts>(deathRes.ErrorCode!, deathRes.Message!);
 
+            // 5'. 核验停止（拒绝配合核验工作；告知书"停止"场景依据）
+            var verifyRes = await _changeService.GetLatestVerifyStopRecordAsync(applicationId, ct);
+            if (verifyRes.IsFailure)
+                return Result.Failure<ChangeDocumentFacts>(verifyRes.ErrorCode!, verifyRes.Message!);
+
             // 6. 本档状态与档案自身分类（死亡停保旧档、归档终结拒保判定用；均以库中当前值为权威）
             var statusRes = await QueryArchiveStateAsync(applicationId, ct);
             if (statusRes.IsFailure)
@@ -190,6 +201,7 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
                 HasFundChangeRegistration = fundRegRes.Value,
                 IsIncomeStopChange = stopRes.Value,
                 IsHouseholdDeathStop = deathRes.Value != null,
+                IsVerifyStop = verifyRes.Value != null,
                 HasEconomicReviewRecord = hasEconomicReview,
                 HasHeadChange = hasHeadChange,
                 IsDeathStoppedArchive = hasHeadChange && isArchiveStopped,

@@ -28,7 +28,8 @@ public class ChangeDocumentApplicabilityTests
         bool deathStop = false,
         bool refusedStop = false,
         bool deathStoppedArchive = false,
-        bool grantReduce = false)
+        bool grantReduce = false,
+        bool verifyStop = false)
         => new()
         {
             ApplicationId = 1,
@@ -39,6 +40,7 @@ public class ChangeDocumentApplicabilityTests
             IsArchiveRefusedStop = refusedStop,
             IsDeathStoppedArchive = deathStoppedArchive,
             HasGrantReduce = grantReduce,
+            IsVerifyStop = verifyStop,
         };
 
     // ─────────── NoticeApplicable：告知书放行口径 ───────────
@@ -84,6 +86,18 @@ public class ChangeDocumentApplicabilityTests
     [Fact]
     public void 户主死亡整户停_不受单人保限制_告知书适用()
         => Assert.True(Facts("UrbanLowIncomeSingle", deathStop: true).NoticeApplicable);
+
+    /// <summary>
+    /// 核验停止（动态管理「拒绝配合核验工作」）：分类不变、无 CategoryStop 记录，
+    /// 清单门靠 IsVerifyStop 放行；与死亡同为客观停保事件，不受单人保排除限制。
+    /// </summary>
+    [Fact]
+    public void 核验停止_告知书适用()
+        => Assert.True(Facts("UrbanSubsistence", verifyStop: true).NoticeApplicable);
+
+    [Fact]
+    public void 核验停止_单人保_仍适用()
+        => Assert.True(Facts("UrbanLowIncomeSingle", verifyStop: true).NoticeApplicable);
 
     /// <summary>
     /// 归档终结拒保：首次申请即被拒的独立新档只置 Stopped、**不写变更记录**，

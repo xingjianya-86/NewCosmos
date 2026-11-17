@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Domain.SocialAssistance;
@@ -145,6 +146,12 @@ public interface IMonthlyReportService
     /// 获取最新一条出席/缺席历史（默认回填弹窗；无记录返回空快照）
     /// </summary>
     Task<Result<MonthlyMeetingAttendance>> GetLatestMeetingAttendanceAsync(int year, int month, string town, CancellationToken ct = default);
+
+    /// <summary>
+    /// 按乡镇取最近一条出席/缺席历史（不限月份；优先精确乡镇，回退「全部」；无记录返回空快照）。
+    /// 消费方：一事一议申报表「会议审议→参会人员」默认回填，与会议记录同一数据源（nc_biz_meeting_attendance_history）。
+    /// </summary>
+    Task<Result<MonthlyMeetingAttendance>> GetLatestMeetingAttendanceByTownAsync(string town, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -403,10 +410,11 @@ public class MonthlyExitRectificationRow
 }
 
 /// <summary>
-/// 临时救助新增汇总行（月报_临时救助新增汇总表）
+/// 临时救助新增汇总行（月报_临时救助新增汇总表；按分段标签拆两段输出，见 TempReliefSummaryGrouper）
 /// </summary>
 public class MonthlyTempReliefRow
 {
+    public string ReliefType { get; set; } = TempReliefConstants.ReliefTypeLarge; // 救助类型（Small=有额度→备用金发放；其余=无额度→报县局审批）
     public string Name { get; set; } = string.Empty;          // 姓名（申请人）
     public string IdCard { get; set; } = string.Empty;        // 身份证号
     public string Age { get; set; } = string.Empty;           // 年龄

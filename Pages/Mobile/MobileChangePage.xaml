@@ -294,6 +294,23 @@
                             <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                         </Grid>
                     </Border>
+
+                    <!-- 拒绝配合核验工作（核验失败直接停止保障；停保后隐藏，由「恢复保障」逆向恢复） -->
+                    <Border StrokeShape="RoundRectangle 12" BackgroundColor="White" StrokeThickness="0" Padding="14"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
+                        <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding RefuseVerifyStopCommand}"/></Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Border BackgroundColor="{StaticResource DangerSoft}" WidthRequest="46" HeightRequest="46"
+                                    StrokeShape="RoundRectangle 12" StrokeThickness="0">
+                                <Label Text="🚫" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="拒绝配合核验工作" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="核验失败，直接停止保障" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="›" FontSize="20" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
                 </VerticalStackLayout>
 
                 <!-- 变更历史 -->

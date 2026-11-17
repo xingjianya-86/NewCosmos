@@ -209,6 +209,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPersonSearchService, PersonSearchService>();
         builder.Services.AddSingleton<ILandContractService, LandContractService>();
         builder.Services.AddSingleton<ISubsidyDataService, SubsidyDataService>();
+        // 快速核验：按身份证聚合查询系统内台账（只读，入口在低收入模块首页功能卡）
+        builder.Services.AddSingleton<IQuickVerifyService, QuickVerifyService>();
         builder.Services.AddSingleton<ISupporterService, SupporterService>();
         builder.Services.AddSingleton<ICaregiverService, CaregiverService>();
         builder.Services.AddSingleton<IEconomicDetailService, EconomicDetailService>();
@@ -401,6 +403,8 @@ public static class MauiProgram
 
         builder.Services.AddTransient<ApplicationFormViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.ApplicationWorkflowViewModel>();
+        // 快速核验 · 模拟测算（低收入模块首页功能卡入口）
+        builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.QuickVerifyViewModel>();
 
 
         builder.Services.AddTransient<CapabilityAssessmentViewModel>();
@@ -561,6 +565,7 @@ public static class MauiProgram
 
         builder.Services.AddTransient<Pages.SocialAssistance.ApplicationFormPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.ApplicationWorkflowPage>();
+        builder.Services.AddTransient<Pages.SocialAssistance.QuickVerifyPage>();
         builder.Services.AddTransient<Pages.Reprint.UnifiedReprintPage>();
 
         builder.Services.AddTransient<Pages.SocialAssistance.CapabilityAssessmentPage>();

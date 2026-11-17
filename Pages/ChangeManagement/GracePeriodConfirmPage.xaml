@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.ChangeManagement.GracePeriodConfirmPage"
              x:DataType="GracePeriodConfirmViewModel"
+             NavigationPage.HasNavigationBar="False"
              Title="{Binding Title}"
              BackgroundColor="{StaticResource Background}">
 

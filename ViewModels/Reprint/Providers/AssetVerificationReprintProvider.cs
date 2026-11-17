@@ -1,7 +1,6 @@
 using NewCosmos.Constants;
 using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
-using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ArchiveManagement;
@@ -150,9 +149,9 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             if (pdfBytes == null || pdfBytes.Length == 0)
                 return Result.Failure<string>(ErrorCodes.DOCUMENT_GENERATION_FAILED, "PDF 生成失败");
 
-            var storageOptions = _serviceProvider.GetRequiredService<StorageOptions>();
-            var tempDir = storageOptions.GetTempPath("ReprintPreview");
-            Directory.CreateDirectory(tempDir);
+            // 预览临时件统一落 {输出根}/temp（OutputPathHelper.GetTempDirectory），
+            // 由启动清理按 yaml cleanup 规则回收；原 %TEMP%\...\ReprintPreview 无人清理
+            var tempDir = OutputPathHelper.GetTempDirectory();
             var previewPath = Path.Combine(tempDir, $"reprint_preview_{record.ArchiveIdCard}_{template.TemplateId}.pdf");
             await File.WriteAllBytesAsync(previewPath, pdfBytes, ct);
 

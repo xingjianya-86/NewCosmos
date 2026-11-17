@@ -29,6 +29,8 @@ public class SplashAssetsService : BaseService, ISplashAssetsService
 
     public string StartUrl => $"https://{ISplashAssetsService.VirtualHost}/splash.html";
 
+    public string LoginUrl => $"https://{ISplashAssetsService.VirtualHost}/login.html";
+
 #if WINDOWS
     public string WindowsFolder => Path.Combine(FileSystem.AppDataDirectory, "Splash");
 #endif
@@ -124,7 +126,8 @@ public class SplashAssetsService : BaseService, ISplashAssetsService
 #if WINDOWS
     /// <summary>
     /// 把构建输出 splash\ 下的静态资产同步到 AppData\Splash\，并写入 config.js 与揭幕背景图。
-    /// 用 App 版本号 + splash.js 时间戳做戳记：升级替换资产后自动重新复制。
+    /// 用 App 版本号 + 全目录资产戳记（拆分后脚本散布在 core\ / scenes\ 等子目录，
+    /// 只看 splash.js 的 mtime 会漏掉子目录改动）做戳记：升级替换资产后自动重新复制。
     /// </summary>
     private void PrepareWindowsFolder()
     {
@@ -137,8 +140,7 @@ public class SplashAssetsService : BaseService, ISplashAssetsService
         Directory.CreateDirectory(targetDir);
 
         var stampPath = Path.Combine(targetDir, ".assets.stamp");
-        var jsPath = Path.Combine(sourceDir, "splash.js");
-        var stamp = $"{AppInfo.Current.VersionString}|{(File.Exists(jsPath) ? File.GetLastWriteTimeUtc(jsPath).Ticks : 0)}";
+        var stamp = $"{AppInfo.Current.VersionString}|{ComputeAssetStamp(sourceDir)}";
 
         var needCopy = !File.Exists(Path.Combine(targetDir, "splash.html"))
                        || !File.Exists(stampPath)
@@ -153,6 +155,29 @@ public class SplashAssetsService : BaseService, ISplashAssetsService
 
         Directory.CreateDirectory(Path.Combine(targetDir, "img"));
         File.WriteAllText(Path.Combine(targetDir, ConfigFileName), BuildConfigScript(), new UTF8Encoding(false));
+    }
+
+    /// <summary>
+    /// 资产戳记：目录内全部文件（除每次启动生成的 config.js）的"相对路径+mtime"聚合后取 SHA256。
+    /// 新增 / 修改 / 删除任一文件都会改变戳记；跨进程稳定（不用字符串 GetHashCode，其值按进程随机）。
+    /// </summary>
+    private static string ComputeAssetStamp(string sourceDir)
+    {
+        var sb = new StringBuilder();
+        foreach (var file in Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories)
+                     .OrderBy(f => f, StringComparer.Ordinal))
+        {
+            if (Path.GetFileName(file).Equals(ConfigFileName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            sb.Append(file.Substring(sourceDir.Length).TrimStart('\\', '/'))
+              .Append(':')
+              .Append(File.GetLastWriteTimeUtc(file).Ticks)
+              .Append('\n');
+        }
+
+        using var sha = global::System.Security.Cryptography.SHA256.Create();
+        return Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString())));
     }
 
     private static void CopyDirectory(string sourceDir, string targetDir)

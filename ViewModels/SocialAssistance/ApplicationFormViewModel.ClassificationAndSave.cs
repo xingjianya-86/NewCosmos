@@ -206,6 +206,36 @@ public partial class ApplicationFormViewModel
             if (result.IsSuccess && result.Value != null)
             {
                 var classification = result.Value;
+
+                // 一事一议档案：算法照跑（收入/标准/分类施保/照料费全链数据运算），但【结论与保障金】
+                // 按审议指定分类强制——算法对本档的"不符合"结论不适用（乡镇集体研究已指定分类）；
+                // 且服务端保障金按算法结论走 switch、不合格兜底 0（"钱没算/不依托数据"的根源）。
+                // 落库走共享尾链（SaveClassificationResultAsync）：分类=审议值不变，金额按数据刷新。
+                if (_isSpecialApproval && !string.IsNullOrEmpty(ClassificationResult))
+                {
+                    var lockedCode = ClassificationResult;
+                    classification.Classification = lockedCode;
+                    classification.IsEligible = true;
+                    classification.IneligibleReason = string.Empty;
+                    classification.Description = ClassificationConstants.ConvertFromCode(lockedCode);
+                    classification.DeterminationBasis =
+                        $"一事一议审议指定：经乡镇集体研究决定，按「{ClassificationConstants.ConvertFromCode(lockedCode)}」施保";
+                    classification.DeterminationDetails = new List<string> { classification.DeterminationBasis };
+                    classification.GracePeriod = null;               // 审议新档不进渐退（算法按其结论给出的渐退不适用）
+                    classification.NeedsSingleRescueDraft = false;   // 指定分类非单人保，不触发单人保草稿
+                    classification.SingleRescueMembers = null;
+
+                    // 保障金按【指定分类】重算：入参镜像服务端 DetermineClassificationAsync 的推导（§9 同口径）
+                    var lockedIsRural = ClassificationConstants.HukouType.IsHukouRural(application.HukouType ?? "");
+                    var lockedFamilySize = application.FamilySize > 0 ? application.FamilySize : FamilyMembers.Count + 1;
+                    var lockedMonthlyIncome = application.TotalAnnualIncome > 0
+                        ? application.TotalAnnualIncome / 12m
+                        : application.TotalFamilyIncome;
+                    var lockedGuarantee = await _classificationService.CalculateGuaranteeAmountAsync(
+                        lockedCode, lockedFamilySize, lockedIsRural, lockedMonthlyIncome, CancellationToken);
+                    classification.GuaranteeAmount = lockedGuarantee.IsSuccess ? lockedGuarantee.Value : 0m;
+                }
+
                 _lastClassificationResult = classification;
 
                 ClassificationResult = classification.Classification;
@@ -674,6 +704,9 @@ public partial class ApplicationFormViewModel
     {
         // 补全模式：认定结果锁定，不允许重置（补全不应改变认定结果）
         if (IsCompletionMode) return;
+
+        // 一事一议档案：分类由审议锁定，禁止重置清空——清空后保存会把审议分类写成 NULL（二次冲掉）
+        if (_isSpecialApproval) return;
 
         // 已确定档案（Approved/Stopped）在非变更流程模式下不允许重置
         if (IsClassificationLocked) return;

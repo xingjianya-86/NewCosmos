@@ -751,8 +751,7 @@ public partial class ArchiveOutputViewModel
             }
 
             // 报告是正式产物，与四件套口径一致：落输出根（不再进会被清理的 temp）
-            var reportDir = Path.Combine(OutputPathHelper.OutputRoot, "核查报告");
-            Directory.CreateDirectory(reportDir);
+            var reportDir = OutputPathHelper.GetCategoryDirectory(OutputCategories.VerificationReport);
             var reportName = $"核查报告_{DateTime.Now:yyyyMMddHHmmssfff}.pdf";
             var reportPath = Path.Combine(reportDir, reportName);
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, CancellationToken);

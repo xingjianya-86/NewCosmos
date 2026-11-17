@@ -22,13 +22,16 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     private readonly IDatabaseService _db;
     private readonly IStandardConfigService _standardConfigService;
     private readonly Services.Utilities.IBusinessTimelineService _timelineService;
+    private readonly Services.Domain.UserManagement.IUserService _userService;
 
     public MonthlyReportService(IDatabaseService db, ILoggerService logger, IStandardConfigService standardConfigService,
-        Services.Utilities.IBusinessTimelineService timelineService) : base(logger)
+        Services.Utilities.IBusinessTimelineService timelineService,
+        Services.Domain.UserManagement.IUserService userService) : base(logger)
     {
         _db = db;
         _standardConfigService = standardConfigService;
         _timelineService = timelineService;
+        _userService = userService;
     }
 
     // ─────────────────────────── 周期与展示辅助 ───────────────────────────
@@ -993,7 +996,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 ? ""
                 : IdCardValidator.ExtractBirthDate(item.HeadIdCard)?.ToString("yyyy-MM-dd") ?? "";
             var categoryCode = item.ClassificationResult ?? "";
-            var display = ClassificationConstants.ConvertToMajorCategoryName(categoryCode);
+            var display = StopCategoryDisplay(categoryCode);
             var enjoy = dateMap.TryGetValue(item.HeadIdCard ?? "", out var dt) ? dt : cycleEnd.ToString("yyyy-MM-dd");
             outRows.Add(new MonthlyStoppedRow
             {
@@ -1032,7 +1035,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                     : IdCardValidator.ExtractBirthDate(item.HeadIdCard)?.ToString("yyyy-MM-dd") ?? "",
                 FamilySize = item.FamilySize?.ToString() ?? "",
                 Address = JoinFullAddress(item.District, item.Town, item.Community, item.Address),
-                Category = ClassificationConstants.ConvertToMajorCategoryName(categoryCode),
+                Category = StopCategoryDisplay(categoryCode),
                 Classification = "",
                 MonthAmount = "",
                 StopReason = BuildReductionReasonText(item),
@@ -1048,6 +1051,18 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     }
 
     /// <summary>
+    /// 停保表「享受类别」显示（2026-11-17 用户口径）：低保行区分城乡输出「农村低保/城市低保」
+    /// （城乡分页后两页同显"低保"无法区分）；其余维持四大类名（低保边缘/特困/刚性支出）。
+    /// 单人保仍属低保边缘组展示，不按农村/城市低保输出。
+    /// </summary>
+    private static string StopCategoryDisplay(string code)
+    {
+        if (ClassificationConstants.IsCodeSubsistence(code) && !ClassificationConstants.IsCodeSingleRescue(code))
+            return ClassificationConstants.IsCodeRural(code) ? "农村低保" : "城市低保";
+        return ClassificationConstants.ConvertToMajorCategoryName(code);
+    }
+
+    /// <summary>
     /// 其他困难人员停止、减员汇总表：读独立停止表 nc_biz_other_difficulty_stops（B 线周期），
     /// 台账原行不删，停止表记录转出事实。停止/减员类型由写入方判定（整户转出=停止，部分成员转出=减员）。
     /// </summary>
@@ -1058,6 +1073,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
         if (cycle.IsFailure) return Result.Failure<List<MonthlyStoppedRow>>(cycle.ErrorCode!, cycle.Message!);
         var c = cycle.Value;
 
+        // 整户转出由 OtherDifficultyLedgerService 按台账 person 逐人写停止行，同户同日会写多条；
+        // 本表列是户主口径且「停止」型事由不带人名，不去重会渲染出 N 行完全相同的记录
+        // （2026-11 实测：王兴久户 2 条 2026-11-12 停止行在表内重复出现两次）。
+        // 守卫：同户同日「停止」只保留最小 id 一行（= 户主本人行）；「减员」行事由自带人名，照旧逐人列示。
+        // 写入端/台账原行不动（alreadyStopped 防重与停保撤回联动均按 person 工作）。
         var sql = @"SELECT s.person_name, s.person_id_card, s.head_name, s.head_id_card, s.family_size,
                            s.hukou_type, s.district, s.street, s.community, s.address,
                            s.old_category, s.stop_type, s.stop_date, s.stop_reason, s.target_classification,
@@ -1065,6 +1085,14 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                     FROM nc_biz_other_difficulty_stops s
                     WHERE s.stop_date >= $1::date AND s.stop_date < $2::date
                       AND ($3 = '' OR s.street = $3)
+                      AND (s.stop_type <> '停止'
+                           OR NOT EXISTS (
+                               SELECT 1 FROM nc_biz_other_difficulty_stops s2
+                                WHERE s2.stop_date = s.stop_date
+                                  AND s2.stop_type = '停止'
+                                  AND COALESCE(NULLIF(s2.head_id_card, ''), s2.person_id_card)
+                                    = COALESCE(NULLIF(s.head_id_card, ''), s.person_id_card)
+                                  AND s2.id < s.id))
                     ORDER BY s.stop_date, s.person_id_card";
         var result = await _db.QueryAsync<OtherDifficultyStopRow>(sql, ct, c.Start, c.End, town ?? "");
         if (result.IsFailure)

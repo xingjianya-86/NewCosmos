@@ -12,7 +12,8 @@ public class Archive
     public string ClassificationResult { get; set; } = string.Empty;
     public DateTime ArchivedAt { get; set; } = DateTime.UtcNow;
     public string ArchivedBy { get; set; } = string.Empty;
-    public string OutputFiles { get; set; } = string.Empty;
+    /// <summary>输出文件清单（jsonb 列）。默认空数组——空串非合法 JSON，直接插会抛 22P02</summary>
+    public string OutputFiles { get; set; } = "[]";
     public long? RelatedArchiveId { get; set; }
     public string RelationType { get; set; } = string.Empty;
     public string RelationDescription { get; set; } = string.Empty;

@@ -1,4 +1,8 @@
-﻿using NewCosmos.Models.Options;
+﻿using System.Text.Json;
+using NewCosmos.Components;
+using NewCosmos.Constants;
+using NewCosmos.Models.Options;
+using NewCosmos.Services.Core;
 using NewCosmos.ViewModels.Auth;
 
 namespace NewCosmos.Pages.Auth;
@@ -6,6 +10,11 @@ namespace NewCosmos.Pages.Auth;
 /// <summary>
 /// 登录页（暖白「技术档案」版）：只做视觉与轻动画，登录逻辑全部在 LoginViewModel。
 /// 视觉语言与启动动画同源：暖白底板、四角定位标记、等宽读数、双语状态字、环形准星。
+///
+/// 序列登录（app.ini LoginStyle=sequence，默认）：本页额外显示 <see cref="SequenceHost"/>
+/// 覆盖层，整页 WebView 播放五步验证序列（login.html），第 2 步嵌真实账号密码表单，
+/// 认证结果驱动后续步骤与终幕；任何故障（WebView 初始化失败 / 脚本回执超时 / 脚本异常 /
+/// 用户点「切换经典登录」）都只是隐藏覆盖层——经典 XAML 本来就在底下渲染，回落无闪切。
 /// </summary>
 public partial class LoginPage : ContentPage
 {
@@ -17,17 +26,37 @@ public partial class LoginPage : ContentPage
     private static readonly Color AccentColor = Color.FromArgb("#1A73E8");
     private static readonly Color HairColor = Color.FromArgb("#290A0A0A");
 
+    private static readonly JsonSerializerOptions SubmitJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly LoginViewModel _viewModel;
     private readonly string _version;
+    private readonly ISplashAssetsService _assets;
+    private readonly ILoggerService _logger;
+    private readonly bool _sequenceMode;
+
+    private AnimationWebViewView? _sequenceView;
+    private Task? _rememberSettingsTask;
+    private bool _fellBack;          // 已回落经典登录页
+    private bool _authInFlight;      // 序列认证请求在途（防并发提交）
+    private string? _lastSubmitId;   // 桥接双路（postMessage + 自定义协议）去重
+    private bool _navigated;         // 认证成功后导航幂等
+    private CancellationTokenSource? _doneWatchdogCts;
 
     private IDispatcherTimer? _clockTimer;
 
-    public LoginPage(LoginViewModel viewModel, AppOptions appOptions)
+    public LoginPage(LoginViewModel viewModel, AppOptions appOptions,
+        ISplashAssetsService assets, ILoggerService logger)
     {
         InitializeComponent();
         _viewModel = viewModel;
         BindingContext = viewModel;
         _version = string.IsNullOrWhiteSpace(appOptions.Version) ? "1.0" : appOptions.Version;
+        _assets = assets;
+        _logger = logger;
+        _sequenceMode = appOptions.IsSequenceLogin;
 
         // 输入焦点语言：左侧强调条 + 细边框点亮
         HookFieldFocus(UsernameEntry, UserAccent, UserFieldBorder);
@@ -36,6 +65,13 @@ public partial class LoginPage : ContentPage
         HookFieldFocus(PasswordEntryPhone, PassAccentPhone, PassFieldBorderPhone);
 
         UpdateClockText();
+
+        if (_sequenceMode)
+        {
+            // 序列模式：预加载记住设置（web 表单 prefill 依赖），并挂覆盖层
+            _ = EnsureRememberSettingsAsync();
+            InitSequenceHost();
+        }
     }
 
     private void HookFieldFocus(Entry entry, BoxView accent, Border border)
@@ -82,6 +118,276 @@ public partial class LoginPage : ContentPage
         border.Stroke = new SolidColorBrush(active ? AccentColor : HairColor);
     }
 
+    /* ══════════════════ 序列登录（LoginStyle=sequence）══════════════════ */
+
+    /// <summary>挂载序列登录覆盖层：透明底加载（透出下方经典版式），故障即隐藏回落</summary>
+    private void InitSequenceHost()
+    {
+        _sequenceView = new AnimationWebViewView(_assets, _logger)
+        {
+            StartUrl = _assets.LoginUrl,
+            // 加载期间透出下方经典登录页；web 底板（app.css）与本页 Plate 同源，观感连续
+            PlatformBackgroundColor = Colors.Transparent
+        };
+        _sequenceView.BridgeReceived += OnSequenceBridge;
+        _sequenceView.HostFaulted += OnSequenceFault;
+        SequenceHost.Children.Add(_sequenceView);
+        SequenceHost.IsVisible = true;
+    }
+
+    private void OnSequenceBridge(string kind, string payload)
+    {
+        if (_fellBack)
+            return;
+
+        switch (kind.ToLowerInvariant())
+        {
+            case "login-ready":
+                // 页面脚本就绪：推送记住的账号/密码到 web 表单（不进 config.js、不入日志）
+                _ = PushPrefillAsync();
+                break;
+
+            case "login-submit":
+                // 凭据只在进程内传递：本分支绝不记录 payload
+                _ = HandleSubmitAsync(payload);
+                break;
+
+            case "done":
+                _ = HandleDoneAsync();
+                break;
+
+            case "login-skip":
+                // 用户点「切换经典登录 ▸」/ Esc：隐藏覆盖层即回落（经典版式本就在下方）
+                FallBackToClassic("用户切换到经典登录");
+                break;
+
+            case "error":
+                _logger.Warn("[LoginPage] 序列登录脚本异常: " + payload);
+                if (_viewModel.LastSignInSucceeded)
+                    _ = NavigateAfterAuthAsync();   // 已认证成功：脚本异常也不拦路，直接进主页
+                else
+                    FallBackToClassic("脚本异常: " + payload);
+                break;
+
+            case "boot":
+                break; // 脚本回执看门狗由 AnimationWebViewView 自行撤销
+
+            case "audio":
+                _logger.Info("[LoginPage] 音频上下文状态: " + payload);
+                break;
+        }
+    }
+
+    /// <summary>宿主链路故障（WebView2 初始化失败 / boot 回执超时 / 加载异常）→ 回落经典页</summary>
+    private void OnSequenceFault(string reason)
+    {
+        if (_viewModel.LastSignInSucceeded)
+        {
+            // 认证已成功：故障只影响动画，直接进主页
+            _ = NavigateAfterAuthAsync();
+            return;
+        }
+
+        FallBackToClassic(reason);
+    }
+
+    /// <summary>把记住的账号/密码推给 web 表单（rememberPass=false 时密码留空）</summary>
+    private async Task PushPrefillAsync()
+    {
+        try
+        {
+            await EnsureRememberSettingsAsync();
+
+            var rememberPass = _viewModel.RememberPassword && !string.IsNullOrEmpty(_viewModel.Password);
+            var json = JsonSerializer.Serialize(new
+            {
+                user = _viewModel.Username ?? string.Empty,
+                pass = rememberPass ? _viewModel.Password : string.Empty,
+                remember = _viewModel.RememberMe,
+                rememberPass = rememberPass
+            });
+
+            if (_sequenceView != null)
+                await _sequenceView.EvalAsync(
+                    "window.__NC_BRIDGE__ && window.__NC_BRIDGE__.dispatch('prefill', " + json + ");");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn("[LoginPage] 推送登录预填失败: " + ex.Message);
+        }
+    }
+
+    /// <summary>处理 web 表单提交：写入 VM 属性 → 执行认证 → 把结果派回页面（auth-result）</summary>
+    private async Task HandleSubmitAsync(string payload)
+    {
+        if (_sequenceView == null)
+            return;
+
+        LoginSubmitPayload? submit;
+        try
+        {
+            submit = JsonSerializer.Deserialize<LoginSubmitPayload>(payload, SubmitJsonOptions);
+        }
+        catch
+        {
+            return; // 载荷损坏：静默丢弃（不记录，可能含凭据）
+        }
+
+        if (submit is null || string.IsNullOrEmpty(submit.Id))
+            return;
+
+        // 双路桥接（postMessage + 自定义协议）按提交号去重；在途认证不接受新提交
+        if (string.Equals(submit.Id, _lastSubmitId, StringComparison.Ordinal) || _authInFlight)
+            return;
+
+        _lastSubmitId = submit.Id;
+        _authInFlight = true;
+
+        try
+        {
+            _viewModel.DeferNavigation = true;
+            _viewModel.Username = submit.User ?? string.Empty;
+            _viewModel.Password = submit.Pass ?? string.Empty;
+            _viewModel.RememberMe = submit.Remember ?? true;
+            _viewModel.RememberPassword = submit.RememberPass ?? false;
+
+            await _viewModel.LoginCommand.ExecuteAsync(null);
+
+            var ok = _viewModel.LastSignInSucceeded;
+            var json = JsonSerializer.Serialize(new
+            {
+                id = submit.Id,
+                ok,
+                msg = ok ? string.Empty : _viewModel.ErrorMessage
+            });
+
+            if (_sequenceView != null)
+                await _sequenceView.EvalAsync(
+                    "window.__NC_BRIDGE__ && window.__NC_BRIDGE__.dispatch('auth-result', " + json + ");");
+
+            if (ok)
+            {
+                if (_fellBack)
+                {
+                    // 认证在途时已回落经典页：动画已无关，认证成功直接进主页
+                    _ = NavigateAfterAuthAsync();
+                }
+                else
+                {
+                    StartDoneWatchdog();
+                }
+            }
+        }
+        finally
+        {
+            _authInFlight = false;
+        }
+    }
+
+    /// <summary>动画终幕完成（done）→ 认证成功才进主页；否则防御性回落</summary>
+    private async Task HandleDoneAsync()
+    {
+        if (_navigated)
+            return;
+
+        if (_viewModel.LastSignInSucceeded)
+            await NavigateAfterAuthAsync();
+        else
+            FallBackToClassic("终幕到达但认证未成功");
+    }
+
+    /// <summary>认证成功后进主页（done 回执 / 终幕看门狗 / 故障时已认证，三处共用，幂等）</summary>
+    private async Task NavigateAfterAuthAsync()
+    {
+        if (_navigated)
+            return;
+
+        _navigated = true;
+        CancelDoneWatchdog();
+
+        try
+        {
+            _viewModel.DeferNavigation = false;
+            await _viewModel.CompleteNavigationAsync();
+            _logger.Info("[LoginPage] 序列登录认证成功，已进入主页");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[LoginPage] 序列登录导航失败");
+            _navigated = false;
+            FallBackToClassic("导航失败: " + ex.Message);
+        }
+    }
+
+    /// <summary>认证成功后等终幕的兜底：到点不再等动画，直接进主页</summary>
+    private void StartDoneWatchdog()
+    {
+        CancelDoneWatchdog();
+        _doneWatchdogCts = new CancellationTokenSource();
+        var token = _doneWatchdogCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(SplashConstants.LoginDoneTimeoutSeconds), token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            _logger.Warn("[LoginPage] 认证成功后终幕未在兜底时长内完成，直接进主页");
+            await MainThread.InvokeOnMainThreadAsync(() => NavigateAfterAuthAsync());
+        }, token);
+    }
+
+    private void CancelDoneWatchdog()
+    {
+        try
+        {
+            _doneWatchdogCts?.Cancel();
+        }
+        catch
+        {
+            // 已释放/已取消均无关紧要
+        }
+
+        _doneWatchdogCts?.Dispose();
+        _doneWatchdogCts = null;
+    }
+
+    /// <summary>
+    /// 回落经典登录页：隐藏覆盖层（经典 XAML 本就在底下渲染，无闪切）。
+    /// 关键复位：DeferNavigation=false，否则经典表单登录会卡住不导航。
+    /// </summary>
+    private void FallBackToClassic(string reason)
+    {
+        if (_fellBack)
+            return;
+
+        _fellBack = true;
+        _logger.Warn("[LoginPage] 序列登录回落经典登录页: " + reason);
+        CancelDoneWatchdog();
+        _viewModel.DeferNavigation = false;
+
+        if (_sequenceView != null)
+        {
+            _sequenceView.BridgeReceived -= OnSequenceBridge;
+            _sequenceView.HostFaulted -= OnSequenceFault;
+            SequenceHost.Children.Remove(_sequenceView);
+            _sequenceView = null;
+        }
+
+        SequenceHost.IsVisible = false;
+    }
+
+    /// <summary>记住设置只加载一次（序列 prefill 与经典 OnAppearing 共用；页面瞬时重建，无跨会话陈旧问题）</summary>
+    private Task EnsureRememberSettingsAsync() =>
+        _rememberSettingsTask ??= _viewModel.LoadRememberSettingsCommand.ExecuteAsync(null);
+
+    /* ════════════════════════ 生命周期与动效 ═══════════════════════ */
+
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
@@ -89,6 +395,7 @@ public partial class LoginPage : ContentPage
 
         _clockTimer?.Stop();
         _clockTimer = null;
+        CancelDoneWatchdog();
         this.AbortAnimation(ReticleSpinName);
         this.AbortAnimation(InnerRingSpinName);
         this.AbortAnimation(ScanlineName);
@@ -106,8 +413,8 @@ public partial class LoginPage : ContentPage
         PlayEntrance();
         StartAmbientAnimation();
 
-        // 在页面加载时初始化记住设置
-        await _viewModel.LoadRememberSettingsCommand.ExecuteAsync(null);
+        // 在页面加载时初始化记住设置（序列模式下构造时已预热，此处幂等）
+        await EnsureRememberSettingsAsync();
 
         // 登录窗前静默检查更新（强制更新在 VM 内拦截；失败/断网仅记日志不阻断登录）
         _ = _viewModel.CheckForUpdatesOnStartupAsync();
@@ -197,5 +504,15 @@ public partial class LoginPage : ContentPage
         var text = $"REV {_version} · {mode} {DateTime.Now:HH:mm:ss}";
         ClockLabel.Text = text;
         ClockLabelPhone.Text = text;
+    }
+
+    /// <summary>web → host 登录提交载荷（login.js 发送；字段名小写，忽略大小写反序列化）</summary>
+    private sealed class LoginSubmitPayload
+    {
+        public string? Id { get; set; }
+        public string? User { get; set; }
+        public string? Pass { get; set; }
+        public bool? Remember { get; set; }
+        public bool? RememberPass { get; set; }
     }
 }
