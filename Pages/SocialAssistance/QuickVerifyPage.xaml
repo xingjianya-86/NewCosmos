@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.SocialAssistance.QuickVerifyPage"
+             x:DataType="QuickVerifyViewModel"
+             Title="快速核验 · 模拟测算"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <!-- 单屏合并版：输入卡 → 收入核算（置顶结果）→ 台账核验 10 组；一个「开始核算」按钮 -->
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- 统一页头（纸墨档案风报头 · Phase 6） -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE721;', Android='&#x1F50D;'}"
+                                   Title="快速核验 · 模拟测算"
+                                   Subtitle="核算家庭收入并判断标准 · 按身份证核验系统内台账（全程只读）"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台"/>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20,16" Spacing="14">
+
+                <!-- ═══════════ 输入卡 ═══════════ -->
+                <Border Style="{StaticResource CardBorder}" Padding="16">
+                    <VerticalStackLayout Spacing="10">
+
+                        <Label Text="👤 被核算人" FontSize="17" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+
+                        <!-- 姓名 / 身份证号（单行两列，无 Grid.Row） -->
+                        <Grid ColumnDefinitions="*,2*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="姓名" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding SimName}" Placeholder="申请人姓名"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="身份证号" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding SimIdCard}" MaxLength="18" Placeholder="18 位身份证号"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- 户口性质 / 家庭人口 / 子女数量（单行三列，无 Grid.Row） -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="户口性质" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Picker ItemsSource="{Binding HukouTypeOptions}"
+                                        SelectedItem="{Binding SelectedHukouType}"
+                                        ItemDisplayBinding="{Binding Display}"
+                                        Style="{StaticResource FormFieldPickerStyle}"
+                                        Title=""/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="家庭人口（不含户主）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding SimFamilySizeText}" Keyboard="Numeric" Placeholder="如 2"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                <Label Text="子女数量" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding SimChildrenText}" Keyboard="Numeric" Placeholder="如 3"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Label Text="🧮 收入（三个有数据来源的项）" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+
+                        <!-- 子女赡养费：留空 = 低保标准 × 20%（核算时自动回显） -->
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="每子女月赡养费（留空＝低保标准×20%，核算后自动回显）" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}"/>
+                            <!-- 不用 Numeric 键盘：可为小数，部分安卓数字键盘无小数点 -->
+                            <Entry Text="{Binding SimPerChildFeeText}" Placeholder="0"
+                                   Style="{StaticResource FormFieldEntryStyle}"/>
+                        </VerticalStackLayout>
+
+                        <!-- 土地三用途 -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="自种面积（亩）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding LandSelfAreaText}" Keyboard="Numeric" Placeholder="0"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="转包面积（亩）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding LandSubleaseAreaText}" Keyboard="Numeric" Placeholder="0"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="4">
+                                <Label Text="承包面积（亩）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding LandContractAreaText}" Keyboard="Numeric" Placeholder="0"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Label FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center">
+                                <Label.FormattedText><FormattedString>
+                                    <Span Text="单价：自种 "/><Span Text="{Binding SelfFarmUnitPrice, StringFormat='{0:0}'}" FontAttributes="Bold"/>
+                                    <Span Text=" ｜ 转包 "/><Span Text="{Binding SubleaseUnitPrice, StringFormat='{0:0}'}" FontAttributes="Bold"/>
+                                    <Span Text=" ｜ 承包 "/><Span Text="{Binding ContractUnitPrice, StringFormat='{0:0}'}" FontAttributes="Bold"/>
+                                    <Span Text=" 元/亩"/>
+                                </FormattedString></Label.FormattedText>
+                            </Label>
+                            <Button Grid.Column="1" Text="从核验带入" Style="{StaticResource ButtonSmall}"
+                                    IsEnabled="{Binding CanImportFromVerify}"
+                                    Command="{Binding ImportLandFromVerifyCommand}"/>
+                        </Grid>
+
+                        <!-- 全自种 / 全转包 / 全承包（与申请表 Step3 同一交互） -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                            <Button Text="全自种" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding BatchSetLandCommand}" CommandParameter="self"/>
+                            <Button Grid.Column="1" Text="全转包" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding BatchSetLandCommand}" CommandParameter="sublease"/>
+                            <Button Grid.Column="2" Text="全承包" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding BatchSetLandCommand}" CommandParameter="contract"/>
+                        </Grid>
+                        <Label IsVisible="{Binding HasLandImportHint}" Text="{Binding LandImportHint}"
+                               FontSize="12" TextColor="{StaticResource WarningDark}" LineBreakMode="WordWrap"/>
+
+                        <!-- 种植补贴 -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="种植补贴年值（元）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Entry Text="{Binding SubsidyAnnualText}" Keyboard="Numeric" Placeholder="0"
+                                       Style="{StaticResource FormFieldEntryStyle}"/>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="从核验带入" Style="{StaticResource ButtonSmall}"
+                                    VerticalOptions="End"
+                                    IsEnabled="{Binding CanImportFromVerify}"
+                                    Command="{Binding ImportSubsidyFromVerifyCommand}"/>
+                        </Grid>
+                        <Label IsVisible="{Binding HasSubsidyImportHint}" Text="{Binding SubsidyImportHint}"
+                               FontSize="12" TextColor="{StaticResource WarningDark}" LineBreakMode="WordWrap"/>
+
+                        <Label IsVisible="{Binding ShowIncomeHint}"
+                               Text="填好后点「开始核算」：一次算出年家庭总收入与收入区间，并同步核验系统内台账（全程只读、不写入任何数据）。"
+                               FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                            <Button Text="清空" Style="{StaticResource ButtonOutline}" HeightRequest="40"
+                                    Command="{Binding ClearAllCommand}"/>
+                            <Button Grid.Column="1" Text="📋 导出报告" Style="{StaticResource ButtonOutline}"
+                                    HeightRequest="40" Padding="16,0"
+                                    IsEnabled="{Binding CanExportReport}"
+                                    Command="{Binding ExportReportCommand}"/>
+                            <Button Grid.Column="2" Text="开始核算" Style="{StaticResource ButtonPrimary}"
+                                    HeightRequest="40" FontSize="17" Padding="32,0"
+                                    Command="{Binding RunAllCommand}"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- ═══════════ 收入核算结果（置顶结果） ═══════════ -->
+                <Border IsVisible="{Binding HasIncomeResult}" Style="{StaticResource CardBorder}" Padding="16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="💰 收入核算（年值权威口径）" FontSize="16" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding IncomeLines}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="SimLineView">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Padding="2,2">
+                                        <Label Text="{Binding Label}" FontSize="14"
+                                               TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                        <Label Grid.Column="1" Text="{Binding Value}" FontSize="14"
+                                               TextColor="{StaticResource TextPrimary}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="年家庭总收入" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding AnnualIncomeText}" FontSize="16" FontAttributes="Bold"
+                                       TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="年人均" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding PerCapitaAnnualText}" FontSize="16" FontAttributes="Bold"
+                                       TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                <Label Text="月人均" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding PerCapitaMonthlyText}" FontSize="16" FontAttributes="Bold"
+                                       TextColor="{StaticResource Primary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="户口性质" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding IncomeHukouText}" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                <Label Text="低保标准（月）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding StandardText}" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                <Label Text="边缘标准上限（×1.5）" FontSize="12" TextColor="{StaticResource TextTertiary}"/>
+                                <Label Text="{Binding EdgeText}" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <!-- 区间结论色块：绿=低保 / 橙=边缘 / 红=超标 -->
+                        <Border Padding="12" StrokeThickness="0" BackgroundColor="{StaticResource SuccessSoft}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding ZoneKind}" Value="Edge">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource WarningSoft}"/>
+                                </DataTrigger>
+                                <DataTrigger TargetType="Border" Binding="{Binding ZoneKind}" Value="Over">
+                                    <Setter Property="BackgroundColor" Value="{StaticResource DangerSoft}"/>
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Label Text="{Binding ZoneText}" FontSize="15" FontAttributes="Bold">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding ZoneKind}" Value="Edge">
+                                        <Setter Property="TextColor" Value="{StaticResource WarningDark}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding ZoneKind}" Value="Over">
+                                        <Setter Property="TextColor" Value="{StaticResource Error}"/>
+                                    </DataTrigger>
+                                    <DataTrigger TargetType="Label" Binding="{Binding ZoneKind}" Value="Low">
+                                        <Setter Property="TextColor" Value="{StaticResource SecondaryDark}"/>
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- ═══════════ 台账核验（10 组只读，零命中分组隐藏） ═══════════ -->
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="📋 台账核验（只读）" FontSize="16" FontAttributes="Bold"
+                           TextColor="{StaticResource TextPrimary}"/>
+                    <Label IsVisible="{Binding HasVerifyResult}" Text="{Binding VerifySummary}"
+                           FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"/>
+                    <Label IsVisible="{Binding ShowVerifyHint}"
+                           Text="尚未核验：点上方「开始核算」，或直接点「从核验带入」（会自动先核验再带入，输入身份证即可点）。"
+                           FontSize="13" TextColor="{StaticResource TextTertiary}" LineBreakMode="WordWrap"/>
+                    <Label IsVisible="{Binding HasVerifyEmpty}"
+                           Text="系统内未查到该身份证的任何台账记录。"
+                           FontSize="14" TextColor="{StaticResource TextTertiary}"/>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding VerifyGroups}" Spacing="12">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="QuickVerifyGroupView">
+                                <Border Style="{StaticResource CardBorder}" Padding="14">
+                                    <VerticalStackLayout Spacing="8">
+                                        <!-- 组标题 + 计数 -->
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold"
+                                                   TextColor="{StaticResource TextPrimary}"/>
+                                            <Label Grid.Column="1" Text="{Binding CountText}" FontSize="13"
+                                                   TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                                        </Grid>
+
+                                        <!-- 匹配方式提示（同名风险） -->
+                                        <Label IsVisible="{Binding ShowMatchNote}" Text="{Binding MatchNote}"
+                                               FontSize="12" TextColor="{StaticResource WarningDark}"/>
+
+                                        <!-- 失败（显式暴露，不冒充无数据；零命中分组已整体隐藏） -->
+                                        <Label IsVisible="{Binding IsFailure}" Text="{Binding FailureText}"
+                                               FontSize="14" TextColor="{StaticResource Error}" LineBreakMode="WordWrap"/>
+
+                                        <!-- 明细行 -->
+                                        <VerticalStackLayout IsVisible="{Binding HasItems}" Spacing="6"
+                                                             BindableLayout.ItemsSource="{Binding Items}">
+                                            <BindableLayout.ItemTemplate>
+                                                <DataTemplate x:DataType="QuickVerifyItemView">
+                                                    <Grid Padding="10,7" ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                                                          BackgroundColor="{StaticResource Gray50}">
+                                                        <VerticalStackLayout Spacing="2">
+                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                                                <Label Text="{Binding Title}" FontSize="14"
+                                                                       FontAttributes="Bold"
+                                                                       TextColor="{StaticResource TextPrimary}"
+                                                                       LineBreakMode="TailTruncation"/>
+                                                                <Label Grid.Column="1"
+                                                                       IsVisible="{Binding HasBadge}"
+                                                                       Text="{Binding Badge}" FontSize="11"
+                                                                       TextColor="White"
+                                                                       BackgroundColor="{StaticResource Warning}"
+                                                                       Padding="6,1" VerticalOptions="Center"/>
+                                                            </Grid>
+                                                            <Label IsVisible="{Binding HasDetail}"
+                                                                   Text="{Binding Detail}" FontSize="12"
+                                                                   TextColor="{StaticResource TextSecondary}"
+                                                                   LineBreakMode="WordWrap"/>
+                                                        </VerticalStackLayout>
+                                                        <Label Grid.Column="1"
+                                                               IsVisible="{Binding HasValue}"
+                                                               Text="{Binding Value}" FontSize="14"
+                                                               TextColor="{StaticResource PrimaryDark}"
+                                                               VerticalOptions="Center"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </BindableLayout.ItemTemplate>
+                                        </VerticalStackLayout>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- 加载遮罩 -->
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="2"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

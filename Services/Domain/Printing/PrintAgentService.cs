@@ -210,6 +210,9 @@ public class PrintAgentService : IPrintAgentService
                 job.PrinterName,
                 job.IsDuplex,
                 job.Copies,
+                job.ApplicantName,
+                job.ApplicantIdCard,
+                job.PhotoCategoryName,
                 ct);
 
             if (result.IsSuccess)
@@ -218,7 +221,7 @@ public class PrintAgentService : IPrintAgentService
                     ("JobNo", job.JobNo),
                     ("Category", job.PhotoCategory ?? ""),
                     ("Layout", job.PhotoLayout ?? ""),
-                    ("Applicant", job.ApplicantName ?? ""));
+                    ("Applicant", DataMasker.MaskName(job.ApplicantName ?? "")));
                 await _queueService.CompleteAsync(job.Id, ct);
             }
             else

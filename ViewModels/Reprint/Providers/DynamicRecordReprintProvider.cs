@@ -1,6 +1,6 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
-using NewCosmos.Models.Options;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.Services.Domain.ChangeManagement;
@@ -19,20 +19,17 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
     private readonly IDynamicManagementRecordService _recordService;
     private readonly IApplicationService _applicationService;
     private readonly IPrintRecordService _printRecordService;
-    private readonly StorageOptions _storageOptions;
     private readonly ILoggerService _logger;
 
     public DynamicRecordReprintProvider(
         IDynamicManagementRecordService recordService,
         IApplicationService applicationService,
         IPrintRecordService printRecordService,
-        StorageOptions storageOptions,
         ILoggerService logger)
     {
         _recordService = recordService;
         _applicationService = applicationService;
         _printRecordService = printRecordService;
-        _storageOptions = storageOptions;
         _logger = logger;
     }
 
@@ -151,8 +148,9 @@ public class DynamicRecordReprintProvider : IReprintDomainProvider, IDynamicReco
             // 优先用留痕存的 PDF 字节（不依赖输出文件是否仍存在）
             if (row.PdfData is { Length: > 0 })
             {
-                var tempDir = _storageOptions.GetTempPath("ReprintPreview");
-                Directory.CreateDirectory(tempDir);
+                // 预览临时件统一落 {输出根}/temp（由启动清理按 yaml cleanup 回收）；
+                // 原 %TEMP%\...\ReprintPreview 无人清理
+                var tempDir = OutputPathHelper.GetTempDirectory();
                 var tempPath = Path.Combine(tempDir, $"dmr_reprint_{printRecordId}_{DateTime.Now:yyyyMMddHHmmssfff}.pdf");
                 await File.WriteAllBytesAsync(tempPath, row.PdfData, ct);
                 _logger.LogBusiness("动态管理档案原样补打", ("PrintRecordId", printRecordId), ("Source", "pdf_data"));

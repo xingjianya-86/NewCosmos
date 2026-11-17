@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="NewCosmos.Pages.SocialAssistance.SpecialApprovalFormPage"
              x:DataType="SpecialApprovalFormViewModel"
+             NavigationPage.HasNavigationBar="False"
              Title="一事一议申报表" BackgroundColor="{StaticResource Background}">
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
         <!-- 统一页头（纸墨档案风报头 · Phase 6 页头架构统一，替代旧渐变英雄头） -->
@@ -21,19 +22,19 @@
                     <VerticalStackLayout Spacing="10">
                         <Label Text="👤 申请人信息" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowSpacing="8">
-                            <Label Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding ApplicantName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold"/>
-                            <Label Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
-                            <Label Text="联系电话" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding ApplicantPhone}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
-                            <Label Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding FamilySizeText}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
-                            <Label Text="家庭住址" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding FamilyAddress}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
-                            <Label Text="申请类别" Style="{StaticResource FormFieldLabelStyle}"/>
-                            <Label Grid.Column="1" Text="{Binding ClassificationName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <Label Grid.Row="0" Text="姓名" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding ApplicantName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" FontAttributes="Bold"/>
+                            <Label Grid.Row="1" Text="身份证号" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding ApplicantIdCard}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                            <Label Grid.Row="2" Text="联系电话" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding ApplicantPhone}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                            <Label Grid.Row="3" Text="家庭人口" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding FamilySizeText}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                            <Label Grid.Row="4" Text="家庭住址" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="4" Grid.Column="1" Text="{Binding FamilyAddress}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                            <Label Grid.Row="5" Text="申请类别" Style="{StaticResource FormFieldLabelStyle}"/>
+                            <Label Grid.Row="5" Grid.Column="1" Text="{Binding ClassificationName}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                         </Grid>
                     </VerticalStackLayout>
                 </Border>
@@ -41,7 +42,12 @@
                 <!-- 申报内容 -->
                 <Border Style="{StaticResource CardBorder}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Text="📋 申报内容" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <!-- 状态常驻外显：已审议后「会议审议」卡整块隐藏，此处是页面唯一的状态提示 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="📋 申报内容" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                            <Label Grid.Column="1" Text="{Binding StatusText}" FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" FontAttributes="Bold"
+                                   TextColor="{StaticResource Warning}"/>
+                        </Grid>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
                         <Label Text="申请救助家庭基本情况" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -92,28 +98,18 @@
                         </Grid>
                         <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
 
+                        <!-- 会议地点/议题/纪要三栏已移除（2026-11-17）：地点由模板承载，议题/纪要无读取方 -->
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="会议日期" Style="{StaticResource FormFieldLabelStyle}"/>
                                 <DatePicker Date="{Binding MeetingDate}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
-                                <Label Text="会议地点" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding MeetingLocation}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
-                            </VerticalStackLayout>
-                        </Grid>
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
-                            <VerticalStackLayout Spacing="4">
-                                <Label Text="会议议题" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding MeetingTopic}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
-                            </VerticalStackLayout>
-                            <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="参会人员" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <Entry Text="{Binding MeetingMembers}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
+                                <!-- 多行名单（默认值来自出席历史，每行一人）：Entry 单行控件只显示首行，必须用 Editor -->
+                                <Editor Text="{Binding MeetingMembers}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="80"/>
                             </VerticalStackLayout>
                         </Grid>
-                        <Label Text="会议纪要" Style="{StaticResource FormFieldLabelStyle}"/>
-                        <Editor Text="{Binding MeetingSummary}" HeightRequest="100" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}"/>
 
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" RowSpacing="8">
                             <VerticalStackLayout Spacing="4">
@@ -152,10 +148,11 @@
 
         <Grid Grid.Row="2" BackgroundColor="{StaticResource White}" Padding="20,12"
               ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
-            <Button Grid.Column="1" Text="保存草稿" Style="{StaticResource ButtonOutline}" Command="{Binding SaveDraftCommand}"/>
+            <Button Grid.Column="1" Text="保存草稿" Style="{StaticResource ButtonOutline}" Command="{Binding SaveDraftCommand}"
+                    IsVisible="{Binding IsEditable}"/>
             <Button Grid.Column="2" Text="提交申报" Style="{StaticResource ButtonPrimary}"
                     Command="{Binding SubmitCommand}"
-                    IsVisible="{Binding IsSubmitted, Converter={StaticResource BoolToInverseConverter}}"/>
+                    IsVisible="{Binding CanSubmitForm}"/>
             <Button Grid.Column="3" Text="生成申报表文档" Style="{StaticResource ButtonSecondary}"
                     Command="{Binding GenerateDocumentCommand}"/>
         </Grid>

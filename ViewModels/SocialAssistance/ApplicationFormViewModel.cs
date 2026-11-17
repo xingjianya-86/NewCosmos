@@ -88,6 +88,13 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     private string? _loadedClassification;
 
     /// <summary>
+    /// 是否一事一议档案（审议通过后分类由审议指定）——Step5 分类判定据此加锁，
+    /// 防算法重判冲掉审议结果（2026-11-17 实测：审议写入的 RuralSubsistence 被重判冲回 IneligibleWithLabor，
+    /// 且 is_eligible=FALSE 会让完成归档误判 Stopped）。
+    /// </summary>
+    private bool _isSpecialApproval;
+
+    /// <summary>
     /// 加载时数据库中的保障金合计（户月 + 分类施保 + 照料费，覆写前真旧值）。同上。
     /// </summary>
     private decimal? _loadedTotalGuaranteeAmount;
@@ -926,6 +933,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsClassificationLocked))]
     [NotifyPropertyChangedFor(nameof(SubmitDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(CanResetClassification))]
     private bool _isClassificationDone;
 
     /// <summary>
@@ -934,6 +942,9 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// </summary>
     public string SubmitDisabledReason =>
         IsSubmitVisible && !IsClassificationDone ? "请先完成「分类判定」，之后才能提交" : string.Empty;
+
+    /// <summary>「重新判定」按钮可见 = 已判定且非一事一议档案（审议分类禁止重置清空）</summary>
+    public bool CanResetClassification => IsClassificationDone && !_isSpecialApproval;
 
     [ObservableProperty]
     private string _determinationBasis = string.Empty;

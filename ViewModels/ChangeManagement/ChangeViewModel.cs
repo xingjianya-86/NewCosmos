@@ -1178,6 +1178,80 @@ public partial class ChangeViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 拒绝配合核验工作：核验失败直接停止保障（只停不建新档，分类与保障金不动）。
+    /// 与其余 6 个入口同门（选定档案 → PrepareForChange → 有效 ID → 状态门），叠加 CHANGE_MANAGE 权限门，
+    /// 二次确认后调服务；停保后本卡片隐藏、切换为「恢复保障」，可无损逆向恢复。
+    /// </summary>
+    [RelayCommand]
+    private async Task RefuseVerifyStopAsync()
+    {
+        if (!await EnsureApplicationSelectedAsync()) return;
+        if (!await PrepareForChangeAsync()) return;
+        if (!await EnsureValidApplicationIdAsync()) return;
+        if (!await EnsureChangeableStatusAsync()) return;
+
+        if (await NeedsCompletionAsync())
+        {
+            _logger.LogBusiness("导航到数据补全（拒绝配合核验工作前置）", ("ApplicationId", ApplicationId));
+            await NavigateToPageAsync<Pages.SocialAssistance.ApplicationFormPage, FormPageParameter>(
+                new FormPageParameter(FormOperationMode.Completion, ApplicationId));
+            return;
+        }
+
+        // 权限门（与死亡待办"去办理"同款）：办理档案变更需 CHANGE_MANAGE
+        var userId = App.CurrentUserId ?? 0;
+        var canManage = userId > 0 &&
+            await _permissionService.HasPermissionAsync(userId, PermissionCodes.CHANGE_MANAGE, CancellationToken);
+        if (!canManage)
+        {
+            await ShowTipAsync("无权限办理档案变更，请联系管理员分配「办理信息变更」权限。");
+            return;
+        }
+
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+        var confirm = await dialog.DisplayAlertAsync(
+            "拒绝配合核验工作",
+            $"确定以「拒绝配合核验工作」为由停止 {ApplicantName} 的保障？\n停止后档案转为已停保，可通过「恢复保障」恢复。",
+            "停止保障", "取消");
+        if (!confirm) return;
+
+        try
+        {
+            IsBusy = true;
+
+            var operatorName = string.IsNullOrEmpty(App.CurrentUserName) ? "System" : App.CurrentUserName;
+            var result = await _changeService.ExecuteVerifyStopAsync(new VerifyStopContext
+            {
+                ApplicationId = ApplicationId,
+                StopDate = DateTime.Today,
+                OperatorName = operatorName
+            }, CancellationToken);
+            if (result.IsFailure)
+            {
+                await ShowTipAsync(result.Message ?? "停止保障失败");
+                return;
+            }
+
+            _logger.LogBusiness("拒绝配合核验工作-停止保障",
+                ("ApplicationId", ApplicationId), ("Operator", operatorName), ("ChangeId", result.Value?.ChangeId ?? 0));
+
+            // 刷新档案信息：状态徽标变「已停保」、IsApplicationStopped=true → 本卡片隐藏、恢复保障卡片出现，
+            // 变更历史同步出现"核验停止"记录
+            await LoadApplicationInfoAsync(ApplicationId);
+            await ShowTipAsync("已停止保障（拒绝配合核验工作）。可在「恢复保障」中恢复。");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"拒绝配合核验工作停止保障失败: {ex.Message}");
+            await ShowTipAsync("停止保障失败，请查看日志");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     #endregion
 
 }

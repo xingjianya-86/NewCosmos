@@ -20,7 +20,7 @@
                     <Button Grid.Column="1" Text="重新判定" Style="{StaticResource ButtonOutline}"
                             HeightRequest="40" Padding="16,0"
                             Command="{Binding ResetClassificationCommand}"
-                            IsVisible="{Binding IsClassificationDone}"
+                            IsVisible="{Binding CanResetClassification}"
                             IsEnabled="{Binding IsClassificationLocked, Converter={StaticResource BoolToInverseConverter}}"/>
                     <Button Grid.Column="2" Text="执行判定" Style="{StaticResource ButtonPrimary}"
                             HeightRequest="40" Padding="20,0"

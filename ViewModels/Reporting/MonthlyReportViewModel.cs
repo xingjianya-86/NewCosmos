@@ -387,7 +387,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             }
             if (dataResult.Value.Count == 0)
             {
-                await _dialogService.DisplayAlertAsync("提示", "勾选的表单本周期均无数据，未生成预览", "确定");
+                await _dialogService.DisplayAlertAsync("提示", EmptyPreviewMessage(keys), "确定");
                 return;
             }
 
@@ -405,7 +405,7 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             }
             if (result.Value.Length == 0)
             {
-                await _dialogService.DisplayAlertAsync("提示", "勾选的表单本周期均无数据，未生成预览", "确定");
+                await _dialogService.DisplayAlertAsync("提示", EmptyPreviewMessage(keys), "确定");
                 return;
             }
 
@@ -421,6 +421,15 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
 #endif
         }, "正在生成预览...");
     }
+
+    /// <summary>
+    /// 预览结果为空时的提示文案：单独勾选「会议记录（一事一议）」且本期无人员 → 给出明确原因；
+    /// 其余组合沿用通用"均无数据"话术（批量跳过语义见 PrintService 跳过约定）。
+    /// </summary>
+    private static string EmptyPreviewMessage(List<string> keys)
+        => keys.Count == 1 && keys[0] == "会议记录_一事一议"
+            ? "本期无一事一议新增人员，不生成一事一议会议记录"
+            : "勾选的表单本周期均无数据，未生成预览";
 
     /// <summary>
     /// 批量打印勾选的表单（默认打印机，可设置份数）
@@ -470,10 +479,10 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                 var result = await _printService.PrintMonthlyFormAsync(SelectedYear, SelectedMonth, key, town, printer, copies, ct);
                 if (result.IsFailure)
                 {
-                    // 无数据表单跳过不打印
+                    // 无数据表单跳过不打印（一事一议无人员也走此通道，跳过条目带原因入结果提示）
                     if (result.ErrorCode == "NOT_FOUND" && result.Message?.Contains("无数据") == true)
                     {
-                        skipped.Add(key);
+                        skipped.Add(result.Message.Contains("一事一议") ? $"{key}（本期无一事一议人员）" : key);
                         continue;
                     }
                     await ShowErrorAsync($"打印失败（{key}）：{result.Message}");
@@ -524,8 +533,8 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         }
 
         // 输出固定到 config\document_output.yaml 的 output.base_directory（不再弹目录选择）
-        var folder = Path.Combine(OutputPathHelper.OutputRoot, "月报表", $"{SelectedYear:D4}{SelectedMonth:D2}");
-        Directory.CreateDirectory(folder);
+        var folder = OutputPathHelper.GetPeriodDirectory(
+            OutputCategories.MonthlyReport, $"{SelectedYear:D4}{SelectedMonth:D2}");
 
         var savedFiles = new List<string>();
         var skipped = new List<string>();
@@ -538,9 +547,10 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
                 var sourceResult = await _printService.RenderMonthlyFormToSourceAsync(SelectedYear, SelectedMonth, key, town, ct);
                 if (sourceResult.IsFailure)
                 {
+                    // 无数据跳过（一事一议无人员同通道，条目带原因）；同一迭代 continue 会连带跳过 PDF 生成
                     if (sourceResult.ErrorCode == "NOT_FOUND" && sourceResult.Message?.Contains("无数据") == true)
                     {
-                        skipped.Add(key);
+                        skipped.Add(sourceResult.Message.Contains("一事一议") ? $"{key}（本期无一事一议人员）" : key);
                         continue;
                     }
                     await ShowErrorAsync($"保存失败（{key}）：{sourceResult.Message}");
@@ -649,10 +659,20 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             HasAttendanceHistory = false;
         }
 
-        PopupAttendees = latest?.Attendees ?? string.Empty;
-        PopupAbsentees = latest?.Absentees ?? string.Empty;
+        PopupAttendees = NormalizeLineBreaks(latest?.Attendees);
+        PopupAbsentees = NormalizeLineBreaks(latest?.Absentees);
         IsAttendancePopupVisible = true;
     }
+
+    /// <summary>
+    /// 换行归一化（存取两端统一）：WinUI Editor 写入的是裸 \r，历史值同样为裸 \r——
+    /// 统一为 \n 保证弹窗逐行显示、落库值标准化（读取端 SplitLines 对 \r/\n 均兼容）。
+    /// </summary>
+    private static string NormalizeLineBreaks(string? text)
+        => (text ?? string.Empty)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal)
+            .Trim();
 
     /// <summary>
     /// 弹窗确认：保存本期会议记录与出席/缺席历史，然后继续原操作
@@ -661,8 +681,9 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
     private async Task ConfirmAttendanceAsync()
     {
         var town = SelectedTown == "全部" ? "" : SelectedTown;
-        Attendees = PopupAttendees?.Trim() ?? string.Empty;
-        Absentees = PopupAbsentees?.Trim() ?? string.Empty;
+        // 归一化后落库（原始 .Trim 已并入 NormalizeLineBreaks）：新历史值统一为 \n
+        Attendees = NormalizeLineBreaks(PopupAttendees);
+        Absentees = NormalizeLineBreaks(PopupAbsentees);
 
         var meeting = new MonthlyMeeting
         {

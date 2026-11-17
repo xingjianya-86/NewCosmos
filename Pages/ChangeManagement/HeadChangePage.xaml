@@ -4,6 +4,7 @@
              xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
              x:Class="NewCosmos.Pages.ChangeManagement.HeadChangePage"
              x:DataType="HeadChangeViewModel"
+             NavigationPage.HasNavigationBar="False"
              Title="户主变更"
              BackgroundColor="{StaticResource Background}">
 

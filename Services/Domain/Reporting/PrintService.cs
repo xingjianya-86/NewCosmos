@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -302,7 +303,7 @@ public partial class PrintService : BaseService, IPrintService
         var extension = baseForm is "会议记录" or "会议记录_一事一议" ? ".docx" : ".xlsx";
         foreach (var page in pagesResult.Value)
         {
-            var tempPath = Path.Combine(Path.GetTempPath(), $"nc_monthly_{Guid.NewGuid():N}{extension}");
+            var tempPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"nc_monthly_{Guid.NewGuid():N}{extension}");
             try
             {
                 using var engine = await _engineFactory.CreateFromTemplateIdAsync(templateId, ct);
@@ -425,7 +426,8 @@ public partial class PrintService : BaseService, IPrintService
             case "新增救助明细":
             case "停保汇总表":
             {
-                // 标题分类名不显示农村/城市前缀（城乡分页仅用 titleSuffix 区分，标题文字统一）
+                // 标题分类名不显示农村/城市前缀（城乡分页仅用 titleSuffix 区分，标题文字统一）——
+                // 例外：停保汇总表（最低生活保障）标题按城乡页区分（2026-11-17 用户口径）
                 var catTag = string.IsNullOrWhiteSpace(category) ? "" : category;
                 var areaTag = string.IsNullOrEmpty(catTag) ? "" : $"（{catTag}）";
                 // 最低生活保障边缘家庭：停止、减员汇总表（固定标题，含县名与"停止、减员"）
@@ -434,16 +436,20 @@ public partial class PrintService : BaseService, IPrintService
                 // 其他困难人员：停止、减员汇总表（复用边缘家庭版式，数据源为独立停止表）
                 var isOtherDifficultyStopForm = baseForm == "停保汇总表"
                     && string.Equals(category, "其他困难人员", StringComparison.Ordinal);
+                var isSubsistenceStopForm = baseForm == "停保汇总表"
+                    && string.Equals(catTag, "最低生活保障", StringComparison.Ordinal);
                 foreach (var rural in new[] { true, false })
                 {
                     var titleSuffix = rural ? "_农村" : "_城市";
+                    var areaName = rural ? "农村" : "城市";
+                    var pageAreaTag = isSubsistenceStopForm ? $"（{areaName}最低生活保障）" : areaTag;
                     var fields = new Dictionary<string, string>
                     {
                         [FieldKeys.REPORT_TITLE] = isEdgeFamilyStopForm
                             ? $"林口县{titleYear}年{titleMonth}月城乡低保边缘家庭停止、减员汇总表"
                             : isOtherDifficultyStopForm
                                 ? $"林口县{titleYear}年{titleMonth}月其他困难人员停止、减员汇总表"
-                                : reportTit + areaTag,
+                                : reportTit + pageAreaTag,
                         ["REPORT_UNIT"] = fillUnit,
                         ["REPORT_DATE"] = fillDate
                     };
@@ -493,6 +499,10 @@ public partial class PrintService : BaseService, IPrintService
                                 ["MONTH_AMOUNT"] = r.MonthAmount,
                                 ["STOP_REASON"] = r.StopReason,
                                 ["STOP_DATE"] = r.StopDate,
+                                // 「享受日期」列专用（与自然减员表同源：r.EnjoyDate = LoadApprovalDateMap 规则）。
+                                // 模板130 的 {享受日期N} 由 config 映射 ENJOY_DATE_N（原误映射 STOP_DATE_N=停止日期，
+                                // 导致享受日期列显示停止日期——2026-11-17 修复）；STOP_DATE 保留供 {停止时间N}（模板131）
+                                ["ENJOY_DATE"] = r.EnjoyDate,
                                 // 边缘家庭"停止、减员汇总表"专用：业务类别=停止/减员（其他停保模板无此占位符）
                                 ["BIZ_TYPE"] = r.BizType
                             });
@@ -673,51 +683,66 @@ public partial class PrintService : BaseService, IPrintService
                 if (src.IsFailure)
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
 
-                // 报表标注月（B线周期次月），模板标题为"{申报月份}临时救助发放汇总表"
-                var reportMonth = $"{titleYear}年{titleMonth}月";
+                // 申报月份 = 所选月份本身（2026-11-17 用户口径：临时救助报表时间不再顺延次月）
+                var reportMonth = $"{year}年{month}月";
 
-                // 分页：模板表体槽位 1..10，超 10 条拆多页
-                const int pageCapacity = 10;
-                var all = src.Value;
-                // 多页时每页落独立文件，须带页码后缀，否则同名文件互相覆盖（单页保持原文件名）
-                var pageCount = (int)Math.Ceiling(all.Count / (double)pageCapacity);
-                for (var pageIndex = 0; pageIndex * pageCapacity < all.Count; pageIndex++)
+                // 一项表单、文档内两段：无额度（大额→报县局审批）在前，有额度（小额定额→备用金发放）在后；
+                // 分段与分类判定点单点实现见 TempReliefSummaryGrouper / TempReliefConstants.IsFixedQuotaType
+                var (noQuota, withQuota) = TempReliefSummaryGrouper.SplitByQuota(src.Value);
+                var segments = new (string Tag, List<MonthlyTempReliefRow> SegmentRows)[]
                 {
-                    var pageRows = all.Skip(pageIndex * pageCapacity).Take(pageCapacity).ToList();
-                    var fields = new Dictionary<string, string>
+                    (TempReliefConstants.SegmentTagCountyApproval, noQuota),
+                    (TempReliefConstants.SegmentTagReservePayout, withQuota)
+                };
+
+                // 分页：模板表体槽位 1..10，超 10 条拆多页（每段独立分页）
+                const int pageCapacity = 10;
+                foreach (var (tag, segmentRows) in segments)
+                {
+                    // 该分类当月无数据：整段跳过（不出空白表）；两段全空则由外层统一返回"月报表表单无数据"
+                    if (segmentRows.Count == 0) continue;
+
+                    // 多页时每页落独立文件，须带页码后缀，否则同名文件互相覆盖（单页保持原文件名）
+                    var pageCount = (int)Math.Ceiling(segmentRows.Count / (double)pageCapacity);
+                    for (var pageIndex = 0; pageIndex * pageCapacity < segmentRows.Count; pageIndex++)
                     {
-                        [FieldKeys.TR_REPORT_MONTH] = reportMonth,
-                        ["REPORT_UNIT"] = fillUnit,
-                        ["REPORT_DATE"] = fillDate
-                    };
-                    var rows = new List<Dictionary<string, string>>();
-                    var seq = pageIndex * pageCapacity + 1;
-                    foreach (var r in pageRows)
-                    {
-                        rows.Add(new Dictionary<string, string>
+                        var pageRows = segmentRows.Skip(pageIndex * pageCapacity).Take(pageCapacity).ToList();
+                        var fields = new Dictionary<string, string>
                         {
-                            [FieldKeys.TR_SEQ] = (seq++).ToString(),
-                            [FieldKeys.TR_NAME] = r.Name,
-                            [FieldKeys.TR_ID_CARD] = r.IdCard,
-                            [FieldKeys.TR_AGE] = r.Age,
-                            [FieldKeys.TR_GENDER] = r.Gender,
-                            [FieldKeys.TR_FAMILY_SIZE] = r.FamilySize,
-                            [FieldKeys.TR_ADDRESS] = r.Address,
-                            [FieldKeys.TR_CATEGORY] = r.Category,
-                            [FieldKeys.TR_PHONE] = r.Phone,
-                            [FieldKeys.TR_AMOUNT] = r.Amount,
-                            [FieldKeys.TR_AUDIT_DATE] = r.AuditDate,
-                            [FieldKeys.TR_REASON] = r.Reason,
-                            [FieldKeys.TR_SELF_PAY] = r.SelfPay,
-                            [FieldKeys.TR_BANK_ACCOUNT] = r.BankAccount
+                            // 分类标签拼进 {申报月份} ⇒ 打印标题"2026年11月（报县局审批）临时救助发放汇总表"（模板零改动）
+                            [FieldKeys.TR_REPORT_MONTH] = $"{reportMonth}（{tag}）",
+                            ["REPORT_UNIT"] = fillUnit,
+                            ["REPORT_DATE"] = fillDate
+                        };
+                        var rows = new List<Dictionary<string, string>>();
+                        var seq = pageIndex * pageCapacity + 1;
+                        foreach (var r in pageRows)
+                        {
+                            rows.Add(new Dictionary<string, string>
+                            {
+                                [FieldKeys.TR_SEQ] = (seq++).ToString(),
+                                [FieldKeys.TR_NAME] = r.Name,
+                                [FieldKeys.TR_ID_CARD] = r.IdCard,
+                                [FieldKeys.TR_AGE] = r.Age,
+                                [FieldKeys.TR_GENDER] = r.Gender,
+                                [FieldKeys.TR_FAMILY_SIZE] = r.FamilySize,
+                                [FieldKeys.TR_ADDRESS] = r.Address,
+                                [FieldKeys.TR_CATEGORY] = r.Category,
+                                [FieldKeys.TR_PHONE] = r.Phone,
+                                [FieldKeys.TR_AMOUNT] = r.Amount,
+                                [FieldKeys.TR_AUDIT_DATE] = r.AuditDate,
+                                [FieldKeys.TR_REASON] = r.Reason,
+                                [FieldKeys.TR_SELF_PAY] = r.SelfPay,
+                                [FieldKeys.TR_BANK_ACCOUNT] = r.BankAccount
+                            });
+                        }
+                        pages.Add(new MonthlyFormPageData
+                        {
+                            Fields = fields,
+                            Rows = rows,
+                            TitleSuffix = $"（{tag}）" + (pageCount > 1 ? $"_{pageIndex + 1}" : string.Empty)
                         });
                     }
-                    pages.Add(new MonthlyFormPageData
-                    {
-                        Fields = fields,
-                        Rows = rows,
-                        TitleSuffix = pageCount > 1 ? $"_{pageIndex + 1}" : string.Empty
-                    });
                 }
                 break;
             }
@@ -733,6 +758,13 @@ public partial class PrintService : BaseService, IPrintService
                                         .Select(s => s.Trim())
                                         .Where(s => !string.IsNullOrEmpty(s))
                                         .ToList();
+
+                // 一事一议会议记录只在本期有人员时才输出（错误码/文案沿用「NOT_FOUND+无数据」跳过约定：
+                // 打印/保存/两预览的批量机制据此自动跳过并进入结果提示；单独勾选预览时
+                // ViewModel 依本文案弹明确提示，不再落"均无数据"通用话术）。
+                if (isSpecial && lines.Count == 0)
+                    return Result.Failure<List<MonthlyFormPageData>>(ErrorCodes.NOT_FOUND,
+                        "本期无一事一议新增人员（无数据），不生成一事一议会议记录");
                 var fields = new Dictionary<string, string>
                 {
                     [FieldKeys.MEETING_TIME] = m.MeetingTime,

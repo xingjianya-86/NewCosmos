@@ -17,7 +17,7 @@ dotnet build NewCosmos.csproj -f net10.0-windows10.0.19041.0     # Windows
 ```
 
 - **测试项目**：`NewCosmos.Tests\NewCosmos.Tests.csproj`（xUnit，2026-11 引入，只测纯逻辑：金额/分段/校验器/状态机/常量）。验证 = `dotnet test NewCosmos.Tests\NewCosmos.Tests.csproj` 全过 + 编译零错误 + 启动冒烟（登录→列表→表单保存→导入→打印预览）。
-- **规范/迁移检查**（报告式，防回潮）：`powershell -File deploy\check_standards.ps1`（AGENTS §5/§7/§8/§10/§12 违规清单）、`powershell -File deploy\check_migrations.ps1`（docs/migrations 与 nc_sys_migrations 对账，需先 `psql -f deploy\migrations_registry_init.sql`）、`powershell -File deploy\check_encoding.ps1`（*.ps1 编码：ENC1 无 BOM 含中文=违规退出码 1，ENC2 读写缺 `-Encoding`=告警）。
+- **规范/迁移检查**（报告式，防回潮）：`powershell -File deploy\check_standards.ps1`（AGENTS §5/§7/§8/§10/§12 + 输出路径 OUT1/OUT2/OUT3 违规清单，`-Category OUT` 可单跑）、`powershell -File deploy\check_migrations.ps1`（docs/migrations 与 nc_sys_migrations 对账，需先 `psql -f deploy\migrations_registry_init.sql`）、`powershell -File deploy\check_encoding.ps1`（*.ps1 编码：ENC1 无 BOM 含中文=违规退出码 1，ENC2 读写缺 `-Encoding`=告警）。
 - 发版入口：`deploy\publish_all.bat`（先用 `-DryRun` 体检），见 §2。
 - 本地可再生占用（`bin\ obj\ publish\`，≈9 GB）可整删重建，维护见 §2。
 - 改数据库 / 改金额 / 改日志，动手前分别看 §8、§9、§10。
@@ -116,7 +116,8 @@ NewCosmos/
 │                   DatabaseManagement、UserManagement、Config、Shared…）；基类见 §6
 ├── Platforms/      平台实现（Windows 文件夹选择、打印机等）
 ├── Resources/      Schema/（YAML 表定义权威）、Seed/、Styles/、PdfJs/、Backgrounds/、
-│                   Splash/（启动动画 Web 资产，dsh-startup-screen 二次开发版，许可见其 THIRD-PARTY-NOTICES.md）
+│                   Splash/（启动动画与序列登录 Web 资产：core\ 引擎、scenes\ 五幕、login.*、嵌入音频包；
+│                   dsh-startup-screen 二次开发版，许可见其 THIRD-PARTY-NOTICES.md）
 ├── Services/
 │   ├── Core/       BaseService、LoggerService、ConfigService、DialogService、DictCacheService、
 │   │               DataMasker（日志脱敏）、SchemaSyncService、
@@ -143,6 +144,7 @@ NewCosmos/
 ├── Scripts/        Lottery\（彩票 Python：lstm_entry.py 统一入口 + 内嵌原版 KittenCN/predict_Lottery_ticket「基于tensorflow lstm模型的彩票预测」GPL-3.0，运行时数据/模型在 %APPDATA%\NewCosmos\LotteryLSTM）、import_templates.ps1|.bat、
 │                   templates_manifest.json；吉祥物素材生成 prepare_mascot_assets.ps1（读仓库根 newcosmos_*_v2.png 去白底/裁边，
 │                   产出 Resources\AppIcon\appicon.png、installer\appicon.ico、Resources\Images\mascot_icon.png、newcosmos_character.png）；
+│                   启动动画音频嵌入包 prepare_splash_audio.ps1（audio\*.mp3 → core\anim-audio-assets.js，改音频后须重新生成）；
 │                   脚本内密码一律读环境变量 NEWCOSMOS_DB_PASSWORD
 ├── python-embed/   嵌入式 Python（彩票训练/预测用，不入库）
 ├── 公文字体/、keystore/ 为本机资产，**不入库**（§2）
@@ -286,9 +288,9 @@ await tx.CommitAsync(ct);      // 未 Commit 则 Dispose 自动回滚
 | 身份证校验 | `Helpers\IdCardValidator.cs` | |
 | 彩票奖级与金额 | SSQ/DLT 奖级判定唯一权威 `Services\Lottery\UserPurchaseService.cs`（含大乐透 26014 期起 9→7 奖级改版），奖金解析 `Helpers\LotteryPrizeResolver.cs`；算法与 LSTM 预测 `Scripts\Lottery\lstm_entry.py`（适配层：数据导出/窗口/负样本降权/JSON）+ `Scripts\Lottery\predict_Lottery_ticket\`（原版 LSTM，commit 6cf60bb7，GPL-3.0；其 `src\bootstrap.py` 承担 TF2.21/Keras3 兼容） | 训练/预测数据源 = `nc_lottery_draws`（由 `fetch_history.py` 同步），算法侧不联网抓取；`nc_lottery_predictions`、`nc_lottery_statistics` 已无代码读写 |
 | 申请主表与业务表结构 | `Resources\Schema\{域}\*.yaml` | 手写迁移 `docs\migrations\*.sql` |
-| 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Helpers\OutputPathHelper.cs`、`config\document_output.yaml`、`Services\Core\ConfigService.cs`（用户级覆盖读写）、`Pages\Config\SettingsPage`（改根入口）、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；六功能点对照与输出根优先级见该文档 |
+| 文档四件套与输出路径 | `Constants\DocumentActionText.cs`、`Constants\OutputCategories.cs`（B 类目录名单一来源）、`Helpers\OutputPathHelper.cs`（A/B 两套目录 API + 分类名映射）、`config\document_output.yaml`、`Services\Core\ConfigService.cs`（用户级覆盖读写）、`Pages\Config\SettingsPage`（改根入口）、`docs\20261007_文档动作与输出路径统一规范.md` | 预览临时/保存落根铁律；A 类文书三层 / B 类报表两层的目录口径、六功能点+其余导出点对照、输出根优先级、OUT 防回潮规则均见该文档 |
 | 在线更新与增量补丁 | `deploy\README.md`（公开库权威）、`deploy\PatchTool`、`deploy\UpdateSigningTool` | 入口见 §2；本机 `docs\20260918_在线更新系统.md` 含内网信息，未入库 |
-| 启动画面（启动动画 / 双就绪门 / 素材融合） | `Pages\Splash\SplashPage.xaml(.cs)`、`Services\Core\SplashGate.cs`、`Services\Core\SplashAssetsService.cs`、`Resources\Splash\*`、`config\app.ini` 的 `[Splash]` | 二次开发自 dsh-startup-screen（MIT © 沈宏宏，音频素材第三方、`SplashSound=0` 可静音）；说明见 `docs\20261027_启动画面移植与素材融合.md` |
+| 启动画面（启动动画 / 双就绪门 / 素材融合 / 序列登录） | `Pages\Splash\SplashPage.xaml(.cs)`、`Pages\Auth\LoginPage.xaml(.cs)`（SequenceHost 覆盖层 + 桥路由）、`Components\AnimationWebViewView.cs`（两端共用宿主：虚拟主机/自动播放/桥接/看门狗）、`Resources\Splash\*`（core\ 引擎、scenes\ 五幕、login.\*、嵌入包由 `Scripts\prepare_splash_audio.ps1` 生成）、`Services\Core\SplashGate.cs`、`Services\Core\SplashAssetsService.cs`、`ViewModels\Auth\LoginViewModel.cs`（DeferNavigation/CompleteNavigationAsync）、`config\app.ini` 的 `[Splash]` 与 `LoginStyle` | 二次开发自 dsh-startup-screen（MIT © 沈宏宏，音频素材第三方、`SplashSound=0` 可静音）；拆分与序列登录见 `docs\20261115_启动动画五幕拆分与序列登录.md`，原移植说明 `docs\20261027_启动画面移植与素材融合.md` |
 | 重病判定（病种目录口径 + 费用口径 + AI 建议管线） | 客户端确定性层 `Helpers\SevereDiseaseJudge.cs`（随包清单 `Resources\Icd10\severe_disease_catalog.json`）；判定编排 `Services\Domain\SevereDisease\SevereDiseaseAdviceService.cs`（确定性→缓存→LLM 三级）与 `SevereDiseaseByCostRule.cs`（第六十八条费用规则单点）；服务端 `deploy\ocr\ocr_api.py` 的 `/ai/severity` + `deploy\ocr\severe_disease_catalog.json`（**清单权威：与客户端副本必须字节一致**，改一处同步另一处）；阈值 `nc_config_standards` 的 `SevereDiseaseCostThreshold`（Rural/Urban 两档，标准配置管理页可编辑） | 三条业务裁定（脑梗塞无"急性"不算、糖尿病未分型不算、癌症待查/C80.9 算）与自动预勾选安全策略（`matched_item∈清单` 才自动、只勾不取消、用户否决即停）见 `docs\20261112_重病判定双口径与AI管线.md`；服务端回归 `deploy\ocr\smoke_ai_severity.py`（33 例，改 prompt/清单/模型后必跑） |
 | 追缴应追缴总额（自动分段 / 月标准×月数 / 人工核实） | `Services\Domain\Recovery\RecoveryAmountCalculator.cs`（分段唯一实现）、`RecoveryHistoryProvider.cs`（历史时间轴取数）、`Constants\RecoveryConstants.cs`、`docs\migrations\20261019_recovery_amount_source.sql`（加列 `amount_source/amount_note/auto_amount` + 分段表 `nc_biz_recovery_segments`） | `recovery_amount` 为唯一事实来源（表单/列表/打印/落库同源）；算不出必须人工填写且必填原因；口径与数据缺口见 `docs\20261019_追缴金额来源与分段计算.md` |
 | 登录会话 / 多端互踢 / 强制下线 | `Services\Domain\UserManagement\UserSessionService.cs`、`Services\Core\SessionHeartbeatService.cs`、`Services\Core\SessionLifecycleService.cs`、`Constants\SessionConstants.cs`、`Resources\Schema\system_sessions\database.yaml` | `nc_sys_user_sessions` 是会话唯一事实来源（本机 SecureStorage 仅缓存）；策略/心跳/宽限配置见 `nc_config_system_standards`（category='session'）；部署先执行 `docs\migrations\20261023_user_sessions.sql`；说明见 `docs\20261023_登录会话与多端互踢.md` |

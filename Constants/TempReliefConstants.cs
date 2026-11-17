@@ -160,6 +160,24 @@ public static class TempReliefConstants
         _ => reliefType ?? string.Empty
     };
 
+    /// <summary>
+    /// 月报「临时救助新增汇总表」分段标签（打印标题 {申报月份} 后缀 / 导出文件名 / 预览标题共用，单一来源）：
+    /// 无额度 = 大额救助（金额不填写）→ 报县局审批；有额度 = 小额快速救助（定额）→ 备用金发放。
+    /// 输出一律用业务措辞，「无额度/有额度」仅作代码内判定用语，不落到打印件上。
+    /// </summary>
+    public const string SegmentTagCountyApproval = "报县局审批";
+
+    /// <summary>月报「临时救助新增汇总表」有额度段标签（小额快速救助定额 → 备用金发放），见 <see cref="SegmentTagCountyApproval"/></summary>
+    public const string SegmentTagReservePayout = "备用金发放";
+
+    /// <summary>
+    /// 是否「有额度」分段——月报临时救助新增汇总表分段的唯一判定点：
+    /// 小额快速救助（定额、有确定金额）= 有额度；大额救助与历史空值 = 无额度
+    /// （主表 relief_type 默认值即 Large，空值兜底与默认一致）。
+    /// </summary>
+    public static bool IsFixedQuotaType(string? reliefType)
+        => string.Equals(reliefType, ReliefTypeSmall, StringComparison.Ordinal);
+
     /// <summary>获取申请人来源中文名</summary>
     public static string GetSourceName(string? sourceType) => sourceType switch
     {
@@ -321,6 +339,12 @@ public static class TempReliefConstants
         if (v.Contains("城镇") || v.Contains("城市")) return false;
         return false;
     }
+
+    /// <summary>
+    /// 当前库（低保申请库）来源表名：候选人检索与政策清单的排序锚点——**当前库优先、历史导入台账在后**。
+    /// 与 <see cref="AllowedSourceTables"/> 末位表一致。
+    /// </summary>
+    public const string CurrentSourceTable = "nc_biz_applications";
 
     /// <summary>白名单：来源表（SQL 表名白名单校验用，禁止动态拼接）</summary>
     public static readonly string[] AllowedSourceTables =

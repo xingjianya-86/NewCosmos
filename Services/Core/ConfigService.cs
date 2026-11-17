@@ -503,6 +503,19 @@ public class ConfigService : IConfigService
                     _appOptions.AndroidImmersiveFullscreen =
                         !string.Equals(value, "EdgeToEdge", StringComparison.OrdinalIgnoreCase);
                     break;
+                case "LoginStyle":
+                    // 登录页形态：sequence（默认，验证序列登录）/ classic（经典原生）。非法值回退默认并告警。
+                    if (string.Equals(value, SplashConstants.LoginStyleSequence, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(value, SplashConstants.LoginStyleClassic, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _appOptions.LoginStyle = value.Trim().ToLowerInvariant();
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("[ConfigService] app.ini LoginStyle 配置无效: {Value}，使用默认 {Default}",
+                            value, SplashConstants.LoginStyleSequence);
+                    }
+                    break;
             }
         }
 
@@ -632,6 +645,7 @@ public class ConfigService : IConfigService
                 case "IncludeErrorDetail": if (bool.TryParse(value, out var includeDetail)) _databaseOptions.IncludeErrorDetail = includeDetail; break;
                 case "ApplicationName": _databaseOptions.ApplicationName = value; break;
                 case "PgDumpPath": _databaseOptions.PgDumpPath = value; break;
+                case "RetentionDays": if (int.TryParse(value, out var retentionDays)) _databaseOptions.RetentionDays = retentionDays; break;
             }
         }
 

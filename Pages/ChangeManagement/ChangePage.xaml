@@ -358,6 +358,24 @@
                         </Grid>
                     </Border>
 
+                    <!-- 拒绝配合核验工作（核验失败直接停止保障；停保后隐藏，由「恢复保障」逆向恢复） -->
+                    <Border Style="{StaticResource CardBorderInteractive}" Padding="20"
+                            IsVisible="{Binding IsApplicationStopped, Converter={StaticResource BoolToInverseConverter}}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding RefuseVerifyStopCommand}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                            <Border BackgroundColor="{StaticResource DangerSoft}" Padding="12" StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                                <Label Text="{OnPlatform WinUI='&#xE711;', Android='&#x1F6AB;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="26" TextColor="{StaticResource Error}"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                <Label Text="拒绝配合核验工作" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="核验失败，直接停止保障" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="{OnPlatform WinUI='&#xE76C;', Android='&#x27A1;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20" TextColor="{StaticResource Gray400}" VerticalOptions="Center"/>
+                        </Grid>
+                    </Border>
+
                 </VerticalStackLayout>
 
                 <!-- 变更历史 -->

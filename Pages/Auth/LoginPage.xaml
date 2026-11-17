@@ -458,6 +458,10 @@
             </VerticalStackLayout>
         </ScrollView>
 
+        <!-- 序列登录覆盖层（LoginStyle=sequence 时由代码加入 AnimationWebViewView 并显示，盖住经典版式；
+             WebView 初始化失败 / 脚本异常 / 加载超时 → 隐藏本层即回落下方经典登录页，无需换页、无闪切） -->
+        <Grid x:Name="SequenceHost" IsVisible="False" />
+
         <!-- 加载遮罩（最顶层） -->
         <components:LoadingOverlay IsLoading="{Binding IsBusy}"
                                    LoadingText="正在授权访问…" />

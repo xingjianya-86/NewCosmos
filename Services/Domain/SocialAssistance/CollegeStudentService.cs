@@ -273,7 +273,9 @@ EXISTS (SELECT 1 FROM nc_biz_family_members m
                 )
                   AND ($1::text IS NULL OR d.name LIKE '%' || $1 || '%' OR d.id_card = $1)
                   -- 排除「当前属于其他困难人员」的成员（口径与豁免见 NotOtherDifficultyExpr）
-                " + NotOtherDifficultyExpr("d.id_card") + @"
+                  -- ⚠ 必须带 AND：注入块是独立 (…) 布尔因子，缺 AND 会在左括号处报 42601
+                  -- （2026-11-08 引入，11-13/11-17 两次实测 syntax error at or near 左括号，POSITION≈8187）
+                AND " + NotOtherDifficultyExpr("d.id_card") + @"
                 ORDER BY d.name
                 LIMIT 100";
 

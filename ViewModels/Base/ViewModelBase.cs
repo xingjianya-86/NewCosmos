@@ -722,6 +722,12 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             ? $"已导出 {fileNames.Count} 个文件"
             : "导出完成";
 
+        // 审计单点：B 类导出（月报表/高龄月报/核查报告/公示/照片/彩票等）共用本助手，
+        // 此前高龄月报与彩票预测无任何业务日志，导出行为不可追溯。
+        Logger.LogBusiness("导出文件",
+            ("Directory", folder),
+            ("FileCount", fileNames?.Count ?? 0));
+
         var message = $"{header}\n目录：{folder}";
         if (!string.IsNullOrEmpty(extra))
             message += $"\n{extra}";

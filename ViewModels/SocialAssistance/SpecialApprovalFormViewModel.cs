@@ -6,6 +6,7 @@ using NewCosmos.Models.Entities;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Domain.Reporting;
 using NewCosmos.Services.Domain.SpecialApproval;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.UserManagement;
@@ -23,6 +24,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
 {
     private readonly ISpecialApprovalFormService _formService;
     private readonly IApplicationService _applicationService;
+    private readonly IMonthlyReportService _monthlyReportService;
     private readonly IDictCacheService _dictCacheService;
     private readonly INewPermissionService _permissionService;
     private readonly IDialogService _dialogService;
@@ -31,8 +33,18 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
 
     private long _applicationId;
 
+    /// <summary>乡镇民政办审核结果默认值（新建/未填时）</summary>
+    private const string DefaultAuditResult = "同意纳入";
+
     /// <summary>当前申请的户籍类型（Rural/Urban），用于指定分类代码按户籍补全</summary>
     private string _applicationHukouType = string.Empty;
+
+    /// <summary>
+    /// 正在回填预案选择（LoadAsync 恢复 SelectedTemplateOption）。
+    /// 置位期间抑制 OnSelectedTemplateOptionChanged 的自动填充——否则每次加载都会把
+    /// 已保存的一事一议说明情况覆盖成预案原文（用户实测「提交后字段恢复默认值」）。
+    /// </summary>
+    private bool _isRestoringTemplateSelection;
 
     #region 抽象属性实现
     protected override IServiceProvider ServiceProvider => _serviceProvider;
@@ -108,15 +120,6 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
     private DateTime _meetingDate = DateTime.Today;
 
     [ObservableProperty]
-    private string _meetingLocation = string.Empty;
-
-    [ObservableProperty]
-    private string _meetingTopic = string.Empty;
-
-    [ObservableProperty]
-    private string _meetingSummary = string.Empty;
-
-    [ObservableProperty]
     private string _meetingMembers = string.Empty;
 
     [ObservableProperty]
@@ -141,6 +144,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
     public SpecialApprovalFormViewModel(
         ISpecialApprovalFormService formService,
         IApplicationService applicationService,
+        IMonthlyReportService monthlyReportService,
         IDictCacheService dictCacheService,
         INewPermissionService permissionService,
         IDialogService dialogService,
@@ -149,6 +153,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
     {
         _formService = formService;
         _applicationService = applicationService;
+        _monthlyReportService = monthlyReportService;
         _dictCacheService = dictCacheService;
         _permissionService = permissionService;
         _dialogService = dialogService;
@@ -173,7 +178,8 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             // 权限
             CanReview = await _permissionService.HasPermissionAsync(App.CurrentUserId ?? 0, PermissionCodes.SPECIAL_APPROVAL_REVIEW, ct);
 
-            // 申请信息
+            // 申请信息（applicationReasonDetail = 档案"家庭情况说明"落库值，供基本情况空时自动带出）
+            var applicationReasonDetail = string.Empty;
             var appResult = await _applicationService.GetByIdAsync(applicationId, ct);
             if (appResult.IsSuccess && appResult.Value != null)
             {
@@ -185,7 +191,45 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
                 FamilyAddress = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
                 FamilySizeText = $"{app.FamilySize} 人";
                 ClassificationName = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? "");
+                applicationReasonDetail = app.ApplicationReasonDetail ?? string.Empty;
                 ReportUnit = string.IsNullOrWhiteSpace(ReportUnit) ? await GetOrganizationNameAsync() : ReportUnit;
+                // 经办人员默认当前登录用户（只补空值，不覆盖已填内容）
+                if (string.IsNullOrWhiteSpace(HandlerName))
+                    HandlerName = App.CurrentUserFullName;
+
+                // 会议审议默认值（一律只补空值，不覆盖已填内容）：
+                // 参会人员与会议记录同源——按乡镇读 nc_biz_meeting_attendance_history 最近一条出席历史；
+                // 审批人姓名默认当前登录用户（同月报会议记录「记录人」默认）、单位默认填报单位。
+                if (string.IsNullOrWhiteSpace(MeetingMembers) && !string.IsNullOrWhiteSpace(app.Town))
+                {
+                    var attendance = await _monthlyReportService.GetLatestMeetingAttendanceByTownAsync(app.Town, ct);
+                    if (attendance.IsFailure)
+                        _logger.Warn($"会议审议参会人员默认回填失败（不影响加载）: {attendance.Message}");
+                    else if (!string.IsNullOrWhiteSpace(attendance.Value?.Attendees))
+                        MeetingMembers = NormalizeLineBreaks(attendance.Value.Attendees);
+                }
+                if (string.IsNullOrWhiteSpace(ApproverName))
+                    ApproverName = App.CurrentUserFullName;
+                if (string.IsNullOrWhiteSpace(ApproverOrganization))
+                    ApproverOrganization = ReportUnit;
+
+                // 审批人职务：取当前登录用户的职务（nc_sys_users.position；只补空，查询失败不影响加载）
+                if (string.IsNullOrWhiteSpace(ApproverTitle) && App.CurrentUserId.HasValue)
+                {
+                    try
+                    {
+                        var userService = _serviceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IUserService>();
+                        var userResult = await userService.GetByIdAsync(App.CurrentUserId.Value, ct);
+                        if (userResult.IsFailure)
+                            _logger.Warn($"审批人职务默认回填失败（不影响加载）: {userResult.Message}");
+                        else if (!string.IsNullOrWhiteSpace(userResult.Value?.Position))
+                            ApproverTitle = userResult.Value.Position;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"审批人职务默认回填异常（不影响加载）: {ex.Message}");
+                    }
+                }
             }
 
             // 申报表
@@ -205,12 +249,30 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
                 IsSubmitted = form.Status == SpecialApprovalConstants.StatusSubmitted;
                 IsReviewed = form.Status is SpecialApprovalConstants.StatusApproved or SpecialApprovalConstants.StatusRejected;
 
-                // 回填预案选择
+                // 回填预案选择（恢复选择不触发填充，见 _isRestoringTemplateSelection）
                 if (!string.IsNullOrEmpty(form.TemplateKey))
                 {
-                    SelectedTemplateOption = TemplateOptions.FirstOrDefault(o => o.Key == form.TemplateKey);
+                    _isRestoringTemplateSelection = true;
+                    try
+                    {
+                        SelectedTemplateOption = TemplateOptions.FirstOrDefault(o => o.Key == form.TemplateKey);
+                    }
+                    finally
+                    {
+                        _isRestoringTemplateSelection = false;
+                    }
                 }
             }
+
+            // 「申请救助家庭基本情况」自动生成：为空时带出档案的"家庭情况说明"
+            // （application_reason_detail = FamilySituationTextBuilder 落库产物，五步表单保存必填 → 有档必有值；
+            //   与文书/资产核查同源。只补空值，用户已填/已存内容一律不覆盖）
+            if (string.IsNullOrWhiteSpace(BasicSituation) && !string.IsNullOrWhiteSpace(applicationReasonDetail))
+                BasicSituation = applicationReasonDetail;
+
+            // 乡镇民政办审核结果默认"同意纳入"（只补空值，不覆盖已保存结论）
+            if (string.IsNullOrWhiteSpace(AuditResult))
+                AuditResult = DefaultAuditResult;
         }, "加载申报表...");
     }
 
@@ -245,6 +307,8 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         {
             // 选择预案：自动填充文案（可继续编辑）
             TemplateKey = value.Key;
+            // 加载回填选择：只恢复选中项，不把已保存的说明情况覆盖回预案原文
+            if (_isRestoringTemplateSelection) return;
             if (!string.IsNullOrEmpty(value.Display))
             {
                 SpecialMatters = value.Display;
@@ -270,6 +334,46 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
 
     /// <summary>申报表状态显示</summary>
     public string StatusText => SpecialApprovalConstants.GetStatusDescription(Status);
+
+    /// <summary>
+    /// 「提交申报」可见 = 未提交且未审议：已提交（防撞"无法重复提交"守卫）与已审议（内容锁定）
+    /// 均隐藏——否则已审议后按钮仍亮、页面又无状态外显，会误导重复点击（2026-11-17 实测）。
+    /// </summary>
+    public bool CanSubmitForm => !IsSubmitted && !IsReviewed;
+
+    partial void OnIsSubmittedChanged(bool value) => OnPropertyChanged(nameof(CanSubmitForm));
+
+    partial void OnIsReviewedChanged(bool value) => OnPropertyChanged(nameof(CanSubmitForm));
+
+    /// <summary>
+    /// 换行归一化：出席历史存量为裸 \r（WinUI Editor 落库），统一转 \n——
+    /// 保证两端 Editor 逐行显示（原 Entry 单行控件 + 裸 \r 导致只显示首个姓名）。
+    /// </summary>
+    private static string NormalizeLineBreaks(string? text)
+        => (text ?? string.Empty)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
+
+    /// <summary>
+    /// 确保申报表草稿已存在（不存在则先保存）。
+    /// 提交申报/生成文档服务端均要求先有草稿；缺失时静默失败会让按钮"点了没反应"，故在此自动补齐。
+    /// 返回 false 表示保存失败（已弹失败窗），调用方应中止后续操作。
+    /// </summary>
+    private async Task<bool> EnsureDraftSavedAsync()
+    {
+        var existing = await _formService.GetByApplicationIdAsync(_applicationId, CancellationToken);
+        if (existing != null && existing.Id > 0)
+            return true;
+
+        var saveResult = await ExecuteAsync(() =>
+            _formService.SaveDraftAsync(BuildRequest(), CancellationToken), "保存申报表草稿...");
+        if (saveResult.IsFailure)
+        {
+            await ShowFailureAsync(saveResult, "保存申报表草稿");
+            return false;
+        }
+        return true;
+    }
 
     /// <summary>是否可编辑申报内容（草稿或已提交但未审议）</summary>
     public bool IsEditable => !IsReviewed && !string.IsNullOrEmpty(ApplicationName);
@@ -297,6 +401,10 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             await _dialogService.DisplayAlertAsync("成功", "申报表草稿已保存", "确定");
             await LoadAsync(_applicationId);
         }
+        else
+        {
+            await ShowFailureAsync(result, "保存草稿");
+        }
     }
 
     /// <summary>
@@ -315,12 +423,19 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             "提交后申报表将锁定，进入会议审议环节，确定提交？", "提交", "取消");
         if (!confirm) return;
 
+        // 服务端要求先有草稿才能提交；缺失则自动补存（失败已弹窗，中止）
+        if (!await EnsureDraftSavedAsync()) return;
+
         var result = await ExecuteAsync(() =>
             _formService.SubmitAsync(BuildRequest(), CancellationToken), "提交申报...");
         if (result.IsSuccess)
         {
             await _dialogService.DisplayAlertAsync("成功", "申报表已提交", "确定");
             await LoadAsync(_applicationId);
+        }
+        else
+        {
+            await ShowFailureAsync(result, "提交申报");
         }
     }
 
@@ -336,12 +451,19 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             return;
         }
 
+        // 服务端要求先有草稿才能生成；缺失则自动补存（失败已弹窗，中止）
+        if (!await EnsureDraftSavedAsync()) return;
+
         var result = await ExecuteAsync<Archive>(() =>
             _formService.GenerateDocumentAsync(_applicationId, CancellationToken), "生成申报表文档...");
 
         if (result.IsSuccess)
         {
             await _dialogService.DisplayAlertAsync("成功", "申报表文档已生成并归档", "确定");
+        }
+        else
+        {
+            await ShowFailureAsync(result, "生成申报表文档");
         }
     }
 
@@ -382,10 +504,10 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         var request = new SpecialApprovalReviewRequest
         {
             ApplicationId = _applicationId,
+            // 申报内容随审议一并落库（提交后仍可编辑；服务端在锁定表单同一 UPDATE 内写入）
+            BasicSituation = BasicSituation,
+            TemplateKey = SelectedTemplateOption?.Key ?? TemplateKey,
             MeetingDate = MeetingDate,
-            MeetingLocation = MeetingLocation,
-            MeetingTopic = MeetingTopic,
-            MeetingSummary = MeetingSummary,
             MeetingMembers = MeetingMembers,
             SpecialReason = SpecialMatters,
             SpecialCircumstances = SpecialMatters,

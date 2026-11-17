@@ -451,11 +451,11 @@
                                               BindableLayout.ItemsSource="{Binding Cards}">
                                             <BindableLayout.ItemTemplate>
                                                 <DataTemplate x:DataType="ModuleCardItem">
-                                                    <Border Grid.Row="{Binding Row}" Grid.Column="{Binding Col}" Style="{StaticResource ModuleCard}">
+                                                    <Border Grid.Row="{Binding Row}" Grid.Column="{Binding Col}" Style="{StaticResource ModuleCard}" VerticalOptions="Fill">
                                                         <Border.Shadow>
                                                             <Shadow Brush="#000000" Offset="0,2" Radius="8" Opacity="0.08"/>
                                                         </Border.Shadow>
-                                                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                                        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
                                                             <HorizontalStackLayout Spacing="12">
                                                                 <Border WidthRequest="44" HeightRequest="44" BackgroundColor="{Binding IconBgColor}" StrokeShape="RoundRectangle 12">
                                                                     <Label Text="{Binding IconGlyph}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="24" TextColor="{Binding IconColor}" HorizontalOptions="Center" VerticalOptions="Center"/>
@@ -465,7 +465,12 @@
                                                                     <Label Text="{Binding Subtitle}" FontSize="14" TextColor="{StaticResource TextTertiary}"/>
                                                                 </VerticalStackLayout>
                                                             </HorizontalStackLayout>
-                                                            <Label Grid.Row="1" Text="{Binding Description}" FontSize="14" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                                                            <!-- 描述区固定 2 行高（Font14×2 行≈42px）：同排卡片内容高度天然一致 → 底边齐平；
+                                                                 MaxLines=2 + TailTruncation：超 2 行时行尾省略号截断（MaxLines>1 保证 WinUI 正常换行）；
+                                                                 VerticalOptions=Start 文字顶对齐，富余高度由 * 行吸收 -->
+                                                            <Label Grid.Row="1" Text="{Binding Description}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                                                                   LineBreakMode="TailTruncation" MaxLines="2"
+                                                                   HeightRequest="42" VerticalOptions="Start"/>
                                                             <Button Grid.Row="2" Text="{Binding ButtonText}" Style="{StaticResource FunctionButtonPrimary}" Command="{Binding Command}" CommandParameter="{Binding CommandParameter}"/>
                                                         </Grid>
                                                     </Border>

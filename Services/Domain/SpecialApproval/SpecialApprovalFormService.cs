@@ -79,8 +79,12 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             return Result.Failure(ErrorCodes.REQUIRED_FIELD_MISSING, "请填写一事一议说明情况");
 
         var existing = await GetByApplicationIdAsync(request.ApplicationId, ct);
-        if (existing != null && existing.Id > 0 && existing.Status == SpecialApprovalConstants.StatusSubmitted)
-            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "申报表已提交，无法修改");
+        // 已提交但未审议仍可修改内容（与 ViewModel IsEditable「草稿或已提交但未审议」同一契约）。
+        // 原实现 Submitted 即拒绝：提交后新填内容无处可存、审议时被静默丢弃（用户实测「数据库可能未保存」）。
+        // 已审议（Approved/Rejected）为终态，禁止修改。
+        if (existing != null && existing.Id > 0
+            && existing.Status is SpecialApprovalConstants.StatusApproved or SpecialApprovalConstants.StatusRejected)
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "申报表已完成会议审议，无法修改");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -181,7 +185,6 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         var appResult = await _applicationService.GetByIdAsync(request.ApplicationId, ct);
         if (appResult.IsFailure || appResult.Value == null)
             return Result.Failure(ErrorCodes.APPLICATION_NOT_FOUND, "未找到申请记录");
-        var app = appResult.Value;
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -190,9 +193,6 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         {
             ApplicationId = request.ApplicationId,
             MeetingDate = request.MeetingDate,
-            MeetingLocation = request.MeetingLocation,
-            MeetingTopic = request.MeetingTopic,
-            MeetingSummary = request.MeetingSummary,
             MeetingMembers = request.MeetingMembers,
             SpecialReason = request.SpecialReason,
             SpecialCircumstances = request.SpecialCircumstances,
@@ -202,15 +202,16 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             ApproverOrganization = request.ApproverOrganization,
             CreatedBy = request.CreatedBy
         };
+        // 会议地点/议题/纪要三栏 2026-11-17 移除（模板承载地点、议题纪要无读取方，全链路死字段）
         var insertApprovalSql = @"INSERT INTO nc_biz_special_approvals
-            (application_id, meeting_date, meeting_location, meeting_topic, meeting_summary,
-             meeting_members, special_reason, special_circumstances, override_classification,
+            (application_id, meeting_date, meeting_members,
+             special_reason, special_circumstances, override_classification,
              approver_name, approver_title, approver_organization, created_by, created_at, updated_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
             RETURNING id";
         var insertResult = await _db.ExecuteScalarAsync(insertApprovalSql, ct,
-            request.ApplicationId, request.MeetingDate, request.MeetingLocation, request.MeetingTopic,
-            request.MeetingSummary, request.MeetingMembers, request.SpecialReason, request.SpecialCircumstances,
+            request.ApplicationId, request.MeetingDate, request.MeetingMembers,
+            request.SpecialReason, request.SpecialCircumstances,
             request.OverrideClassification, request.ApproverName, request.ApproverTitle,
             request.ApproverOrganization, request.CreatedBy);
         if (insertResult.IsFailure)
@@ -221,27 +222,29 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         var formStatus = request.Approved
             ? SpecialApprovalConstants.StatusApproved
             : SpecialApprovalConstants.StatusRejected;
+        // 申报内容随审议一并落库（提交后内容仍可编辑，见 SaveDraftAsync 注释）：
+        // 原实现只写会议字段，提交后新填的基本情况/说明在审议锁定时被静默丢弃。
+        // SpecialReason 即 VM 的一事一议说明情况（与 SpecialCircumstances 同源）。
         var updateFormSql = @"UPDATE nc_biz_special_approval_forms SET
-            status = $1, audit_result = $2, audit_date = $3, updated_at = NOW()
-            WHERE id = $4 AND deleted_at IS NULL";
+            status = $1, audit_result = $2, audit_date = $3,
+            basic_situation = $4, special_matters = $5, template_key = $6,
+            updated_at = NOW()
+            WHERE id = $7 AND deleted_at IS NULL";
         var updateFormResult = await _db.ExecuteNonQueryAsync(updateFormSql, ct,
             formStatus, request.Approved ? "同意纳入" : "不同意纳入",
-            request.MeetingDate == default ? (DateTime?)null : request.MeetingDate, form.Id);
+            request.MeetingDate == default ? (DateTime?)null : request.MeetingDate,
+            request.BasicSituation, request.SpecialReason, request.TemplateKey, form.Id);
         if (updateFormResult.IsFailure)
             return Result.Failure(updateFormResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, updateFormResult.Message);
 
-        // 3. 回写申请
+        // 3. 回写申请（2026-11-17 起：只写分类与标记，不迁移申请状态）
         if (request.Approved)
         {
-            // 未提交的申请先提交（Draft→Submitted）
-            if (app.Status == ApplicationStatusExtensions.GetCode(Models.Enums.ApplicationStatus.Draft))
-            {
-                var submitResult = await _applicationService.SubmitAsync(request.ApplicationId, request.CreatedBy, ct);
-                if (submitResult.IsFailure)
-                    return Result.Failure(submitResult.ErrorCode ?? ErrorCodes.OPERATION_FAILED, submitResult.Message);
-            }
-
-            // 回写分类与一事一议标记
+            // 审议通过 = 确定指定救助分类与一事一议标记；申请保持原状态/步骤（正常为 Draft+step5
+            // 「已建档未提交」），交回档案申报程序继续：档案制作出文书 → 完成归档（归档即审核
+            // CompleteArchiveAsync）→ Approved+step6。
+            // 原实现 Submit→Approve 直落终态会整段跳过档案制作管线；更早版本 Approved+step<6
+            // 还曾让档案落在五个工作流 Tab 之外不可见（韩应成 id=111 实测，两种修法均已废弃）。
             var updateAppSql = @"UPDATE nc_biz_applications SET
                 classification_result = $1, is_eligible = TRUE,
                 is_special_approval = TRUE, special_approval_id = $2,
@@ -251,17 +254,6 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
                 request.OverrideClassification, specialApprovalId, request.ApplicationId);
             if (updateAppResult.IsFailure)
                 return Result.Failure(updateAppResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, updateAppResult.Message);
-
-            // 状态机：Submitted→Approved
-            var approveResult = await _applicationService.ApproveAsync(new ApplicationApproveRequest
-            {
-                ApplicationId = request.ApplicationId,
-                Approved = true,
-                ApprovalComment = "一事一议审议通过",
-                ApprovedBy = request.CreatedBy
-            }, ct);
-            if (approveResult.IsFailure)
-                return Result.Failure(approveResult.ErrorCode ?? ErrorCodes.OPERATION_FAILED, approveResult.Message);
         }
         else
         {
@@ -307,8 +299,12 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             var fields = await BuildFieldDataAsync(app, form, ct);
             engine.ReplaceFields(fields);
 
+            // 目录段用真实姓名（与打印/补打口径一致）：脱敏名含 '*' 是 Windows 非法文件名字符，
+            // 会直接触发 ERROR_INVALID_NAME「文件名、目录名或卷标语法不正确」（…\韩**_111 实测）。
+            // DataMasker 仅用于日志脱敏（§10），禁止进文件路径。
             var dir = OutputPathHelper.EnsureDirectoryExists(
-                "社会救助申请", DataMasker.MaskName(app.ApplicantName), app.Id.ToString(), DateTime.Today);
+                OutputPathHelper.GetCategoryDisplayName(PrintBusinessTypes.FamilyApplication),
+                app.ApplicantName, app.Id.ToString(), DateTime.Today);
 
             var fileType = TemplateFileTypes.Normalize(template.FileType);
             var fileName = $"档案_乡镇社会救助一事一议申报表_{DateTime.Now:yyyyMMddHHmmssfff}.{fileType}";

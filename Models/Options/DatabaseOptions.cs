@@ -43,6 +43,13 @@ public class DatabaseOptions
     public string PgDumpPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// 备份保留天数：每次备份成功后清理早于该天数的备份文件。
+    /// 来源 database.ini 的 RetentionDays（该键此前从未被解析，属死配置，2026-11-15 激活）。
+    /// &lt;= 0 表示不清理。
+    /// </summary>
+    public int RetentionDays { get; set; }
+
+    /// <summary>
     /// 连接超时时间（秒）
 /// </summary>
     public int ConnectionTimeout { get; set; }

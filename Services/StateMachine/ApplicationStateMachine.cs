@@ -12,7 +12,9 @@ namespace NewCosmos.Services.StateMachine;
 ///    归档直接 Draft/Submitted → Approved（或不合格 → Stopped），不经过 Completed；
 /// ② Completed 为历史保留态：全库无写入点（生产库存量 0 行），仅在读侧过滤集/转换器中兼容，
 ///    用于读取旧备份恢复的数据——禁止新增写入，勿当活跃状态使用；
-/// ③ Submitted 仅由一事一议（SpecialApprovalFormService.CompleteReviewAsync）与 SubmitAsync 进入，
+/// ③ Submitted 仅由 SubmitAsync 进入（2026-11-17 起一事一议审议不再迁移申请状态：
+///    SpecialApprovalFormService.CompleteReviewAsync 只回写指定分类与标记，申请留在
+///    Draft+step5「已建档未提交」，由档案制作→完成归档走原管线转 Approved），
 ///    普通申请 Draft → 归档 → Approved；
 /// ④ 状态机严格校验 Submit/Approve/Refuse；CompleteArchiveAsync 与 StopAsync(allowSubmittedOverride)
 ///    的"业务放行"是有意为之（见各方法注释），改动前先读 ApplicationStatusService。

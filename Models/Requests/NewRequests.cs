@@ -24,10 +24,11 @@ public record SpecialApprovalFormRequest
 public record SpecialApprovalReviewRequest
 {
     public required long ApplicationId { get; init; }
+    // 申报内容（审议锁定表单前的最后一并落库：原实现只写会议字段，提交后新填的内容会被静默丢弃）
+    public string BasicSituation { get; init; } = string.Empty;
+    public string TemplateKey { get; init; } = string.Empty;
     public DateTime MeetingDate { get; init; }
-    public string MeetingLocation { get; init; } = string.Empty;
-    public string MeetingTopic { get; init; } = string.Empty;
-    public string MeetingSummary { get; init; } = string.Empty;
+    // 会议地点/议题/纪要三栏已于 2026-11-17 移除（地点由模板承载；议题/纪要无任何读取方）
     public string MeetingMembers { get; init; } = string.Empty;
     public string SpecialReason { get; init; } = string.Empty;
     public string SpecialCircumstances { get; init; } = string.Empty;

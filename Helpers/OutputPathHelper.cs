@@ -81,6 +81,31 @@ public static class OutputPathHelper
     }
 
     /// <summary>
+    /// B 类·分类目录：{输出根}\{分类}\（核查报告/档案照片/彩票预测等平铺落文件的分类），自动创建。
+    /// 分类名取 <see cref="Constants.OutputCategories"/>，禁止调用方自拼 OutputRoot。
+    /// </summary>
+    public static string GetCategoryDirectory(string category)
+    {
+        var dir = Path.GetFullPath(Path.Combine(OutputRoot, category));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>
+    /// B 类·期间目录：{输出根}\{分类}\{期间}\（月报表/高龄月报/公示文件等按期组织），自动创建。
+    /// 期间格式由调用方给定（月报 yyyyMM、公示 yyyy-MM），分类名取 <see cref="Constants.OutputCategories"/>。
+    /// </summary>
+    public static string GetPeriodDirectory(string category, string period)
+    {
+        if (string.IsNullOrWhiteSpace(period))
+            throw new ArgumentException("期间不能为空（B 类目录需要 yyyyMM / yyyy-MM 等期间段）", nameof(period));
+
+        var dir = Path.GetFullPath(Path.Combine(OutputRoot, category, period));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>
     /// 确保输出目录存在
     /// </summary>
     public static string EnsureDirectoryExists(
@@ -122,15 +147,23 @@ public static class OutputPathHelper
     }
 
     /// <summary>
-    /// 获取业务类型对应的中文分类名
+    /// 获取业务类型对应的中文分类名（输出目录名 + UI 业务类型显示名共用）。
+    /// 登记范围以 <see cref="Constants.PrintBusinessTypes"/> 与 PrintExecuteService.PrintPermissionMap
+    /// 的键集为准——新增业务打印类型时必须在此同步登记，否则会产出英文目录。
+    /// 未登记类型一律落「未分类」并告警（原实现原样返回英文，已实际产出
+    /// AssetVerificationMonthlyReport / Recovery 两个英文目录，见输出路径规范）。
     /// </summary>
     public static string GetCategoryDisplayName(string businessType)
     {
-        return businessType switch
+        if (string.IsNullOrWhiteSpace(businessType))
+            return UnregisteredCategory;
+
+        var display = businessType switch
         {
             "AssetVerification" => "资产核查",
             "FamilyApplication" => "社会救助申请",
             "MonthlyReport" => "月报表",
+            "AssetVerificationMonthlyReport" => "资产核查月报表", // 与 CategoryDisplayConverter 同名
             "EconomicReview" => "经济复核",
             "ArchiveQuery" => "档案查询",
             "TemporaryAssistance" => "临时救助",
@@ -139,9 +172,25 @@ public static class OutputPathHelper
             "LowIncomeProof" => "低保证明",
             "DeathStatement" => "死亡情况说明",
             "NearRelative" => "近亲属备案", // 近亲属备案独立输出域（NearRelativeConstants.BusinessType）
-            _ => businessType
+            "Recovery" => "追缴", // 与 ArchiveCategoryResolver 的分类名一致
+            "ArchivePhoto" => "档案照片", // 与 ArchivePhotoQueryViewModel 导出目录同名
+            "DynamicRecord" or "DynamicManagementRecord" => "动态管理档案", // 与 DynamicManagementRecordService.OutputCategory 同名
+            _ => string.Empty
         };
+
+        if (display.Length == 0)
+        {
+            Serilog.Log.Warning(
+                "[OutputPathHelper] 业务类型 {BusinessType} 未登记中文分类名，输出目录与显示名回退为「{Category}」；请在 OutputPathHelper.GetCategoryDisplayName 补登记",
+                businessType, UnregisteredCategory);
+            return UnregisteredCategory;
+        }
+
+        return display;
     }
+
+    /// <summary>未登记业务类型的兜底分类名（保证不产出英文目录）</summary>
+    private const string UnregisteredCategory = "未分类";
 
     /// <summary>
     /// 判断两路径是否存在包含关系（任一方向，含同一路径）——输出根切换前的迁移安全校验：

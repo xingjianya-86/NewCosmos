@@ -1,0 +1,113 @@
+/* ============================================================================
+ * 帝皇权杖δ-me13 · 序列登录专属样式（login.html 加载，splash.css 之后）
+ * ----------------------------------------------------------------------------
+ * 只做增量：第 2 步的"身份卡片位"换成账号密码表单（沿用 .dsu-card 的
+ * 发丝线分隔与档案行版式），以及核验失败的错误态配色。
+ * 底板/机框/按钮/字幕一律沿用 splash.css，不在此重复定义。
+ * ========================================================================== */
+
+/* ── 登录表单（占据 .dsu-card 的位置，行版式与身份卡一致）─────────────── */
+.dsu-form {
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+}
+
+.dsu-form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26px;
+  padding: 9px 4px;
+}
+.dsu-form-row + .dsu-form-row {
+  border-top: 1px solid var(--dsu-hair-soft);
+}
+
+.dsu-form-row label {
+  font-family: var(--dsu-zh);
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: var(--dsu-muted);
+  flex: none;
+}
+
+.dsu-form-row input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--dsu-mono);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--dsu-ink);
+  text-align: right;
+  padding: 2px 0;
+}
+.dsu-form-row input::placeholder {
+  color: var(--dsu-hair);
+  letter-spacing: 0.1em;
+}
+.dsu-form-row input:focus {
+  /* 聚焦只点光标与占位，不加框：档案行的克制感 */
+  caret-color: var(--dsu-accent);
+}
+.dsu-form-row input:-webkit-autofill {
+  /* 系统自动填充别刷白底，保持档案纸面 */
+  -webkit-text-fill-color: var(--dsu-ink);
+  transition: background-color 9999s ease-out;
+}
+
+.dsu-form-checks {
+  display: flex;
+  gap: 22px;
+  padding: 8px 4px 2px;
+  border-top: 1px solid var(--dsu-hair-soft);
+}
+.dsu-form-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-family: var(--dsu-zh);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--dsu-muted);
+  user-select: none;
+}
+.dsu-form-checks input[type="checkbox"] {
+  accent-color: var(--dsu-accent);
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ── 错误行（校验提示 / 服务端核验失败原因，等宽红字）────────────────── */
+.dsu-form-err {
+  font-family: var(--dsu-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--dsu-glitch-a);
+  padding: 7px 4px 1px;
+  border-top: 1px solid var(--dsu-hair-soft);
+  margin-top: 2px;
+}
+.dsu-form-err[hidden] { display: none; }
+
+/* ── 核验失败：中央状态字整行转红（错误态在回到表单前的短暂驻留）────────── */
+.dsu-status.dsu-err,
+.dsu-status.dsu-err .dsu-ch {
+  color: var(--dsu-glitch-a);
+}
+.dsu-status.dsu-err .dsu-caret {
+  background: var(--dsu-glitch-a);
+}
+
+/* ── 认证等待中：主按钮去脉冲、降透明，表示"不可再点" ─────────────────── */
+.dsu-btn[disabled] {
+  opacity: 0.55;
+  cursor: default;
+  animation: none;
+}

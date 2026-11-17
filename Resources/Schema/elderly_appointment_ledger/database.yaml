@@ -1,0 +1,112 @@
+# 老人预约申请沟通台账 Schema 定义（2026-11 新增）
+# 来源：《林口县老人预约申请沟通台账最新.xlsx》（林口县老人预约申请沟通台账，Sheet1：第1行标题、第2行表头、第3行起数据，共 487 行）
+#   原文件已不在 C:\Projects；数据取自其等同导出 CSV（经原 Excel 全量统计指标逐项反验一致）。
+# 单表台账：老人预约"能力评估"服务的沟通记录；一人一行（id_card 唯一），重复导入走 upsert 幂等。
+# 第13列在源表无表头，落库命名 assess_result（已评估/达不到中度/申请错误/住院，空=尚未回填）。
+database: 老人预约申请沟通台账
+version: 1.0
+description: 林口县老人预约申请沟通台账 - 预约能力评估服务的老人与联系人沟通记录，含预约时间与评估结论
+
+tables:
+  - name: nc_biz_elderly_appointment_ledger
+    comment: "[预约评估] 老人预约申请沟通台账 - 一人一行，id_card 唯一，重复导入幂等覆盖"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: seq_no
+        type: INT
+        nullable: true
+        comment: 源表序号
+      - name: city_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 所属市(牡丹江市)
+      - name: county_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 所属县区(林口县)
+      - name: elder_name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 老人姓名
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 公民身份号码(唯一，导入幂等键)
+      - name: elder_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 老年人联系电话
+      - name: contact_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 联系人姓名(源表'-'或空=无联系人)
+      - name: contact_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 联系人电话
+      - name: service_type
+        type: VARCHAR(50)
+        nullable: true
+        comment: 预约服务类型(本批全部为"能力评估")
+      - name: appointment_text
+        type: VARCHAR(50)
+        nullable: true
+        comment: 预约时间原文(如 2026-10-20 上午)
+      - name: appointment_date
+        type: DATE
+        nullable: true
+        comment: 预约日期(自 appointment_text 解析，统计口径)
+      - name: appointment_half
+        type: VARCHAR(4)
+        nullable: true
+        comment: 预约时段(上午/下午)
+      - name: application_time_raw
+        type: VARCHAR(50)
+        nullable: true
+        comment: 申请时间原文(源表个别行为"2026-10-29 下午")
+      - name: application_time
+        type: TIMESTAMP
+        nullable: true
+        comment: 申请时间(可解析时落值，否则 NULL，原文在 application_time_raw)
+      - name: residence_address
+        type: VARCHAR(500)
+        nullable: true
+        comment: 居住地址(源表原文，未归一到标准地址)
+      - name: assess_result
+        type: VARCHAR(50)
+        nullable: true
+        comment: 评估结论/状态(源表第13列，无表头；空=尚未回填)
+      - name: source_file
+        type: VARCHAR(200)
+        nullable: true
+        comment: 来源文件名
+      - name: source_row
+        type: INT
+        nullable: true
+        comment: 源表 Excel 行号(回溯核对用)
+      - name: created_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: now()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: now()
+        comment: 更新时间(重复导入时刷新)
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 软删除时间(NULL=未删除)
+    indexes:
+      - name: uq_elderly_appointment_ledger_id_card
+        columns: [id_card]
+        unique: true
+      - name: idx_elderly_appointment_ledger_date
+        columns: [appointment_date]
+      - name: idx_elderly_appointment_ledger_service
+        columns: [service_type]

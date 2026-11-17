@@ -194,6 +194,12 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
         NavigateToFeatureAsync<Pages.SocialAssistance.NearRelativeListPage>(
             true, "近亲属备案", "近亲属备案");
 
+    // 快速核验·模拟测算：只读核验系统内台账 + 收入标准试算（入口门控沿用查看低收入认定权限）
+    [RelayCommand]
+    private Task OpenQuickVerifyAsync() =>
+        NavigateToFeatureAsync<Pages.SocialAssistance.QuickVerifyPage>(
+            CanAccessSocialAssistance, "快速核验·模拟测算", "快速核验·模拟测算");
+
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
 
     #endregion

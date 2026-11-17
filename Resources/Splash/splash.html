@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8" ?>
 <!doctype html>
 <html lang="zh-CN">
 <head>
@@ -17,7 +18,23 @@
 <script src="config.js"></script>
 <!-- 2) 宿主桥：done / error 事件 → newcosmos-splash:// 自定义协议 -->
 <script src="bridge.js"></script>
-<!-- 3) 动画运行时（已本地化：品牌标识、音频路径） -->
+<!-- 3) 运行时 core 引擎（配置/DOM/音效/台词/标题栏/时间线/收尾，7 个模块） -->
+<script src="core/anim-config.js"></script>
+<script src="core/anim-dom.js"></script>
+<!-- 音频嵌入包（prepare_splash_audio.ps1 生成）：mp3 零请求 -->
+<script src="core/anim-audio-assets.js"></script>
+<script src="core/anim-audio.js"></script>
+<script src="core/anim-voice.js"></script>
+<script src="core/anim-chrome.js"></script>
+<script src="core/anim-timeline.js"></script>
+<script src="core/anim-runtime.js"></script>
+<!-- 4) 五幕场景（黑幕 / 洗白 / 档案底板 / 五步验证 / 终幕揭幕） -->
+<script src="scenes/scene-brand.js"></script>
+<script src="scenes/scene-wash.js"></script>
+<script src="scenes/scene-plate.js"></script>
+<script src="scenes/scene-verify.js"></script>
+<script src="scenes/scene-finale.js"></script>
+<!-- 5) 编排器：按原时序串起五幕（已本地化：品牌标识、音频路径） -->
 <script src="splash.js"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 using NewCosmos.Constants;
+using NewCosmos.Helpers;
 using NewCosmos.Models.Enums;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -257,7 +258,7 @@ public partial class PrintService
 
         foreach (var fields in pagesResult.Value)
         {
-            var tempPath = Path.Combine(Path.GetTempPath(), $"nc_elderly_{Guid.NewGuid():N}.xlsx");
+            var tempPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"nc_elderly_{Guid.NewGuid():N}.xlsx");
             try
             {
                 using var engine = await _engineFactory.CreateFromTemplateIdAsync(templateId, ct);
@@ -389,7 +390,7 @@ public partial class PrintService
 
         foreach (var (fields, _) in dataResult.Value)
         {
-            var tempPath = Path.Combine(Path.GetTempPath(), $"nc_elderly_age90_{Guid.NewGuid():N}.xlsx");
+            var tempPath = Path.Combine(OutputPathHelper.GetTempDirectory(), $"nc_elderly_age90_{Guid.NewGuid():N}.xlsx");
             try
             {
                 using var engine = await _engineFactory.CreateFromTemplateIdAsync(templateResult.Value, ct);

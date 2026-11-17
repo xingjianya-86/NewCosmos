@@ -32,7 +32,14 @@
 
                 <!-- 最新开奖信息卡片区 -->
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
-                    <Label Text="{Binding LatestDrawTitle}" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Label Text="{Binding LatestDrawTitle}" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0" VerticalOptions="Center"/>
+                        <Picker Grid.Column="1"
+                                ItemsSource="{Binding LotteryTypeOptions}"
+                                SelectedItem="{Binding SelectedLotteryTypeOption}"
+                                ItemDisplayBinding="{Binding Name}"
+                                WidthRequest="120" HeightRequest="40" VerticalOptions="Center"/>
+                    </Grid>
 
                     <Border Style="{StaticResource CardBorder}" Padding="16">
                         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">

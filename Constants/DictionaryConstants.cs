@@ -226,6 +226,14 @@ public static class DictionaryConstants
         /// 明细 field_name=MemberRemove、field_label=成员姓名、new_value='转出单人保'。
         /// </summary>
         public const string SINGLE_RESCUE_OUT = "SingleRescueOut";
+
+        /// <summary>
+        /// 核验停止（保障对象动态管理「拒绝配合核验工作」按钮：核验失败直接停止保障，只停不建新档）。
+        /// change_category=NULL（不入增减员调整表）、triggered_stop 恒 false——
+        /// 置 true 会被 GetLatestGraceExitChangeAsync 的 triggered_stop=true 分支误读为渐退退出记录
+        ///（同"分类施保减除"先例）；停保事实由本 change_type 专用查询承载。
+        /// </summary>
+        public const string VERIFY_STOP = "VerifyStop";
     }
 
     /// <summary>

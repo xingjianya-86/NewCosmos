@@ -558,6 +558,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 适用事实（与装配端方向一一对应，单点权威 = ChangeDocumentFacts.NoticeApplicable）：
             //   ① 户主死亡整户停止 → IsHouseholdDeathStop（整户已死，须告知终止；
             //      **不受"单人保排除"限制**——死亡是客观事件，无论原分类是否单人保都应告知）；
+            //   ①' 核验停止（拒绝配合核验工作）→ IsVerifyStop（同为客观停保事件，同样不受单人保排除限制）；
             //   ② 停保/不予认定 → IsIncomeStopChange（复核/成员变更收入超标 triggered_stop），
             //      或归档终结拒保兜底 IsArchiveRefusedStop（只置 Stopped、无变更记录，app95 同型）；
             //   ③ 待遇调整 → HasFundChangeRegistration（链上有"保障金变更登记"，旧/新同属低保且
@@ -617,6 +618,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     ("FundChangeRegistration", docFacts?.HasFundChangeRegistration ?? false),
                     ("ArchiveRefusedStop", docFacts?.IsArchiveRefusedStop ?? false),
                     ("HouseholdDeathStop", docFacts?.IsHouseholdDeathStop ?? false),
+                    ("VerifyStop", docFacts?.IsVerifyStop ?? false),
                     ("TemplateFilterMode", IsTemplateFilterMode),
                     ("Classification", classification));
             }

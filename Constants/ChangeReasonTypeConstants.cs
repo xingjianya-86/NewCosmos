@@ -39,4 +39,11 @@ public static class ChangeReasonTypeConstants
     /// 分类施保金额变动一律登记（分类施保为固定档位标准，不套保障金 10 元阈值）。
     /// </summary>
     public const string ClassifiedSubsidyChange = "分类施保变更";
+
+    /// <summary>
+    /// 核验停止（动态管理「拒绝配合核验工作」直接停止保障）。
+    /// 故意不复用 EconomicReview/HeadDeceased/MemberChange——GetLatestReviewChangeRecordAsync /
+    /// GetLatestGraceExitChangeAsync 按 reason_type 取"最近一条"，复用会被定期复核/渐退文书误读。
+    /// </summary>
+    public const string VerifyStop = "核验停止";
 }

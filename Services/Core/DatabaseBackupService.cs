@@ -124,6 +124,9 @@ public class DatabaseBackupService : BaseService, IDatabaseBackupService
             LogInfo("备份数据库完成");
             Logger.LogBusiness("数据库备份完成", ("BackupFile", backupFileName), ("Size", FormatSize(new FileInfo(fullPath).Length)));
 
+            // 轮转：清理超期备份（RetentionDays <= 0 表示不清理）
+            PruneExpiredBackups(backupPath, appOptions.ApplicationName, dbOptions.RetentionDays);
+
             return Result.Success(fullPath);
         }
         catch (Exception ex)
@@ -141,6 +144,50 @@ public class DatabaseBackupService : BaseService, IDatabaseBackupService
         var unit = 0;
         while (size >= 1024 && unit < units.Length - 1) { size /= 1024; unit++; }
         return $"{size:0.##} {units[unit]}";
+    }
+
+    /// <summary>
+    /// 清理早于保留期的备份文件（只删本服务产出的 "{应用名}_backup_*.sql"，不误伤用户自放文件）。
+    /// retentionDays &lt;= 0 表示不清理。单个文件删除失败仅记日志，绝不影响刚完成的备份结果。
+    /// </summary>
+    private void PruneExpiredBackups(string backupPath, string applicationName, int retentionDays)
+    {
+        if (retentionDays <= 0) return;
+
+        try
+        {
+            if (!Directory.Exists(backupPath)) return;
+
+            var cutoff = DateTime.Now.AddDays(-retentionDays);
+            var pattern = $"{applicationName}_backup_*.sql";
+            var expired = Directory.GetFiles(backupPath, pattern)
+                .Where(f => File.GetLastWriteTime(f) < cutoff)
+                .ToList();
+
+            if (expired.Count == 0) return;
+
+            var freed = 0L;
+            foreach (var file in expired)
+            {
+                try
+                {
+                    freed += new FileInfo(file).Length;
+                    File.Delete(file);
+                }
+                catch (Exception ex)
+                {
+                    LogWarn($"清理过期备份失败: {Path.GetFileName(file)}, {ex.Message}");
+                }
+            }
+
+            LogInfo($"已清理 {expired.Count} 个超过 {retentionDays} 天的备份，释放 {FormatSize(freed)}");
+            Logger.LogBusiness("过期备份清理", ("Count", expired.Count), ("RetentionDays", retentionDays), ("Freed", FormatSize(freed)));
+        }
+        catch (Exception ex)
+        {
+            // 轮转属附加动作：失败只告警，不影响备份主流程
+            LogWarn($"备份轮转清理异常: {ex.Message}");
+        }
     }
 
     /// <summary>

@@ -17,11 +17,14 @@
     LOG1  空 catch 吞异常（§7）
     LOG2  catch 内仅注释"静默处理"（§7）
     SEC   明文密码字面量入代码（§12）
+    OUT1  绕过 OutputPathHelper 直拼输出根 Path.Combine(OutputRoot,...)（输出路径统一规范 docs\20261007 §2）
+    OUT2  输出分类目录名字面量直拼（应取 Constants\OutputCategories + GetCategoryDirectory/GetPeriodDirectory）
+    OUT3  A 类文书目录传英文业务类型字面量（须经 GetCategoryDisplayName 中文化，否则产出英文目录）
     TODO  TODO/FIXME 残留计数
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('ALL','SQL','UI','SYNC','LOG','SEC','TODO')]
+    [ValidateSet('ALL','SQL','UI','SYNC','LOG','SEC','OUT','TODO')]
     [string]$Category = 'ALL'
 )
 
@@ -138,6 +141,29 @@ foreach ($f in $files) {
             Hit 'SEC' $f $n $t
         }
 
+        # OUT1: 绕过 OutputPathHelper 直拼输出根（docs\20261007 §2：写文件一律走
+        #   GetFilePath/EnsureDirectoryExists（A 类）或 GetCategoryDirectory/GetPeriodDirectory（B 类））。
+        #   豁免：OutputPathHelper 自身实现；OutputRootMigrationService 读根做迁移。
+        #   注意 TryOpenFolder(OutputRoot)/PickFolderAsync(设置页改根) 是"读根"，无 Path.Combine 不命中。
+        if ($Category -in 'ALL','OUT' -and $f.Name -ne 'OutputPathHelper.cs' -and
+            $t -match 'Path\.Combine\(\s*(?:Helpers\.)?OutputPathHelper\.OutputRoot|Path\.Combine\(\s*OutputRoot\b') {
+            Hit 'OUT1' $f $n $t
+        }
+
+        # OUT2: 输出分类目录名字面量直拼（目录名单一来源 = Constants\OutputCategories；
+        #   命中说明有人绕过常量自拼路径。多行 Path.Combine 本规则查不到，靠评审把关）
+        if ($Category -in 'ALL','OUT' -and
+            $t -match 'Path\.Combine\([^)]*"(月报表|高龄月报|核查报告|公示文件|档案照片|彩票预测)"') {
+            Hit 'OUT2' $f $n $t
+        }
+
+        # OUT3: A 类文书目录传英文业务类型字面量 → 产出英文目录（阶段A 实锤
+        #   AssetVerificationMonthlyReport/Recovery 两个英文目录；必须走 GetCategoryDisplayName）
+        if ($Category -in 'ALL','OUT' -and
+            $t -match '(GetFilePath|EnsureDirectoryExists|GetSubjectDirectory)\(\s*"[A-Za-z][A-Za-z0-9_]*"') {
+            Hit 'OUT3' $f $n $t
+        }
+
         # TODO
         if ($Category -in 'ALL','TODO' -and $t -match 'TODO|FIXME') {
             Hit 'TODO' $f $n $t
@@ -149,7 +175,7 @@ Write-Host ""
 Write-Host "==== NewCosmos 规范检查报告 ($(Get-Date -Format 'yyyy-MM-dd HH:mm')) ====" -ForegroundColor Cyan
 $grouped = $results | Group-Object Cat | Sort-Object Name
 foreach ($g in $grouped) {
-    $color = if ($g.Name -in @('SEC','UI1','SQL1')) { 'Red' } elseif ($g.Count -gt 10) { 'Yellow' } else { 'Gray' }
+    $color = if ($g.Name -in @('SEC','UI1','SQL1','OUT1','OUT2','OUT3')) { 'Red' } elseif ($g.Count -gt 10) { 'Yellow' } else { 'Gray' }
     Write-Host ("{0,-5} {1,4} 处" -f $g.Name, $g.Count) -ForegroundColor $color
 }
 Write-Host ("合计 {0} 处" -f $results.Count)
