@@ -5,6 +5,7 @@ using NewCosmos.Constants;
 using NewCosmos.Models.Requests;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Platform;
 using NewCosmos.ViewModels.Base;
 
@@ -20,6 +21,7 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
     private const double CardAspectRatio = 85.6 / 54.0;
 
     private readonly IOcrRecognizeClient _ocrClient;
+    private readonly IArchivePhotoPendingService _pendingPhotoService;
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
@@ -40,12 +42,14 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
     /// <summary>当前类别（默认身份证；取景框仅身份证类别显示）</summary>
     private string _categoryCode = PhotoCategoryConstants.ID_CARD;
 
-    public MobileOcrScanPage(IOcrRecognizeClient ocrClient, ILoggerService logger,
+    public MobileOcrScanPage(IOcrRecognizeClient ocrClient, IArchivePhotoPendingService pendingPhotoService,
+        ILoggerService logger,
         IDialogService dialogService, IServiceProvider serviceProvider,
         IScreenAwakeService screenAwake)
     {
         InitializeComponent();
         _ocrClient = ocrClient;
+        _pendingPhotoService = pendingPhotoService;
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
@@ -145,6 +149,73 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         GuideFrame.HeightRequest = frameWidth * CardAspectRatio;
     }
 
+    /// <summary>无身份证：把当前拍/选的照片直接存入待归属照片池（不要求身份证）。</summary>
+    private async void OnSavePendingClicked(object? sender, EventArgs e)
+    {
+        if (_capturing || _completed) return;
+
+        _capturing = true;
+        ShowBusy(true, "正在保存待归属照片...");
+        try
+        {
+            byte[]? bytes = null;
+            string? fileName = null;
+
+            if (DeviceInfo.Platform == DevicePlatform.WinUI)
+            {
+                var picker = _serviceProvider.GetRequiredService<IFilePickerService>();
+                var pick = await picker.PickFileAsync("选择照片",
+                    new[] { ".jpg", ".jpeg", ".png", ".webp" });
+                if (pick.Status != FilePickStatus.Picked || string.IsNullOrWhiteSpace(pick.Path))
+                    return;
+                bytes = await File.ReadAllBytesAsync(pick.Path);
+                fileName = Path.GetFileName(pick.Path);
+            }
+            else
+            {
+                var shot = await MediaPicker.Default.CapturePhotoAsync();
+                if (shot == null) return;
+                fileName = shot.FileName;
+                await using var stream = await shot.OpenReadAsync();
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            }
+
+            if (bytes == null || bytes.Length == 0)
+            {
+                await _dialogService.DisplayAlertAsync("提示", "照片内容为空，请重试", "确定");
+                return;
+            }
+
+            var save = await _pendingPhotoService.SavePendingAsync(
+                bytes, _categoryCode, fileName, null, null, "扫描页待归属",
+                _scanCts?.Token ?? CancellationToken.None);
+            if (save.IsFailure)
+            {
+                await _dialogService.DisplayAlertAsync("保存失败", save.Message ?? "保存待归属照片失败", "确定");
+                return;
+            }
+
+            await _dialogService.ShowSnackBarAsync("已存入待归属照片");
+            await RestartPreviewAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // 页面离开：静默
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存待归属照片失败");
+            await _dialogService.DisplayAlertAsync("错误", $"保存失败：{ex.Message}", "确定");
+        }
+        finally
+        {
+            _capturing = false;
+            ShowBusy(false);
+        }
+    }
+
     private async void OnCaptureClicked(object? sender, EventArgs e)
     {
         if (_capturing || _completed) return;
@@ -185,19 +256,30 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
 
         try
         {
-            var photos = await MediaPicker.Default.PickPhotosAsync();
-            var photo = photos?.FirstOrDefault();
-            if (photo is null) return;
-
-            _capturing = true;
             byte[] bytes;
-            await using (var stream = await photo.OpenReadAsync())
-            using (var ms = new MemoryStream())
+            if (DeviceInfo.Platform == DevicePlatform.WinUI)
             {
+                // Windows：相机不可用/无权限时走系统文件选择，保证 PC 端也能选图识别
+                var picker = _serviceProvider.GetRequiredService<IFilePickerService>();
+                var pick = await picker.PickFileAsync("选择证件图片",
+                    new[] { ".jpg", ".jpeg", ".png", ".webp" });
+                if (pick.Status != FilePickStatus.Picked || string.IsNullOrWhiteSpace(pick.Path))
+                    return;
+                bytes = await File.ReadAllBytesAsync(pick.Path);
+            }
+            else
+            {
+                var photos = await MediaPicker.Default.PickPhotosAsync();
+                var photo = photos?.FirstOrDefault();
+                if (photo is null) return;
+
+                await using var stream = await photo.OpenReadAsync();
+                using var ms = new MemoryStream();
                 await stream.CopyToAsync(ms);
                 bytes = ms.ToArray();
             }
 
+            _capturing = true;
             await RecognizeAndAssignAsync(bytes);
         }
         catch (OperationCanceledException)

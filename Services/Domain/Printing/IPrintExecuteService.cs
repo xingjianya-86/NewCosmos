@@ -25,5 +25,6 @@ public interface IPrintExecuteService
         int copies = 1,
         bool isDuplex = false,
         bool printToPrinter = true,
+        bool includePhotos = false,
         CancellationToken ct = default);
 }

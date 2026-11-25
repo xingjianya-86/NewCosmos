@@ -400,6 +400,7 @@ public partial class DeathStatementViewModel
             Math.Max(1, Copies),
             IsDuplex,
             printToPrinter: printToPrinter,
+            includePhotos: false,
             ct);
     }
 

@@ -357,6 +357,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.DeathIdentityAggregator>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IDeathStatementService, Services.Domain.ArchiveManagement.DeathStatementService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoService, Services.Domain.ArchiveManagement.ArchivePhotoService>();
+builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoPendingService, Services.Domain.ArchiveManagement.ArchivePhotoPendingService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoWebPMigrationService, Services.Domain.ArchiveManagement.ArchivePhotoWebPMigrationService>();
         builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IPublicityOutputService, Services.Domain.ArchiveManagement.PublicityOutputService>();
         builder.Services.AddSingleton<Services.Domain.ChangeManagement.IChangeService, Services.Domain.ChangeManagement.ChangeService>();
@@ -598,6 +599,8 @@ public static class MauiProgram
         // 档案照片查询/导出（桌面端）：按身份证/备注检索 → 预览 → 导出到输出根
         builder.Services.AddTransient<ViewModels.ArchiveManagement.ArchivePhotoQueryViewModel>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ArchivePhotoQueryPage>();
+builder.Services.AddTransient<ViewModels.ArchiveManagement.PendingPhotosViewModel>();
+builder.Services.AddTransient<Pages.ArchiveManagement.PendingPhotosPage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.ProofUnitTemplateManagePage>();
         builder.Services.AddTransient<Pages.ArchiveManagement.MonthlyPublicityPage>();
 

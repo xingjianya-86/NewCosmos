@@ -29,6 +29,7 @@ namespace NewCosmos.ViewModels.ArchiveManagement;
 public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 {
     private readonly IArchivePhotoService _photoService;
+    private readonly IArchivePhotoPendingService _pendingPhotoService;
     private readonly IArchivePhotoWebPMigrationService _webpMigrationService;
     private readonly IDialogService _dialogService;
     private readonly ILoggerService _logger;
@@ -59,6 +60,20 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     [ObservableProperty]
     private string _keyword = string.Empty;
+
+    /// <summary>待归属照片数量（无身份证先存的照片）。</summary>
+    [ObservableProperty]
+    private int _pendingPhotoCount;
+
+    public string PendingPhotosText => $"待归属照片 ({PendingPhotoCount})";
+
+    partial void OnPendingPhotoCountChanged(int value) => OnPropertyChanged(nameof(PendingPhotosText));
+
+    /// <summary>打开待归属照片池；带入当前查询身份证作为归属默认值。</summary>
+    [RelayCommand]
+    private async Task OpenPendingPhotosAsync()
+        => await NavigateToPageAsync<Pages.ArchiveManagement.PendingPhotosPage, PendingPhotosParameter>(
+            new PendingPhotosParameter(string.IsNullOrWhiteSpace(Keyword) ? null : Keyword.Trim()));
 
     /// <summary>类别代码，空 = 全部。</summary>
     [ObservableProperty]
@@ -143,6 +158,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
 
     public ArchivePhotoQueryViewModel(
         IArchivePhotoService photoService,
+        IArchivePhotoPendingService pendingPhotoService,
         IArchivePhotoWebPMigrationService webpMigrationService,
         IDialogService dialogService,
         ILoggerService logger,
@@ -151,6 +167,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         INewPermissionService permissionService)
     {
         _photoService = photoService;
+        _pendingPhotoService = pendingPhotoService;
         _webpMigrationService = webpMigrationService;
         _dialogService = dialogService;
         _logger = logger;
@@ -186,6 +203,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     {
         await base.OnAppearingAsync();
         await RefreshPendingCountAsync();
+        await RefreshPendingPhotosCountAsync();
 
         // 业务页带身份证进入 → 自动检索；从采集页/补传页返回 → 无条件重查（新插入照片要立即可见）
         if (_autoSearchOnAppear || _returnRefreshNeeded)
@@ -373,6 +391,14 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
         var result = await _webpMigrationService.CountPendingAsync(CancellationToken);
         if (result.IsSuccess)
             PendingWebPCount = result.Value;
+    }
+
+    /// <summary>刷新待归属照片数量（与 WebP 待转换计数分开）。</summary>
+    private async Task RefreshPendingPhotosCountAsync()
+    {
+        var result = await _pendingPhotoService.CountPendingAsync(CancellationToken);
+        if (result.IsSuccess)
+            PendingPhotoCount = result.Value;
     }
 
     /// <summary>
@@ -704,11 +730,10 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     {
         try
         {
-            var owner = await ResolveOwnerForInsertAsync();
-            if (owner == null) return;
-
             var category = await ResolveInsertCategoryAsync();
             if (category == null) return; // 用户取消选类别
+
+            var owner = await ResolveOwnerForInsertAsync(showError: false);
 
             var picked = await MediaPicker.Default.PickPhotosAsync();
             if (picked == null) return;
@@ -729,7 +754,10 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 }
             }
 
-            await InsertBytesAsync(owner, category, files, InsertSourcePick);
+            if (owner == null)
+                await InsertBytesToPendingAsync(files, category, InsertSourcePick);
+            else
+                await InsertBytesAsync(owner, category, files, InsertSourcePick);
         }
         catch (FeatureNotSupportedException)
         {
@@ -761,11 +789,10 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 return;
             }
 
-            var owner = await ResolveOwnerForInsertAsync();
-            if (owner == null) return;
-
             var category = await ResolveInsertCategoryAsync();
             if (category == null) return;
+
+            var owner = await ResolveOwnerForInsertAsync(showError: false);
 
             var files = new List<byte[]>(paths.Count);
             foreach (var path in paths)
@@ -781,7 +808,10 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 }
             }
 
-            await InsertBytesAsync(owner, category, files, InsertSourceDrop);
+            if (owner == null)
+                await InsertBytesToPendingAsync(files, category, InsertSourceDrop);
+            else
+                await InsertBytesAsync(owner, category, files, InsertSourceDrop);
         }
         catch (Exception ex)
         {
@@ -842,25 +872,29 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     /// 锁定插入归属人：关键词为合法身份证用之，否则用"当前查询结果同属一人"（见 <see cref="PhotoOwnerResolver"/>）；
     /// 再查库确认该身份证确实存在于三类业务档案，取回姓名与代表业务 ID。任一步不通过都给出可执行的提示。
     /// </summary>
-    private async Task<PhotoOwner?> ResolveOwnerForInsertAsync()
+    private async Task<PhotoOwner?> ResolveOwnerForInsertAsync(bool showError = true)
     {
         var idCard = PhotoOwnerResolver.Resolve(Keyword, Photos.Select(p => p.ApplicantIdCard));
         if (string.IsNullOrEmpty(idCard))
         {
-            await _dialogService.DisplayAlertAsync("请先指定档案人员",
-                "插入的照片必须挂到已存在的档案人员名下。\n\n" +
-                "请先在查询框输入该人员的 18 位身份证号并点「查询」" +
-                "（或让查询结果只显示这一个人），再执行插入。", "确定");
+            if (showError)
+                await _dialogService.DisplayAlertAsync("请先指定档案人员",
+                    "插入的照片必须挂到已存在的档案人员名下。\n\n" +
+                    "请先在查询框输入该人员的 18 位身份证号并点「查询」" +
+                    "（或让查询结果只显示这一个人），再执行插入。", "确定");
             return null;
         }
 
         var result = await _photoService.ResolveOwnerAsync(idCard, CancellationToken);
         if (result.IsFailure)
         {
-            await _dialogService.DisplayAlertAsync("无法插入", result.Message ?? "档案人员不存在", "确定");
+            if (showError)
+                await _dialogService.DisplayAlertAsync("无法插入", result.Message ?? "档案人员不存在", "确定");
             return null;
         }
 
+        if (result.Value == null && showError)
+            await _dialogService.DisplayAlertAsync("无法插入", "该身份证不在业务档案中，请先建立申请", "确定");
         return result.Value;
     }
 
@@ -895,6 +929,42 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 PersonName: owner.PersonName ?? string.Empty,
                 IdCard: owner.IdCard ?? string.Empty)
             : null;
+
+    /// <summary>无有效归属人时：把图片存入待归属照片池，拿到身份证后再归属。</summary>
+    private async Task InsertBytesToPendingAsync(List<byte[]> files, string category, string source)
+    {
+        if (files.Count == 0)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "没有可插入的图片文件", "确定");
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            var saved = 0;
+            string? firstError = null;
+            foreach (var bytes in files)
+            {
+                var result = await _pendingPhotoService.SavePendingAsync(
+                    bytes, category, null, null, null, source, CancellationToken);
+                if (result.IsFailure)
+                {
+                    firstError ??= result.Message;
+                    _logger.Warn($"待归属照片保存失败: {result.Message}");
+                    continue;
+                }
+                saved++;
+            }
+
+            await RefreshPendingPhotosCountAsync();
+            if (saved > 0)
+                await _dialogService.ShowSnackBarAsync($"未指定有效身份证，已存入待归属 {saved} 张（可稍后在「待归属照片」归属）");
+            else
+                await _dialogService.DisplayAlertAsync("保存失败", firstError ?? "未保存任何照片", "确定");
+
+            return Result.Success();
+        }, "存入待归属照片...");
+    }
 
     /// <summary>批量入库 → 记业务日志 → 刷新列表与待转计数 → 汇总提示（成功/失败张数 + 首个原因）。</summary>
     private async Task InsertBytesAsync(PhotoOwner owner, string category, List<byte[]> files, string source)

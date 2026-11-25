@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
@@ -168,6 +168,10 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isDuplex = true;
+
+    /// <summary>打印照片（默认关：档案打印默认无照片输出）。</summary>
+    [ObservableProperty]
+    private bool _includePhotos;
 
     // ---- 预览 ----
     [ObservableProperty]
@@ -912,6 +916,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 actualCopies,
                 IsDuplex,
                 printToPrinter: printToPrinter,
+                includePhotos: IncludePhotos,
                 CancellationToken);
 
             if (result.IsSuccess)

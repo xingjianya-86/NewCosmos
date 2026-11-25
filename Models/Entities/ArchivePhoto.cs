@@ -49,3 +49,28 @@ public class ArchivePhoto
     /// <summary>类别中文名（列表展示用）。</summary>
     public string PhotoCategoryName => PhotoCategoryConstants.GetDisplayName(PhotoCategory);
 }
+
+/// <summary>待归属照片（身份证未定，先存；归属后写入 nc_biz_archive_photos）。</summary>
+public class PendingArchivePhoto
+{
+    public long Id { get; set; }
+    public byte[] PhotoData { get; set; } = Array.Empty<byte>();
+    public string ImageFormat { get; set; } = PhotoFormatConstants.WebP;
+    public string PhotoCategory { get; set; } = PhotoCategoryConstants.OTHER_CERT;
+    public string? PhotoName { get; set; }
+    public long FileSize { get; set; }
+    public string? RecognizedName { get; set; }
+    public string? RecognizedIdCard { get; set; }
+    public string? Source { get; set; }
+    public string Status { get; set; } = "Pending";
+    public long? AssignedPhotoId { get; set; }
+    public DateTime? AssignedAt { get; set; }
+    public int? CreatedBy { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public string PhotoCategoryName => PhotoCategoryConstants.GetDisplayName(PhotoCategory);
+    public string DisplayName => !string.IsNullOrWhiteSpace(RecognizedName)
+        ? RecognizedName!
+        : (!string.IsNullOrWhiteSpace(PhotoName) ? PhotoName! : $"待归属照片 #{Id}");
+}

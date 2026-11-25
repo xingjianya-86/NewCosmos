@@ -643,7 +643,22 @@ public partial class TempReliefFormViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(ApplicantIdCard))
         {
-            await _dialogService.DisplayAlertAsync("提示", "请先选择申请人（身份证号缺失），再查看或采集照片", "确定");
+            var choice = await _dialogService.DisplayActionSheetAsync(
+                "身份证号缺失", "取消", null, "扫描证件", "拍照/选图存入待归属");
+            if (choice == "扫描证件")
+            {
+                await ScanIdCardAsync();
+                return;
+            }
+            if (choice == "拍照/选图存入待归属")
+            {
+                await NavigateToPageAsync<Pages.Mobile.MobileArchivePhotoPage, ArchivePhotoParameter>(
+                    new ArchivePhotoParameter(
+                        string.Empty,
+                        _id > 0 ? _id : null,
+                        ApplicantName,
+                        AssignContext: this));
+            }
             return;
         }
 
@@ -653,6 +668,31 @@ public partial class TempReliefFormViewModel : ViewModelBase
                 ApplicantIdCard.Trim(),
                 ApplicationId: _id > 0 ? _id : null,
                 AssignContext: this));
+    }
+
+    /// <summary>
+    /// 扫描证件（不要求先有身份证）：相机/选图 → OCR → 定向回填姓名/身份证/详细地址。
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanIdCardAsync()
+    {
+        try
+        {
+            var completion = new TaskCompletionSource<int>();
+            await NavigateToPageAsync<Pages.Mobile.MobileOcrScanPage, OcrScanParameter>(
+                new OcrScanParameter(this, applied => completion.TrySetResult(applied)));
+
+            var applied = await completion.Task;
+            if (applied > 0)
+                await _dialogService.ShowSnackBarAsync($"已回填 {applied} 条识别结果");
+
+            _logger.LogBusiness("临时救助-证件扫描", ("Applied", applied.ToString()));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "临时救助证件扫描失败");
+            await _dialogService.DisplayAlertAsync("提示", "扫描失败，请重试或手动录入", "确定");
+        }
     }
 
     /// <summary>救助对象选项条目</summary>

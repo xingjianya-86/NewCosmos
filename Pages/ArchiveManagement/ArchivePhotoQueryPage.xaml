@@ -42,7 +42,7 @@
                     <Button Grid.Column="6" x:Name="btnExportToFolder" Text="另存为…" Style="{StaticResource ButtonPrimary}" HeightRequest="40"
                             Command="{Binding ExportToFolderCommand}"/>
                 </Grid>
-                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*" ColumnSpacing="8">
                     <Button Grid.Column="0" Text="{Binding ExportSelectedText}"
                             Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             Command="{Binding ExportSelectedCommand}"/>
@@ -64,7 +64,9 @@
                     <!-- 手机端「更多」：收拢桌面端摆在外面的次要功能（导出全部/另存为/清空/转WebP/采集页/补传/导出格式） -->
                     <Button Grid.Column="7" x:Name="btnMore" Text="更多 ▾" Style="{StaticResource ButtonOutline}" HeightRequest="36"
                             IsVisible="False" Command="{Binding MoreOptionsCommand}"/>
-                    <Label Grid.Column="8" x:Name="lblHint" Text="插入须先查到具体的人（身份证），也可把图片直接拖进窗口；勾选多张可导出/推送打印/另存为"
+                    <Button Grid.Column="8" Text="{Binding PendingPhotosText}" Style="{StaticResource ButtonOutline}" HeightRequest="36"
+                            Command="{Binding OpenPendingPhotosCommand}"/>
+                    <Label Grid.Column="9" x:Name="lblHint" Text="插入须先查到具体的人（身份证），也可把图片直接拖进窗口；勾选多张可导出/推送打印/另存为"
                            FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                 </Grid>
             </VerticalStackLayout>

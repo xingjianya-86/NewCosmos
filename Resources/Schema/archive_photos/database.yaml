@@ -61,3 +61,79 @@ tables:
         columns: [applicant_id_card, photo_category, created_at]
       - name: idx_archive_photos_application
         columns: [application_id]
+
+  # ── 待归属照片池（无身份证先存） ──
+  - name: nc_biz_archive_photo_pending
+    comment: 待归属照片池 - 身份证未定时先存，归属后写入 nc_biz_archive_photos
+    columns:
+      - name: id
+        type: bigserial
+        primaryKey: true
+        nullable: false
+        comment: 自增主键
+      - name: photo_data
+        type: bytea
+        nullable: false
+        comment: 照片二进制（WebP）
+      - name: image_format
+        type: character varying(16)
+        defaultValue: "'webp'"
+        nullable: false
+        comment: 照片格式
+      - name: photo_category
+        type: character varying(30)
+        defaultValue: "'OTHER_CERT'"
+        nullable: false
+        comment: 照片类别
+      - name: photo_name
+        type: character varying(200)
+        nullable: true
+        comment: 照片备注/原名
+      - name: file_size
+        type: bigint
+        defaultValue: 0
+        nullable: false
+        comment: 照片字节数
+      - name: recognized_name
+        type: character varying(100)
+        nullable: true
+        comment: OCR 识别姓名（可空）
+      - name: recognized_id_card
+        type: character varying(30)
+        nullable: true
+        comment: OCR 识别身份证号（可空）
+      - name: source
+        type: character varying(30)
+        nullable: true
+        comment: 来源（拍照/相册/拖入）
+      - name: status
+        type: character varying(20)
+        defaultValue: "'Pending'"
+        nullable: false
+        comment: Pending待归属 / Assigned已归属
+      - name: assigned_photo_id
+        type: bigint
+        nullable: true
+        comment: 归属后 nc_biz_archive_photos.id
+      - name: assigned_at
+        type: timestamp without time zone
+        nullable: true
+        comment: 归属时间
+      - name: created_by
+        type: integer
+        nullable: true
+        comment: 创建人ID
+      - name: created_by_name
+        type: character varying(100)
+        nullable: true
+        comment: 创建人姓名
+      - name: created_at
+        type: timestamp without time zone
+        defaultValue: CURRENT_TIMESTAMP
+        nullable: false
+        comment: 创建时间
+    indexes:
+      - name: idx_archive_photo_pending_status
+        columns: [status, created_at]
+      - name: idx_archive_photo_pending_id_card
+        columns: [recognized_id_card]

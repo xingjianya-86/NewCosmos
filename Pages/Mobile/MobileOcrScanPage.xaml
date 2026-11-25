@@ -47,7 +47,7 @@
         </Grid>
 
         <!-- 底部操作 -->
-        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Padding="20,16,20,32">
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" Padding="20,16,20,32">
             <Button Grid.Column="0" Text="取消" HeightRequest="50" CornerRadius="12" FontSize="16"
                     BackgroundColor="Transparent" TextColor="White"
                     BorderColor="#66FFFFFF" BorderWidth="1"
@@ -56,7 +56,11 @@
                     BackgroundColor="Transparent" TextColor="White"
                     BorderColor="#66FFFFFF" BorderWidth="1"
                     Clicked="OnPickFromGalleryClicked"/>
-            <Button Grid.Column="2" Text="拍照" HeightRequest="50" CornerRadius="12" FontSize="16" FontAttributes="Bold"
+            <Button Grid.Column="2" Text="存待归属" HeightRequest="50" CornerRadius="12" FontSize="16"
+                    BackgroundColor="Transparent" TextColor="White"
+                    BorderColor="#66FFFFFF" BorderWidth="1"
+                    Clicked="OnSavePendingClicked"/>
+            <Button Grid.Column="3" Text="拍照" HeightRequest="50" CornerRadius="12" FontSize="16" FontAttributes="Bold"
                     BackgroundColor="{StaticResource Primary}" TextColor="White"
                     Clicked="OnCaptureClicked"/>
         </Grid>

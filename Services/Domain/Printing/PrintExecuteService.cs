@@ -175,6 +175,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         int copies = 1,
         bool isDuplex = false,
         bool printToPrinter = true,
+        bool includePhotos = false,
         CancellationToken ct = default)
     {
         LogInfo(printToPrinter ? $"执行打印: Template={templateName}" : $"执行生成(不打印): Template={templateName}");
@@ -213,9 +214,13 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
             var config = string.IsNullOrEmpty(template.ConfigJson) ? null : TemplateConfig.FromJson(template.ConfigJson);
 
             // 签名/照片嵌入准备：模板含 SIGNATURE_*/PHOTO_* 占位符时取回图片（失败不阻断打印）
+            // 照片默认不嵌入（includePhotos=false）；只在档案输出页显式勾选“打印照片”时才取。
             var sigImages = await BuildSignatureImageMapAsync(config, businessType, applicantIdCard, businessId, ct);
-            foreach (var kv in await BuildPhotoImageMapAsync(config, applicantIdCard, ct))
-                sigImages[kv.Key] = kv.Value;
+            if (includePhotos)
+            {
+                foreach (var kv in await BuildPhotoImageMapAsync(config, applicantIdCard, ct))
+                    sigImages[kv.Key] = kv.Value;
+            }
 
             var category = OutputPathHelper.GetCategoryDisplayName(businessType);
             var ext = template.FileType.ToLowerInvariant() switch

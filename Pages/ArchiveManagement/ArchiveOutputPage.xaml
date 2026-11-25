@@ -129,32 +129,41 @@
                                         SelectedItem="{Binding SelectedPrinter}"
                                         VerticalOptions="Center"
                                         Title="选择打印机"/>
-                                <Label Grid.Row="1" Grid.Column="0" Text="倍数(份)" VerticalOptions="Center" FontSize="16" TextColor="{StaticResource TextSecondary}"/>
-                                <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
-                                    <Button Text="−"
-                                            Command="{Binding DecreaseCopiesCommand}"
-                                            WidthRequest="36" HeightRequest="36"
-                                            FontSize="20" FontAttributes="Bold"
-                                            Padding="0"
-                                            BackgroundColor="{StaticResource Gray200}"
-                                            TextColor="{StaticResource TextPrimary}"
-                                            CornerRadius="4"/>
-                                    <Entry Text="{Binding Copies}" Keyboard="Numeric"
-                                           WidthRequest="60" HeightRequest="36"
-                                           HorizontalTextAlignment="Center"
-                                           VerticalOptions="Center"/>
-                                    <Button Text="+"
-                                            Command="{Binding IncreaseCopiesCommand}"
-                                            WidthRequest="36" HeightRequest="36"
-                                            FontSize="20" FontAttributes="Bold"
-                                            Padding="0"
-                                            BackgroundColor="{StaticResource Gray200}"
-                                            TextColor="{StaticResource TextPrimary}"
-                                            CornerRadius="4"/>
-                                </HorizontalStackLayout>
+                                <Label Grid.Row="1" Grid.Column="0" Text="打印份数" VerticalOptions="Center" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                                <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="4">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Button Text="−"
+                                                Command="{Binding DecreaseCopiesCommand}"
+                                                WidthRequest="44" HeightRequest="44"
+                                                FontSize="24" FontAttributes="Bold"
+                                                Padding="0"
+                                                BackgroundColor="{StaticResource Gray200}"
+                                                TextColor="{StaticResource TextPrimary}"
+                                                CornerRadius="6"/>
+                                        <Entry Text="{Binding Copies}" Keyboard="Numeric"
+                                               WidthRequest="72" HeightRequest="44"
+                                               FontSize="18" FontAttributes="Bold"
+                                               HorizontalTextAlignment="Center"
+                                               VerticalOptions="Center"/>
+                                        <Button Text="+"
+                                                Command="{Binding IncreaseCopiesCommand}"
+                                                WidthRequest="44" HeightRequest="44"
+                                                FontSize="24" FontAttributes="Bold"
+                                                Padding="0"
+                                                BackgroundColor="{StaticResource Gray200}"
+                                                TextColor="{StaticResource TextPrimary}"
+                                                CornerRadius="6"/>
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding Copies, StringFormat='本次每个模板打印 {0} 份'}"
+                                           FontSize="13" TextColor="{StaticResource TextTertiary}"/>
+                                </VerticalStackLayout>
                                 <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Spacing="8">
                                     <Label Text="双面打印" VerticalOptions="Center"/>
                                     <Switch IsToggled="{Binding IsDuplex}" OnColor="{StaticResource Primary}"/>
+                                </HorizontalStackLayout>
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1" Spacing="8">
+                                    <Label Text="打印照片" VerticalOptions="Center"/>
+                                    <Switch IsToggled="{Binding IncludePhotos}" OnColor="{StaticResource Primary}"/>
                                 </HorizontalStackLayout>
                             </Grid>
                         </VerticalStackLayout>

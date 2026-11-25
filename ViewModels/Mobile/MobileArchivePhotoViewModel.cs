@@ -25,6 +25,7 @@ namespace NewCosmos.ViewModels.Mobile;
 public partial class MobileArchivePhotoViewModel : ViewModelBase
 {
     private readonly IArchivePhotoService _photoService;
+    private readonly IArchivePhotoPendingService _pendingPhotoService;
     private readonly IPrintQueueService _printQueueService;
     private readonly INewPermissionService _permissionService;
     private readonly IDialogService _dialogService;
@@ -63,6 +64,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
     public MobileArchivePhotoViewModel(
         IArchivePhotoService photoService,
+        IArchivePhotoPendingService pendingPhotoService,
         IPrintQueueService printQueueService,
         INewPermissionService permissionService,
         IDialogService dialogService,
@@ -72,6 +74,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         IScreenAwakeService screenAwake)
     {
         _photoService = photoService;
+        _pendingPhotoService = pendingPhotoService;
         _printQueueService = printQueueService;
         _permissionService = permissionService;
         _dialogService = dialogService;
@@ -355,12 +358,6 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
     private async Task CaptureAsync(bool camera)
     {
-        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
-        {
-            await _dialogService.DisplayAlertAsync("提示", "缺少身份证号关联，无法存档", "确定");
-            return;
-        }
-
         try
         {
             // 拍照：单张；从相册选择：支持一次多选，批量归入当前类别
@@ -434,12 +431,6 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     /// </summary>
     public async Task InsertFromDroppedPathsAsync(IReadOnlyList<string>? paths)
     {
-        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
-        {
-            await _dialogService.DisplayAlertAsync("提示", "缺少身份证号关联，无法存档", "确定");
-            return;
-        }
-
         try
         {
             if (paths == null || paths.Count == 0)
@@ -482,6 +473,41 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         }
     }
 
+    /// <summary>无身份证：原始字节存入待归属照片池（压缩由待归属服务统一处理）。</summary>
+    private async Task SaveRawBatchToPendingAsync(
+        IReadOnlyList<byte[]> raws, int readFailed, string? firstReadError, string source)
+    {
+        if (raws.Count == 0) return;
+
+        var saved = 0;
+        var failed = readFailed;
+        string? firstError = firstReadError;
+
+        await ExecuteAsync(async () =>
+        {
+            foreach (var raw in raws)
+            {
+                var save = await _pendingPhotoService.SavePendingAsync(
+                    raw, SelectedCategoryCode, null, ApplicantName, null, source, CancellationToken);
+                if (save.IsFailure)
+                {
+                    failed++;
+                    firstError ??= save.Message;
+                    _logger.Warn($"待归属照片保存失败: {save.Message}");
+                    continue;
+                }
+                saved++;
+            }
+
+            if (saved > 0)
+                await _dialogService.ShowSnackBarAsync($"已存入待归属 {saved} 张照片");
+            else
+                await _dialogService.DisplayAlertAsync("保存失败", firstError ?? "未保存任何照片", "确定");
+
+            return Result.Success();
+        }, "保存待归属照片...");
+    }
+
     /// <summary>
     /// 批量入库（拍照 / 相册选图 / 拖入 **共用的唯一保存链路**）：
     /// 编号基准取该人该类别现有照片（2026-11-04 命名规则，往下递增不覆盖）→ 逐张交
@@ -497,6 +523,13 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
 
         if (raws.Count == 0 && failedCount == 0)
             return; // 用户全部取消
+
+        // 无身份证：先存入待归属照片池，拿到身份证后再归属（不再拦截采集）
+        if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+        {
+            await SaveRawBatchToPendingAsync(raws, readFailed, firstReadError, source);
+            return;
+        }
 
         // 命名规则（2026-11-04）：姓名_身份证后4位_类别_编号，编号=该人该类别内流水，往下递增不覆盖。
         // 保存前取一次现有照片算基准号，本批内逐张递增。

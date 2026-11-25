@@ -508,12 +508,6 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
     [RelayCommand]
     private async Task ScanIdCardAsync()
     {
-        if (DeviceInfo.Platform != DevicePlatform.Android)
-        {
-            await _dialogService.DisplayAlertAsync("提示", "扫描功能请在手机上使用；电脑端可在「照片采集」中选图识别", "确定");
-            return;
-        }
-
         try
         {
             var completion = new TaskCompletionSource<int>();

@@ -997,6 +997,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
                 Math.Max(1, Copies),
                 IsDuplex,
                 printToPrinter: printToPrinter,
+                includePhotos: false,
                 CancellationToken);
 
             if (result.IsFailure)

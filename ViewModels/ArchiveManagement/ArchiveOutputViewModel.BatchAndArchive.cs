@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Enums;
@@ -279,6 +279,7 @@ public partial class ArchiveOutputViewModel
             actualCopies,
             IsDuplex,
             printToPrinter: printToPrinter,
+            includePhotos: IncludePhotos,
             CancellationToken);
 
         if (result.IsSuccess)
@@ -434,6 +435,7 @@ public partial class ArchiveOutputViewModel
                 actualCopies,
                 IsDuplex,
                 printToPrinter: printToPrinter,
+                includePhotos: IncludePhotos,
                 CancellationToken);
 
             if (result.IsSuccess)

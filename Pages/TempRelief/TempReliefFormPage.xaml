@@ -339,10 +339,12 @@
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="6">
                                     <Label Text="身份证号 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                         <Entry Text="{Binding ApplicantIdCard}" IsReadOnly="{Binding IsApplicantReadOnly}"
                                                BackgroundColor="{StaticResource Gray100}" Style="{StaticResource FormFieldEntryStyle}"/>
-                                        <Button Grid.Column="1" Text="照片" Style="{StaticResource ButtonSmall}"
+                                        <Button Grid.Column="1" Text="扫描" Style="{StaticResource ButtonSmall}"
+                                                Command="{Binding ScanIdCardCommand}" VerticalOptions="Center"/>
+                                        <Button Grid.Column="2" Text="照片" Style="{StaticResource ButtonSmall}"
                                                 Command="{Binding OpenPhotosCommand}" VerticalOptions="Center"/>
                                     </Grid>
                                 </VerticalStackLayout>
