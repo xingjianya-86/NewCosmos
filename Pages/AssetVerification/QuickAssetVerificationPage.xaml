@@ -217,10 +217,13 @@
 
                         <BoxView Style="{StaticResource Divider}" Margin="0"/>
 
-                        <!-- 添加按钮 -->
-                        <Button Text="＋ 添加授权人" Command="{Binding AddApplicantCommand}"
-                                Style="{StaticResource ButtonOutline}" HorizontalOptions="Start"
-                                HeightRequest="40" Padding="16,0"/>
+                        <!-- 添加按钮 + 照片采集/识别（选图或拍照 → OCR → 定向回填授权人行） -->
+                        <HorizontalStackLayout Spacing="12" HorizontalOptions="Start">
+                            <Button Text="＋ 添加授权人" Command="{Binding AddApplicantCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="40" Padding="16,0"/>
+                            <Button Text="照片采集/识别" Command="{Binding OpenPhotosCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="40" Padding="16,0"/>
+                        </HorizontalStackLayout>
 
                         <!-- 表头 -->
                         <Grid ColumnDefinitions="*,140,1.5*,Auto,*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
