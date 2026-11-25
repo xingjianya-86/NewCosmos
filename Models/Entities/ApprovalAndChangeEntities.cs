@@ -54,6 +54,9 @@ public class SpecialApprovalForm
     /// <summary>备案日期（5 个工作日备案终点）</summary>
     public DateTime? FiledAt { get; set; }
 
+    /// <summary>负面清单勾选项（code 逗号分隔；正常提交应为空，留痕用）</summary>
+    public string? NegativeItems { get; set; }
+
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; }

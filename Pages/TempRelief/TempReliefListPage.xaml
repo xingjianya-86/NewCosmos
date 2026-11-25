@@ -32,9 +32,24 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="提交" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    IsVisible="{Binding CanSubmit}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=SubmitCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="确认" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Success}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ConfirmCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="退回" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                    IsVisible="{Binding CanReturn}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReturnCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="不予" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Error}" TextColor="White"
+                                    IsVisible="{Binding CanReject}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=RejectCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"
@@ -85,9 +100,24 @@
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                            <Button Text="提交" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                                    IsVisible="{Binding CanSubmit}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=SubmitCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="确认" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Success}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ConfirmCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="退回" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Warning}" TextColor="White"
+                                    IsVisible="{Binding CanReturn}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReturnCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="不予" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Error}" TextColor="White"
+                                    IsVisible="{Binding CanReject}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=RejectCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="编辑" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"
@@ -155,6 +185,11 @@
                                     BackgroundColor="{StaticResource Info}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReprintCommand}"
                                     CommandParameter="{Binding .}"/>
+                            <Button Text="备案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Success}" TextColor="White"
+                                    IsVisible="{Binding CanMarkFiled}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=MarkFiledCommand}"
+                                    CommandParameter="{Binding .}"/>
                             <Button Text="终止" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=StopCommand}"
@@ -211,6 +246,11 @@
                             <Button Text="补打" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Info}" TextColor="White"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=ReprintCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            <Button Text="备案" FontSize="15" Padding="14,8"
+                                    BackgroundColor="{StaticResource Success}" TextColor="White"
+                                    IsVisible="{Binding CanMarkFiled}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type TempReliefListViewModel}}, Path=MarkFiledCommand}"
                                     CommandParameter="{Binding .}"/>
                             <Button Text="终止" FontSize="15" Padding="14,8"
                                     BackgroundColor="{StaticResource Warning}" TextColor="White"

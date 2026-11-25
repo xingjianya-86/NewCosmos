@@ -1592,7 +1592,7 @@ public class TempReliefService : BaseService, ITempReliefService
         var sql = @"UPDATE nc_biz_temp_relief_applications SET
                     filing_status = $1, updated_at = NOW()
                     WHERE id = $2 AND deleted_at IS NULL AND status = $3
-                      AND payment_channel = $4 AND filing_status = $5";
+                      AND payment_channel = $4 AND COALESCE(filing_status, $5) = $5";
         var result = await _db.ExecuteNonQueryAsync(sql, ct,
             TempReliefConstants.FilingFiled, id, TempReliefConstants.StatusConfirmed,
             TempReliefConstants.PaymentCounty, TempReliefConstants.FilingPending);

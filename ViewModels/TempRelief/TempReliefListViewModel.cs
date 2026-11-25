@@ -403,6 +403,109 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     }
 
     [RelayCommand]
+    private async Task SubmitAsync(TempReliefApplication? app)
+    {
+        if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「提交申请」")) return;
+
+        var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+        var confirm = await dialogService.DisplayAlertAsync("提交申请",
+            $"确定提交 [{app.ApplicationNo}] {app.ApplicantName} 的临时救助申请吗？\n提交后进入办理时限。",
+            "提交", "取消");
+        if (!confirm) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _applicationService.SubmitAsync(app.Id, App.CurrentUserName, CancellationToken);
+            if (result.IsSuccess)
+            {
+                _logger.LogBusiness("临时救助申请提交成功", ("ApplicationId", app.Id));
+                await LoadAllCountsAsync();
+                await LoadDataAsync();
+            }
+            return result;
+        }, "提交申请...");
+    }
+
+    [RelayCommand]
+    private async Task ReturnAsync(TempReliefApplication? app)
+    {
+        if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「退回补正」")) return;
+
+        var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+        var reason = await dialogService.DisplayPromptAsync("退回补正", "请填写退回原因：",
+            "确定", "取消", "如：材料不全/信息需核实等");
+        if (reason == null) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _applicationService.ReturnAsync(app.Id, reason, App.CurrentUserName, CancellationToken);
+            if (result.IsSuccess)
+            {
+                _logger.LogBusiness("临时救助申请退回补正", ("ApplicationId", app.Id));
+                await LoadAllCountsAsync();
+                await LoadDataAsync();
+            }
+            return result;
+        }, "退回补正...");
+    }
+
+    [RelayCommand]
+    private async Task RejectAsync(TempReliefApplication? app)
+    {
+        if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「不予救助」")) return;
+
+        var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+        var reason = await dialogService.DisplayPromptAsync("不予救助", "请填写不予救助理由：",
+            "确定", "取消", "如：不符合救助条件等");
+        if (reason == null) return;
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            await dialogService.DisplayAlertAsync("提示", "不予救助理由不能为空", "确定");
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _applicationService.RejectAsync(
+                app.Id, reason, App.CurrentUserName, DateTime.Now, "书面", CancellationToken);
+            if (result.IsSuccess)
+            {
+                _logger.LogBusiness("临时救助不予救助", ("ApplicationId", app.Id));
+                await LoadAllCountsAsync();
+                await LoadDataAsync();
+            }
+            return result;
+        }, "登记不予救助...");
+    }
+
+    [RelayCommand]
+    private async Task MarkFiledAsync(TempReliefApplication? app)
+    {
+        if (app == null) return;
+        if (!await HasTempPermissionAsync(PermissionCodes.TEMP_EDIT, "「登记备案」")) return;
+
+        var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+        var confirm = await dialogService.DisplayAlertAsync("登记备案",
+            $"确定 [{app.ApplicationNo}] {app.ApplicantName} 已完成备案登记吗？",
+            "已备案", "取消");
+        if (!confirm) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var result = await _applicationService.MarkFiledAsync(app.Id, App.CurrentUserName, CancellationToken);
+            if (result.IsSuccess)
+            {
+                _logger.LogBusiness("临时救助备案完成", ("ApplicationId", app.Id));
+                await LoadDataAsync();
+            }
+            return result;
+        }, "登记备案...");
+    }
+
+    [RelayCommand]
     private async Task StopAsync(TempReliefApplication? app)
     {
         if (app == null) return;

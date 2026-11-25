@@ -701,6 +701,19 @@ public class ApplicationService : BaseService, IApplicationService
     {
         ValidateNotNull(request, nameof(request));
 
+        // 一事一议门槛：不通过禁止提交；草稿/已上报/退回补正未完成也禁止提交。
+        var specialStatusResult = await _db.ExecuteScalarAsync<string>(
+            @"SELECT status FROM nc_biz_special_approval_forms
+              WHERE application_id = $1 AND deleted_at IS NULL
+              ORDER BY id DESC LIMIT 1", ct, request.ApplicationId);
+        if (specialStatusResult.IsFailure)
+            return Result.Failure(specialStatusResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                specialStatusResult.Message ?? "读取一事一议状态失败");
+        var specialStatus = specialStatusResult.Value;
+        if (SpecialApprovalConstants.IsNotPassed(specialStatus))
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "该申请一事一议结论为不通过，不能提交");
+        if (SpecialApprovalConstants.BlocksApplicationSubmit(specialStatus))
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "该申请存在未完成的一事一议，请先登记评议结论");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 

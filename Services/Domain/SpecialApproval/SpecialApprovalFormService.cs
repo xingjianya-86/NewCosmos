@@ -26,6 +26,12 @@ public interface ISpecialApprovalFormService
 
     Task<Result> CompleteReviewAsync(SpecialApprovalReviewRequest request, CancellationToken ct = default);
 
+    /// <summary>登记备案完成（已返回结论 / 历史 Approved → Filed）。</summary>
+    Task<Result> MarkFiledAsync(long applicationId, string operatorName, CancellationToken ct = default);
+
+    /// <summary>退回补正（已上报 → 退回补正），乡镇可修改后重新提交。</summary>
+    Task<Result> ReturnForCorrectionAsync(long applicationId, string? reason, string operatorName, CancellationToken ct = default);
+
     Task<Result<Archive>> GenerateDocumentAsync(long applicationId, CancellationToken ct = default);
 }
 
@@ -85,12 +91,10 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             return Result.Failure(ErrorCodes.REQUIRED_FIELD_MISSING, "请填写一事一议说明情况");
 
         var existing = await GetByApplicationIdAsync(request.ApplicationId, ct);
-        // 已提交但未审议仍可修改内容（与 ViewModel IsEditable「草稿或已提交但未审议」同一契约）。
-        // 原实现 Submitted 即拒绝：提交后新填内容无处可存、审议时被静默丢弃（用户实测「数据库可能未保存」）。
-        // 已审议（Approved/Rejected）为终态，禁止修改。
+        // 已上报但未登记结论仍可修改内容；结论登记后（Returned/NotPassed/Filed/历史 Approved/Rejected）锁定。
         if (existing != null && existing.Id > 0
-            && existing.Status is SpecialApprovalConstants.StatusApproved or SpecialApprovalConstants.StatusRejected)
-            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "申报表已完成会议审议，无法修改");
+            && !SpecialApprovalConstants.IsContentEditable(existing.Status))
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "申报表已登记结论或已备案，无法修改");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -99,12 +103,16 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             var updateSql = @"UPDATE nc_biz_special_approval_forms SET
                 basic_situation = $1, special_matters = $2, template_key = $3,
                 report_unit = $4, handler_name = $5, form_date = $6,
-                audit_result = $7, audit_date = $8, updated_at = NOW()
-                WHERE id = $9 AND deleted_at IS NULL";
+                audit_result = $7, audit_date = $8,
+                case_type = $9, negative_items = $10,
+                updated_at = NOW()
+                WHERE id = $11 AND deleted_at IS NULL";
             var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
                 request.BasicSituation, request.SpecialMatters, request.TemplateKey,
                 request.ReportUnit, request.HandlerName, request.FormDate,
-                request.AuditResult, request.AuditDate, existing.Id);
+                request.AuditResult, request.AuditDate,
+                request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems),
+                existing.Id);
             if (updateResult.IsFailure)
                 return Result.Failure(updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, updateResult.Message);
         }
@@ -114,13 +122,14 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             var insertSql = @"INSERT INTO nc_biz_special_approval_forms
                 (application_id, form_no, basic_situation, special_matters, template_key,
                  report_unit, handler_name, form_date, audit_result, audit_date,
-                 status, created_by, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())";
+                 status, created_by, case_type, negative_items, created_at, updated_at)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())";
             var insertResult = await _db.ExecuteNonQueryAsync(insertSql, ct,
                 request.ApplicationId, formNo, request.BasicSituation, request.SpecialMatters, request.TemplateKey,
                 request.ReportUnit, request.HandlerName, request.FormDate,
                 request.AuditResult, request.AuditDate,
-                SpecialApprovalConstants.StatusDraft, request.CreatedBy);
+                SpecialApprovalConstants.StatusDraft, request.CreatedBy,
+                request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems));
             if (insertResult.IsFailure)
                 return Result.Failure(insertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, insertResult.Message);
         }
@@ -131,7 +140,7 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
     }
 
     /// <summary>
-    /// 提交申报（Draft→Submitted）
+    /// 提交申报（草稿/退回补正 → 已上报），写 case_type、submitted_at。
     /// </summary>
     public async Task<Result> SubmitAsync(SpecialApprovalFormRequest request, CancellationToken ct = default)
     {
@@ -139,12 +148,16 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         if (string.IsNullOrWhiteSpace(request.SpecialMatters))
             return Result.Failure(ErrorCodes.REQUIRED_FIELD_MISSING, "请填写一事一议说明情况");
 
+        var caseError = SpecialApprovalConstants.ValidateCaseSelection(request.CaseType, request.NegativeItems);
+        if (caseError != null)
+            return Result.Failure(ErrorCodes.VALIDATION_FAILED, caseError);
+
         var existing = await GetByApplicationIdAsync(request.ApplicationId, ct);
         if (existing == null || existing.Id <= 0)
             return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_FORM_NOT_FOUND, "请先保存申报表草稿");
 
-        if (existing.Status != SpecialApprovalConstants.StatusDraft)
-            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "申报表已提交，无法重复提交");
+        if (!SpecialApprovalConstants.CanSubmit(existing.Status))
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_ALREADY_SUBMITTED, "仅草稿或退回补正状态可提交");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -152,25 +165,36 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             basic_situation = $1, special_matters = $2, template_key = $3,
             report_unit = $4, handler_name = $5, form_date = $6,
             audit_result = $7, audit_date = $8,
-            status = $10, updated_at = NOW()
-            WHERE id = $9 AND deleted_at IS NULL AND status = $11";
+            status = $9, submitted_at = CURRENT_DATE,
+            case_type = $10, negative_items = $11,
+            updated_at = NOW()
+            WHERE id = $12 AND deleted_at IS NULL AND status = ANY($13)";
         var result = await _db.ExecuteNonQueryAsync(sql, ct,
             request.BasicSituation, request.SpecialMatters, request.TemplateKey,
             request.ReportUnit, request.HandlerName, request.FormDate,
-            request.AuditResult, request.AuditDate, existing.Id,
-            ApplicationStatusCodes.SUBMITTED, ApplicationStatusCodes.DRAFT);
+            request.AuditResult, request.AuditDate,
+            SpecialApprovalConstants.StatusSubmitted,
+            request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems),
+            existing.Id,
+            (object)new[]
+            {
+                SpecialApprovalConstants.StatusDraft,
+                SpecialApprovalConstants.StatusReturnedForCorrection
+            });
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message);
+        if (result.Value == 0)
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "仅草稿或退回补正状态可提交");
 
         await tx.CommitAsync(ct);
-        LogInfo($"申报表已提交: ApplicationId={request.ApplicationId}, FormNo={existing.FormNo}");
+        LogInfo($"申报表已提交: ApplicationId={request.ApplicationId}, FormNo={existing.FormNo}, CaseType={request.CaseType}");
         return Result.Success();
     }
 
     /// <summary>
-    /// 会议审议闭环：写 nc_biz_special_approvals（最终会议审议结果）→ 更新申报表状态 → 回写申请。
-    /// 通过：申报表 Approved，申请按指定分类施保（状态机 Draft→Submitted→Approved，IsSpecialApproval=true）。
-    /// 驳回：申报表 Rejected，申请转 Refused（Draft 或 Submitted 均可）。
+    /// 登记评议结论：写 nc_biz_special_approvals（评议结果）→ 更新申报表状态 → 通过时回写申请分类/标记。
+    /// 通过：申报表 Returned（待备案），申请按指定分类施保，IsSpecialApproval=true。
+    /// 不通过：申报表 NotPassed（终态），申请状态不变；由申请提交门槛禁止再提交。
     /// </summary>
     public async Task<Result> CompleteReviewAsync(SpecialApprovalReviewRequest request, CancellationToken ct = default)
     {
@@ -182,8 +206,9 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         if (form == null || form.Id <= 0)
             return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_FORM_NOT_FOUND, "未找到一事一议申报表");
 
-        if (form.Status is SpecialApprovalConstants.StatusApproved or SpecialApprovalConstants.StatusRejected)
-            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_REVIEW_DONE, "该申报表已完成会议审议");
+        if (!SpecialApprovalConstants.CanRecordConclusion(form.Status))
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_REVIEW_DONE,
+                $"当前状态（{SpecialApprovalConstants.GetStatusDescription(form.Status)}）不可登记结论，仅已上报可登记");
 
         if (request.Approved && !SpecialApprovalConstants.IsValidOverrideClassification(request.OverrideClassification))
             return Result.Failure(ErrorCodes.INVALID_CLASSIFICATION, "请选择有效的指定救助分类");
@@ -224,10 +249,10 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             return Result.Failure(insertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, insertResult.Message);
         var specialApprovalId = insertResult.Value;
 
-        // 2. 更新申报表状态
+        // 2. 更新申报表状态：通过 → Returned（待备案）；不通过 → NotPassed（终态，禁止申请提交）
         var formStatus = request.Approved
-            ? SpecialApprovalConstants.StatusApproved
-            : SpecialApprovalConstants.StatusRejected;
+            ? SpecialApprovalConstants.StatusReturned
+            : SpecialApprovalConstants.StatusNotPassed;
         // 申报内容随审议一并落库（提交后内容仍可编辑，见 SaveDraftAsync 注释）：
         // 原实现只写会议字段，提交后新填的基本情况/说明在审议锁定时被静默丢弃。
         // SpecialReason 即 VM 的一事一议说明情况（与 SpecialCircumstances 同源）。
@@ -263,20 +288,66 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         }
         else
         {
-            // 驳回：申请转 Refused
-            var refuseResult = await _applicationService.ApproveAsync(new ApplicationApproveRequest
-            {
-                ApplicationId = request.ApplicationId,
-                Approved = false,
-                ApprovalComment = "一事一议审议驳回",
-                ApprovedBy = request.CreatedBy
-            }, ct);
-            if (refuseResult.IsFailure)
-                return Result.Failure(refuseResult.ErrorCode ?? ErrorCodes.OPERATION_FAILED, refuseResult.Message);
+            // 不通过：只登记申报表结论，不把申请置 Refused；
+            // 申请保持原状态，由 ApplicationService.SubmitAsync 的“一事一议不通过”门槛禁止提交。
+            LogInfo($"一事一议结论为不通过（申请保持原状态）: ApplicationId={request.ApplicationId}");
         }
 
         await tx.CommitAsync(ct);
         LogInfo($"一事一议审议完成: ApplicationId={request.ApplicationId}, Approved={request.Approved}, SpecialApprovalId={specialApprovalId}");
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// 登记备案完成（已返回结论 / 历史 Approved → Filed），写 filed_at。
+    /// </summary>
+    public async Task<Result> MarkFiledAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    {
+        var form = await GetByApplicationIdAsync(applicationId, ct);
+        if (form == null || form.Id <= 0)
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_FORM_NOT_FOUND, "未找到一事一议申报表");
+        if (!SpecialApprovalConstants.CanMarkFiled(form.Status))
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION,
+                $"当前状态（{SpecialApprovalConstants.GetStatusDescription(form.Status)}）不可登记备案");
+
+        var sql = @"UPDATE nc_biz_special_approval_forms SET
+                    status = $1, filed_at = CURRENT_DATE, updated_at = NOW()
+                    WHERE id = $2 AND deleted_at IS NULL AND status = ANY($3)";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            SpecialApprovalConstants.StatusFiled, form.Id,
+            (object)new[] { SpecialApprovalConstants.StatusReturned, SpecialApprovalConstants.StatusApproved });
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message);
+        if (result.Value == 0)
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "仅已返回结论状态可登记备案");
+
+        LogInfo($"一事一议备案完成: ApplicationId={applicationId}, Operator={operatorName ?? "System"}");
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// 退回补正（已上报 → 退回补正），乡镇可修改后重新提交。
+    /// </summary>
+    public async Task<Result> ReturnForCorrectionAsync(long applicationId, string? reason,
+        string operatorName, CancellationToken ct = default)
+    {
+        var form = await GetByApplicationIdAsync(applicationId, ct);
+        if (form == null || form.Id <= 0)
+            return Result.Failure(ErrorCodes.SPECIAL_APPROVAL_FORM_NOT_FOUND, "未找到一事一议申报表");
+        if (form.Status != SpecialApprovalConstants.StatusSubmitted)
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "仅已上报状态可退回补正");
+
+        var sql = @"UPDATE nc_biz_special_approval_forms SET
+                    status = $1, updated_at = NOW()
+                    WHERE id = $2 AND deleted_at IS NULL AND status = $3";
+        var result = await _db.ExecuteNonQueryAsync(sql, ct,
+            SpecialApprovalConstants.StatusReturnedForCorrection, form.Id, SpecialApprovalConstants.StatusSubmitted);
+        if (result.IsFailure)
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message);
+        if (result.Value == 0)
+            return Result.Failure(ErrorCodes.INVALID_TRANSITION, "仅已上报状态可退回补正");
+
+        LogInfo($"一事一议退回补正: ApplicationId={applicationId}, Operator={operatorName ?? "System"}, Reason={reason ?? string.Empty}");
         return Result.Success();
     }
 
@@ -399,6 +470,13 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             ["{申请救助家庭需要一事一议说明的情况}"] = form.SpecialMatters,
             ["{审核结果}"] = form.AuditResult,
             ["{审核日期}"] = auditDate,
+            ["{适用情形}"] = SpecialApprovalConstants.GetCaseTypeName(form.CaseType) ?? string.Empty,
+            ["{不适用情形}"] = string.Join("；", SpecialApprovalConstants
+                .SplitNegativeItems(form.NegativeItems)
+                .Select(x => SpecialApprovalConstants.GetNegativeItemName(x) ?? x)),
+            ["{上报日期}"] = form.SubmittedAt?.ToString("yyyy年M月d日") ?? string.Empty,
+            ["{备案日期}"] = form.FiledAt?.ToString("yyyy年M月d日") ?? string.Empty,
+            ["{评议结论}"] = SpecialApprovalConstants.GetStatusDescription(form.Status),
             ["{填报单位}"] = reportUnit,
             ["{审核确认时间}"] = confirmTime
         };

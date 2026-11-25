@@ -263,6 +263,20 @@ public class TempReliefApplication
         }
     };
 
+    /// <summary>可提交：草稿 / 退回补正</summary>
+    public bool CanSubmit => Status is TempReliefConstants.StatusDraft or TempReliefConstants.StatusReturned;
+
+    /// <summary>可退回补正：已提交</summary>
+    public bool CanReturn => Status == TempReliefConstants.StatusSubmitted;
+
+    /// <summary>可登记不予救助：草稿 / 已提交</summary>
+    public bool CanReject => Status is TempReliefConstants.StatusDraft or TempReliefConstants.StatusSubmitted;
+
+    /// <summary>可登记备案：上级部门发放、已确认、待备案（历史空值视为待备案）</summary>
+    public bool CanMarkFiled => Status == TempReliefConstants.StatusConfirmed
+        && PaymentChannel == TempReliefConstants.PaymentCounty
+        && (string.IsNullOrEmpty(FilingStatus) || FilingStatus == TempReliefConstants.FilingPending);
+
     /// <summary>来源中文名（界面绑定）</summary>
     public string SourceName => TempReliefConstants.GetSourceName(SourceType);
 

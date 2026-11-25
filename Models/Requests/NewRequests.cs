@@ -16,6 +16,12 @@ public record SpecialApprovalFormRequest
     public string AuditResult { get; init; } = string.Empty;
     public DateTime? AuditDate { get; init; }
     public string CreatedBy { get; init; } = string.Empty;
+
+    /// <summary>适用情形代码（8 类之一；草稿可空，提交必填）</summary>
+    public string CaseType { get; init; } = string.Empty;
+
+    /// <summary>负面清单勾选项（code 列表；命中任一项不能提交）</summary>
+    public string[] NegativeItems { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>

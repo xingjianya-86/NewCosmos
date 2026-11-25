@@ -105,14 +105,44 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
     [ObservableProperty]
     private string _status = string.Empty;
 
-    [ObservableProperty]
-    private bool _isSubmitted;
+    /// <summary>已上报（源状态 Submitted）：显示评议结论登记卡</summary>
+    public bool IsSubmitted => Status == SpecialApprovalConstants.StatusSubmitted;
 
-    [ObservableProperty]
-    private bool _isReviewed;
+    /// <summary>已登记结论或已备案（锁定编辑）</summary>
+    public bool IsReviewed => Status is SpecialApprovalConstants.StatusReturned
+        or SpecialApprovalConstants.StatusNotPassed
+        or SpecialApprovalConstants.StatusFiled
+        or SpecialApprovalConstants.StatusApproved
+        or SpecialApprovalConstants.StatusRejected;
+
+    partial void OnStatusChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsSubmitted));
+        OnPropertyChanged(nameof(IsReviewed));
+        OnPropertyChanged(nameof(CanSubmitForm));
+        OnPropertyChanged(nameof(IsEditable));
+        OnPropertyChanged(nameof(CanMarkFiled));
+        OnPropertyChanged(nameof(CanReturnForCorrection));
+    }
 
     [ObservableProperty]
     private string _templateKey = string.Empty;
+
+    // ── 黑民规〔2026〕10 号：适用情形 / 负面清单 / 时间节点 ──
+    [ObservableProperty]
+    private ObservableCollection<DictItemOption> _caseTypeOptions = new();
+
+    [ObservableProperty]
+    private DictItemOption? _selectedCaseType;
+
+    [ObservableProperty]
+    private ObservableCollection<NegativeItemOption> _negativeItemOptions = new();
+
+    [ObservableProperty]
+    private DateTime? _submittedAt;
+
+    [ObservableProperty]
+    private DateTime? _filedAt;
     #endregion
 
     #region 会议审议
@@ -174,6 +204,8 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         {
             LoadTemplateOptions();
             LoadOverrideClassificationOptions();
+            LoadCaseTypeOptions();
+            LoadNegativeItemOptions();
 
             // 权限
             CanReview = await _permissionService.HasPermissionAsync(App.CurrentUserId ?? 0, PermissionCodes.SPECIAL_APPROVAL_REVIEW, ct);
@@ -246,8 +278,14 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
                 AuditDate = form.AuditDate;
                 FormNo = form.FormNo;
                 Status = form.Status;
-                IsSubmitted = form.Status == SpecialApprovalConstants.StatusSubmitted;
-                IsReviewed = form.Status is SpecialApprovalConstants.StatusApproved or SpecialApprovalConstants.StatusRejected;
+                SubmittedAt = form.SubmittedAt;
+                FiledAt = form.FiledAt;
+                SelectedCaseType = CaseTypeOptions.FirstOrDefault(o => o.Key == form.CaseType);
+                var selectedNegatives = SpecialApprovalConstants
+                    .SplitNegativeItems(form.NegativeItems)
+                    .ToHashSet(StringComparer.Ordinal);
+                foreach (var item in NegativeItemOptions)
+                    item.IsSelected = selectedNegatives.Contains(item.Code);
 
                 // 回填预案选择（恢复选择不触发填充，见 _isRestoringTemplateSelection）
                 if (!string.IsNullOrEmpty(form.TemplateKey))
@@ -301,6 +339,26 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         }
     }
 
+    /// <summary>加载 8 类适用情形（code 稳定，Display 为正式文名称）。</summary>
+    private void LoadCaseTypeOptions()
+    {
+        CaseTypeOptions.Clear();
+        foreach (var (code, name) in SpecialApprovalConstants.CaseTypes)
+        {
+            CaseTypeOptions.Add(new DictItemOption { Key = code, Display = name });
+        }
+    }
+
+    /// <summary>加载 6 项负面清单（默认全不勾选）。</summary>
+    private void LoadNegativeItemOptions()
+    {
+        NegativeItemOptions.Clear();
+        foreach (var (code, name) in SpecialApprovalConstants.NegativeItems)
+        {
+            NegativeItemOptions.Add(new NegativeItemOption { Code = code, Name = name });
+        }
+    }
+
     partial void OnSelectedTemplateOptionChanged(DictItemOption? value)
     {
         if (value != null && !string.IsNullOrEmpty(value.Key))
@@ -342,14 +400,16 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
     public string StatusText => SpecialApprovalConstants.GetStatusDescription(Status);
 
     /// <summary>
-    /// 「提交申报」可见 = 未提交且未审议：已提交（防撞"无法重复提交"守卫）与已审议（内容锁定）
-    /// 均隐藏——否则已审议后按钮仍亮、页面又无状态外显，会误导重复点击（2026-11-17 实测）。
+    /// 「提交申报」可见：新表（Status 为空）、草稿、退回补正。
+    /// 已上报/已登记结论/已备案均隐藏，避免重复提交。
     /// </summary>
-    public bool CanSubmitForm => !IsSubmitted && !IsReviewed;
+    public bool CanSubmitForm => string.IsNullOrEmpty(Status) || SpecialApprovalConstants.CanSubmit(Status);
 
-    partial void OnIsSubmittedChanged(bool value) => OnPropertyChanged(nameof(CanSubmitForm));
+    /// <summary>可登记备案：已返回结论（含历史 Approved）。</summary>
+    public bool CanMarkFiled => SpecialApprovalConstants.CanMarkFiled(Status);
 
-    partial void OnIsReviewedChanged(bool value) => OnPropertyChanged(nameof(CanSubmitForm));
+    /// <summary>可退回补正：已上报。</summary>
+    public bool CanReturnForCorrection => Status == SpecialApprovalConstants.StatusSubmitted;
 
     /// <summary>
     /// 换行归一化：出席历史存量为裸 \r（WinUI Editor 落库），统一转 \n——
@@ -381,8 +441,9 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         return true;
     }
 
-    /// <summary>是否可编辑申报内容（草稿或已提交但未审议）</summary>
-    public bool IsEditable => !IsReviewed && !string.IsNullOrEmpty(ApplicationName);
+    /// <summary>是否可编辑申报内容（新表/草稿/已上报待结论/退回补正；结论登记后锁定）</summary>
+    public bool IsEditable => !string.IsNullOrEmpty(ApplicationName)
+        && (string.IsNullOrEmpty(Status) || SpecialApprovalConstants.IsContentEditable(Status));
 
     private string ApplicationName => ApplicantName;
 
@@ -425,8 +486,16 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             return;
         }
 
+        var negativeCodes = NegativeItemOptions.Where(x => x.IsSelected).Select(x => x.Code).ToArray();
+        var caseError = SpecialApprovalConstants.ValidateCaseSelection(SelectedCaseType?.Key, negativeCodes);
+        if (caseError != null)
+        {
+            await _dialogService.DisplayAlertAsync("不能提交", caseError, "确定");
+            return;
+        }
+
         var confirm = await _dialogService.DisplayAlertAsync("确认提交",
-            "提交后申报表将锁定，进入会议审议环节，确定提交？", "提交", "取消");
+            "提交后申报表进入县级评议（10 个工作日），确定提交？", "提交", "取消");
         if (!confirm) return;
 
         // 服务端要求先有草稿才能提交；缺失则自动补存（失败已弹窗，中止）
@@ -501,9 +570,11 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             return;
         }
 
-        var actionText = approved ? "通过" : "驳回";
-        var confirm = await _dialogService.DisplayAlertAsync("确认审议",
-            $"确定审议{actionText}该一事一议申报？\n{(!approved ? "驳回后该申请将不予救助。" : "通过后该申请将按指定分类施保。")}",
+        var actionText = approved ? "通过" : "不通过";
+        var confirm = await _dialogService.DisplayAlertAsync("确认登记结论",
+            approved
+                ? "确定登记“通过”结论？通过后申报表进入待备案，申请按指定分类施保。"
+                : "确定登记“不通过”结论？不通过后该申请不能再提交，申请状态保持不变。",
             "确定", "取消");
         if (!confirm) return;
 
@@ -529,8 +600,55 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             _formService.CompleteReviewAsync(request, CancellationToken), $"会议审议{actionText}...");
         if (result.IsSuccess)
         {
-            await _dialogService.DisplayAlertAsync("成功", $"一事一议审议{actionText}", "确定");
+            await _dialogService.DisplayAlertAsync("成功", $"一事一议结论已登记（{actionText}）", "确定");
             await LoadAsync(_applicationId);
+        }
+    }
+
+    /// <summary>登记备案完成（待备案 → 已备案）。</summary>
+    [RelayCommand]
+    private async Task MarkFiledAsync()
+    {
+        if (_applicationId <= 0) return;
+
+        var confirm = await _dialogService.DisplayAlertAsync("登记备案",
+            "确定该一事一议已完成备案登记吗？", "已备案", "取消");
+        if (!confirm) return;
+
+        var result = await ExecuteAsync(() =>
+            _formService.MarkFiledAsync(_applicationId, App.CurrentUserFullName, CancellationToken), "登记备案...");
+        if (result.IsSuccess)
+        {
+            await _dialogService.DisplayAlertAsync("成功", "一事一议已登记备案", "确定");
+            await LoadAsync(_applicationId);
+        }
+        else
+        {
+            await ShowFailureAsync(result, "登记备案");
+        }
+    }
+
+    /// <summary>退回补正（已上报 → 退回补正）。</summary>
+    [RelayCommand]
+    private async Task ReturnForCorrectionAsync()
+    {
+        if (_applicationId <= 0) return;
+
+        var reason = await _dialogService.DisplayPromptAsync("退回补正", "请填写退回补正原因：",
+            "确定", "取消", "如：材料不全/情形需补充说明等");
+        if (reason == null) return;
+
+        var result = await ExecuteAsync(() =>
+            _formService.ReturnForCorrectionAsync(_applicationId, reason, App.CurrentUserFullName, CancellationToken),
+            "退回补正...");
+        if (result.IsSuccess)
+        {
+            await _dialogService.DisplayAlertAsync("成功", "已退回补正", "确定");
+            await LoadAsync(_applicationId);
+        }
+        else
+        {
+            await ShowFailureAsync(result, "退回补正");
         }
     }
 
@@ -549,6 +667,18 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         FormDate = FormDate,
         AuditResult = AuditResult,
         AuditDate = AuditDate,
+        CaseType = SelectedCaseType?.Key ?? string.Empty,
+        NegativeItems = NegativeItemOptions.Where(x => x.IsSelected).Select(x => x.Code).ToArray(),
         CreatedBy = App.CurrentUserFullName
     };
+}
+
+/// <summary>负面清单勾选项（页面 CheckBox 绑定）。</summary>
+public partial class NegativeItemOption : ObservableObject
+{
+    public string Code { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSelected;
 }
