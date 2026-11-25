@@ -152,6 +152,15 @@ tables:
         type: character varying(500)
         nullable: true
         comment: 负面清单勾选项（code 逗号分隔；正常提交应为空，留痕用）
+      - name: filing_receipt
+        type: character varying(500)
+        nullable: true
+        comment: 备案回执文件（文件名/路径）
+      - name: is_long_term_publicized
+        type: boolean
+        defaultValue: false
+        nullable: false
+        comment: 是否纳入长期公示（一事一议通过对象标记）
       - name: created_by
         type: character varying(100)
         nullable: true

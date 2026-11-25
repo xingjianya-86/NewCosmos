@@ -22,6 +22,9 @@ public record SpecialApprovalFormRequest
 
     /// <summary>负面清单勾选项（code 列表；命中任一项不能提交）</summary>
     public string[] NegativeItems { get; init; } = Array.Empty<string>();
+
+    /// <summary>备案回执文件（文件名/路径）</summary>
+    public string FilingReceipt { get; init; } = string.Empty;
 }
 
 /// <summary>

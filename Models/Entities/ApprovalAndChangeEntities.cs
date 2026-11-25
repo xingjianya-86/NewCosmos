@@ -57,6 +57,12 @@ public class SpecialApprovalForm
     /// <summary>负面清单勾选项（code 逗号分隔；正常提交应为空，留痕用）</summary>
     public string? NegativeItems { get; set; }
 
+    /// <summary>备案回执文件（文件名/路径）</summary>
+    public string? FilingReceipt { get; set; }
+
+    /// <summary>是否纳入长期公示（一事一议通过对象标记）</summary>
+    public bool IsLongTermPublicized { get; set; }
+
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; }

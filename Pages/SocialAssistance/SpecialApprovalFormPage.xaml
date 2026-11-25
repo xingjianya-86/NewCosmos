@@ -90,6 +90,17 @@
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
 
+                        <Label Text="备案回执" Style="{StaticResource FormFieldLabelStyle}"/>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Text="{Binding FilingReceipt}" IsReadOnly="True"
+                                   Placeholder="未选择回执文件"
+                                   FontSize="{OnPlatform WinUI=15, Android=14, Default=15}" HeightRequest="38"/>
+                            <Button Grid.Column="1" Text="选择文件" Style="{StaticResource ButtonSmall}"
+                                    Command="{Binding PickFilingReceiptCommand}"/>
+                        </Grid>
+                        <Label Text="已纳入长期公示" FontSize="14" TextColor="{StaticResource Success}"
+                               IsVisible="{Binding IsLongTermPublicized}"/>
+
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="填报单位" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -111,6 +122,22 @@
                                        Placeholder="如：同意纳入"/>
                             </VerticalStackLayout>
                         </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 负面结论告知书 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="📄 负面结论告知书" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <Button Text="不予受理告知书" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding NotAcceptedNoticeCommand}"/>
+                            <Button Grid.Column="1" Text="不予救助告知书" Style="{StaticResource ButtonDanger}"
+                                    Command="{Binding RejectedNoticeCommand}"/>
+                        </Grid>
+                        <Label Text="不予受理应在 3 个工作日内书面告知；告知书生成 PDF 并归入档案。"
+                               FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                     </VerticalStackLayout>
                 </Border>
 

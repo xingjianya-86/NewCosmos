@@ -10,11 +10,23 @@ using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.SocialAssistance;
 using NewCosmos.Services.Domain.UserManagement;
 using NewCosmos.Services.Templates;
+using PdfSharp;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 
 using ApplicationEntity = NewCosmos.Models.Entities.Application;
 using SpecialApprovalEntity = NewCosmos.Models.Entities.SpecialApproval;
 
 namespace NewCosmos.Services.Domain.SpecialApproval;
+
+/// <summary>一事一议负面结论告知书类型。</summary>
+public enum SpecialApprovalNoticeKind
+{
+    /// <summary>不予受理（不符合适用情形，3 个工作日内书面告知）</summary>
+    NotAccepted,
+    /// <summary>不予救助（评议不通过）</summary>
+    Rejected
+}
 
 public interface ISpecialApprovalFormService
 {
@@ -27,10 +39,14 @@ public interface ISpecialApprovalFormService
     Task<Result> CompleteReviewAsync(SpecialApprovalReviewRequest request, CancellationToken ct = default);
 
     /// <summary>登记备案完成（已返回结论 / 历史 Approved → Filed）。</summary>
-    Task<Result> MarkFiledAsync(long applicationId, string operatorName, CancellationToken ct = default);
+    Task<Result> MarkFiledAsync(long applicationId, string? receiptFile, string operatorName, CancellationToken ct = default);
 
     /// <summary>退回补正（已上报 → 退回补正），乡镇可修改后重新提交。</summary>
     Task<Result> ReturnForCorrectionAsync(long applicationId, string? reason, string operatorName, CancellationToken ct = default);
+
+    /// <summary>生成负面结论告知书 PDF（不予受理 / 不予救助）并归档。</summary>
+    Task<Result<Archive>> GenerateNoticeAsync(long applicationId, SpecialApprovalNoticeKind kind,
+        string reason, CancellationToken ct = default);
 
     Task<Result<Archive>> GenerateDocumentAsync(long applicationId, CancellationToken ct = default);
 }
@@ -104,14 +120,15 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
                 basic_situation = $1, special_matters = $2, template_key = $3,
                 report_unit = $4, handler_name = $5, form_date = $6,
                 audit_result = $7, audit_date = $8,
-                case_type = $9, negative_items = $10,
+                case_type = $9, negative_items = $10, filing_receipt = $11,
                 updated_at = NOW()
-                WHERE id = $11 AND deleted_at IS NULL";
+                WHERE id = $12 AND deleted_at IS NULL";
             var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
                 request.BasicSituation, request.SpecialMatters, request.TemplateKey,
                 request.ReportUnit, request.HandlerName, request.FormDate,
                 request.AuditResult, request.AuditDate,
                 request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems),
+                request.FilingReceipt,
                 existing.Id);
             if (updateResult.IsFailure)
                 return Result.Failure(updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, updateResult.Message);
@@ -122,14 +139,15 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             var insertSql = @"INSERT INTO nc_biz_special_approval_forms
                 (application_id, form_no, basic_situation, special_matters, template_key,
                  report_unit, handler_name, form_date, audit_result, audit_date,
-                 status, created_by, case_type, negative_items, created_at, updated_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())";
+                 status, created_by, case_type, negative_items, filing_receipt, created_at, updated_at)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())";
             var insertResult = await _db.ExecuteNonQueryAsync(insertSql, ct,
                 request.ApplicationId, formNo, request.BasicSituation, request.SpecialMatters, request.TemplateKey,
                 request.ReportUnit, request.HandlerName, request.FormDate,
                 request.AuditResult, request.AuditDate,
                 SpecialApprovalConstants.StatusDraft, request.CreatedBy,
-                request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems));
+                request.CaseType, SpecialApprovalConstants.JoinNegativeItems(request.NegativeItems),
+                request.FilingReceipt);
             if (insertResult.IsFailure)
                 return Result.Failure(insertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, insertResult.Message);
         }
@@ -259,12 +277,14 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         var updateFormSql = @"UPDATE nc_biz_special_approval_forms SET
             status = $1, audit_result = $2, audit_date = $3,
             basic_situation = $4, special_matters = $5, template_key = $6,
+            is_long_term_publicized = $8,
             updated_at = NOW()
             WHERE id = $7 AND deleted_at IS NULL";
         var updateFormResult = await _db.ExecuteNonQueryAsync(updateFormSql, ct,
             formStatus, request.Approved ? "同意纳入" : "不同意纳入",
             request.MeetingDate == default ? (DateTime?)null : request.MeetingDate,
-            request.BasicSituation, request.SpecialReason, request.TemplateKey, form.Id);
+            request.BasicSituation, request.SpecialReason, request.TemplateKey, form.Id,
+            request.Approved);
         if (updateFormResult.IsFailure)
             return Result.Failure(updateFormResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, updateFormResult.Message);
 
@@ -301,7 +321,8 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
     /// <summary>
     /// 登记备案完成（已返回结论 / 历史 Approved → Filed），写 filed_at。
     /// </summary>
-    public async Task<Result> MarkFiledAsync(long applicationId, string operatorName, CancellationToken ct = default)
+    public async Task<Result> MarkFiledAsync(long applicationId, string? receiptFile,
+        string operatorName, CancellationToken ct = default)
     {
         var form = await GetByApplicationIdAsync(applicationId, ct);
         if (form == null || form.Id <= 0)
@@ -311,17 +332,18 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
                 $"当前状态（{SpecialApprovalConstants.GetStatusDescription(form.Status)}）不可登记备案");
 
         var sql = @"UPDATE nc_biz_special_approval_forms SET
-                    status = $1, filed_at = CURRENT_DATE, updated_at = NOW()
-                    WHERE id = $2 AND deleted_at IS NULL AND status = ANY($3)";
+                    status = $1, filed_at = CURRENT_DATE, filing_receipt = $2,
+                    is_long_term_publicized = TRUE, updated_at = NOW()
+                    WHERE id = $3 AND deleted_at IS NULL AND status = ANY($4)";
         var result = await _db.ExecuteNonQueryAsync(sql, ct,
-            SpecialApprovalConstants.StatusFiled, form.Id,
+            SpecialApprovalConstants.StatusFiled, receiptFile, form.Id,
             (object)new[] { SpecialApprovalConstants.StatusReturned, SpecialApprovalConstants.StatusApproved });
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, result.Message);
         if (result.Value == 0)
             return Result.Failure(ErrorCodes.INVALID_TRANSITION, "仅已返回结论状态可登记备案");
 
-        LogInfo($"一事一议备案完成: ApplicationId={applicationId}, Operator={operatorName ?? "System"}");
+        LogInfo($"一事一议备案完成: ApplicationId={applicationId}, Operator={operatorName ?? "System"}, Receipt={receiptFile ?? string.Empty}");
         return Result.Success();
     }
 
@@ -349,6 +371,141 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
 
         LogInfo($"一事一议退回补正: ApplicationId={applicationId}, Operator={operatorName ?? "System"}, Reason={reason ?? string.Empty}");
         return Result.Success();
+    }
+
+    /// <summary>
+    /// 生成负面结论告知书 PDF（不予受理 / 不予救助）并归档。
+    /// 不依赖 nc_biz_templates（现有告知书模板无“理由/不予受理”占位符），直接排版 PDF。
+    /// </summary>
+    public async Task<Result<Archive>> GenerateNoticeAsync(long applicationId, SpecialApprovalNoticeKind kind,
+        string reason, CancellationToken ct = default)
+    {
+        var form = await GetByApplicationIdAsync(applicationId, ct);
+        if (form == null || form.Id <= 0)
+            return Result.Failure<Archive>(ErrorCodes.SPECIAL_APPROVAL_FORM_NOT_FOUND, "未找到一事一议申报表");
+
+        var appResult = await _applicationService.GetByIdAsync(applicationId, ct);
+        if (appResult.IsFailure || appResult.Value == null)
+            return Result.Failure<Archive>(ErrorCodes.APPLICATION_NOT_FOUND, "未找到申请记录");
+        var app = appResult.Value;
+
+        if (!ChinesePdfFontResolver.EnsureRegistered(out var fontError))
+            return Result.Failure<Archive>(ErrorCodes.DOCUMENT_GENERATION_FAILED, fontError ?? "中文字体不可用");
+
+        try
+        {
+            var title = kind == SpecialApprovalNoticeKind.NotAccepted
+                ? "社会救助“一事一议”不予受理告知书"
+                : "社会救助“一事一议”不予救助告知书";
+            var lines = BuildNoticeLines(app, form, kind, reason);
+
+            var dir = OutputPathHelper.EnsureDirectoryExists(
+                OutputPathHelper.GetCategoryDisplayName(PrintBusinessTypes.FamilyApplication),
+                app.ApplicantName, app.Id.ToString(), DateTime.Today);
+            var fileName = $"一事一议_{title.Replace("社会救助“一事一议”", "", StringComparison.Ordinal)}_{DateTime.Now:yyyyMMddHHmmssfff}.pdf";
+            var outputPath = Path.Combine(dir, fileName);
+
+            using (var doc = new PdfDocument())
+            {
+                var page = doc.AddPage();
+                page.Size = PageSize.A4;
+                using var gfx = XGraphics.FromPdfPage(page);
+                var titleFont = new XFont(ChinesePdfFontResolver.FaceName, 18, XFontStyleEx.Bold);
+                var bodyFont = new XFont(ChinesePdfFontResolver.FaceName, 12, XFontStyleEx.Regular);
+                var smallFont = new XFont(ChinesePdfFontResolver.FaceName, 10, XFontStyleEx.Regular);
+
+                var y = 80.0;
+                gfx.DrawString(title, titleFont, XBrushes.Black,
+                    new XRect(0, y, page.Width.Point, 30), XStringFormats.TopCenter);
+                y += 56;
+
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrEmpty(line))
+                    {
+                        y += 12;
+                        continue;
+                    }
+                    foreach (var wrapped in WrapNoticeText(line, 30))
+                    {
+                        if (y > page.Height.Point - 80) break;
+                        gfx.DrawString(wrapped, bodyFont, XBrushes.Black,
+                            new XRect(60, y, page.Width.Point - 120, 20), XStringFormats.TopLeft);
+                        y += 24;
+                    }
+                }
+
+                y = page.Height.Point - 80;
+                gfx.DrawString($"告知单位：{form.ReportUnit}", smallFont, XBrushes.Black,
+                    new XRect(60, y, page.Width.Point - 120, 16), XStringFormats.TopLeft);
+                gfx.DrawString($"告知日期：{DateTime.Today:yyyy年M月d日}", smallFont, XBrushes.Black,
+                    new XRect(60, y + 20, page.Width.Point - 120, 16), XStringFormats.TopLeft);
+                if (kind == SpecialApprovalNoticeKind.NotAccepted)
+                    gfx.DrawString("（本告知书应在作出不予受理决定后 3 个工作日内送达）", smallFont, XBrushes.Black,
+                        new XRect(60, y + 42, page.Width.Point - 120, 16), XStringFormats.TopLeft);
+
+                doc.Save(outputPath);
+            }
+
+            var archiveResult = await _archiveService.CreateOrAppendFilesAsync(
+                applicationId,
+                "SpecialApproval",
+                app.ClassificationResult ?? "",
+                App.CurrentUserFullName,
+                new List<ArchiveFile>
+                {
+                    new()
+                    {
+                        TemplateId = "notice",
+                        FileName = fileName,
+                        FileType = "pdf",
+                        FileSize = new FileInfo(outputPath).Length,
+                        OutputPath = outputPath
+                    }
+                }, ct);
+            if (archiveResult.IsFailure)
+                return Result.Failure<Archive>(archiveResult.ErrorCode ?? ErrorCodes.DOCUMENT_GENERATION_FAILED,
+                    archiveResult.Message);
+
+            LogInfo($"一事一议告知书已生成并归档: ApplicationId={applicationId}, Kind={kind}, Path={outputPath}");
+            return Result.Success(archiveResult.Value!);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "生成一事一议告知书");
+            return Result.FromException<Archive>(ex);
+        }
+    }
+
+    private static List<string> BuildNoticeLines(ApplicationEntity app, SpecialApprovalForm form,
+        SpecialApprovalNoticeKind kind, string reason)
+    {
+        var address = AddressResolver.BuildAddressFromText(app.District, app.Town, app.Community, app.Address);
+        var caseName = SpecialApprovalConstants.GetCaseTypeName(form.CaseType) ?? "（未选择）";
+        var lines = new List<string>
+        {
+            $"申请人：{app.ApplicantName}（身份证号：{app.ApplicantIdCard}）",
+            $"家庭住址：{address}",
+            string.Empty,
+            kind == SpecialApprovalNoticeKind.NotAccepted
+                ? $"您提出的社会救助“一事一议”申请（适用情形：{caseName}），经审查不符合受理条件，决定不予受理。"
+                : "您提出的社会救助“一事一议”申请，经评议，结论为不通过，决定不予救助。",
+            string.IsNullOrWhiteSpace(reason) ? string.Empty : $"理由：{reason.Trim()}",
+            string.Empty,
+            "如对本决定不服，可自收到本告知书之日起 60 日内依法申请行政复议，或 6 个月内依法提起行政诉讼。"
+        };
+        return lines;
+    }
+
+    private static IEnumerable<string> WrapNoticeText(string text, int maxChars)
+    {
+        if (text.Length <= maxChars)
+        {
+            yield return text;
+            yield break;
+        }
+        for (var i = 0; i < text.Length; i += maxChars)
+            yield return text.Substring(i, Math.Min(maxChars, text.Length - i));
     }
 
     /// <summary>
@@ -470,6 +627,17 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
             ["{申请救助家庭需要一事一议说明的情况}"] = form.SpecialMatters,
             ["{审核结果}"] = form.AuditResult,
             ["{审核日期}"] = auditDate,
+            ["{申请意见}"] = form.AuditResult,
+            ["{一事一议事项基本情况}"] = form.BasicSituation,
+            ["{疑难事项}"] = form.SpecialMatters,
+            ["{审批时间}"] = auditDate,
+            ["{所在单位}"] = reportUnit,
+            ["{享受分类}"] = ClassificationConstants.ConvertToFullName(app.ClassificationResult ?? ""),
+            ["{事项名称}"] = form.BasicSituation,
+            ["{经办人}"] = form.HandlerName,
+            ["{纪检监察部门备案}"] = string.Empty,
+            ["{市级民政部门备案}"] = string.Empty,
+            ["{附件清单}"] = "申请表；会议纪要；审核确认表",
             ["{适用情形}"] = SpecialApprovalConstants.GetCaseTypeName(form.CaseType) ?? string.Empty,
             ["{不适用情形}"] = string.Join("；", SpecialApprovalConstants
                 .SplitNegativeItems(form.NegativeItems)

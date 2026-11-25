@@ -150,7 +150,8 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
         ["城市低保"] = 1,
         ["特困供养"] = 2,
         ["低保边缘"] = 3,
-        ["刚性支出"] = 4
+        ["刚性支出"] = 4,
+        ["一事一议"] = 5
     };
 
     public async Task<Result<List<PublicityFamilyRow>>> GetPublicityFamiliesAsync(CancellationToken ct = default)
@@ -224,11 +225,36 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
                 merged.TryAdd(f.ApplicantIdCard, f);
             }
 
+            // 5'. 一事一议长期公示对象（通过结论打标）：并入名单；已在名单中的追加标记
+            var longTermResult = await QueryLongTermPublicityFamiliesAsync(monthEnd, ct);
+            if (longTermResult.IsFailure)
+                return Result.Failure<List<PublicityFamilyRow>>(longTermResult.ErrorCode!, longTermResult.Message!);
+            var longTerm = longTermResult.Value ?? new List<PublicityFamilyRow>();
+            var longTermIds = new HashSet<string>(
+                longTerm.Select(f => f.ApplicantIdCard?.Trim())
+                    .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var f in longTerm)
+            {
+                if (string.IsNullOrWhiteSpace(f.ApplicantIdCard)) continue;
+                if (exitedIds.Contains(f.ApplicantIdCard)) continue;
+                merged.TryAdd(f.ApplicantIdCard, f);
+            }
+            if (longTermIds.Count > 0)
+            {
+                foreach (var f in merged.Values)
+                {
+                    if (!string.IsNullOrWhiteSpace(f.ApplicantIdCard)
+                        && longTermIds.Contains(f.ApplicantIdCard.Trim()))
+                        AppendLongTermRemark(f);
+                }
+            }
+
             // 6. 近亲属备案标记（批量命中户主身份证）
             await MarkNearRelativeAsync(merged.Values.ToList(), ct);
 
             var rows = merged.Values.ToList();
-            LogInfo($"公示名单(月度合并)取数完成: 导入库 {imported.Count} + 当前库 {current.Count} - 退出 {exitedIds.Count} = {rows.Count} 户");
+            LogInfo($"公示名单(月度合并)取数完成: 导入库 {imported.Count} + 当前库 {current.Count} + 长期公示 {longTerm.Count} - 退出 {exitedIds.Count} = {rows.Count} 户");
             return Result.Success(rows);
         }
         catch (Exception ex)
@@ -502,6 +528,49 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             LogException(ex, "QueryActiveCurrentFamiliesAsync");
             return Result.FromException<List<PublicityFamilyRow>>(ex);
         }
+    }
+
+    /// <summary>一事一议通过对象（长期公示标记）并入公示名单。</summary>
+    private async Task<Result<List<PublicityFamilyRow>>> QueryLongTermPublicityFamiliesAsync(
+        DateTime monthEnd, CancellationToken ct)
+    {
+        const string sql = @"
+            SELECT '一事一议' AS category,
+                   a.applicant_name, a.applicant_id_card,
+                   COALESCE(a.applicant_phone, '') AS phone,
+                   COALESCE(a.address, '') AS address,
+                   COALESCE(a.community, '') AS community,
+                   COALESCE(NULLIF(a.confirmed_family_size, 0), a.family_size, 0) AS guarantee_size,
+                   0 AS base_amount, 0 AS family_classified, 0 AS person_classified,
+                   0 AS care_cost, 0 AS total_amount,
+                   '一事一议长期公示' AS remark
+              FROM nc_biz_special_approval_forms f
+              JOIN nc_biz_applications a ON a.id = f.application_id
+             WHERE f.is_long_term_publicized = TRUE
+               AND f.deleted_at IS NULL
+               AND a.deleted_at IS NULL
+               AND a.status NOT IN ('Refused', 'Stopped')
+               AND (a.stop_date IS NULL OR a.stop_date >= $1::date)";
+        try
+        {
+            var result = await _db.QueryAsync<PublicityFamilyRow>(sql, ct, monthEnd);
+            if (result.IsFailure)
+                return Result.Failure<List<PublicityFamilyRow>>(result.ErrorCode!, result.Message!);
+            return Result.Success(result.Value ?? new List<PublicityFamilyRow>());
+        }
+        catch (Exception ex)
+        {
+            LogException(ex, "QueryLongTermPublicityFamiliesAsync");
+            return Result.FromException<List<PublicityFamilyRow>>(ex);
+        }
+    }
+
+    /// <summary>在备注列追加长期公示标记（不覆盖原申请原因）。</summary>
+    private static void AppendLongTermRemark(PublicityFamilyRow row)
+    {
+        const string marker = "一事一议长期公示";
+        if (row.Remark.Contains(marker, StringComparison.Ordinal)) return;
+        row.Remark = string.IsNullOrWhiteSpace(row.Remark) ? marker : $"{row.Remark}；{marker}";
     }
 
     /// <summary>批量标记近亲属备案（户主身份证命中 nc_biz_near_relative_links.id_card）。</summary>

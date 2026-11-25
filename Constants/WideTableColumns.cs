@@ -91,7 +91,8 @@ public static class WideTableColumns
     public const string SpecialApprovalFormsColumns =
         "id, application_id, form_no, basic_situation, special_matters, template_key," +
         "report_unit, handler_name, form_date, audit_result, audit_date, status, created_by," +
-        "created_at, updated_at, deleted_at, case_type, submitted_at, filed_at, negative_items";
+        "created_at, updated_at, deleted_at, case_type, submitted_at, filed_at, negative_items," +
+        "filing_receipt, is_long_term_publicized";
 
     /// <summary>nc_biz_special_approvals 全列（按列序）</summary>
     public const string SpecialApprovalsColumns =

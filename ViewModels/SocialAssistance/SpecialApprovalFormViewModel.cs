@@ -143,6 +143,14 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
 
     [ObservableProperty]
     private DateTime? _filedAt;
+
+    /// <summary>备案回执文件（文件名/路径）</summary>
+    [ObservableProperty]
+    private string _filingReceipt = string.Empty;
+
+    /// <summary>是否纳入长期公示</summary>
+    [ObservableProperty]
+    private bool _isLongTermPublicized;
     #endregion
 
     #region 会议审议
@@ -280,6 +288,8 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
                 Status = form.Status;
                 SubmittedAt = form.SubmittedAt;
                 FiledAt = form.FiledAt;
+                FilingReceipt = form.FilingReceipt ?? string.Empty;
+                IsLongTermPublicized = form.IsLongTermPublicized;
                 SelectedCaseType = CaseTypeOptions.FirstOrDefault(o => o.Key == form.CaseType);
                 var selectedNegatives = SpecialApprovalConstants
                     .SplitNegativeItems(form.NegativeItems)
@@ -605,6 +615,52 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         }
     }
 
+    /// <summary>选择备案回执文件（仅存路径/文件名）。</summary>
+    [RelayCommand]
+    private async Task PickFilingReceiptAsync()
+    {
+        var path = await PickFileWithFeedbackAsync("选择备案回执",
+            new[] { ".pdf", ".jpg", ".jpeg", ".png", ".docx" });
+        if (!string.IsNullOrWhiteSpace(path))
+            FilingReceipt = path;
+    }
+
+    /// <summary>生成不予受理告知书（不符合适用情形，3 个工作日内书面告知）。</summary>
+    [RelayCommand]
+    private async Task NotAcceptedNoticeAsync()
+    {
+        if (_applicationId <= 0) return;
+        var reason = await _dialogService.DisplayPromptAsync("不予受理告知书",
+            "请填写不予受理理由：", "生成", "取消", "如：不符合“一事一议”适用情形等");
+        if (reason == null) return;
+
+        var result = await ExecuteAsync<Archive>(() =>
+            _formService.GenerateNoticeAsync(_applicationId, SpecialApprovalNoticeKind.NotAccepted, reason, CancellationToken),
+            "生成不予受理告知书...");
+        if (result.IsSuccess)
+            await _dialogService.DisplayAlertAsync("成功", "不予受理告知书已生成并归档", "确定");
+        else
+            await ShowFailureAsync(result, "生成不予受理告知书");
+    }
+
+    /// <summary>生成不予救助告知书（评议不通过）。</summary>
+    [RelayCommand]
+    private async Task RejectedNoticeAsync()
+    {
+        if (_applicationId <= 0) return;
+        var reason = await _dialogService.DisplayPromptAsync("不予救助告知书",
+            "请填写不予救助理由：", "生成", "取消", "如：经评议不符合救助条件等");
+        if (reason == null) return;
+
+        var result = await ExecuteAsync<Archive>(() =>
+            _formService.GenerateNoticeAsync(_applicationId, SpecialApprovalNoticeKind.Rejected, reason, CancellationToken),
+            "生成不予救助告知书...");
+        if (result.IsSuccess)
+            await _dialogService.DisplayAlertAsync("成功", "不予救助告知书已生成并归档", "确定");
+        else
+            await ShowFailureAsync(result, "生成不予救助告知书");
+    }
+
     /// <summary>登记备案完成（待备案 → 已备案）。</summary>
     [RelayCommand]
     private async Task MarkFiledAsync()
@@ -616,7 +672,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         if (!confirm) return;
 
         var result = await ExecuteAsync(() =>
-            _formService.MarkFiledAsync(_applicationId, App.CurrentUserFullName, CancellationToken), "登记备案...");
+            _formService.MarkFiledAsync(_applicationId, FilingReceipt, App.CurrentUserFullName, CancellationToken), "登记备案...");
         if (result.IsSuccess)
         {
             await _dialogService.DisplayAlertAsync("成功", "一事一议已登记备案", "确定");
@@ -669,6 +725,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         AuditDate = AuditDate,
         CaseType = SelectedCaseType?.Key ?? string.Empty,
         NegativeItems = NegativeItemOptions.Where(x => x.IsSelected).Select(x => x.Code).ToArray(),
+        FilingReceipt = FilingReceipt,
         CreatedBy = App.CurrentUserFullName
     };
 }
