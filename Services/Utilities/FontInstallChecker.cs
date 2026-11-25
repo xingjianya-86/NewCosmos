@@ -50,9 +50,10 @@ public static class FontInstallChecker
                     missing.Add(new OfficialFontItem(string.Join(" / ", candidates), file, Path.GetFileName(file)));
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 检查本身失败不阻断启动：调用方按"无缺失"处理并由上层记日志
+            // 检查本身失败不阻断启动，但必须留痕：否则字体缺失会伪装成"无缺失"。
+            Serilog.Log.Warning(ex, "[FontInstallChecker] 公文字体检查失败，本次按无缺失处理");
         }
         return missing;
     }

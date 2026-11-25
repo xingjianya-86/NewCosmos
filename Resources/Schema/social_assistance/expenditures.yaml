@@ -21,6 +21,14 @@ tables:
         type: BIGINT
         nullable: true
         comment: 关联成员ID
+      - name: member_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 支出人员姓名（身份快照，2026-11-19 起必填）
+      - name: member_id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 支出人员身份证号（身份快照，死亡剔除/去重用）
       - name: expenditure_type
         type: VARCHAR(50)
         nullable: true

@@ -98,8 +98,9 @@ public class PredictionResult
         {
             return JsonSerializer.Deserialize<int[]>(PredictedRedJson) ?? Array.Empty<int>();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[PredictionResult] 预测红球 JSON 解析失败，预测号码显示为空");
             return Array.Empty<int>();
         }
     }
@@ -121,8 +122,9 @@ public class PredictionResult
         {
             return JsonSerializer.Deserialize<int[]>(PredictedBlueJson) ?? Array.Empty<int>();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[PredictionResult] 预测蓝球 JSON 解析失败，预测号码显示为空");
             return Array.Empty<int>();
         }
     }

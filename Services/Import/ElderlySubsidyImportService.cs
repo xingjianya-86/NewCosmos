@@ -98,8 +98,11 @@ public partial class ElderlySubsidyImportService : BaseImportService
         var excludeCount = 0;
         var excludeSamples = new List<string>();
 
-        // 加载查重集：当前库已登记（未删除）身份证 + 死亡记录身份证
+        // 加载查重集：当前库已登记（未删除且非草稿）身份证 + 死亡记录身份证
         // 已登记/已死亡的人员拒绝再次导入（含原户主死亡等场景）
+        // 草稿不拦截（2026-11-18）：草稿非定稿、不算已登记，不应挡名册导入——
+        // 草稿人员照常进名册，后续补全建档时 MigrateFromHistoryAsync 幂等返回草稿档、
+        // 保存后名册行自动标 Stopped，冲突自解；且统计/待新增/复核三处口径均不双计。
         // §6：查重集加载失败中止导入（空查重集会导致全部数据重复导入）
         var existingIdsResult = await LoadExistingIdCardSetAsync(ct);
         if (existingIdsResult.IsFailure)
@@ -151,7 +154,9 @@ public partial class ElderlySubsidyImportService : BaseImportService
                      subsidy_amount, bank_account, person_type, original_type, data_year, imported_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP);";
 
-                await DatabaseService.ExecuteNonQueryAsync("DELETE FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND data_year = $2", ct, idCard, dataYear);
+                await ExecOrThrowAsync(DatabaseService,
+                    "DELETE FROM nc_biz_elderly_subsidy_history WHERE id_card = $1 AND data_year = $2",
+                    ct, idCard, dataYear);
                 var execResult = await DatabaseService.ExecuteNonQueryAsync(sql, ct,
                     name!, pinyinName!, idCard!, gender!, (object)birthDate!, (object)age!, phone, address,
                     subsidyAmount, bankAccount, personType, originalType, dataYear);
@@ -191,7 +196,8 @@ public partial class ElderlySubsidyImportService : BaseImportService
     }
 
     /// <summary>
-    /// 加载查重集：当前库已登记（未删除）身份证 + 死亡记录身份证（nc_biz_death_records.member_id_card）。
+    /// 加载查重集：当前库已登记（未删除且非 Draft 草稿）身份证 + 死亡记录身份证（nc_biz_death_records.member_id_card）。
+    /// 草稿非定稿不拦截导入；软删（deleted_at 非空）视为作废、同样不拦截。
     /// §6：加载失败显式失败——查重集为空会导致全部数据按"新数据"重复导入。
     /// </summary>
     private async Task<Result<HashSet<string>>> LoadExistingIdCardSetAsync(CancellationToken ct)
@@ -200,7 +206,7 @@ public partial class ElderlySubsidyImportService : BaseImportService
         try
         {
             var apps = await DatabaseService.QueryAsync<string>(
-                "SELECT id_card FROM nc_biz_elderly_applications WHERE deleted_at IS NULL AND id_card IS NOT NULL", ct);
+                "SELECT id_card FROM nc_biz_elderly_applications WHERE deleted_at IS NULL AND status <> 'Draft' AND id_card IS NOT NULL", ct);
             if (apps.IsFailure)
                 return Result.Failure<HashSet<string>>(
                     apps.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,

@@ -172,8 +172,9 @@ public class AndroidNetworkAccessService : BaseService, INetworkAccessService
                     n.Name.StartsWith("zt", StringComparison.OrdinalIgnoreCase)
                     && n.OperationalStatus == OperationalStatus.Up);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[AndroidNetworkAccess] 枚举 ZeroTier 网卡失败");
             return null;
         }
     }
@@ -187,8 +188,9 @@ public class AndroidNetworkAccessService : BaseService, INetworkAccessService
                 .Select(a => a.Address)
                 .FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)?.ToString() ?? string.Empty;
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[AndroidNetworkAccess] 读取网卡 IPv4 地址失败");
             return string.Empty;
         }
     }

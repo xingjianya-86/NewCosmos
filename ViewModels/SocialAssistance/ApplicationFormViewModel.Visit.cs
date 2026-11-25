@@ -48,7 +48,7 @@ public partial class ApplicationFormViewModel
         try
         {
             var list = await _visitRecordService.GetListByApplicationIdAsync(_applicationId);
-            var records = list.IsSuccess && list.Value != null ? list.Value : new List<VisitRecord>();
+            var records = list.HasValue ? list.Value : new List<VisitRecord>();
             VisitRecords = new ObservableCollection<VisitRecord>(records);
 
             if (records.Count > 0)

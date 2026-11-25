@@ -53,6 +53,12 @@ public interface IFamilyMemberService
     Task<Result<int>> DeleteNonSupportByApplicationIdAsync(long applicationId, CancellationToken ct = default);
 
     /// <summary>
+    /// 按主表申请人字段同步户主成员行（2026-11-19）：更新/补建唯一 is_applicant 户主行并清除非现任户主标记。
+    /// 幂等；表单保存事务内调用，失败由外层回滚。
+    /// </summary>
+    Task<Result> UpsertHouseholdHeadFromApplicationAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 查询申请下已登记死亡的成员身份证（历史数据未软删，展示/生成档案时须过滤）
     /// </summary>
     Task<Result<List<string>>> GetDeadIdCardsByApplicationIdAsync(long applicationId, CancellationToken ct = default);

@@ -187,9 +187,17 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             ("保障金减发表_最低生活保障", "保障金减发表（最低生活保障）"),
             ("施保金减发", "分类施保金减发人员表（最低生活保障）"),
             ("分类施保增加", "分类施保金增发人员表（最低生活保障）"),
-            ("自然减员表", "人员变动_自然减员月报表"),
+            ("自然减员表", "人员变动_自然减员月报表（全部）"),
+            ($"自然减员表_{MonthlyReportCategoryConstants.Subsistence}", $"人员变动_自然减员月报表（{MonthlyReportCategoryConstants.Subsistence}）"),
+            ($"自然减员表_{MonthlyReportCategoryConstants.LowIncomeEdge}", $"人员变动_自然减员月报表（{MonthlyReportCategoryConstants.LowIncomeEdge}）"),
+            ($"自然减员表_{MonthlyReportCategoryConstants.Destitute}", $"人员变动_自然减员月报表（{MonthlyReportCategoryConstants.Destitute}）"),
+            ($"自然减员表_{MonthlyReportCategoryConstants.RigidExpenditure}", $"人员变动_自然减员月报表（{MonthlyReportCategoryConstants.RigidExpenditure}）"),
             ("临时救助新增汇总表", "临时救助新增汇总表"),
-            ("档案_退出对象兜底情况纠治表", "退出对象兜底情况纠治表（批量）"),
+            ("档案_退出对象兜底情况纠治表", "退出对象兜底情况纠治表（全部）"),
+            ($"档案_退出对象兜底情况纠治表_{MonthlyReportCategoryConstants.Subsistence}", $"退出对象兜底情况纠治表（{MonthlyReportCategoryConstants.Subsistence}）"),
+            ($"档案_退出对象兜底情况纠治表_{MonthlyReportCategoryConstants.LowIncomeEdge}", $"退出对象兜底情况纠治表（{MonthlyReportCategoryConstants.LowIncomeEdge}）"),
+            ($"档案_退出对象兜底情况纠治表_{MonthlyReportCategoryConstants.Destitute}", $"退出对象兜底情况纠治表（{MonthlyReportCategoryConstants.Destitute}）"),
+            ($"档案_退出对象兜底情况纠治表_{MonthlyReportCategoryConstants.RigidExpenditure}", $"退出对象兜底情况纠治表（{MonthlyReportCategoryConstants.RigidExpenditure}）"),
             ("会议记录", "会议记录"),
             ("会议记录_一事一议", "会议记录（一事一议）"),
             (NearRelativeConstants.FormKeyStaffBatch, "近亲属备案（工作人员批量）"),
@@ -289,18 +297,26 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
         DeathCount = death.Value?.Count ?? 0;
 
         var stats = await _reportService.GetStatisticsAsync(SelectedYear, SelectedMonth, ct);
-        if (stats.IsSuccess)
+        if (stats.IsFailure)
         {
-            TotalAmountText = stats.Value.TotalAmount.ToString("N2");
-            SummaryText = $"在保 {stats.Value.TotalArchives} 户，月保障金合计 {stats.Value.TotalAmount:N2} 元";
+            await ShowErrorAsync(stats.Message);
+            return;
         }
+        TotalAmountText = stats.Value.TotalAmount.ToString("N2");
+        SummaryText = $"在保 {stats.Value.TotalArchives} 户，月保障金合计 {stats.Value.TotalAmount:N2} 元";
     }
 
     private async Task LoadMeetingAsync()
     {
         var town = SelectedTown == "全部" ? "" : SelectedTown;
         var result = await _reportService.GetMeetingAsync(SelectedYear, SelectedMonth, town, ct: CancellationToken);
-        if (!result.IsSuccess || result.Value == null)
+        if (result.IsFailure)
+        {
+            // 查询失败若静默返回，界面会保留上一次会议记录并可能被直接保存。
+            await ShowErrorAsync(result.Message);
+            return;
+        }
+        if (result.Value == null)
             return;
         MeetingTime = result.Value.MeetingTime;
         Host = result.Value.Host;
@@ -345,7 +361,10 @@ public partial class MonthlyReportMainViewModel : ViewModelBase
             return string.Empty;
         var usersResult = await _userService.GetByOrganizationAsync(orgId.Value);
         if (usersResult.IsFailure || usersResult.Value == null)
+        {
+            _logger.Warn($"月报：民政助理查询失败，署名将为空: {usersResult.ErrorCode} {usersResult.Message}");
             return string.Empty;
+        }
         return usersResult.Value.FirstOrDefault(u => u.Position == PositionTitles.CivilAssistant)?.FullName ?? string.Empty;
     }
 

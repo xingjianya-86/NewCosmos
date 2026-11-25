@@ -53,6 +53,19 @@ public class Result
     /// <summary>
     /// 从异常创建失败结
 /// </summary>
+    /// <summary>
+    /// 失败即抛出 BusinessException（用于必须中断事务的收尾步骤）。
+    /// 收敛各处 "if (result.IsFailure) throw new BusinessException(errorCode ?? ..., message ?? ...)" 样板，
+    /// 统一补齐空错误码/空消息。业务规则校验仍应优先返回 Result，不以此替代正常流程。
+    /// </summary>
+    public void ThrowIfFailure(string operation)
+    {
+        if (IsFailure)
+            throw new BusinessException(
+                string.IsNullOrEmpty(ErrorCode) ? ErrorCodes.UNKNOWN_ERROR : ErrorCode,
+                string.IsNullOrEmpty(Message) ? $"{operation}失败" : $"{operation}失败: {Message}");
+    }
+
     public static Result FromException(Exception ex, string errorCode = null)
     {
         var code = errorCode ?? GetErrorCodeFromException(ex);
@@ -121,6 +134,10 @@ public class Result<T> : Result
 {
     public T Value { get; }
 
+    /// <summary>成功且携带非空值。收敛大量 <c>IsSuccess &amp;&amp; Value != null</c> 组合判断。</summary>
+    [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true, nameof(Value))]
+    public bool HasValue => IsSuccess && Value is not null;
+
     private Result(bool isSuccess, T value, string errorCode, string message, IReadOnlyList<string> errors)
         : base(isSuccess, errorCode, message, errors)
     {
@@ -143,7 +160,7 @@ public class Result<T> : Result
     /// </summary>
     public Result<TNew> Map<TNew>(Func<T, TNew> mapper)
     {
-        return IsSuccess && Value is not null
+        return HasValue
             ? Success(mapper(Value))
             : Failure<TNew>(ErrorCode!, Message!, Errors.ToArray());
     }
@@ -153,7 +170,7 @@ public class Result<T> : Result
     /// </summary>
     public async Task<Result<TNew>> MapAsync<TNew>(Func<T, Task<TNew>> mapper)
     {
-        return IsSuccess && Value is not null
+        return HasValue
             ? Success(await mapper(Value))
             : Failure<TNew>(ErrorCode!, Message!, Errors.ToArray());
     }
@@ -168,7 +185,7 @@ public class Result<T> : Result
     /// </summary>
     public T GetValueOrThrow()
     {
-        if (IsSuccess && Value is not null)
+        if (HasValue)
             return Value;
         throw new BusinessException(ErrorCode ?? ErrorCodes.UNKNOWN_ERROR, Message ?? "未知错误");
     }

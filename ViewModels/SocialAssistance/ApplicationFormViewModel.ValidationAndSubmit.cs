@@ -112,7 +112,7 @@ public partial class ApplicationFormViewModel
             {
                 var who = string.Join("、", exemptNames);
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED,
-                    $"家庭成员 [{who}] 勾选了\"因照顾重病重残亲属免于劳动力判定\"，但本户未勾选任何重病或重残成员，请先在其他成员的健康状况中如实标注");
+                    $"家庭成员 [{who}] 勾选了\"因照顾重病重残亲属免于劳动力判定\"，但本户（含户主本人）未标注任何重病或重残成员，请先在本人或其他成员的健康状况中如实标注");
             }
         }
 
@@ -135,11 +135,13 @@ public partial class ApplicationFormViewModel
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED, "经营收入不能为负数");
         }
 
-        // 验证刚性支出
+        // 验证刚性支出（2026-11-19 起必须落户到人：支出人员姓名+身份证必填）
         foreach (var expenditure in RigidExpenditures)
         {
             if (expenditure.Amount < 0)
                 return Result.Failure(ErrorCodes.VALIDATION_FAILED, "刚性支出不能为负数");
+            if (string.IsNullOrWhiteSpace(expenditure.MemberName) || string.IsNullOrWhiteSpace(expenditure.MemberIdCard))
+                return Result.Failure(ErrorCodes.VALIDATION_FAILED, "刚性支出需选择支出人员");
         }
 
         // 验证土地面积
@@ -545,14 +547,14 @@ public partial class ApplicationFormViewModel
                 // [CT 豁免] 保存收尾：补全标记落库必须完成，不响应页面离开
                 var markResult = await _applicationService.MarkDataCompletedAsync(_applicationId, CancellationToken.None);
                 if (markResult.IsFailure)
-                    _logger.Warn($"标记数据补全完成失败: {markResult.Message}");
+                    _logger.Error($"标记数据补全完成失败（下次进入仍会重复提示补全）: {markResult.ErrorCode} {markResult.Message}");
                 _logger.LogBusiness("数据补全保存完成，返回变更页", ("ApplicationId", _applicationId));
 
                 // 数据补全并写入数据库后：删除对应的导入库家庭及人员行（防止重复建档/重复导入）
                 // [CT 豁免] 保存收尾：删除导入库数据必须完成，不响应页面离开（中断会重新出现重复建档）
                 var delResult = await _importedArchiveService.DeleteImportedFamilyByApplicationAsync(_applicationId, CancellationToken.None);
                 if (delResult.IsFailure)
-                    _logger.Warn($"删除导入库家庭失败: {delResult.Message}");
+                    _logger.Error($"删除导入库家庭失败（存在重复建档风险）: {delResult.ErrorCode} {delResult.Message}");
 
                 var completionPage = Helpers.WindowNavigator.CurrentPage;
                 if (completionPage != null)
@@ -678,7 +680,7 @@ public partial class ApplicationFormViewModel
             // 预勾选名单与档案输出的清单过滤同源（ChangeDocumentApplicabilityService 单点口径，
             // 补打中心同用）：告知书必选；渐退→渐退审批表；有人员变动→增减员表。
             // （原「减发→档案_保障金减少」已删：模板不在库，减发由告知书"待遇调整"方向承载）
-            var preselect = new List<string> { DocumentTemplateNames.ChangeNotice }; // 告知书必选
+            var preselect = new List<string> { TemplateDocTypes.ChangeNotice }; // 告知书必选
             var factsResult = await _serviceProvider
                 .GetRequiredService<IChangeDocumentApplicabilityService>()
                 .GetFactsAsync(_applicationId, ClassificationResult, CancellationToken);
@@ -686,9 +688,9 @@ public partial class ApplicationFormViewModel
             {
                 var facts = factsResult.Value;
                 if (facts.HasActiveGracePeriod)
-                    preselect.Add(DocumentTemplateNames.GraceApproval);
+                    preselect.Add(TemplateDocTypes.GraceApproval);
                 if (facts.HasMemberChange)
-                    preselect.Add(DocumentTemplateNames.MemberChangeTable);
+                    preselect.Add(TemplateDocTypes.MemberChangeTable);
             }
             else
             {
@@ -713,15 +715,18 @@ public partial class ApplicationFormViewModel
         }
     }
 
-    /// <summary>写入输出文书上下文（进 Production 前调用；PrepareAndNavigateAsync 不会清这些字段）</summary>
-    private void ApplyDocumentOutputContext(IEnumerable<string> preselectNames)
+    /// <summary>
+    /// 写入输出文书上下文（进 Production 前调用；PrepareAndNavigateAsync 不会清这些字段）。
+    /// preselectDocTypes = 文档类型清单（TemplateDocTypes，方案B精准定位；原按模板名）。
+    /// </summary>
+    private void ApplyDocumentOutputContext(IEnumerable<string> preselectDocTypes)
     {
         ClearDocumentOutputContext();
         PrintNavigationData.OutputCategories = Helpers.ArchiveCategoryResolver.DocumentOperationCategories;
         PrintNavigationData.OperationOverride = "人员变更";
-        PrintNavigationData.PrefilterTemplateNames = preselectNames
+        PrintNavigationData.PrefilterDocTypes = preselectDocTypes
             .Distinct(StringComparer.Ordinal).ToArray();
-        PrintNavigationData.TemplateFilter = null; // 分类+预勾选，非强白名单
+        PrintNavigationData.TemplateDocTypeFilter = null; // 分类+预勾选，非强白名单
     }
 
     /// <summary>清理输出文书上下文（整档路径进入 Production 前调用）</summary>
@@ -729,17 +734,17 @@ public partial class ApplicationFormViewModel
     {
         PrintNavigationData.OutputCategories = null;
         PrintNavigationData.OperationOverride = null;
-        PrintNavigationData.PrefilterTemplateNames = null;
-        PrintNavigationData.TemplateFilter = null;
+        PrintNavigationData.PrefilterDocTypes = null;
+        PrintNavigationData.TemplateDocTypeFilter = null;
     }
 
     /// <summary>
     /// 装配打印字段并进入档案输出页（保留：强白名单旁路，成员变更等若需直出仍可用）。
     /// 渐退/Step5 已改为 OpenDocumentProductionAsync → Production → Output。
     /// </summary>
-    private async Task OpenDocumentOutputAsync(IReadOnlyList<string> templateNames, long applicationId)
+    private async Task OpenDocumentOutputAsync(IReadOnlyList<string> docTypes, long applicationId)
     {
-        if (applicationId <= 0 || templateNames == null || templateNames.Count == 0)
+        if (applicationId <= 0 || docTypes == null || docTypes.Count == 0)
         {
             await _serviceProvider.GetRequiredService<IDialogService>()
                 .DisplayAlertAsync("错误", "文书直出参数无效", "确定");
@@ -759,7 +764,7 @@ public partial class ApplicationFormViewModel
             if (printData == null)
                 throw new InvalidOperationException("文书字段装配失败，请确认档案数据完整");
 
-            // 先清文书模式上下文（OutputCategories/OperationOverride/Prefilter 残留会污染白名单的候选分类集），下方再写 TemplateFilter
+            // 先清文书模式上下文（OutputCategories/OperationOverride/Prefilter 残留会污染白名单的候选分类集），下方再写 TemplateDocTypeFilter
             PrintNavigationData.ClearDocumentMode();
             PrintNavigationData.BusinessType = string.IsNullOrEmpty(printData.BusinessType)
                 ? "FamilyApplication"
@@ -772,9 +777,9 @@ public partial class ApplicationFormViewModel
             // 近亲属备案对数据：与档案制作页导航同口径显式携带（文书直出两表"每对一页"用）
             PrintNavigationData.NearRelativePairs = printData.NearRelativePairs;
             PrintNavigationData.Status = ApplicationStatus ?? string.Empty;
-            PrintNavigationData.TemplateFilter = templateNames.ToArray();
+            PrintNavigationData.TemplateDocTypeFilter = docTypes.ToArray();
 
-            _logger.Info($"文书直出: ApplicationId={applicationId}, 模板={string.Join("|", templateNames)}");
+            _logger.Info($"文书直出: ApplicationId={applicationId}, 文档类型={string.Join("|", docTypes)}");
 
             await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
         }
@@ -883,7 +888,7 @@ public partial class ApplicationFormViewModel
             if (oldSnapshot == null)
             {
                 var oldSnapshotResult = await _applicationService.GetByIdAsync(_applicationId, CancellationToken);
-                if (oldSnapshotResult.IsSuccess && oldSnapshotResult.Value != null)
+                if (oldSnapshotResult.HasValue)
                 {
                     oldSnapshot = oldSnapshotResult.Value;
                 }
@@ -987,9 +992,9 @@ public partial class ApplicationFormViewModel
             {
                 // 预勾选：告知书必选 + 渐退审批表（原「保障金减少」项已删：模板不在库，
                 // 减发场景由《档案_变更告知书》"待遇调整"方向承载）
-                var docs = new List<string> { DocumentTemplateNames.ChangeNotice };
+                var docs = new List<string> { TemplateDocTypes.ChangeNotice };
                 if (IsInGracePeriod)
-                    docs.Add(DocumentTemplateNames.GraceApproval);
+                    docs.Add(TemplateDocTypes.GraceApproval);
                 try
                 {
                     ApplyDocumentOutputContext(docs);

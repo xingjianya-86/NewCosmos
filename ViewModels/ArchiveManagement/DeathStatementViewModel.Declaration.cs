@@ -147,7 +147,7 @@ public partial class DeathStatementViewModel
             // 刷新列表并按新申报重新装载上下文
             var searchResult = await _deathStatementService.SearchAsync(
                 _scope!, SearchKeyword, SearchFrom, SearchTo, ShowAll, ct);
-            if (searchResult.IsSuccess && searchResult.Value != null)
+            if (searchResult.HasValue)
             {
                 SearchResults.Clear();
                 foreach (var i in searchResult.Value) SearchResults.Add(i);

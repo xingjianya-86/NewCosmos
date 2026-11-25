@@ -77,6 +77,12 @@ public static class TempReliefPrintDataBuilder
         {
             [FieldKeys.TEMP_APPLICATION_NO] = app.ApplicationNo,
             [FieldKeys.TEMP_RELIEF_TYPE_NAME] = TempReliefConstants.GetReliefTypeName(app.ReliefType),
+        [FieldKeys.TEMP_POPULATION_STATUS] = TempReliefConstants.GetPopulationStatusName(app.PopulationStatus),
+        [FieldKeys.TEMP_PAYMENT_CHANNEL] = TempReliefConstants.GetPaymentChannelName(
+            TempReliefConstants.ResolvePaymentChannel(app.ReliefType, app.PaymentChannel)),
+        [FieldKeys.TEMP_CATEGORY_DISPLAY] = TempReliefConstants.GetCategoryDisplayName(
+            app.ReliefType, app.PopulationStatus, app.PaymentChannel),
+        [FieldKeys.TEMP_DEADLINE] = app.DeadlineDate?.ToString("yyyy-MM-dd") ?? string.Empty,
             // 批5 双写→清理：原 TEMP_REPORT_UNIT 已删（同源同值，T226 config 已迁本键；
             // BatchAndArchive:934 的兜底读取方已同步改读 REPORT_UNIT）
             [FieldKeys.REPORT_UNIT] = app.ReportUnit,
@@ -122,10 +128,10 @@ public static class TempReliefPrintDataBuilder
             [FieldKeys.FAMILY_SIZE] = familySize?.ToString() ?? string.Empty,
             [FieldKeys.TEMP_FAMILY_CATEGORY] = app.FamilyCategory,
             [FieldKeys.TEMP_VERIFY_RESULT] = "情况属实",
-            [FieldKeys.TEMP_CONFIRM_AMOUNT] = app.ReliefType == TempReliefConstants.ReliefTypeSmall && app.ConfirmAmount.HasValue
+            [FieldKeys.TEMP_CONFIRM_AMOUNT] = app.ConfirmAmount.HasValue
                 ? app.ConfirmAmount.Value.ToString("F2") : new string(' ', 12),
-            [FieldKeys.TEMP_PARENT_UNIT] = app.ReliefType == TempReliefConstants.ReliefTypeLarge
-                ? "县民政部门意见" : "镇政府意见",
+            [FieldKeys.TEMP_PARENT_UNIT] = TempReliefConstants.ResolvePaymentChannel(app.ReliefType, app.PaymentChannel)
+                == TempReliefConstants.PaymentCounty ? "县民政部门意见" : "镇政府意见",
             [FieldKeys.TEMP_FAMILY_CATEGORY_CHECKLIST] = BuildAuditFamilyCategoryChecklist(app),
             [FieldKeys.TEMP_ACCEPTANCE_DATE] = acceptance.ToString("yyyy年M月d日"),
             [FieldKeys.TEMP_ACCEPTANCE_CONCLUSION] = BuildAcceptanceConclusion(app, acceptance),
@@ -259,6 +265,11 @@ public static class TempReliefPrintDataBuilder
         };
 
         var acceptanceText = acceptanceDate.ToString("yyyy年M月d日");
+
+        // 小额快救：免公示、免经济核对（政策第二十一条），结论按快救口径输出
+        if (app.ReliefType == TempReliefConstants.ReliefTypeSmall)
+            return $"{reasonWord}，经核实情况紧急，按小额快救办理（免家庭经济状况核对和公示），同意给予临时救助。";
+
         return string.IsNullOrEmpty(rangeText)
             ? $"{reasonWord}，{acceptanceText}验收通过。"
             : $"{reasonWord}，于{rangeText}公示，{acceptanceText}验收通过。";

@@ -125,7 +125,7 @@ public class ProofUnitTemplateService : BaseService, IProofUnitTemplateService
                 ? $"{name}证明模板"
                 : Path.GetFileNameWithoutExtension(fileName);
             var template = await _templateService.SaveAsync(
-                templateName, fileType, fileData, new[] { ProofCategory }, configJson ?? string.Empty, ct);
+                templateName, fileType, fileData, new[] { ProofCategory }, configJson ?? string.Empty, "证明文件", ct);
 
             var insert = await _db.ExecuteNonQueryAsync(
                 @"INSERT INTO nc_config_proof_unit_templates (unit_name, template_id, created_by, updated_by, created_at)

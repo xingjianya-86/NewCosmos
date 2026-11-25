@@ -109,7 +109,7 @@ public partial class ElderlyReviewListViewModel : PagedSearchViewModelBase
         try
         {
             var result = await _applicationService.GetPendingReviewsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 PendingReviews.Clear();
                 foreach (var item in result.Value) PendingReviews.Add(item);

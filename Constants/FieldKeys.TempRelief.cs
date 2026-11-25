@@ -40,7 +40,11 @@ public static partial class FieldKeys
     public const string TEMP_TOWN = "TEMP_TOWN";                                     // 所在镇/街道
     public const string TEMP_ACCEPTANCE_PERSON = "TEMP_ACCEPTANCE_PERSON";           // 乡镇验收人（民政助理）
     public const string TEMP_CONTACT_PHONE = "TEMP_CONTACT_PHONE";                   // 工作单位联系方式（公示异议反馈电话）
-    public const string TEMP_RELIEF_TYPE_NAME = "TEMP_RELIEF_TYPE_NAME";             // 救助类型名称（大额/小额）
+    public const string TEMP_RELIEF_TYPE_NAME = "TEMP_RELIEF_TYPE_NAME";             // 救助类型名称（常规/小额快救）
+    public const string TEMP_POPULATION_STATUS = "TEMP_POPULATION_STATUS";           // 人群状态（在保障人群内/不在保障人群内）
+    public const string TEMP_PAYMENT_CHANNEL = "TEMP_PAYMENT_CHANNEL";               // 发放渠道（上级部门发放/备用金发放）
+    public const string TEMP_CATEGORY_DISPLAY = "TEMP_CATEGORY_DISPLAY";             // 6 类业务场景展示名
+    public const string TEMP_DEADLINE = "TEMP_DEADLINE";                             // 办理截止日
     public const string TEMP_APPLICATION_NO = "TEMP_APPLICATION_NO";                 // 申请编号
     public const string TEMP_APPLICANT_PHONE = "TEMP_APPLICANT_PHONE";               // 申请人联系电话（审批表）
     public const string TEMP_PUBLICIZE_START = "TEMP_PUBLICIZE_START";               // 公示开始日期（验收报告日期起）

@@ -245,7 +245,9 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 COUNT(*) FILTER (WHERE status = $4 AND {NewArchiveFilter.IsNewArchiveExpr("nc_biz_applications")} AND first_approved_at >= $1::timestamp AND first_approved_at < $2::timestamp) AS new_archives,
                 COUNT(*) FILTER (WHERE status = $5 AND stop_date >= $1::date AND stop_date < $2::date
                     {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
-                    {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS stopped_archives,
+                    {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}
+                    -- 真·首拒（从未享受）不是停保（app110 实测错例）
+                    {StoppedArchiveFilter.NotFirstRefusalSql("nc_biz_applications")}) AS stopped_archives,
                 COALESCE(SUM(total_guarantee_amount) FILTER (WHERE status = $4 AND (stop_date IS NULL OR stop_date >= $3::date)), 0) AS total_amount
             FROM nc_biz_applications
             WHERE deleted_at IS NULL;
@@ -299,31 +301,11 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
     // ─────────────────── 六张表单数据 ───────────────────
 
     /// <summary>
-    /// 分类过滤白名单：最低生活保障=低保+低保单人；最低生活保障边缘家庭=低保边缘；特困人员=分散/集中供养；刚性支出困难家庭=刚性支出。
+    /// 分类过滤白名单（单点实现见 <see cref="MonthlyReportCategoryConstants.ResolveCodes"/>）。
     /// 空/null = 不过滤。返回 null 表示不过滤。
     /// </summary>
     private static string[]? CategoryCodes(string? category)
-    {
-        return category switch
-        {
-            "最低生活保障" => new[]
-            {
-                ClassificationConstants.RuralSubsistence, ClassificationConstants.UrbanSubsistence,
-                ClassificationConstants.RuralLowIncomeSingle, ClassificationConstants.UrbanLowIncomeSingle
-            },
-            "最低生活保障边缘家庭" => new[] { ClassificationConstants.RuralLowIncome, ClassificationConstants.UrbanLowIncome },
-            "特困人员" => new[]
-            {
-                ClassificationConstants.RuralDestituteScattered, ClassificationConstants.RuralDestituteCentralized,
-                ClassificationConstants.UrbanDestituteScattered, ClassificationConstants.UrbanDestituteCentralized
-            },
-            "刚性支出困难家庭" => new[]
-            {
-                ClassificationConstants.RuralRigidExpenditure, ClassificationConstants.UrbanRigidExpenditure
-            },
-            _ => null
-        };
-    }
+        => MonthlyReportCategoryConstants.ResolveCodes(category);
 
     /// <summary>
     /// 家庭住址（与 AddressResolver.BuildAddress 同口径）：
@@ -689,7 +671,7 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
               FROM nc_biz_family_members
               WHERE application_id = ANY($1) AND deleted_at IS NULL AND is_applicant = true",
             ct, ids);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             foreach (var r in result.Value)
                 if (r.ApplicationId.HasValue && !string.IsNullOrWhiteSpace(r.RelationshipToHead))
@@ -888,6 +870,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
 
         // 停保日期在 nc_biz_applications.stop_date；初次享受日期：导入库建档户取纳入时间，其余取首次审批时间（LoadApprovalDateMapAsync）
         // 户月保障金=household_monthly_guarantee_amount（不含分类施保），分类施保独立列
+        // （唯一例外：本方法输出到「停保汇总表（最低生活保障）」城市页时，保障金额/月 = 户月保障金 + 分类施保，
+        //   2026-11-20 县里口径，见出参组装处 MonthAmount 注释）
         var sql = $@"SELECT a.applicant_name AS head_name, a.applicant_id_card AS head_id_card,
                             {MemberCountSql("a")},
                             a.address, a.classification_result,
@@ -906,6 +890,8 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                        {StoppedArchiveFilter.NotGraceContinuationSql("a")}
                        -- 终结档（停旧建新产物自身为停保码）与被停的旧档是同一户，避免重复计数
                        {StoppedArchiveFilter.TerminalRebuildArchiveSql("a")}
+                       -- 真·首拒（从未审批享受、链上无在保前分类）不是停保（app110 实测错例）
+                       {StoppedArchiveFilter.NotFirstRefusalSql("a")}
                      ORDER BY a.stop_date ASC, a.first_approved_at DESC";
         var result = await _db.QueryAsync<StoppedRowData>(sql, ct, parameters.ToArray());
         if (result.IsFailure)
@@ -998,6 +984,9 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
             var categoryCode = item.ClassificationResult ?? "";
             var display = StopCategoryDisplay(categoryCode);
             var enjoy = dateMap.TryGetValue(item.HeadIdCard ?? "", out var dt) ? dt : cycleEnd.ToString("yyyy-MM-dd");
+            // 仅「停保汇总表（最低生活保障）」的城市页行合并分类施保进保障金额（见下方 MonthAmount 注释）
+            var isUrbanSubsistenceStop = string.Equals(category, "最低生活保障", StringComparison.Ordinal)
+                && !ClassificationConstants.IsCodeRural(categoryCode);
             outRows.Add(new MonthlyStoppedRow
             {
                 HeadName = item.HeadName ?? "",
@@ -1006,9 +995,14 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 FamilySize = (item.FamilySize ?? 0).ToString(),
                 Address = JoinFullAddress(item.District, item.Town, item.Community, item.Address),
                 Category = display,
-                // 分类施保列=户分类施保金额（贺传波等停保户=208.00）
+                // 分类施保列=户分类施保金额（贺传波等停保户=208.00），独立列始终显示原值
                 Classification = (item.ClassifiedSubsidyAmount ?? 0).ToString("F2"),
-                MonthAmount = (item.TotalGuaranteeAmount ?? 0).ToString("F2"),
+                // 2026-11-20 县里口径：停保汇总表（最低生活保障）**城市页**「保障金额/月」须含分类施保
+                // （虞德芳 685+142=827）；农村页与其他表维持"户月保障金不含分类施保"原口径。
+                // 城乡是同一次查询后按 IsRural 拆页，故用行自身分类码判城市页（单人保码也在 RuralCodes/UrbanCodes 内）。
+                MonthAmount = (isUrbanSubsistenceStop
+                        ? (item.TotalGuaranteeAmount ?? 0) + (item.ClassifiedSubsidyAmount ?? 0)
+                        : (item.TotalGuaranteeAmount ?? 0)).ToString("F2"),
                 StopReason = item.StopReason ?? "",
                 StopDate = item.StopDate?.ToString("yyyy-MM-dd") ?? "",
                 EnjoyDate = enjoy,
@@ -1608,9 +1602,10 @@ public partial class MonthlyReportService : BaseService, IMonthlyReportService
                 ? new HouseholdAmountSnapshot { OldHouseholdMonthly = household, OldClassified = classified }
                 : null;
         }
-        catch (global::System.Text.Json.JsonException)
+        catch (global::System.Text.Json.JsonException ex)
         {
-            // 快照解析失败不影响主流程（消费端回退原值）
+            // 快照解析失败不影响主流程（消费端回退原值），但月报旧值列会失真，必须留痕。
+            Serilog.Log.Warning(ex, "[MonthlyReport] 变更快照解析失败，月报户月旧值将回退原值");
             return null;
         }
     }

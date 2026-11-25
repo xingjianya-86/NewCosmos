@@ -113,10 +113,6 @@ public interface ITemplateEngine : IDisposable
     /// </summary>
     Task<byte[]> ExportPdfFromFileAsync(string sourceFilePath, string pdfOutputPath = null, CancellationToken ct = default);
 
-    /// <summary>
-    /// 获取模板中所有未替换的占位符（用于调试/校验）
-    /// </summary>
-    List<string> GetUnresolvedPlaceholders();
 }
 
 /// <summary>
@@ -318,7 +314,11 @@ public class TemplateConfig
                 return global::System.Text.Json.JsonSerializer.Deserialize<TemplateConfig>(normalized, _fromJsonOptions)
                     ?? new TemplateConfig();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // elem 格式展开失败：回退原始 JSON 再试；失败原因留痕，避免损坏配置被当"空模板"。
+                Serilog.Log.Debug(ex, "[TemplateEngine] elem 格式展开失败，回退原始 JSON 解析");
+            }
         }
 
         return global::System.Text.Json.JsonSerializer.Deserialize<TemplateConfig>(json, _fromJsonOptions) ?? new TemplateConfig();

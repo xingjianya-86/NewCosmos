@@ -272,7 +272,7 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
             if (orgId is > 0)
             {
                 var orgResult = await _organizationService.GetByIdAsync(orgId.Value, ct);
-                if (orgResult.IsSuccess && orgResult.Value != null)
+                if (orgResult.HasValue)
                 {
                     county = string.IsNullOrWhiteSpace(orgResult.Value.CountyName) ? "林口县" : orgResult.Value.CountyName;
                     town = string.IsNullOrWhiteSpace(orgResult.Value.TownName) ? "-" : orgResult.Value.TownName;
@@ -423,7 +423,9 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
                 $@"SELECT applicant_id_card FROM nc_biz_applications
                   WHERE status = $1 AND stop_date IS NOT NULL AND stop_date <= $2::date AND deleted_at IS NULL
                   {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
-                  {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}",
+                  {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}
+                  -- 真·首拒（从未享受）不是退出，不进公示排除集合（app110 实测错例）
+                  {StoppedArchiveFilter.NotFirstRefusalSql("nc_biz_applications")}",
                 ct, ApplicationStatusCodes.STOPPED, monthEnd);
             if (stoppedResult.IsFailure)
                 return Result.Failure<HashSet<string>>(stoppedResult.ErrorCode!, stoppedResult.Message!);
@@ -520,7 +522,12 @@ public class PublicityOutputService : BaseService, IPublicityOutputService
                 @"SELECT DISTINCT id_card FROM nc_biz_near_relative_links
                   WHERE id_card IS NOT NULL AND id_card <> '' AND id_card = ANY($1::text[])",
                 ct, new object[] { cards });
-            if (result.IsFailure || result.Value == null) return;
+            if (result.IsFailure)
+            {
+                LogWarn($"近亲属备案标记查询失败，名单该列将按未备案处理: {result.ErrorCode} {result.Message}");
+                return;
+            }
+            if (result.Value == null) return;
 
             var hit = new HashSet<string>(
                 result.Value.Select(r => r.IdCard?.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!),

@@ -75,7 +75,7 @@ public partial class ArchiveOutputViewModel
 
             var photoService = _serviceProvider.GetRequiredService<Services.Domain.ArchiveManagement.IArchivePhotoService>();
             var result = await photoService.GetByPersonAsync(idCard.Trim(), null, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var photo in result.Value)
                 {
@@ -298,11 +298,11 @@ public partial class ArchiveOutputViewModel
             fields = await BuildDirectoryFieldsAsync(fields);
             rows = BuildDirectoryRows(timeline.MeetingDate);
         }
-        else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
+        else if (TemplateDocTypes.IsSupporterPledge(template.DocType))
         {
             rows = PrintNavigationData.SupporterTableData ?? new List<Dictionary<string, string>>();
         }
-        else if (template.Name.Contains("近亲属"))
+        else if (template.DocType == TemplateDocTypes.NearRelative)
         {
             rows = PrintNavigationData.NearRelativePairs ?? new List<Dictionary<string, string>>();
         }

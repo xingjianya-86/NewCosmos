@@ -7,17 +7,138 @@ namespace NewCosmos.Constants;
 /// </summary>
 public static class TempReliefConstants
 {
-    /// <summary>救助类型：大额救助（金额不填写）</summary>
+    /// <summary>救助类型：常规救助（金额由上级核定；备用金渠道手工填）</summary>
     public const string ReliefTypeLarge = "Large";
 
-    /// <summary>救助类型：小额快速救助（定额）</summary>
+    /// <summary>救助类型：小额快救（定额）</summary>
     public const string ReliefTypeSmall = "Small";
+
+    // ── 两大类 × 三小类（2026-11-25） ──
+    /// <summary>人群状态：在保障人群内（四类在册）</summary>
+    public const string PopulationInsured = "Insured";
+
+    /// <summary>人群状态：不在保障人群内（手工登记）</summary>
+    public const string PopulationUninsured = "Uninsured";
+
+    /// <summary>发放渠道：上级部门发放</summary>
+    public const string PaymentCounty = "County";
+
+    /// <summary>发放渠道：备用金发放（小额固定此渠道）</summary>
+    public const string PaymentReserve = "Reserve";
+
+    /// <summary>非在册手工登记来源（source_type；source_table 为空）</summary>
+    public const string SourceManual = "Manual";
+
+    /// <summary>
+    /// 四类在册来源表（临时救助“在保障人群内”白名单）：
+    /// 农村低保 / 城市低保 / 特困 / 低保边缘 / 刚性支出。
+    /// </summary>
+    public static readonly string[] InsuredSourceTables =
+    {
+        "nc_biz_rural_subsistence_families",
+        "nc_biz_urban_subsistence_families",
+        "nc_biz_destitute_families",
+        "nc_biz_low_income_edge_families",
+        "nc_biz_rigid_expenditure_families"
+    };
+
+    /// <summary>来源是否属于四类在册（人群状态判定单点）。</summary>
+    public static bool IsInsuredSourceTable(string? sourceTable)
+        => !string.IsNullOrEmpty(sourceTable) && Array.IndexOf(InsuredSourceTables, sourceTable) >= 0;
+
+    /// <summary>
+    /// 人群状态判定：手工登记一律非在册；其余按来源表是否四类在册。
+    /// </summary>
+    public static string ResolvePopulationStatus(string? sourceType, string? sourceTable)
+        => string.Equals(sourceType, SourceManual, StringComparison.Ordinal)
+           || !IsInsuredSourceTable(sourceTable)
+            ? PopulationUninsured
+            : PopulationInsured;
+
+    /// <summary>
+    /// 发放渠道归一：小额固定备用金；常规默认上级部门；非法值回退默认。
+    /// </summary>
+    public static string ResolvePaymentChannel(string? reliefType, string? channel)
+    {
+        if (string.Equals(reliefType, ReliefTypeSmall, StringComparison.Ordinal))
+            return PaymentReserve;
+        return string.Equals(channel, PaymentReserve, StringComparison.Ordinal)
+            ? PaymentReserve
+            : PaymentCounty;
+    }
+
+    /// <summary>人群状态中文名。</summary>
+    public static string GetPopulationStatusName(string? status) => status switch
+    {
+        PopulationInsured => "在保障人群内",
+        PopulationUninsured => "不在保障人群内",
+        _ => status ?? string.Empty
+    };
+
+    /// <summary>发放渠道中文名。</summary>
+    public static string GetPaymentChannelName(string? channel) => channel switch
+    {
+        PaymentCounty => "上级部门发放",
+        PaymentReserve => "备用金发放",
+        _ => channel ?? string.Empty
+    };
+
+    /// <summary>6 类业务场景展示名（列表/打印用）。</summary>
+    public static string GetCategoryDisplayName(string? reliefType, string? populationStatus, string? channel)
+    {
+        var population = GetPopulationStatusName(populationStatus);
+        var sub = string.Equals(reliefType, ReliefTypeSmall, StringComparison.Ordinal)
+            ? "小额快救"
+            : $"常规救助（{GetPaymentChannelName(ResolvePaymentChannel(reliefType, channel))}）";
+        return $"{population} · {sub}";
+    }
+
+    /// <summary>
+    /// 办理时限（自然日，2026-11-25 口径）：小额 2 日；在册常规 5 日；非在册常规 15 日。
+    /// </summary>
+    public static int GetDeadlineDays(string? reliefType, string? populationStatus)
+    {
+        if (string.Equals(reliefType, ReliefTypeSmall, StringComparison.Ordinal)) return 2;
+        return string.Equals(populationStatus, PopulationInsured, StringComparison.Ordinal) ? 5 : 15;
+    }
+
+    /// <summary>办理截止日 = 受理日 + 时限天数。</summary>
+    public static DateTime GetDeadlineDate(DateTime acceptedAt, string? reliefType, string? populationStatus)
+        => acceptedAt.Date.AddDays(GetDeadlineDays(reliefType, populationStatus));
+
+    /// <summary>剩余天数（负数=已逾期）。</summary>
+    public static int GetRemainingDays(DateTime dueDate, DateTime today)
+        => (dueDate.Date - today.Date).Days;
+
+    /// <summary>备用金单次上限系数（政策 4–6 倍档上界）。</summary>
+    public const decimal ReserveCapMultiplier = 6m;
+
+    /// <summary>备用金单次上限 = 基数 × 遇困人数 × 6（配置化前默认）。</summary>
+    public static decimal GetReserveCap(decimal baseStandard, int personCount)
+        => baseStandard <= 0 || personCount <= 0
+            ? 0m
+            : CeilToYuan(baseStandard * personCount * ReserveCapMultiplier);
 
     /// <summary>状态：草稿</summary>
     public const string StatusDraft = "Draft";
 
     /// <summary>状态：已确认</summary>
     public const string StatusConfirmed = "Confirmed";
+
+    /// <summary>状态：已提交（乡镇初审通过，等待登记县确认件）</summary>
+    public const string StatusSubmitted = "Submitted";
+
+    /// <summary>状态：不予救助（终态，须有理由与告知时间）</summary>
+    public const string StatusRejected = "Rejected";
+
+    /// <summary>状态：退回补正（乡镇可修改后重新提交）</summary>
+    public const string StatusReturned = "Returned";
+
+    /// <summary>备案状态：待备案（上级部门发放确认后）</summary>
+    public const string FilingPending = "Pending";
+
+    /// <summary>备案状态：已备案</summary>
+    public const string FilingFiled = "Filed";
 
     /// <summary>状态：已终止</summary>
     public const string StatusStopped = "Stopped";
@@ -149,14 +270,115 @@ public static class TempReliefConstants
         return true;
     }
 
+    /// <summary>
+    /// 家庭遇困人数统一兜底（单点）：显式值 > 0 时用之；否则按家庭人口，仍为空取 1。
+    /// 遇困人数 ≠ 家庭人口，批量录入/旧客户端未提供时才回退。
+    /// </summary>
+    public static int ResolveReliefPersonCount(int? personCount, int? familySize)
+        => personCount is > 0 ? personCount.Value : Math.Max(familySize ?? 1, 1);
+
+    #region 两项政策档位（黑民规〔2026〕12 号，2026-11-25）
+
+    /// <summary>小额快救 50% 档</summary>
+    public const string TierSmall50 = "S50";
+
+    /// <summary>小额快救 75% 档</summary>
+    public const string TierSmall75 = "S75";
+
+    /// <summary>小额快救 100% 档</summary>
+    public const string TierSmall100 = "S100";
+
+    /// <summary>小额快救全部档位（顺序即表单顺序）</summary>
+    public static readonly string[] SmallTierCodes = { TierSmall50, TierSmall75, TierSmall100 };
+
+    /// <summary>档位系数（0.5/0.75/1）；未知档位返回 0。</summary>
+    public static decimal TierMultiplier(string? code) => code switch
+    {
+        TierSmall50 => 0.5m,
+        TierSmall75 => 0.75m,
+        TierSmall100 => 1m,
+        _ => 0m
+    };
+
+    /// <summary>档位展示名。</summary>
+    public static string GetTierLabel(string? code) => code switch
+    {
+        TierSmall50 => "50%",
+        TierSmall75 => "75%",
+        TierSmall100 => "100%",
+        _ => code ?? string.Empty
+    };
+
+    /// <summary>金额进一法到元（政策口径，禁止四舍五入）。</summary>
+    public static decimal CeilToYuan(decimal value) => Math.Ceiling(value);
+
+    /// <summary>
+    /// 小额快救单次总额 = 家庭遇困人数 × 城市低保月标准 × 档位系数，最后一次性进一法到元。
+    /// </summary>
+    public static decimal ComputeSmallTotal(int personCount, decimal baseStandard, string? tierCode)
+    {
+        if (personCount <= 0) return 0m;
+        var multiplier = TierMultiplier(tierCode);
+        if (baseStandard <= 0 || multiplier <= 0) return 0m;
+        return CeilToYuan(personCount * baseStandard * multiplier);
+    }
+
+    /// <summary>档位上限（人数 × 基数 × 系数，进一法到元）。</summary>
+    public static decimal GetSmallTierCeiling(decimal baseStandard, int personCount, string? tierCode)
+        => ComputeSmallTotal(personCount, baseStandard, tierCode);
+
+    /// <summary>
+    /// 校验小额确定金额：大于 0 且不超过档位上限；允许下调。
+    /// 标准/档位缺失或人数非法时显式失败（禁止静默放行）。
+    /// </summary>
+    public static bool TryValidateSmallAmount(string? input, decimal baseStandard, int personCount,
+        string? tierCode, out decimal amount, out string? error)
+    {
+        error = null;
+        if (!TryParseConfirmAmount(input, out amount))
+        {
+            error = "确定金额须为大于 0 的数字";
+            return false;
+        }
+
+        if (personCount <= 0)
+        {
+            error = "家庭遇困人数（含户主）须大于 0";
+            return false;
+        }
+
+        if (baseStandard <= 0)
+        {
+            error = "未配置当前生效的城市低保月标准，无法核定救助金额";
+            return false;
+        }
+
+        if (TierMultiplier(tierCode) <= 0)
+        {
+            error = "请选择小额快救档位（50%/75%/100%）";
+            return false;
+        }
+
+        var ceiling = GetSmallTierCeiling(baseStandard, personCount, tierCode);
+        if (amount > ceiling)
+        {
+            error = $"确定金额不能超过{GetTierLabel(tierCode)}档上限 {ceiling:F2} 元（{personCount} 人 × 城市低保标准 {baseStandard:F2} × {TierMultiplier(tierCode):0.##}）";
+            return false;
+        }
+
+        return true;
+    }
+
+    #endregion
+
     /// <summary>家庭人口上限（审批表成员行数）</summary>
     public const int MaxMemberRows = 5;
 
     /// <summary>获取救助类型中文名</summary>
     public static string GetReliefTypeName(string? reliefType) => reliefType switch
     {
-        ReliefTypeLarge => "大额救助",
-        ReliefTypeSmall => "小额快速救助",
+        ReliefTypeLarge => "常规救助",
+        ReliefTypeSmall => "小额快救",
         _ => reliefType ?? string.Empty
     };
 
@@ -169,6 +391,19 @@ public static class TempReliefConstants
 
     /// <summary>月报「临时救助新增汇总表」有额度段标签（小额快速救助定额 → 备用金发放），见 <see cref="SegmentTagCountyApproval"/></summary>
     public const string SegmentTagReservePayout = "备用金发放";
+
+    // ── 两大类 × 三小类（2026-11-25）：月报按发放渠道 × 人群状态分四段 ──
+    /// <summary>上级发放 · 在保障人群内</summary>
+    public const string SegmentTagCountyInsured = "上级发放·在册";
+
+    /// <summary>上级发放 · 不在保障人群内</summary>
+    public const string SegmentTagCountyUninsured = "上级发放·非在册";
+
+    /// <summary>备用金发放 · 在保障人群内（含常规 + 小额）</summary>
+    public const string SegmentTagReserveInsured = "备用金·在册";
+
+    /// <summary>备用金发放 · 不在保障人群内（含常规 + 小额）</summary>
+    public const string SegmentTagReserveUninsured = "备用金·非在册";
 
     /// <summary>
     /// 是否「有额度」分段——月报临时救助新增汇总表分段的唯一判定点：
@@ -183,6 +418,7 @@ public static class TempReliefConstants
     {
         SourceImportTab => "导入台账",
         SourceApplication => "最低生活保障申请",
+        SourceManual => "非在册登记",
         _ => sourceType ?? string.Empty
     };
 
@@ -203,8 +439,11 @@ public static class TempReliefConstants
     public static string GetStatusName(string? status) => status switch
     {
         StatusDraft => "草稿",
+        StatusSubmitted => "已提交",
         StatusConfirmed => "已确认",
         StatusStopped => "已终止",
+        StatusRejected => "不予救助",
+        StatusReturned => "退回补正",
         _ => status ?? string.Empty
     };
 
@@ -421,11 +660,6 @@ public static class TempReliefConstants
     /// <summary>打印模板分类：小额</summary>
     public const string CategorySmall = "临时救助/小额";
 
-    /// <summary>
-    /// 打印模板名匹配令牌：审核审批表（手机推送打印固定取该模板）。
-    /// 2026-10-21 起模板按救助类型分表：大额「临时救助_大额救助_审核审批表」/ 小额「临时救助_小额救助_审核审批表」，
-    /// 旧「临时救助_审核审批表」前缀不再成立；改用「名称含本令牌」匹配。
-    /// 业务确认手机端与桌面端同打这一张，禁止再按 sort_order 猜模板。
-    /// </summary>
-    public const string TemplateAuditApprovalNameToken = "审核审批表";
+    // 原 TemplateAuditApprovalNameToken（"审核审批表" 名称令牌）已删：手机推送打印选模板改按
+    // TemplateDocTypes.TempReliefAuditApproval 文档类型精准匹配（方案B，2026-11-18）。
 }

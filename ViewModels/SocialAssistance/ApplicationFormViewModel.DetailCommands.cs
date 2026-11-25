@@ -427,7 +427,7 @@ public partial class ApplicationFormViewModel
         try
         {
             var result = await _applicationService.GetClassificationsByIdCardsAsync(idCards, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
                 return result.Value;
             _logger.Warn($"批量查询赡养人档案失败: {result.Message}");
         }
@@ -877,13 +877,25 @@ public partial class ApplicationFormViewModel
     private void RefreshIncomeMemberOptions()
     {
         IncomeMemberOptions.Clear();
-        if (!string.IsNullOrWhiteSpace(ApplicantName))
+
+        // 户主：成员表有户主行（2026-11-19 起表单保存会维护）就用真实行（带 Id/member_id），
+        // 否则退回合成对象（历史档案/尚未保存的新表单）
+        var headMember = FamilyMembers.FirstOrDefault(m =>
+            m.IsApplicant
+            || string.Equals(m.MemberCategory, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase));
+        if (headMember != null)
+        {
+            IncomeMemberOptions.Add(headMember);
+        }
+        else if (!string.IsNullOrWhiteSpace(ApplicantName))
         {
             IncomeMemberOptions.Add(new FamilyMember
             {
                 Name = ApplicantName,
                 IdCard = ApplicantIdCard,
                 Age = Helpers.IdCardValidator.ExtractAgeBasic(ApplicantIdCard),
+                IsApplicant = true,
+                IsHouseholdHead = true,
                 MemberCategory = MemberCategoryConstants.HOUSEHOLD_HEAD
             });
         }
@@ -901,7 +913,7 @@ public partial class ApplicationFormViewModel
     {
         if (IncomeMemberOptions.Count == 0) return;
 
-        void MatchCollection<T>(IEnumerable<T> items) where T : class
+        void MatchCollection<T>(IEnumerable<T> items, string selectedProperty) where T : class
         {
             foreach (var item in items)
             {
@@ -913,14 +925,15 @@ public partial class ApplicationFormViewModel
                     m.Name == name && (string.IsNullOrEmpty(idCard) || m.IdCard == idCard));
                 if (match == null) continue;
 
-                typeof(T).GetProperty("SelectedIncomeMember")?.SetValue(item, match);
+                typeof(T).GetProperty(selectedProperty)?.SetValue(item, match);
             }
         }
 
-        MatchCollection(LaborIncomes);
-        MatchCollection(BusinessIncomes);
-        MatchCollection(PropertyIncomes);
-        MatchCollection(TransferIncomes);
+        MatchCollection(LaborIncomes, "SelectedIncomeMember");
+        MatchCollection(BusinessIncomes, "SelectedIncomeMember");
+        MatchCollection(PropertyIncomes, "SelectedIncomeMember");
+        MatchCollection(TransferIncomes, "SelectedIncomeMember");
+        MatchCollection(RigidExpenditures, "SelectedMember");
     }
 
     /// <summary>
@@ -1062,8 +1075,22 @@ public partial class ApplicationFormViewModel
     #region 刚性支出命令
 
     [RelayCommand]
-    private async Task AddRigidExpenditureAsync() =>
-        await AddIncomeItemAsync(RigidExpenditures, new RigidExpenditure { ApplicationId = _applicationId, ExpenditureType = DictionaryConstants.RigidExpenditureType.MEDICAL }, "刚性支出");
+    private async Task AddRigidExpenditureAsync()
+    {
+        // 刚性支出必须落户到人（2026-11-19）：先选支出人员，取消则不新增
+        var member = await PickIncomeMemberAsync("选择支出人员");
+        if (member == null) return;
+        await AddIncomeItemAsync(RigidExpenditures, new RigidExpenditure
+        {
+            ApplicationId = _applicationId,
+            MemberId = member.Id,
+            MemberName = member.Name,
+            MemberIdCard = member.IdCard ?? "",
+            SelectedMember = member,
+            PersonDescription = member.Name,
+            ExpenditureType = DictionaryConstants.RigidExpenditureType.MEDICAL
+        }, "刚性支出");
+    }
 
     [RelayCommand]
     private async Task RemoveRigidExpenditureAsync(RigidExpenditure? expenditure) =>

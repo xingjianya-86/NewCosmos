@@ -139,11 +139,13 @@ public abstract class BaseImportService : BaseService, IImportService
         {
             LogWarn("导入被用户取消");
             result.Errors.Add("导入已取消");
+            result.ErrorCount++; // 文件级异常必须计入失败，否则外层按 ErrorCount==0 判成功
         }
         catch (Exception ex)
         {
             LogError($"操作失败: {ex.Message}");
             result.Errors.Add($"执行失败: {ex.Message}");
+            result.ErrorCount++; // 同上：禁止整文件崩溃仍被判定为导入成功
         }
 
         return result;
@@ -196,11 +198,13 @@ public abstract class BaseImportService : BaseService, IImportService
         {
             LogWarn("文件导入被取消");
             result.Errors.Add("导入已取消");
+            result.ErrorCount++;
         }
         catch (Exception ex)
         {
             LogError($"操作失败: {ex.Message}");
             result.Errors.Add($"执行失败: {ex.Message}");
+            result.ErrorCount++;
         }
         finally
         {

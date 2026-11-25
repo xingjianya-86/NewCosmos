@@ -115,8 +115,9 @@ public partial class MobileArchivePhotoPage : ContentPage, IParameterizedPage<Ar
         }
         catch (Exception ex)
         {
-            // 拖放失败不打断页面（按钮采集链路不受影响）
-            System.Diagnostics.Debug.WriteLine($"拖入图片失败: {ex.Message}");
+            // 拖放失败不打断页面（按钮采集链路不受影响），但必须给用户可见反馈 + 日志。
+            Serilog.Log.Warning(ex, "[MobileArchivePhotoPage] 拖入图片失败");
+            await DisplayAlertAsync("插入失败", $"拖入的图片未能插入：{ex.Message}", "确定");
         }
     }
 #endif

@@ -233,7 +233,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             _operatorCountyName = orgResult.Value.CountyName ?? string.Empty;
 
             var townResult = await _regionService.GetTownByIdAsync(_operatorTownId.Value);
-            if (townResult.IsSuccess && townResult.Value != null)
+            if (townResult.HasValue)
             {
                 OperatorTownName = townResult.Value.TownName;
                 await LoadVillagesAsync(_operatorTownId.Value);
@@ -259,7 +259,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             _villageCodeMap.Clear();
 
             var result = await _regionService.GetVillagesByTownIdAsync(townId);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var village in result.Value.Where(v => v.IsActive).OrderBy(v => v.SortOrder))
                 {
@@ -301,7 +301,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             var result = await _dictionaryService.GetItemsByCategoryAsync(
                 DictionaryTypeCodes.FamilyRelationships);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var item in result.Value.Where(i => i.IsActive).OrderBy(i => i.SortOrder))
                 {
@@ -347,7 +347,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             var result = await _dictionaryService.GetItemsByCategoryAsync(
                 DictionaryTypeCodes.ApplicationReasons);
 
-            if (result.IsSuccess && result.Value != null && result.Value.Count > 0)
+            if (result.HasValue && result.Value.Count > 0)
             {
                 foreach (var item in result.Value.Where(i => i.IsActive).OrderBy(i => i.SortOrder))
                 {
@@ -391,7 +391,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             var result = await _dictionaryService.GetItemsByCategoryAsync(
                 DictionaryTypeCodes.IdTypes);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var item in result.Value.Where(i => i.IsActive).OrderBy(i => i.SortOrder))
                 {
@@ -871,7 +871,7 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         if (userId.HasValue)
         {
             var userResult = await _userService.GetByIdAsync(userId.Value);
-            if (userResult.IsSuccess && userResult.Value != null)
+            if (userResult.HasValue)
             {
                 var user = userResult.Value;
                 operatorName = user.FullName ?? user.Username;
@@ -1108,14 +1108,20 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
         try
         {
             var usersResult = await _userService.GetByOrganizationAsync(orgId.Value);
-            if (usersResult.IsFailure || usersResult.Value == null || usersResult.Value.Count == 0)
+            if (usersResult.IsFailure)
+            {
+                _logger.Warn($"读取民政助理失败，文书显示「未配置」: {usersResult.ErrorCode} {usersResult.Message}");
+                return "未配置";
+            }
+            if (usersResult.Value == null || usersResult.Value.Count == 0)
                 return "未配置";
 
             var civilAssistant = usersResult.Value.FirstOrDefault(u => u.Position == PositionTitles.CivilAssistant);
             return civilAssistant?.FullName ?? "未配置";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"读取民政助理异常，文书显示「未配置」: {ex.Message}");
             return "未配置";
         }
     }
@@ -1142,14 +1148,15 @@ public partial class QuickAssetVerificationViewModel : ViewModelBase
             if (org.ParentId.HasValue)
             {
                 var parentResult = await _organizationService.GetByIdAsync(org.ParentId.Value);
-                if (parentResult.IsSuccess && parentResult.Value != null)
+                if (parentResult.HasValue)
                     parentPhone = parentResult.Value.Phone ?? "-";
             }
 
             return new OrganizationInfoDto(district, town, parentName, parentPhone, unitPhone);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"获取机构信息异常，告知书机构字段将以「-」占位: {ex.Message}");
             return new OrganizationInfoDto("-", "-", "-", "-", "-");
         }
     }

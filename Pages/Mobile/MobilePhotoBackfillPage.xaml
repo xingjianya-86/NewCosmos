@@ -8,7 +8,7 @@
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="{StaticResource Background}">
 
-    <!-- 历史档案照片补传：高龄 / 低收入 / 临时救助 三域按身份证查已有照片数，
+    <!-- 历史档案照片补传：高龄 / 低收入 / 临时救助 / 资产核查 四域按身份证查已有照片数，
          手工勾选后 ① 连续采集（照片页会话队列） ② 推送打印（PC 执行）。
          照片按身份证归档，补传不改业务表。 -->
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="0">
@@ -62,6 +62,14 @@
                     </Border.GestureRecognizers>
                     <Label Text="临时救助" FontSize="14"
                            TextColor="{Binding IsDomainTempRelief, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
+                </Border>
+                <Border StrokeShape="RoundRectangle 16" Padding="12,7"
+                        BackgroundColor="{Binding IsDomainAsset, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1a73e8|#EEF2F7'}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding SwitchDomainCommand}" CommandParameter="AssetVerification"/>
+                    </Border.GestureRecognizers>
+                    <Label Text="资产核查" FontSize="14"
+                           TextColor="{Binding IsDomainAsset, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFFFFF|#475569'}"/>
                 </Border>
             </HorizontalStackLayout>
         </ScrollView>

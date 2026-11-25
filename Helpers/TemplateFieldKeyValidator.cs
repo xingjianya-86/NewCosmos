@@ -38,6 +38,7 @@ public static class TemplateFieldKeyValidator
         }
         catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[TemplateFieldKeyValidator] 模板 config 解析失败");
             return new[] { $"config 解析失败：{ex.Message}" };
         }
 

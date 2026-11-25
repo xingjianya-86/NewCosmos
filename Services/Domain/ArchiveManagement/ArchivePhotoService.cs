@@ -51,8 +51,9 @@ public class ArchivePhotoService : BaseService, IArchivePhotoService
     }
 
     /// <summary>
-    /// 人员维度三域聚合 CTE（**单点维护**）：低收入/高龄/临时救助 UNION → 按 $1 业务域 / $2 关键词过滤
-    /// → 按身份证聚合成 counted（业务域、代表业务ID、已传照片张数）。
+    /// 人员维度四域聚合 CTE（**单点维护**）：低收入/高龄/临时救助/资产核查 UNION
+    /// → 按 $1 业务域 / $2 关键词过滤 → 按身份证聚合成 counted（业务域、代表业务ID、已传照片张数）。
+    /// 资产核查取 nc_biz_asset_checks 全部申请行（户主 + 家庭成员），身份证两端去空格并排除空值。
     /// 补传候选检索与 PC 插入归属人解析共用，禁止在别处另抄一份。
     /// </summary>
     private const string PersonCte = @"
@@ -73,6 +74,13 @@ WITH biz AS (
     SELECT 'TempRelief', t.id, t.applicant_name, t.applicant_id_card
     FROM nc_biz_temp_relief_applications t
     WHERE t.deleted_at IS NULL
+
+    UNION ALL
+
+    SELECT 'AssetVerification', ac.id, ac.applicant_name, btrim(ac.applicant_id_card)
+    FROM nc_biz_asset_checks ac
+    WHERE ac.deleted_at IS NULL
+      AND btrim(COALESCE(ac.applicant_id_card, '')) <> ''
 ),
 filtered AS (
     SELECT * FROM biz
@@ -212,6 +220,8 @@ counted AS (
             double? lat = null, lng = null;
 
             var partsResult = await GetWatermarkAddressPartsAsync(idCard, ct);
+            if (partsResult.IsFailure)
+                LogWarn($"水印地址解析失败，水印将缺少地址行: {partsResult.ErrorCode} {partsResult.Message}");
             var parts = partsResult.IsSuccess ? partsResult.Value : null;
             if (parts != null)
             {
@@ -280,7 +290,8 @@ counted AS (
     /// <summary>地址/坐标共用的区划部件（临时救助镇列回退已在构造时并入 Town）。</summary>
     private sealed record WatermarkAddressParts(string? County, string? Town, string? Village, long? VillageId);
 
-    // 三域按优先级取首个有地址的档案：① 低收入 —— 优先区划代号列 JOIN nc_regions_* 转名称
+    // 水印地址仍只取原三域（资产核查表只有 family_address/community 文本、无区划代号列，不纳入）：
+    // 按优先级取首个有地址的档案：① 低收入 —— 优先区划代号列 JOIN nc_regions_* 转名称
     // （区划表为名称单一事实来源），该级代号为空才回退同级名称文本列；② 高龄 —— family_* 代号 JOIN；
     // ③ 临时救助 —— 无区划代号列读名称文本（镇列回退 family_town）。值全部参数化，表名静态常量。
     private const string WatermarkAddressSql = @"
@@ -383,6 +394,8 @@ LIMIT 1";
                 var byId = await _db.QuerySingleAsync<VillageGeoRow>(
                     "SELECT id, longitude::double precision, latitude::double precision FROM nc_regions_villages WHERE id = $1",
                     ct, parts.VillageId.Value);
+                if (byId.IsFailure)
+                    LogWarn($"水印坐标查询失败（将尝试在线定位）: VillageId={parts.VillageId.Value}, {byId.ErrorCode} {byId.Message}");
                 if (byId.Value != null)
                     (rowId, rowLng, rowLat) = (byId.Value.Id, byId.Value.Longitude, byId.Value.Latitude);
             }
@@ -401,6 +414,8 @@ ORDER BY v.id
 LIMIT 1";
                 var byName = await _db.QuerySingleAsync<VillageGeoRow>(
                     byNameSql, ct, village, parts.Town?.Trim() ?? string.Empty, parts.County?.Trim() ?? string.Empty);
+                if (byName.IsFailure)
+                    LogWarn($"水印坐标按名称查询失败（将尝试在线定位）: {byName.ErrorCode} {byName.Message}");
                 if (byName.Value != null)
                     (rowId, rowLng, rowLat) = (byName.Value.Id, byName.Value.Longitude, byName.Value.Latitude);
             }
@@ -597,7 +612,7 @@ LIMIT 1";
     }
 
     /// <summary>
-    /// 照片补传候选（人员维度）：三域 UNION ALL → 按业务域/关键词过滤 → 按身份证聚合（业务域、代表业务ID）
+    /// 照片补传候选（人员维度）：四域 UNION ALL → 按业务域/关键词过滤 → 按身份证聚合（业务域、代表业务ID）
     /// → LEFT JOIN 照片张数。不做"未传"过滤：已传照片的人同样可继续补传。
     /// </summary>
     public async Task<Result<PagedResult<PhotoBackfillCandidate>>> GetBackfillCandidatesAsync(
@@ -690,7 +705,7 @@ WHERE ($1::text = '' OR applicant_id_card ILIKE '%' || $1::text || '%'
     }
 
     /// <summary>
-    /// 解析照片插入归属人：18 位合法 + 三类业务档案中确实存在（必须指定已存在的档案人员）。
+    /// 解析照片插入归属人：18 位合法 + 四类业务档案中确实存在（必须指定已存在的档案人员）。
     /// 复用 <see cref="PersonCte"/>（与补传候选同一段 SQL），按身份证精确定位到一个人。
     /// </summary>
     public async Task<Result<PhotoOwner>> ResolveOwnerAsync(string idCard, CancellationToken ct = default)
@@ -717,7 +732,7 @@ LIMIT 1";
         if (hit == null)
         {
             return Result.Failure<PhotoOwner>(ErrorCodes.NOT_FOUND,
-                "该身份证不在低收入/高龄/临时救助档案中（插入照片必须指定已存在的档案人员）");
+                "该身份证不在低收入/高龄/临时救助/资产核查档案中（插入照片必须指定已存在的档案人员）");
         }
 
         return Result.Success(new PhotoOwner

@@ -76,7 +76,7 @@ public interface IMonthlyReportService
     Task<Result<List<MonthlyAddedRow>>> GetAddedRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 停保汇总（status=ApplicationStatusCodes.STOPPED 且 stop_date∈周期的申请）
+    /// 停保汇总（status=ApplicationStatusCodes.STOPPED 且 stop_date∈周期；排除停旧建新/渐退期接续与真·首拒档）
     /// </summary>
     Task<Result<List<MonthlyStoppedRow>>> GetStoppedRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
@@ -112,14 +112,17 @@ public interface IMonthlyReportService
     Task<Result<List<MonthlyClassifiedAddRow>>> GetClassifiedSubsidyAddsHistoryAsync(int year, int month, CancellationToken ct = default);
 
     /// <summary>
-    /// 人员变动_自然减员月报表（nc_biz_death_records 死亡日期∈周期）
+    /// 人员变动_自然减员月报表（nc_biz_death_records 死亡日期∈周期）。
+    /// category 为空出「全部」（含未关联档案的死亡申报）；传分类名时仅出该分类，
+    /// 未关联档案（分类为空）的行只进「全部」。
     /// </summary>
     Task<Result<List<MonthlyDeathRow>>> GetDeathRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 退出对象兜底纠治表（本月停保 + 渐退期满 + 经济复核降档退出对象；核查渐退期/纳入低保/特困/边缘/刚性/直接退出）
+    /// 退出对象兜底纠治表（本月停保 + 渐退期满 + 经济复核降档退出对象；停保源排除停旧建新接续与真·首拒档；核查渐退期/纳入低保/特困/边缘/刚性/直接退出）。
+    /// category 为空出「全部」；传分类名时按「退出前享受类别」过滤，停止码（收入超标/不符合）与空分类行只进「全部」。
     /// </summary>
-    Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, CancellationToken ct = default);
+    Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default);
 
     /// <summary>
     /// 临时救助新增汇总（status=ApplicationStatusCodes.CONFIRMED 且 confirmed_at∈周期的临时救助申请，户级名单）
@@ -283,8 +286,9 @@ public class MonthlyStoppedRow
     public string FamilySize { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;     // 享受类别（低保/低收入…）
-    public string Classification { get; set; } = string.Empty; // 户分类施保（显示名）
-    public string MonthAmount { get; set; } = string.Empty;  // 户月保障金
+    public string Classification { get; set; } = string.Empty; // 户分类施保金额（F2，独立列，始终原值）
+    public string MonthAmount { get; set; } = string.Empty;  // 保障金额/月：默认=户月保障金（不含分类施保）；
+                                                             // 例外（2026-11-20 县里口径）：停保汇总表（最低生活保障）城市页 = 户月保障金 + 分类施保
     public string StopReason { get; set; } = string.Empty;   // 停止原因
     public string StopDate { get; set; } = string.Empty;     // 停止日期
     public string EnjoyDate { get; set; } = string.Empty;    // 享受日期（=审批时间 first_approved_at）
@@ -410,11 +414,13 @@ public class MonthlyExitRectificationRow
 }
 
 /// <summary>
-/// 临时救助新增汇总行（月报_临时救助新增汇总表；按分段标签拆两段输出，见 TempReliefSummaryGrouper）
+/// 临时救助新增汇总行（月报_临时救助新增汇总表；按发放渠道 × 人群状态拆四段输出，见 TempReliefSummaryGrouper）
 /// </summary>
 public class MonthlyTempReliefRow
 {
-    public string ReliefType { get; set; } = TempReliefConstants.ReliefTypeLarge; // 救助类型（Small=有额度→备用金发放；其余=无额度→报县局审批）
+    public string ReliefType { get; set; } = TempReliefConstants.ReliefTypeLarge; // Large=常规 / Small=小额快救
+    public string PopulationStatus { get; set; } = TempReliefConstants.PopulationInsured; // Insured/Uninsured
+    public string PaymentChannel { get; set; } = TempReliefConstants.PaymentCounty;      // County/Reserve
     public string Name { get; set; } = string.Empty;          // 姓名（申请人）
     public string IdCard { get; set; } = string.Empty;        // 身份证号
     public string Age { get; set; } = string.Empty;           // 年龄

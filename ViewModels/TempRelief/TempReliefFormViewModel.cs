@@ -38,6 +38,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     private long _id;
     private bool _suppressReload;
+    private string _lastLargePaymentChannel = TempReliefConstants.PaymentCounty;
 
     /// <summary>公示日期默认值的计算代际计数：连续触发时仅最新一次结果生效</summary>
     private int _publicizeCalcGeneration;
@@ -129,6 +130,55 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     #endregion
 
+    #region 两大类（人群状态）
+
+    /// <summary>人群状态：Insured 在保障人群内 / Uninsured 不在保障人群内</summary>
+    [ObservableProperty]
+    private string _populationStatus = TempReliefConstants.PopulationInsured;
+
+    public bool IsInsured => PopulationStatus == TempReliefConstants.PopulationInsured;
+    public bool IsUninsured => !IsInsured;
+
+    /// <summary>非在册手工登记：未选中任何台账候选时，申请人字段可编辑</summary>
+    public bool IsManualEntry => IsUninsured && string.IsNullOrEmpty(_sourceTable);
+
+    /// <summary>在册必须走台账选择（只读）；非在册手工登记可编辑；已选候选时只读</summary>
+    public bool IsApplicantReadOnly => !IsManualEntry;
+
+    partial void OnIsCandidateSelectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsManualEntry));
+        OnPropertyChanged(nameof(IsApplicantReadOnly));
+    }
+
+
+    partial void OnPopulationStatusChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsInsured));
+        OnPropertyChanged(nameof(IsUninsured));
+        OnPropertyChanged(nameof(IsManualEntry));
+        OnPropertyChanged(nameof(IsApplicantReadOnly));
+        if (_suppressReload) return;
+
+        // 切换大类必须重选来源：在册走四类台账，非在册可手工登记或从其他困难/申请库选
+        _sourceTable = string.Empty;
+        _sourceFamilyId = 0;
+        Candidates.Clear();
+        SelectedCandidate = null;
+        IsCandidateSelected = false;
+        CandidateSummary = string.Empty;
+        OnPropertyChanged(nameof(IsManualEntry));
+        OnPropertyChanged(nameof(IsApplicantReadOnly));
+    }
+
+    [RelayCommand]
+    private void SelectInsured() => PopulationStatus = TempReliefConstants.PopulationInsured;
+
+    [RelayCommand]
+    private void SelectUninsured() => PopulationStatus = TempReliefConstants.PopulationUninsured;
+
+    #endregion
+
     #region 救助类型
 
     [ObservableProperty]
@@ -137,13 +187,55 @@ public partial class TempReliefFormViewModel : ViewModelBase
     public bool IsLargeType => ReliefType == TempReliefConstants.ReliefTypeLarge;
     public bool IsSmallType => ReliefType == TempReliefConstants.ReliefTypeSmall;
 
+    /// <summary>发放渠道：County 上级部门发放 / Reserve 备用金发放（小额固定 Reserve）</summary>
+    [ObservableProperty]
+    private string _paymentChannel = TempReliefConstants.PaymentCounty;
+
+    public bool IsCountyChannel => PaymentChannel == TempReliefConstants.PaymentCounty;
+    public bool IsReserveChannel => PaymentChannel == TempReliefConstants.PaymentReserve;
+
+    /// <summary>常规·备用金：显示手工金额输入</summary>
+    public bool IsLargeReserve => IsLargeType && IsReserveChannel;
+
+    partial void OnPaymentChannelChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsCountyChannel));
+        OnPropertyChanged(nameof(IsReserveChannel));
+        OnPropertyChanged(nameof(IsLargeReserve));
+        if (!_suppressReload && value == TempReliefConstants.PaymentReserve)
+            SafeFireAndForget(async () => await LoadSmallAmountLevelsAsync());
+    }
+
+    [RelayCommand]
+    private void SelectCountyChannel() => PaymentChannel = TempReliefConstants.PaymentCounty;
+
+    [RelayCommand]
+    private void SelectReserveChannel() => PaymentChannel = TempReliefConstants.PaymentReserve;
+
     partial void OnReliefTypeChanged(string value)
     {
         OnPropertyChanged(nameof(IsLargeType));
         OnPropertyChanged(nameof(IsSmallType));
-        if (!_suppressReload && value == TempReliefConstants.ReliefTypeSmall)
+        OnPropertyChanged(nameof(IsLargeReserve));
+        if (_suppressReload) return;
+
+        if (value == TempReliefConstants.ReliefTypeSmall)
         {
+            // 小额快救固定备用金；免公示、免经济状况核对（保留入户调查记录）
+            _lastLargePaymentChannel = PaymentChannel;
+            PaymentChannel = TempReliefConstants.PaymentReserve;
+            HasPublicizeDates = false;
             SafeFireAndForget(async () => await LoadSmallAmountLevelsAsync());
+        }
+        else
+        {
+            // 切回常规救助：恢复上次渠道与 5 天公示曲线
+            PaymentChannel = _lastLargePaymentChannel;
+            // 小额档位金额不沿用到常规；常规备用金由用户手工填写
+            ConfirmAmountInput = string.Empty;
+            _confirmAmount = 0m;
+            _confirmAmountMax = 0m;
+            SafeFireAndForget(async () => await ApplyPublicizeDefaultsAsync());
         }
     }
 
@@ -167,9 +259,28 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private string _confirmAmountInput = string.Empty;
 
-    /// <summary>小额定额说明（自动匹配户籍 / 户籍缺失需手选 / 金额上限提示）</summary>
+    /// <summary>小额定额说明（基数 × 档位 × 人数 / 金额上限提示）</summary>
     [ObservableProperty]
     private string _smallAmountHint = string.Empty;
+
+    /// <summary>家庭遇困人数（含户主）输入；≠ 家庭人口</summary>
+    [ObservableProperty]
+    private string _reliefPersonCountInput = "1";
+
+    /// <summary>家庭遇困人数（解析后的落库值；0 = 非法，保存前拦截）</summary>
+    public int ReliefPersonCount { get; private set; } = 1;
+
+    partial void OnReliefPersonCountInputChanged(string value)
+    {
+        ReliefPersonCount = int.TryParse(value?.Trim(), out var count) && count > 0 ? count : 0;
+        OnPropertyChanged(nameof(ReliefPersonCountHint));
+        if (!_suppressReload) UpdateConfirmAmount();
+    }
+
+    /// <summary>遇困人数提示（家庭人口上限来自成员明细统一口径）</summary>
+    public string ReliefPersonCountHint => ApplicantFamilySize is > 0
+        ? $"家庭人口 {ApplicantFamilySize} 人；遇困人数含户主，须 >0 且 ≤ {ApplicantFamilySize}"
+        : "遇困人数含户主，须大于 0";
 
     /// <summary>确定金额（落库值；输入非法时为 0，保存前会被校验拦截）</summary>
     private decimal _confirmAmount;
@@ -177,16 +288,9 @@ public partial class TempReliefFormViewModel : ViewModelBase
     /// <summary>当前档位对应的低保月标准（确定金额上限）</summary>
     private decimal _confirmAmountMax;
 
-    /// <summary>正在整体刷新档位选项（此时选中首项不代表用户手选户籍）</summary>
-    private bool _applyingLevelOptions;
-
     partial void OnSelectedSmallAmountLevelChanged(string value)
     {
         UpdateConfirmAmount();
-
-        // 户籍未从数据库读到（列表含两档）时，用户手选档位即视为选定户籍分类
-        if (!_applyingLevelOptions && !_suppressReload)
-            TryAdoptHukouFromLevel(value);
     }
 
     partial void OnConfirmAmountInputChanged(string value)
@@ -194,90 +298,110 @@ public partial class TempReliefFormViewModel : ViewModelBase
         _confirmAmount = TempReliefConstants.TryParseConfirmAmount(value, out var amount) ? amount : 0m;
     }
 
+    /// <summary>当前生效的城市低保月标准（金额基数）</summary>
+    private decimal _baseStandard;
+
     /// <summary>
-    /// 档位变化：确定金额默认回到该档标准（可再手动下调）。
-    /// 存量记录由 LoadAsync 回填原档位名+原金额，旧金额不受影响。
+    /// 档位/人数变化：确定金额默认按政策公式重算（人数 × 城市低保标准 × 系数，进一法到元），
+    /// 用户仍可手动下调；存量旧档位仅回显、不按新公式重算。
     /// </summary>
     private void UpdateConfirmAmount()
     {
         var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
-        if (level != null)
-        {
-            _confirmAmountMax = level.StandardValue;
-            _confirmAmount = level.StandardValue;
-            ConfirmAmountInput = level.StandardValue.ToString("0.##", CultureInfo.InvariantCulture);
-        }
-        else
+        if (level == null)
         {
             _confirmAmountMax = 0m;
             _confirmAmount = 0m;
             ConfirmAmountInput = string.Empty;
+            SmallAmountHint = BuildSmallAmountHint();
+            return;
         }
 
+        // 存量旧档位（无政策档位码）：保留原金额回显，提示改选政策档位
+        if (TempReliefConstants.TierMultiplier(level.StandardType) <= 0)
+        {
+            _confirmAmountMax = level.StandardValue;
+            _confirmAmount = level.StandardValue;
+            ConfirmAmountInput = level.StandardValue > 0
+                ? level.StandardValue.ToString("0.##", CultureInfo.InvariantCulture)
+                : string.Empty;
+            SmallAmountHint = BuildSmallAmountHint();
+            return;
+        }
+
+        _confirmAmountMax = TempReliefConstants.GetSmallTierCeiling(
+            _baseStandard, ReliefPersonCount, level.StandardType);
+        _confirmAmount = _confirmAmountMax;
+        ConfirmAmountInput = _confirmAmountMax > 0
+            ? _confirmAmountMax.ToString("0.##", CultureInfo.InvariantCulture)
+            : string.Empty;
         SmallAmountHint = BuildSmallAmountHint();
     }
 
-    /// <summary>定额说明：户籍来自数据库则提示已自动匹配；未读到则提示手动选择档位（=手选户籍分类）</summary>
     private string BuildSmallAmountHint()
     {
-        if (TempReliefConstants.ResolveSubsistenceStandardType(_hukouType) == null)
-            return "未读取到户籍分类，请手动选择档位；确定金额可下调，不得超过所选标准。";
+        if (ReliefPersonCount <= 0)
+            return "请填写家庭遇困人数（含户主，须大于 0）。";
+        if (_baseStandard <= 0)
+            return "未取到当前生效的城市低保月标准，无法自动核定金额。";
 
-        return _confirmAmountMax > 0
-            ? $"已按户籍匹配低保月标准 {_confirmAmountMax:F2} 元/月；确定金额可下调，不得超过 {_confirmAmountMax:F2} 元。"
-            : "未取到当前生效的低保月标准，无法自动确定金额。";
-    }
+        var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
+        var multiplier = TempReliefConstants.TierMultiplier(level?.StandardType);
+        if (multiplier <= 0)
+            return "存量档位仅用于回显；请改选政策档位（50%/75%/100%）。";
 
-    /// <summary>户籍缺失时：把用户手选的档位回写为户籍分类（Rural/Urban），保存时随申请落库</summary>
-    private void TryAdoptHukouFromLevel(string levelName)
-    {
-        if (TempReliefConstants.ResolveSubsistenceStandardType(_hukouType) != null) return;
-
-        var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == levelName);
-        if (level == null) return;
-
-        if (level.StandardType == TempReliefConstants.SubsistenceStandardRural)
-            _hukouType = "Rural";
-        else if (level.StandardType == TempReliefConstants.SubsistenceStandardUrban)
-            _hukouType = "Urban";
-
-        SmallAmountHint = BuildSmallAmountHint();
+        return $"小额快救：{ReliefPersonCount} 人 × 城市低保标准 {_baseStandard:F2} 元 × {multiplier:0.##} = {_confirmAmountMax:F2} 元（进一法到元）；可下调，不得超过该上限。小额快救免公示、免经济状况核对。";
     }
 
     private List<ConfigStandard> SmallAmountLevels { get; set; } = new();
 
     private async Task LoadSmallAmountLevelsAsync()
     {
-        // 定额救助按户籍动态取低保月标准（农村 632 / 城镇 827；户籍为空时两档手选）
-        var result = await _applicationService.GetSmallAmountLevelsAsync(_hukouType, CancellationToken);
-        if (result.IsFailure || result.Value == null)
+        // 政策第十条：基数 = 当前有效的城市低保月标准最高值，不按户籍分流。
+        var baseResult = await _applicationService.GetReliefBaseStandardAsync(CancellationToken);
+        if (baseResult.IsFailure)
         {
-            _logger.LogError(new Exception(result.Message ?? "未知错误"), "加载小额定额档位失败");
+            _logger.LogError(new Exception(baseResult.Message ?? "未知错误"), "加载城市低保月标准失败");
+            _baseStandard = 0m;
+            SmallAmountHint = baseResult.Message ?? "未取到当前生效的城市低保月标准，无法自动核定金额。";
             return;
         }
 
-        SmallAmountLevels = result.Value;
+        _baseStandard = baseResult.Value;
+
+        // 常规救助只需要基数（备用金上限校验），不构建小额档位
+        if (IsLargeType)
+        {
+            SmallAmountLevels = new();
+            SmallAmountLevelOptions.Clear();
+            SelectedSmallAmountLevel = string.Empty;
+            SmallAmountHint = $"备用金上限 = 城市低保标准 {_baseStandard:F2} × 遇困人数 × 6；手工填写金额。";
+            return;
+        }
+
+        SmallAmountLevels = TempReliefConstants.SmallTierCodes
+            .Select(code => new ConfigStandard
+            {
+                StandardType = code,
+                StandardName = $"{TempReliefConstants.GetTierLabel(code)}档",
+                StandardValue = _baseStandard,
+                Unit = "元/月",
+                IsActive = true,
+                EffectiveStartDate = DateTime.Today
+            })
+            .ToList();
 
         // 已在 UI 线程时同步应用：BeginInvokeOnMainThread 在 Windows 上恒入队，
-        // 会晚于 LoadAsync 的存量档位兜底（EnsureLegacySmallAmountOption）执行，
-        // 把注入的旧档位选项清掉、选中项改回低保档 → 存量金额回显丢失。
+        // 会晚于 LoadAsync 的存量档位兜底执行，把选中项改回第一档 → 存量金额回显丢失。
         void ApplyLevelOptions()
         {
-            _applyingLevelOptions = true;
-            try
+            SmallAmountLevelOptions.Clear();
+            foreach (var level in SmallAmountLevels)
             {
-                SmallAmountLevelOptions.Clear();
-                foreach (var level in SmallAmountLevels)
-                {
-                    SmallAmountLevelOptions.Add(level.StandardName);
-                }
-                if (SmallAmountLevelOptions.Count > 0)
-                    SelectedSmallAmountLevel = SmallAmountLevelOptions[0];
+                SmallAmountLevelOptions.Add(level.StandardName);
             }
-            finally
-            {
-                _applyingLevelOptions = false;
-            }
+            if (SmallAmountLevelOptions.Count > 0)
+                SelectedSmallAmountLevel = SmallAmountLevelOptions[0];
         }
 
         if (MainThread.IsMainThread)
@@ -364,6 +488,11 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     [ObservableProperty]
     private int? _applicantFamilySize;
+
+    partial void OnApplicantFamilySizeChanged(int? value)
+    {
+        OnPropertyChanged(nameof(ReliefPersonCountHint));
+    }
 
     [ObservableProperty]
     private string _applicantFamilyCategory = string.Empty;
@@ -1151,7 +1280,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
         {
             var orgService = _serviceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IOrganizationService>();
             var result = await orgService.GetByIdAsync(orgId.Value, ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var org = result.Value;
                 if (!string.IsNullOrWhiteSpace(org.Name)) return org.Name;
@@ -1202,6 +1331,21 @@ public partial class TempReliefFormViewModel : ViewModelBase
     {
         try
         {
+            // 小额快救：免公示（政策第二十一条），不生成公示起止
+            if (ReliefType == TempReliefConstants.ReliefTypeSmall)
+            {
+                _suppressReload = true;
+                try
+                {
+                    HasPublicizeDates = false;
+                }
+                finally
+                {
+                    _suppressReload = false;
+                }
+                return;
+            }
+
             var generation = Interlocked.Increment(ref _publicizeCalcGeneration);
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
 

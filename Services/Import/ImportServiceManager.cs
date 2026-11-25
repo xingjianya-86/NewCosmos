@@ -271,7 +271,6 @@ public class ImportServiceManager : BaseService, IImportServiceManager
         }
 
         await File.WriteAllLinesAsync(tempPath, lines);
-        LogInfo($"执行操作");
         return tempPath;
     }
 

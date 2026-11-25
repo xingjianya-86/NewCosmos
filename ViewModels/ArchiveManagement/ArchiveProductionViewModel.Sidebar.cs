@@ -309,7 +309,7 @@ public partial class ArchiveProductionViewModel
 
             // 渐退取最近一条（含已退出）：退出后补打审批表仍需起止/退出说明
             var graceRes = await _gracePeriodService.GetLatestAsync(app.Id, CancellationToken);
-            if (graceRes.IsSuccess && graceRes.Value != null)
+            if (graceRes.HasValue)
             {
                 if (graceRes.Value.IsActive)
                 {
@@ -361,7 +361,7 @@ public partial class ArchiveProductionViewModel
             _fieldData[FieldKeys.ADJ_EFFECTIVE_DATE] =
                 new DateTime(adjAuditTime.Year, adjAuditTime.Month, 1).AddMonths(1).ToString("yyyy年M月1日");
 
-            if (changeRes.IsSuccess && changeRes.Value != null && changeRes.Value.Count > 0)
+            if (changeRes.HasValue && changeRes.Value.Count > 0)
             {
                 // 统计增员/减员人数和金额差
                 int addCount = 0, removeCount = 0;
@@ -390,7 +390,7 @@ public partial class ArchiveProductionViewModel
                 //   ② 有"保障金变更登记"记录：以登记记录为权威取数源（户月保障金口径，分类施保变动另行记录）；
                 //   ③ 兼容旧数据（无登记记录）：回退按人员变动记录金额差累加，但必须过登记阈值——
                 //      阈值以下视为不调整待遇 → 两格 0.00（与月报取数同规则，避免文书与月报口径分裂）。
-                var inGracePeriod = graceRes.IsSuccess && graceRes.Value != null && graceRes.Value.IsActive;
+                var inGracePeriod = graceRes.HasValue && graceRes.Value.IsActive;
                 var registration = await GetFundChangeRegistrationSafeAsync(app.Id);
                 if (inGracePeriod)
                 {
@@ -488,7 +488,7 @@ public partial class ArchiveProductionViewModel
     private async Task<List<MemberAdjustEntry>> GetMemberAdjustEntriesSafeAsync(long applicationId)
     {
         var result = await _changeService.GetMemberAdjustEntriesAsync(applicationId, 5, CancellationToken);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
             return result.Value;
 
         _logger.Error($"增减员逐人明细加载失败: ApplicationId={applicationId}, ErrorCode={result.ErrorCode}, Message={result.Message}");
@@ -658,13 +658,14 @@ public partial class ArchiveProductionViewModel
 
             var userService = _serviceProvider.GetRequiredService<IUserService>();
             var userResult = await userService.GetByIdAsync(userId.Value);
-            if (userResult.IsSuccess && userResult.Value != null)
+            if (userResult.HasValue)
                 return userResult.Value.FullName ?? "未配";
 
             return "未配";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"获取民政助理姓名异常，文书该字段将显示「未配」: {ex.Message}");
             return "未配";
         }
     }
@@ -682,13 +683,14 @@ public partial class ArchiveProductionViewModel
 
             var userService = _serviceProvider.GetRequiredService<IUserService>();
             var userResult = await userService.GetByIdAsync(userId.Value);
-            if (userResult.IsSuccess && userResult.Value != null)
+            if (userResult.HasValue)
                 return (userResult.Value.IdentityCard ?? "", userResult.Value.Position ?? "");
 
             return ("", "");
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"获取经办人证件/职务异常，文书该字段将为空: {ex.Message}");
             return ("", "");
         }
     }
@@ -716,14 +718,15 @@ public partial class ArchiveProductionViewModel
             if (org.ParentId.HasValue)
             {
                 var parentResult = await _organizationService.GetByIdAsync(org.ParentId.Value);
-                if (parentResult.IsSuccess && parentResult.Value != null)
+                if (parentResult.HasValue)
                     parentPhone = parentResult.Value.Phone ?? "-";
             }
 
             return new OrganizationInfoDto(district, town, parentName, parentPhone, unitName, unitPhone);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"获取机构信息异常，文书机构字段将以「-」占位: {ex.Message}");
             return new OrganizationInfoDto("-", "-", "-", "-", "-", "-");
         }
     }
@@ -850,7 +853,10 @@ public partial class ArchiveProductionViewModel
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warn($"加载补贴明细失败（土地补贴将按 0 计）: {ex.Message}");
+        }
 
         // 折算条件注记：补贴金额为 面积×单价×比例 折算后值，比例≠100% 时在补贴分项末尾附说明
         var subsidyRatioNote = SubsidyRatioHelper.BuildNote(subsidies);
@@ -886,7 +892,7 @@ public partial class ArchiveProductionViewModel
     private async Task ApplyReviewGroupAsync(ApplicationEntity app, long applicationId)
     {
         var reviewRes = await _changeService.GetLatestReviewChangeRecordAsync(applicationId, CancellationToken);
-        if (reviewRes.IsSuccess && reviewRes.Value != null)
+        if (reviewRes.HasValue)
         {
             var rv = reviewRes.Value;
             var (action, amountTail) = BuildReviewAmountChange(app, rv);
@@ -981,7 +987,10 @@ public partial class ArchiveProductionViewModel
                 return i;
             }
         }
-        catch (JsonException) { }
+        catch (JsonException ex)
+        {
+            Serilog.Log.Debug(ex, "[ArchiveProduction] 变更快照整型键解析失败（按缺失继续）: Key={Key}", key);
+        }
         return null;
     }
 
@@ -1001,7 +1010,10 @@ public partial class ArchiveProductionViewModel
                 return v.GetString();
             }
         }
-        catch (JsonException) { }
+        catch (JsonException ex)
+        {
+            Serilog.Log.Debug(ex, "[ArchiveProduction] 变更快照文本键解析失败（按缺失继续）: Key={Key}", key);
+        }
         return null;
     }
 
@@ -1026,25 +1038,25 @@ public partial class ArchiveProductionViewModel
             if (app.HukouCityId is > 0)
             {
                 var r = await regionService.GetCityByIdAsync(app.HukouCityId.Value);
-                if (r.IsSuccess && r.Value != null) sb.Append(r.Value.CityName);
+                if (r.HasValue) sb.Append(r.Value.CityName);
                 else if (r.IsFailure) _logger.Warn($"户籍地址-市级区域名查询失败（ApplicationId={app.Id}, CityId={app.HukouCityId}, {r.Message}）");
             }
             if (app.HukouCountyId is > 0)
             {
                 var r = await regionService.GetCountyByIdAsync(app.HukouCountyId.Value);
-                if (r.IsSuccess && r.Value != null) sb.Append(r.Value.CountyName);
+                if (r.HasValue) sb.Append(r.Value.CountyName);
                 else if (r.IsFailure) _logger.Warn($"户籍地址-县级区域名查询失败（ApplicationId={app.Id}, CountyId={app.HukouCountyId}, {r.Message}）");
             }
             if (app.HukouTownId is > 0)
             {
                 var r = await regionService.GetTownByIdAsync(app.HukouTownId.Value);
-                if (r.IsSuccess && r.Value != null) sb.Append(r.Value.TownName);
+                if (r.HasValue) sb.Append(r.Value.TownName);
                 else if (r.IsFailure) _logger.Warn($"户籍地址-乡镇区域名查询失败（ApplicationId={app.Id}, TownId={app.HukouTownId}, {r.Message}）");
             }
             if (app.HukouVillageId is > 0)
             {
                 var r = await regionService.GetVillageByIdAsync(app.HukouVillageId.Value);
-                if (r.IsSuccess && r.Value != null) sb.Append(r.Value.VillageName);
+                if (r.HasValue) sb.Append(r.Value.VillageName);
                 else if (r.IsFailure) _logger.Warn($"户籍地址-村级区域名查询失败（ApplicationId={app.Id}, VillageId={app.HukouVillageId}, {r.Message}）");
             }
 
@@ -1279,8 +1291,9 @@ public partial class ArchiveProductionViewModel
 
             return "-";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"构建财产豁免情况异常，文书该字段将以「-」占位: {ex.Message}");
             return "-";
         }
     }

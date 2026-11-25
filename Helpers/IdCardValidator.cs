@@ -51,8 +51,9 @@ public static class IdCardValidator
             var day = int.Parse(idCard.Substring(12, 2));
             return new DateTime(year, month, day);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[IdCardValidator] 身份证出生日期解析失败（按无效处理）");
             return null;
         }
     }
@@ -111,8 +112,9 @@ public static class IdCardValidator
             var day = int.Parse(idCard.Substring(12, 2));
             return new DateTime(year, month, day);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[IdCardValidator] 身份证出生日期解析失败（按无效处理）");
             return null;
         }
     }

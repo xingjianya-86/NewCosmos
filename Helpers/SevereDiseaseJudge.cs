@@ -96,7 +96,7 @@ public sealed class SevereDiseaseJudge
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"加载重病清单失败: {ex.Message}");
+            Serilog.Log.Warning(ex, "[SevereDiseaseJudge] 加载重病清单失败，确定性判定将全部未命中");
             return new SevereDiseaseJudge(new CatalogDto(), Array.Empty<byte>());
         }
     }
@@ -115,7 +115,7 @@ public sealed class SevereDiseaseJudge
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"解析重病清单失败: {ex.Message}");
+            Serilog.Log.Warning(ex, "[SevereDiseaseJudge] 解析重病清单失败，确定性判定将全部未命中");
             return new SevereDiseaseJudge(new CatalogDto(), Array.Empty<byte>());
         }
     }
@@ -132,7 +132,7 @@ public sealed class SevereDiseaseJudge
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"读取安卓重病清单资产失败: {assetPath} {ex.Message}");
+            Serilog.Log.Warning(ex, "[SevereDiseaseJudge] 读取安卓重病清单资产失败: {Asset}", assetPath);
             return null;
         }
     }

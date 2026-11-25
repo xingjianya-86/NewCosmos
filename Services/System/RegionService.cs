@@ -210,8 +210,9 @@ public class RegionService : BaseService, IRegionService
             var text = new string(head[..read]);
             return text.Contains("\"Version\":1", StringComparison.Ordinal);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[RegionService] 地区快照版本判断失败，按新格式读取: {Path}", path);
             return false;   // 判不了就按新格式读，读失败走原有 catch 分支
         }
     }
@@ -587,7 +588,14 @@ SELECT
             AND table_name IN ('nc_regions_cities', 'nc_regions_counties', 'nc_regions_towns', 'nc_regions_villages')";
 
         var result = await _dbService.ExecuteScalarAsync(checkSql, ct);
-        if (result.IsSuccess && Convert.ToInt64(result.Value) >= 4)
+        if (result.IsFailure)
+        {
+            // 检查失败若落入"表不完整"分支，会触发 allowDrop 整表重建（瞬时故障即清空区划）。
+            LogError($"检查地区表存在性失败，已中止（不重建）: {result.ErrorCode} {result.Message}");
+            return Result.Failure(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"检查地区表存在性失败: {result.Message}");
+        }
+        if (Convert.ToInt64(result.Value) >= 4)
         {
             LogInfo("地区表已存在");
             _tablesVerified = true;
@@ -653,7 +661,7 @@ SELECT
             await EnsureTablesExistAsync(ct);
             ReportProgress(progress, 2, totalSteps, "清空地级市数据");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_cities"), ("Operation", "RegionService.InitializeFromSeed"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_cities", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_cities", ct);
             ReportProgress(progress, 3, totalSteps, "导入地级市数据");
             var citiesResult = LoadCitiesFromYaml();
             if (citiesResult.IsFailure)
@@ -668,7 +676,7 @@ SELECT
             }
             ReportProgress(progress, 4, totalSteps, "清空县区表");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_counties"), ("Operation", "RegionService.InitializeFromSeed"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_counties", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_counties", ct);
             ReportProgress(progress, 5, totalSteps, "导入县区数据");
             var countiesResult = LoadCountiesFromYaml();
             if (countiesResult.IsFailure)
@@ -684,7 +692,7 @@ SELECT
             }
             ReportProgress(progress, 6, totalSteps, "清空乡镇表");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_towns"), ("Operation", "RegionService.InitializeFromSeed"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_towns", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_towns", ct);
             ReportProgress(progress, 7, totalSteps, "导入乡镇数据");
             var townsResult = LoadTownsFromYaml();
             if (townsResult.IsFailure)
@@ -700,7 +708,7 @@ SELECT
             }
             ReportProgress(progress, 8, totalSteps, "清空村/社区表");
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_villages"), ("Operation", "RegionService.InitializeFromSeed"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_villages", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_villages", ct);
             ReportProgress(progress, 9, totalSteps, "导入村/社区数据");
             var villagesResult = LoadVillagesFromCsv();
             if (villagesResult.IsFailure)
@@ -747,11 +755,11 @@ SELECT
         try
         {
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_villages"), ("Operation", "RegionService.ClearTables"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_villages", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_villages", ct);
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_towns"), ("Operation", "RegionService.ClearTables"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_towns", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_towns", ct);
             Logger.LogSecurity("清空表(TRUNCATE)", ("Table", "nc_regions_counties"), ("Operation", "RegionService.ClearTables"));
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_regions_counties", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_regions_counties", ct);
             await tx.CommitAsync(ct);
 
             InvalidateRegionCaches();
@@ -796,7 +804,7 @@ SELECT
         var sql = "SELECT id, city_name, city_code, province_id, sort_order, is_active FROM nc_regions_cities WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCity>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             _citiesCache = result.Value;
             return Result.Success(new List<RegionCity>(result.Value));
@@ -860,7 +868,7 @@ SELECT
         var sql = "SELECT id, province_name, province_code, sort_order, is_active FROM nc_regions_provinces WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionProvince>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
             return Result.Success(new List<RegionProvince>(result.Value));
 
         // 省表缺失（迁移未跑）时显式失败，不洗成"无省数据"
@@ -882,7 +890,7 @@ SELECT
         // 表现是"选省后城市全空"（AGENTS §8：位置参数 $1..$n 与 SQL 一一对应）
         var result = await _dbService.QueryAsync<RegionCity>(sql, ct, provinceId);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
             return Result.Success(new List<RegionCity>(result.Value));
 
         return CompleteList(result, "省内地级市列表");
@@ -910,7 +918,7 @@ SELECT
         var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCounty>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             _allCountiesCache = result.Value;
             return Result.Success(new List<RegionCounty>(result.Value));
@@ -939,7 +947,7 @@ SELECT
         var sql = "SELECT id, county_name, county_code, city_name, sort_order, is_active FROM nc_regions_counties WHERE city_name = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionCounty>(sql, ct, cityName);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             _countiesByCityCache[cityName] = result.Value;
             return Result.Success(new List<RegionCounty>(result.Value));
@@ -1021,7 +1029,7 @@ SELECT
         var sql = "SELECT id, county_id, town_name, town_code, town_type, sort_order, is_active FROM nc_regions_towns WHERE county_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionTown>(sql, ct, countyId);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             _townsByCountyCache[countyId] = result.Value;
             return Result.Success(new List<RegionTown>(result.Value));
@@ -1096,7 +1104,7 @@ SELECT
         var sql = "SELECT id, town_id, village_name, village_code, village_type, sort_order, is_active FROM nc_regions_villages WHERE town_id = $1 AND is_active = TRUE ORDER BY sort_order, id";
         var result = await _dbService.QueryAsync<RegionVillage>(sql, ct, townId);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             _villagesByTownCache[townId] = result.Value;
             return Result.Success(new List<RegionVillage>(result.Value));
@@ -1898,14 +1906,21 @@ SELECT
 
         var startIdResult = await GetNextVillageIdAsync(ct);
         if (startIdResult.IsFailure)
+        {
+            LogError($"获取村/社区起始ID失败，导入中止: {startIdResult.ErrorCode} {startIdResult.Message}");
             return Result.Failure<int>(startIdResult.ErrorCode!, startIdResult.Message!);
+        }
         var startId = startIdResult.Value;
         var processed = new List<(int TownId, string Name, string Code, string Type, int SortOrder, bool IsActive)>();
 
         var grouped = villages.GroupBy(v => v.StreetCode);
         foreach (var group in grouped)
         {
-            if (!townMap.TryGetValue(group.Key, out var townId)) continue;
+            if (!townMap.TryGetValue(group.Key, out var townId))
+            {
+                LogWarn($"村/社区导入：街道编码 {group.Key} 在乡镇映射中不存在，已跳过 {group.Count()} 个村");
+                continue;
+            }
 
             var sort = 1;
             foreach (var v in group)
@@ -2034,11 +2049,16 @@ SELECT
     {
         var checkSql = "SELECT COUNT(*) FROM nc_regions_cities WHERE id = $1";
         var exists = await _dbService.ExecuteScalarAsync(checkSql, ct, city.Id);
-        if (exists.IsSuccess && Convert.ToInt32(exists.Value) == 0)
+        if (exists.IsFailure)
+        {
+            LogError($"检查地级市 {city.Id} 是否存在失败: {exists.ErrorCode} {exists.Message}");
+            throw new BusinessException(exists.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, $"检查地级市是否存在失败: {exists.Message}");
+        }
+        if (Convert.ToInt32(exists.Value) == 0)
         {
             var sql = @"INSERT INTO nc_regions_cities (id, city_name, city_code, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5)";
-            await _dbService.ExecuteNonQueryAsync(sql, ct,
+            await ExecOrThrowAsync(_dbService, sql, ct,
                 city.Id, city.CityName, city.CityCode, city.SortOrder, city.IsActive);
         }
     }
@@ -2148,11 +2168,16 @@ SELECT
     {
         var checkSql = "SELECT COUNT(*) FROM nc_regions_counties WHERE id = $1";
         var exists = await _dbService.ExecuteScalarAsync(checkSql, ct, county.Id);
-        if (exists.IsSuccess && Convert.ToInt32(exists.Value) == 0)
+        if (exists.IsFailure)
+        {
+            LogError($"检查县区 {county.Id} 是否存在失败: {exists.ErrorCode} {exists.Message}");
+            throw new BusinessException(exists.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, $"检查县区是否存在失败: {exists.Message}");
+        }
+        if (Convert.ToInt32(exists.Value) == 0)
         {
             var sql = @"INSERT INTO nc_regions_counties (id, county_name, county_code, city_name, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5, $6)";
-            await _dbService.ExecuteNonQueryAsync(sql, ct,
+            await ExecOrThrowAsync(_dbService, sql, ct,
                 county.Id, county.CountyName, county.CountyCode,
                 county.CityName, county.SortOrder, county.IsActive);
         }
@@ -2162,11 +2187,16 @@ SELECT
     {
         var checkSql = "SELECT COUNT(*) FROM nc_regions_towns WHERE id = $1";
         var exists = await _dbService.ExecuteScalarAsync(checkSql, ct, town.Id);
-        if (exists.IsSuccess && Convert.ToInt32(exists.Value) == 0)
+        if (exists.IsFailure)
+        {
+            LogError($"检查乡镇 {town.Id} 是否存在失败: {exists.ErrorCode} {exists.Message}");
+            throw new BusinessException(exists.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, $"检查乡镇是否存在失败: {exists.Message}");
+        }
+        if (Convert.ToInt32(exists.Value) == 0)
         {
             var sql = @"INSERT INTO nc_regions_towns (id, county_id, town_name, town_code, town_type, sort_order, is_active)
                         VALUES ($1, $2, $3, $4, $5, $6, $7)";
-            await _dbService.ExecuteNonQueryAsync(sql, ct,
+            await ExecOrThrowAsync(_dbService, sql, ct,
                 town.Id, town.CountyId, town.TownName, town.TownCode,
                 town.TownType, town.SortOrder, town.IsActive);
         }

@@ -529,6 +529,11 @@
                                 <Border Padding="8" Margin="2" StrokeShape="RoundRectangle 6"
                                         BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
                                     <VerticalStackLayout Spacing="3">
+                                        <!-- 支出人员（2026-11-19 必须落户到人） -->
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedMember, Mode=TwoWay}" ItemDisplayBinding="{Binding Name}"
+                                                Title="支出人员" FontSize="16" HeightRequest="32" BackgroundColor="White"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                         <!-- 支出类型 -->
                                         <Picker ItemsSource="{Binding BindingContext.RigidExpenditureTypeOptions, Source={x:Reference StepRoot}}"
                                                 SelectedItem="{Binding ExpenditureType}" FontSize="16" HeightRequest="32" BackgroundColor="White"

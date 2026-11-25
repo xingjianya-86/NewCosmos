@@ -235,8 +235,9 @@ public class AnimationWebViewView : ContentView
         {
             text = e.TryGetWebMessageAsString();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[AnimationWebView] WebMessage 解码失败，已丢弃本条消息");
             return;
         }
 
@@ -288,6 +289,14 @@ public class AnimationWebViewView : ContentView
         var kind = qIndex >= 0 ? rest[..qIndex] : rest;
         var query = qIndex >= 0 ? rest[(qIndex + 1)..] : string.Empty;
 
+        // WebView2 对带查询的自定义协议导航会按 URI 规范化成 host/path 形态：
+        // newcosmos-splash://splash-intent?payload=… → …splash-intent/?payload=…，
+        // kind 尾部多一个斜杠会令 switch 不匹配（2026-11-18 实测 splash-intent 落到 default；
+        // 同根因下 login-submit 等带查询消息的协议备份路此前静默失效，只靠 postMessage 主路）。
+        // 统一去尾部斜杠与 postMessage 路的 kind 对齐——双路桥本就按幂等/按 id 去重设计（见 LoginPage）。
+        if (kind.EndsWith('/'))
+            kind = kind[..^1];
+
         var payload = ExtractQueryParam(query, "payload");
         if (payload.Length == 0)
             payload = ExtractQueryParam(query, "msg");
@@ -317,8 +326,9 @@ public class AnimationWebViewView : ContentView
             {
                 return Uri.UnescapeDataString(pair[(eq + 1)..]);
             }
-            catch
+            catch (Exception ex)
             {
+                Serilog.Log.Debug(ex, "[AnimationWebView] URL 解码失败，使用原文");
                 return pair[(eq + 1)..];
             }
         }

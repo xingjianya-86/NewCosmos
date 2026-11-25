@@ -72,18 +72,24 @@ public class SystemService : BaseService, ISystemService
                 // 获取活跃用户数量
                 var userCountSql = "SELECT COUNT(*) FROM nc_sys_users WHERE is_active = true";
                 var countResult = await _db.ExecuteScalarAsync(userCountSql, ct);
+                if (countResult.IsFailure)
+                    LogWarn($"系统状态：活跃用户数查询失败，显示为 0: {countResult.ErrorCode} {countResult.Message}");
                 status.ActiveUserCount = countResult.IsSuccess ? Convert.ToInt32(countResult.Value) : 0;
 
                 // 获取数据库版本
                 var versionSql = "SELECT version()";
                 var versionResult = await _db.QuerySingleAsync<string>(versionSql, ct);
-                status.DatabaseVersion = versionResult.IsSuccess && versionResult.Value != null
+                if (versionResult.IsFailure)
+                    LogWarn($"系统状态：数据库版本查询失败，显示为未知: {versionResult.ErrorCode} {versionResult.Message}");
+                status.DatabaseVersion = versionResult.HasValue
                     ? versionResult.Value.Split(',')[0]
                     : "未知";
 
                 // 获取服务器时间
                 var timeSql = "SELECT NOW()";
                 var timeResult = await _db.QuerySingleAsync<DateTime>(timeSql, ct);
+                if (timeResult.IsFailure)
+                    LogWarn($"系统状态：服务器时间查询失败，回退本机时间: {timeResult.ErrorCode} {timeResult.Message}");
                 status.ServerTime = timeResult.IsSuccess ? timeResult.Value : DateTime.Now;
             }
 

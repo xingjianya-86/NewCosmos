@@ -201,9 +201,9 @@ public class HolidayManageService : BaseService, IHolidayManageService
             ORDER BY holiday_date";
 
         var result = await _dbService.QueryAsync<SysHoliday>(sql, ct, year);
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<SysHoliday>());
+        if (result.IsFailure)
+            return Result.Failure<List<SysHoliday>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<SysHoliday>());
     }
 
     public async Task<Result> UpsertHolidayAsync(DateTime date, string dateType, string name, string source, CancellationToken ct = default)

@@ -236,9 +236,10 @@ public class WordEngine : ITemplateEngine
 
             return frame;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 无文本框 story：索引器抛 COMException，属正常情况（静默返回 null）
+            // 无文本框 story：索引器抛 COMException，属正常情况
+            _logger.Debug($"WordEngine: 无文本框 story（正常回退）: {ex.Message}");
             SafeRelease(frame);
             return null;
         }
@@ -940,13 +941,6 @@ public class WordEngine : ITemplateEngine
         var pdfBytes = await OfficeComDocuments.ExportToPdfAsync(OfficeAppKind.Word, sourceFilePath, pdfOutputPath, _logger, ct);
         _logger.Info("WordEngine: 从文件导出 PDF 完成");
         return pdfBytes;
-    }
-
-    public List<string> GetUnresolvedPlaceholders()
-    {
-        // Office COM 方式下，未解析的占位符检查需要遍历文档内容
-        // 简化实现：返回空列表
-        return new List<string>();
     }
 
     public void Dispose()

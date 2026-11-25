@@ -392,7 +392,15 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
 
             // 读取同户成员（银行账号在部分导入库家庭表有列，这里仅返回成员；银行由表单补全）
             var membersResult = await _db.QueryAsync<ImportedMemberRow>(BuildMembersSql(def), ct, f.ApplicantIdCard);
-            if (membersResult.IsSuccess && membersResult.Value != null)
+            if (membersResult.IsFailure)
+            {
+                // 成员查不到会把"查询故障"当"无成员"继续建档。
+                LogError($"导入库家庭成员查询失败: {membersResult.ErrorCode} {membersResult.Message}");
+                return Result.Failure<ImportedFamilyDetail>(
+                    membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"导入库家庭成员查询失败: {membersResult.Message}");
+            }
+            if (membersResult.Value != null)
             {
                 foreach (var m in membersResult.Value)
                 {
@@ -683,11 +691,21 @@ public class ImportedArchiveService : BaseService, IImportedArchiveService
 
             // 查重：已登记过高龄补贴则跳过
             var exists = await _elderlyService.CheckIdCardExistsAsync(m.IdCard, null, ct);
-            if (exists.IsSuccess && exists.Value) continue;
+            if (exists.IsFailure)
+            {
+                // 查重失败不能建：宁可本次不建，也不能重复建高龄档。
+                LogWarn($"自动建高龄档：查重失败，已跳过 {DataMasker.MaskIdCard(m.IdCard)}: {exists.Message}");
+                continue;
+            }
+            if (exists.Value) continue;
 
             // 调用 EvaluateAsync 获取分类 + 补发分段
             var eval = await _elderlyService.EvaluateAsync(m.IdCard, DateTime.Now, ct);
-            if (eval.IsFailure) continue;
+            if (eval.IsFailure)
+            {
+                LogWarn($"自动建高龄档：评估失败，已跳过 {DataMasker.MaskIdCard(m.IdCard)}: {eval.ErrorCode} {eval.Message}");
+                continue;
+            }
 
             // 构建高龄补贴登记（从成员 + 家庭行填充字段）
             var gender = string.IsNullOrEmpty(m.Gender) ? eval.Value.Gender : m.Gender;

@@ -86,9 +86,12 @@ public class LotteryDataService : ILotteryDataService
             var existingResult = await _db.QueryAsync<string>(
                 "SELECT draw_number FROM nc_lottery_draws WHERE lottery_type = $1 AND draw_number = ANY($2)",
                 ct, lotteryType.ToString(), incomingNumbers.ToArray());
-            var existing = existingResult.IsSuccess
-                ? new HashSet<string>(existingResult.Value ?? new List<string>(), StringComparer.Ordinal)
-                : new HashSet<string>(StringComparer.Ordinal);
+            if (existingResult.IsFailure)
+            {
+                _logger.Error($"同步历史数据：查询已存在期号失败，已中止: {existingResult.ErrorCode} {existingResult.Message}");
+                return Result.Failure<int>(existingResult.ErrorCode!, existingResult.Message!);
+            }
+            var existing = new HashSet<string>(existingResult.Value ?? new List<string>(), StringComparer.Ordinal);
             var newCount = incomingNumbers.Count(n => !existing.Contains(n));
 
             var affected = await BatchInsertDrawsAsync(lotteryType, draws, ct);
@@ -296,6 +299,10 @@ public class LotteryDataService : ILotteryDataService
                 if (result.IsSuccess && result.Value > 0)
                 {
                     insertedCount++;
+                }
+                else if (result.IsFailure)
+                {
+                    _logger.Warn($"插入记录 {draw.draw_number} 失败: {result.ErrorCode} {result.Message}");
                 }
             }
             catch (Exception ex)

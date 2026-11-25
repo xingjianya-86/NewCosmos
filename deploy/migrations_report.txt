@@ -1,5 +1,4 @@
-﻿检查时间: 2026-11-15 19:03:06
-[VERIFY-APPLIED] 20261115_village_coordinates.sql
+﻿检查时间: 2026-11-19 15:54:57
 [PENDING] 20261103_destitute_cancel_filing_categories.sql
 [PENDING] 20261104_archive_photo_name_backfill.sql
 [PENDING] 20261111_template_survey_date_bindings.sql

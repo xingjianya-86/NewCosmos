@@ -199,6 +199,19 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
                 if (auditMain.IsFailure)
                     return Result.Failure(auditMain.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
                         $"审计留痕写入失败，归档已回滚: {auditMain.Message}");
+
+                // 归档终结拒保补写 CategoryStop（2026-11-19 丁玉花 app113）：链上有在保前分类时，
+                // 本档是"曾享受 → 判不合格被拒"而非"首次申请即被拒"，补记停保变更记录——
+                // 《档案_变更告知书》方向②按 old_classification 判「停止」（而非「不予认定」），
+                // 动态管理变更留痕同步。守卫不满足（真·首拒/链上已有停保记录）→ 跳过；
+                // 失败 → 回滚归档（§7 显式失败，与经济复核 WriteCategoryStopRecordAsync 先例一致）。
+                if (targetStatus == ApplicationStatus.Stopped)
+                {
+                    var refusalStop = await WriteArchiveRefusalCategoryStopAsync(current, operatorName, ct);
+                    if (refusalStop.IsFailure)
+                        return Result.Failure(refusalStop.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            $"归档终结拒保停保记录补写失败，归档已回滚: {refusalStop.Message}");
+                }
                 await tx.CommitAsync(ct);
             }
 
@@ -230,6 +243,71 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             LogException(ex, "完成归档");
             return Result.FromException(ex);
         }
+    }
+
+    /// <summary>
+    /// 归档终结拒保补写 CategoryStop（须在调用方已开启的事务内执行；2026-11-19 丁玉花 app113）：
+    /// 链上有在保前分类的拒保档补记停保事实（old=链上前分类、new=档案自身停保码、triggered_stop=true、
+    /// change_reason_type=归档终结拒保），《档案_变更告知书》方向②据此出「停止」而非「不予认定」。
+    /// 链上前分类与装配端兜底同源（Helpers\ChainPreClassification 单点），两侧口径不劈叉。
+    /// 守卫：① 自身为停保码；② 链上前分类非空且非停保码（否则=真·首次申请即被拒，不补写）；
+    /// ③ 链上无既有 CategoryStop（幂等，经济复核/成员变更的停保记录优先）。
+    /// 金额两列置 NULL：追缴历史（RecoveryHistoryProvider）按 new_guarantee_amount IS NOT NULL 取数，
+    /// 写值会把本记录误入追缴链；月报停保行由终结档/状态过滤排除，不依赖本记录金额。
+    /// 直写 SQL 而非注入 IChangeService：ChangeService→IApplicationService→IApplicationStatusService
+    /// 构成 DI 构造环。失败由调用方回滚归档。
+    /// </summary>
+    private async Task<Result> WriteArchiveRefusalCategoryStopAsync(
+        StatusRow current, string operatorName, CancellationToken ct)
+    {
+        var ownCode = current.ClassificationResult ?? string.Empty;
+        if (!ClassificationConstants.IsCodeStop(ownCode))
+            return Result.Success(); // 非停保码不属本记录语义（调用方已按判不合格分流，理论不可达）
+
+        var preResult = await ChainPreClassification.ResolveAsync(_db, current.Id, ct);
+        if (preResult.IsFailure)
+            return Result.Failure(preResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                preResult.Message ?? "链上前分类查询失败");
+        var pre = preResult.Value;
+        if (string.IsNullOrEmpty(pre) || ClassificationConstants.IsCodeStop(pre))
+        {
+            LogInfo($"归档终结拒保跳过停保记录补写（无在保前分类，按首次申请即被拒处理）: ApplicationId={current.Id}");
+            return Result.Success();
+        }
+
+        var existsResult = await _db.ExecuteScalarAsync<bool>(
+            @"SELECT EXISTS(SELECT 1 FROM nc_biz_change_records
+                            WHERE (application_id = $1 OR new_application_id = $1)
+                              AND change_type = 'CategoryStop' AND deleted_at IS NULL)",
+            ct, current.Id);
+        if (existsResult.IsFailure)
+            return Result.Failure(existsResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                existsResult.Message ?? "停保变更记录幂等检查失败");
+        if (existsResult.Value)
+            return Result.Success(); // 链上已有停保记录，方向由既有记录承载
+
+        var insertResult = await _db.ExecuteNonQueryAsync(
+            @"INSERT INTO nc_biz_change_records
+                (application_id, change_no, change_type, change_reason, change_reason_type, change_date,
+                 old_classification, new_classification, triggered_stop, operator_name,
+                 new_application_id, changed_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, NULL, NOW())",
+            ct,
+            current.Id,
+            $"CHG{DateTime.Now:yyyyMMddHHmmssfff}",
+            DictionaryConstants.ChangeType.CATEGORY_STOP,
+            BuildIneligibleStopReason(current.ClassificationResult),
+            ChangeReasonTypeConstants.ArchiveRefusalStop,
+            DateTime.Today,
+            pre,
+            ownCode,
+            operatorName);
+        if (insertResult.IsFailure)
+            return Result.Failure(insertResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                insertResult.Message ?? "写入归档终结拒保停保记录失败");
+
+        LogInfo($"归档终结拒保补写 CategoryStop: ApplicationId={current.Id}, {pre} → {ownCode}");
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -491,7 +569,12 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
                 @"SELECT id, applicant_name, applicant_id_card, original_application_id, chain_type,
                          classification_result, first_approved_at
                   FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, applicationId);
-            if (appResult.IsFailure || appResult.Value == null)
+            if (appResult.IsFailure)
+            {
+                LogWarn($"单人保转出留痕：读取申请失败，已跳过: ApplicationId={applicationId}, {appResult.ErrorCode} {appResult.Message}");
+                return;
+            }
+            if (appResult.Value == null)
                 return;
 
             var app = appResult.Value;
@@ -502,7 +585,12 @@ public class ApplicationStatusService : BaseService, IApplicationStatusService
             var sourceResult = await _db.QuerySingleAsync<SingleRescueSourceRow>(
                 @"SELECT id, applicant_name, applicant_id_card, classification_result
                   FROM nc_biz_applications WHERE id = $1 AND deleted_at IS NULL", ct, app.OriginalApplicationId.Value);
-            if (sourceResult.IsFailure || sourceResult.Value == null)
+            if (sourceResult.IsFailure)
+            {
+                LogWarn($"单人保转出留痕：读取源申请失败，已跳过: SourceId={app.OriginalApplicationId}, {sourceResult.ErrorCode} {sourceResult.Message}");
+                return;
+            }
+            if (sourceResult.Value == null)
                 return;
 
             var source = sourceResult.Value;

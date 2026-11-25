@@ -223,7 +223,7 @@ public class FamilyMember : INotifyPropertyChanged
                 _homeCity = value;
                 OnPropertyChanged();
                 if (!_isLoadingDefaults)
-                    _ = LoadDistrictsForCityAsync(value);
+                    _ = SafeLoadAsync(() => LoadDistrictsForCityAsync(value), nameof(LoadDistrictsForCityAsync));
             }
         }
     }
@@ -242,7 +242,7 @@ public class FamilyMember : INotifyPropertyChanged
                 _homeDistrict = value;
                 OnPropertyChanged();
                 if (!_isLoadingDefaults)
-                    _ = LoadTownsForDistrictAsync(value);
+                    _ = SafeLoadAsync(() => LoadTownsForDistrictAsync(value), nameof(LoadTownsForDistrictAsync));
             }
         }
     }
@@ -261,7 +261,7 @@ public class FamilyMember : INotifyPropertyChanged
                 _homeTown = value;
                 OnPropertyChanged();
                 if (!_isLoadingDefaults)
-                    _ = LoadVillagesForTownAsync(value);
+                    _ = SafeLoadAsync(() => LoadVillagesForTownAsync(value), nameof(LoadVillagesForTownAsync));
             }
         }
     }
@@ -319,7 +319,7 @@ public class FamilyMember : INotifyPropertyChanged
                 _hukouCity = value;
                 OnPropertyChanged();
                 if (!_isLoadingDefaults)
-                    _ = LoadHukouDistrictsForCityAsync(value);
+                    _ = SafeLoadAsync(() => LoadHukouDistrictsForCityAsync(value), nameof(LoadHukouDistrictsForCityAsync));
             }
         }
     }
@@ -338,7 +338,7 @@ public class FamilyMember : INotifyPropertyChanged
                 _hukouDistrict = value;
                 OnPropertyChanged();
                 if (!_isLoadingDefaults)
-                    _ = LoadHukouTownsForDistrictAsync(value);
+                    _ = SafeLoadAsync(() => LoadHukouTownsForDistrictAsync(value), nameof(LoadHukouTownsForDistrictAsync));
             }
         }
     }
@@ -1057,6 +1057,22 @@ public class FamilyMember : INotifyPropertyChanged
     #region 地址级联加载方法
 
     /// <summary>
+    /// 地址级联加载的 fire-and-forget 包装：异常必须被观察并留痕，
+    /// 否则区县/乡镇下拉框会莫名其妙变空且无任何日志。
+    /// </summary>
+    private static async Task SafeLoadAsync(Func<Task> load, string operation)
+    {
+        try
+        {
+            await load();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[FamilyMember] 地址级联加载失败: {Operation}", operation);
+        }
+    }
+
+    /// <summary>
     /// 初始化地址选项集合（加载指定地区的选项）
     /// </summary>
     public async Task LoadInitialAddressOptionsAsync(string? city, string? district, string? town)
@@ -1073,8 +1089,13 @@ public class FamilyMember : INotifyPropertyChanged
             MemberCityOptions.Clear();
             if (citiesResult.IsSuccess)
             {
-                foreach (var c in citiesResult.Value)
+                foreach (var c in citiesResult.Value ?? new List<RegionCity>())
                     MemberCityOptions.Add(c.CityName);
+            }
+            else
+            {
+                Serilog.Log.Warning("[FamilyMember] 加载城市选项失败: {Code} {Message}",
+                    citiesResult.ErrorCode, citiesResult.Message);
             }
 
             // 加载区县选项
@@ -1148,8 +1169,13 @@ public class FamilyMember : INotifyPropertyChanged
         MemberDistrictOptions.Clear();
         if (countiesResult.IsSuccess)
         {
-            foreach (var county in countiesResult.Value)
+            foreach (var county in countiesResult.Value ?? new List<RegionCounty>())
                 MemberDistrictOptions.Add(county.CountyName);
+        }
+        else
+        {
+            Serilog.Log.Warning("[FamilyMember] 加载区县选项失败: {City} {Code} {Message}",
+                city, countiesResult.ErrorCode, countiesResult.Message);
         }
     }
 
@@ -1174,10 +1200,20 @@ public class FamilyMember : INotifyPropertyChanged
                 var townsResult = await regionService.GetTownsByCountyIdAsync(county.Id);
                 if (townsResult.IsSuccess)
                 {
-                    foreach (var town in townsResult.Value)
+                    foreach (var town in townsResult.Value ?? new List<RegionTown>())
                         MemberTownOptions.Add(town.TownName);
                 }
+                else
+                {
+                    Serilog.Log.Warning("[FamilyMember] 加载乡镇选项失败: {District} {Code} {Message}",
+                        district, townsResult.ErrorCode, townsResult.Message);
+                }
             }
+        }
+        else
+        {
+            Serilog.Log.Warning("[FamilyMember] 反查区县失败: {District} {Code} {Message}",
+                district, countiesResult.ErrorCode, countiesResult.Message);
         }
     }
 
@@ -1202,10 +1238,20 @@ public class FamilyMember : INotifyPropertyChanged
                 var villagesResult = await regionService.GetVillagesByTownIdAsync(townEntity.Id);
                 if (villagesResult.IsSuccess)
                 {
-                    foreach (var village in villagesResult.Value)
+                    foreach (var village in villagesResult.Value ?? new List<RegionVillage>())
                         MemberVillageOptions.Add(village.VillageName);
                 }
+                else
+                {
+                    Serilog.Log.Warning("[FamilyMember] 加载村社区选项失败: {Town} {Code} {Message}",
+                        town, villagesResult.ErrorCode, villagesResult.Message);
+                }
             }
+        }
+        else
+        {
+            Serilog.Log.Warning("[FamilyMember] 反查乡镇失败: {Town} {Code} {Message}",
+                town, townsResult.ErrorCode, townsResult.Message);
         }
     }
 
@@ -1222,8 +1268,13 @@ public class FamilyMember : INotifyPropertyChanged
 
         if (countiesResult.IsSuccess)
         {
-            foreach (var county in countiesResult.Value)
+            foreach (var county in countiesResult.Value ?? new List<RegionCounty>())
                 HukouDistrictOptions.Add(county.CountyName);
+        }
+        else
+        {
+            Serilog.Log.Warning("[FamilyMember] 加载户籍区县选项失败: {City} {Code} {Message}",
+                city, countiesResult.ErrorCode, countiesResult.Message);
         }
     }
 
@@ -1248,10 +1299,20 @@ public class FamilyMember : INotifyPropertyChanged
                 var townsResult = await regionService.GetTownsByCountyIdAsync(county.Id);
                 if (townsResult.IsSuccess)
                 {
-                    foreach (var town in townsResult.Value)
+                    foreach (var town in townsResult.Value ?? new List<RegionTown>())
                         HukouTownOptions.Add(town.TownName);
                 }
+                else
+                {
+                    Serilog.Log.Warning("[FamilyMember] 加载户籍乡镇选项失败: {District} {Code} {Message}",
+                        district, townsResult.ErrorCode, townsResult.Message);
+                }
             }
+        }
+        else
+        {
+            Serilog.Log.Warning("[FamilyMember] 反查户籍区县失败: {District} {Code} {Message}",
+                district, countiesResult.ErrorCode, countiesResult.Message);
         }
     }
 

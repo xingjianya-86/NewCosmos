@@ -58,7 +58,7 @@ public static class Icd10Catalog
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"加载 ICD-10 字典失败: {ex.Message}");
+            Serilog.Log.Warning(ex, "[Icd10Catalog] 加载 ICD-10 字典失败，病名回填将全部为空");
             return new Dictionary<string, string>();
         }
     }
@@ -78,7 +78,7 @@ public static class Icd10Catalog
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"读取安卓 ICD-10 字典资产失败: {assetPath} {ex.Message}");
+            Serilog.Log.Warning(ex, "[Icd10Catalog] 读取安卓 ICD-10 字典资产失败: {Asset}", assetPath);
             return null;
         }
     }

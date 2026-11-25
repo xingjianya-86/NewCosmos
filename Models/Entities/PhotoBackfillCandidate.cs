@@ -13,7 +13,7 @@ public partial class PhotoBackfillCandidate : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
-    /// <summary>所属业务域代码，'/' 分隔：ElderlyBenefits/SocialAssistance/TempRelief。</summary>
+    /// <summary>所属业务域代码，'/' 分隔：ElderlyBenefits/SocialAssistance/TempRelief/AssetVerification。</summary>
     public string BusinessTypes { get; set; } = string.Empty;
 
     /// <summary>代表业务ID（补传时写入照片 application_id 追溯用）。</summary>
@@ -48,6 +48,7 @@ public partial class PhotoBackfillCandidate : ObservableObject
         "ElderlyBenefits" => "高龄津贴",
         "SocialAssistance" => "低收入人口",
         "TempRelief" => "临时救助",
+        "AssetVerification" => "资产核查",
         _ => code
     };
 }

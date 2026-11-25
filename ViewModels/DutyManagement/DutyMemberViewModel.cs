@@ -743,7 +743,7 @@ public partial class DutyMemberViewModel : ViewModelBase
         {
             ImportLogLines.Clear();
             var result = await _dutyService.PreviewMemberImportAsync(ImportFilePath, ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var preview = result.Value;
                 ImportSummaryText = preview.SummaryText;
@@ -839,7 +839,7 @@ public partial class DutyMemberViewModel : ViewModelBase
             if (!confirm) return;
 
             var importResult = await _dutyService.ImportMembersAsync(ImportFilePath, ct);
-            if (importResult.IsSuccess && importResult.Value != null)
+            if (importResult.HasValue)
             {
                 var r = importResult.Value;
                 ImportSummaryText = r.SummaryText;

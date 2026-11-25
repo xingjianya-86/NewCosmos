@@ -38,9 +38,10 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private readonly IChangeDocumentApplicabilityService _changeDocApplicability = null!;
 
     /// <summary>
-    /// 由 Page 注入：WebView2 打印 PDF 的回调（pdfPath → Task）。用于核查报告等非 Office/WPS 格式打印。
+    /// 由 Page 注入：WebView2 打印 PDF 的回调（pdfPath → Result）。用于核查报告等非 Office/WPS 格式打印。
+    /// 返回失败时调用方必须提示用户，禁止把"没打成"当成功。
     /// </summary>
-    public Func<string, Task>? WebViewPrintPdfFunc { get; set; }
+    public Func<string, Task<Result>>? WebViewPrintPdfFunc { get; set; }
 
     private byte[] _currentPdfData = null!;
     private string _batchNo = string.Empty;
@@ -235,7 +236,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(idCard)) return null;
 
             var result = await _assetVerificationService.GetLatestIdByIdCardAsync(idCard, ct);
-            if (result.IsSuccess && result.Value.HasValue)
+            if (result.IsFailure)
+                _logger.Warn($"解析核查报告 check_id 失败（报告将从归档清单缺失）: {result.ErrorCode} {result.Message}");
+            else if (result.Value.HasValue)
                 return result.Value;
         }
         catch (Exception ex)
@@ -279,14 +282,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         $"{PrintNavigationData.BusinessType}|{PrintNavigationData.BusinessId}|{PrintNavigationData.Classification}|" +
         $"{PrintNavigationData.Status}|{PrintNavigationData.FieldData?.Count}|{PrintNavigationData.FieldData?.GetValueOrDefault(FieldKeys.FAMILY_LAND_AREA)}|" +
         $"{PrintNavigationData.SupporterTableData?.Count}|{string.Join(';', PrintNavigationData.OutputCategories ?? [])}|" +
-        $"{PrintNavigationData.OperationOverride}|{PrintNavigationData.TemplateFilter?.Length}|{PrintNavigationData.PrefilterTemplateNames?.Length}";
+        $"{PrintNavigationData.OperationOverride}|{PrintNavigationData.TemplateDocTypeFilter?.Length}|{PrintNavigationData.PrefilterDocTypes?.Length}";
 
     private async Task InitializeCoreAsync()
     {
         Title = "档案输出";
         _batchNo = Guid.NewGuid().ToString("N").ToUpper();
 
-        // 文书模式护栏：OutputCategories / OperationOverride / TemplateFilter / PrefilterTemplateNames
+        // 文书模式护栏：OutputCategories / OperationOverride / TemplateDocTypeFilter / PrefilterDocTypes
         // 仅低收入人口域（FamilyApplication / EconomicReview，含补打中心动态记录）才有效；
         // 其余域（普惠高龄、临时救助、追缴、资产核查、月报…）一律忽略，回退按 BusinessType 取分类。
         // 起因：低保/变更「仅出文书」写入的静态上下文若未被清理（如从档案制作页直接返回），
@@ -294,8 +297,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         var docModeAllowed = PrintNavigationData.BusinessType is "FamilyApplication" or "EconomicReview";
         var outCats = docModeAllowed ? PrintNavigationData.OutputCategories : null;
         var operationOverride = docModeAllowed ? PrintNavigationData.OperationOverride : null;
-        var templateFilter = docModeAllowed ? PrintNavigationData.TemplateFilter : null;
-        var preselect = docModeAllowed ? PrintNavigationData.PrefilterTemplateNames : null;
+        // 白名单/预勾选值 = 文档类型（doc_type，方案B精准定位；原按模板名）
+        var docTypeFilter = docModeAllowed ? PrintNavigationData.TemplateDocTypeFilter : null;
+        var preselectDocTypes = docModeAllowed ? PrintNavigationData.PrefilterDocTypes : null;
 
         // 数据快照：下方模板条件剔除（土地/赡养人/一事一议/近亲属）与停保告知书追加都发生在多次 await 之后，
         // 期间静态 PrintNavigationData 可能被 Clear()（页面 OnDisappearing/输出归档）或其它流程覆盖。
@@ -308,18 +312,18 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         var categories = outCats is { Length: > 0 } ? outCats
             : GetCategoriesByBusinessType(businessType, operationOverride);
         var classification = PrintNavigationData.Classification;
-        IsTemplateFilterMode = templateFilter is { Length: > 0 };
+        IsTemplateFilterMode = docTypeFilter is { Length: > 0 };
         IsDocumentMode = !IsTemplateFilterMode
             && (outCats is { Length: > 0 }
                 || operationOverride != null
-                || preselect is { Length: > 0 });
+                || preselectDocTypes is { Length: > 0 });
         var isDocumentMode = IsDocumentMode;
             _logger.LogBusiness("加载打印模板",
                 ("BusinessType", businessType),
                 ("Categories", string.Join(",", categories)),
                 ("Classification", classification),
-                ("TemplateFilter", templateFilter == null ? "(整档)" : string.Join("|", templateFilter)),
-                ("Prefilter", preselect == null ? "(无)" : string.Join("|", preselect)),
+                ("DocTypeFilter", docTypeFilter == null ? "(整档)" : string.Join("|", docTypeFilter)),
+                ("Prefilter", preselectDocTypes == null ? "(无)" : string.Join("|", preselectDocTypes)),
                 // 诊断：土地/赡养人剔除判定依据（补打清单缺「村级土地说明/赡养费承诺书」排查用）
                 ("FamilyLandArea", fieldData?.GetValueOrDefault(FieldKeys.FAMILY_LAND_AREA) ?? "(null)"),
                 ("SupporterCount", supporterData?.Count.ToString() ?? "(null)"),
@@ -368,19 +372,15 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 _logger.Warn($"变动文书事实查询被跳过（BusinessId 为空）: BusinessType={businessType}, Classification={classification}");
             }
 
-            // 近亲属备案独立输出（列表页"输出档案"入口）：无申请分类可依据，按模板名直取两张表
+            // 近亲属备案独立输出（列表页"输出档案"入口）：无申请分类可依据，按文档类型直取两张表
+            //（doc_type=近亲属 恰为 151/152 两表；方案B 精准定位，原按两个模板名逐一 GetByNameAsync）
             List<Template> templates;
             if (string.Equals(businessType, NearRelativeConstants.BusinessType, StringComparison.OrdinalIgnoreCase))
             {
-                templates = new List<Template>();
-                foreach (var templateName in new[] { NearRelativeConstants.TemplateLinkInfo, NearRelativeConstants.TemplateObjectInfo })
-                {
-                    var nameResult = await _templateService.GetByNameAsync(templateName);
-                    if (nameResult.IsFailure)
-                        throw new BusinessException(nameResult.ErrorCode!, nameResult.Message!);
-                    if (nameResult.Value != null)
-                        templates.Add(nameResult.Value);
-                }
+                var byDocType = await _templateService.GetByDocTypeAsync(TemplateDocTypes.NearRelative);
+                if (byDocType.IsFailure)
+                    throw new BusinessException(byDocType.ErrorCode!, byDocType.Message!);
+                templates = byDocType.Value;
             }
             else
             {
@@ -390,8 +390,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
 
             foreach (var t in templates)
             {
-                // 仅出文书：分类模板先按白名单收窄
-                if (IsTemplateFilterMode && !templateFilter!.Contains(t.Name, StringComparer.Ordinal))
+                // 小额快救：政策免公示、免验收（保留入户调查），模板清单阶段剔除两类文书
+                if (businessType == TempReliefConstants.BusinessType
+                    && classification == TempReliefConstants.ReliefTypeSmall
+                    && t.DocType is TemplateDocTypes.TempReliefPublicity or TemplateDocTypes.TempReliefAcceptance)
+                    continue;
+
+                // 仅出文书：分类模板先按白名单收窄（白名单值=文档类型，方案B）
+                if (IsTemplateFilterMode && !docTypeFilter!.Contains(t.DocType, StringComparer.Ordinal))
                     continue;
 
                 var config = ResolveTemplateConfig(t.ConfigJson, classification);
@@ -399,57 +405,23 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 {
                     TemplateId = t.Id,
                     Name = t.Name,
+                    DocType = t.DocType,
                     FileType = t.FileType,
                     IsSelected = true,
                     BaseCopies = config.Copies,
                     IsDirectoryTemplate = config.IsDirectory,
                     DirectoryDateField = config.DirectoryDateField,
-                    IsCoverTemplate = Constants.DocumentTemplateNames.IsCover(t.Name),
+                    IsCoverTemplate = TemplateDocTypes.IsCover(t.DocType),
                     SortOrder = t.SortOrder
                 };
 
-                // 模板17/18（无土地证明/村级土地说明）按是否有土地二选一
-                if (t.Name.Contains("无土地证明"))
+                // 适用性门槛（单点：TemplateApplicability，按文档类型+数据事实）：
+                // 土地二选一（无土地证明/村级土地说明）/ 一事一议三表 / 近亲属两表。
+                // 取代原 4 段 Name.Contains 文件名判定——新增同类模板上传选对 doc_type 即零代码生效。
+                if (!TemplateApplicability.IsApplicable(t.DocType, fieldData))
                 {
-                    var hasLand = HasFamilyLand(fieldData);
-                    if (hasLand)
-                    {
-                        item.IsApplicable = false;
-                        item.IsSelected = false;
-                    }
-                }
-                else if (t.Name.Contains("村级土地说明"))
-                {
-                    var hasLand = HasFamilyLand(fieldData);
-                    if (!hasLand)
-                    {
-                        item.IsApplicable = false;
-                        item.IsSelected = false;
-                    }
-                }
-                // 一事一议申报表：仅当该申请为一事一议申请（存在申报表数据）时显示
-                else if (t.Name.Contains("一事一议申报表"))
-                {
-                    var hasSpecialApprovalData = fieldData != null
-                        && fieldData.TryGetValue(FieldKeys.SPECIAL_APPROVAL_MATTERS, out var matters)
-                        && !string.IsNullOrWhiteSpace(matters);
-                    if (!hasSpecialApprovalData)
-                    {
-                        item.IsApplicable = false;
-                        item.IsSelected = false;
-                    }
-                }
-                // 近亲属两表：仅当该申请存在关联备案时显示
-                else if (t.Name.Contains("近亲属"))
-                {
-                    var hasNearRelativeData = fieldData != null
-                        && fieldData.TryGetValue(FieldKeys.NEAR_RELATIVE_HAS_DATA, out var flag)
-                        && flag == "1";
-                    if (!hasNearRelativeData)
-                    {
-                        item.IsApplicable = false;
-                        item.IsSelected = false;
-                    }
+                    item.IsApplicable = false;
+                    item.IsSelected = false;
                 }
 
                 // 变动文书按人员属性/变动事实过滤：无渐退期不出渐退审批表、无减发不出保障金减少、
@@ -469,9 +441,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             // 文书模式按档案类型补挂入户调查表：变动分类集（DocumentOperationCategories）不含分类码，
             // 而「档案_入户调查表」「档案_特困入户调查表_特困人员」挂的是 12 个档案分类码 → 变动文书清单取不到。
             // 取数走 GetByCategoriesAsync([classification])：低保/边缘/刚性 → 档案_入户调查表，特困 → 特困版，
-            // 选哪张由模板 categories 决定（跟档案类型挂钩），不硬编码模板名映射。仅列出处供下方预勾选强制勾选。
+            // 选哪张由模板 categories 决定（跟档案类型挂钩）；类型判定用 doc_type=入户调查（原按名子串）。
             // 死亡停保旧档（绝户/停旧建新旧档）不补挂：家庭已不存在，无从入户调查（与变动文书过滤同口径）。
-            var addedSurveyNames = new List<string>();
+            var addedSurveyIds = new List<long>();
             if (!IsTemplateFilterMode && isDocumentMode
                 && businessType is "FamilyApplication" or "EconomicReview"
                 && !string.IsNullOrEmpty(classification)
@@ -480,21 +452,22 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 var byClassification = await _templateService.GetByCategoriesAsync(new[] { classification }, CancellationToken);
                 foreach (var t in byClassification)
                 {
-                    if (!t.Name.Contains("入户调查") || Templates.Any(x => x.TemplateId == t.Id)) continue;
+                    if (t.DocType != TemplateDocTypes.Survey || Templates.Any(x => x.TemplateId == t.Id)) continue;
                     var surveyConfig = ResolveTemplateConfig(t.ConfigJson, classification);
                     Templates.Add(new TemplateSelectItem
                     {
                         TemplateId = t.Id,
                         Name = t.Name,
+                        DocType = t.DocType,
                         FileType = t.FileType,
                         IsSelected = true,
                         BaseCopies = surveyConfig.Copies,
                         IsDirectoryTemplate = surveyConfig.IsDirectory,
                         DirectoryDateField = surveyConfig.DirectoryDateField,
-                        IsCoverTemplate = Constants.DocumentTemplateNames.IsCover(t.Name),
+                        IsCoverTemplate = TemplateDocTypes.IsCover(t.DocType),
                         SortOrder = t.SortOrder
                     });
-                    addedSurveyNames.Add(t.Name);
+                    addedSurveyIds.Add(t.Id);
                 }
             }
 
@@ -509,7 +482,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             foreach (var t in otherTemplates) Templates.Add(t);
 
             // 检查赡养费承诺书模板是否适用（无赡养人时跳过）
-            var supporterTemplate = Templates.FirstOrDefault(t => Constants.DocumentTemplateNames.IsSupporterPledge(t.Name));
+            var supporterTemplate = Templates.FirstOrDefault(t => TemplateDocTypes.IsSupporterPledge(t.DocType));
             if (supporterTemplate != null)
             {
                 var hasSupporters = supporterData != null && supporterData.Count > 0;
@@ -552,9 +525,9 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             //（死亡停止 → 停保·不予认定(含归档终结拒保兜底) → 待遇调整 → 三者皆空即空白告知书）。
             // 本页只决定"这个模板出不出现在清单里"，不碰方向。
             // 出处两条：① 基础分类命中（模板挂变动叶子「档案_变更告知书」后由 GetByCategoriesAsync 带出，
-            //   再由 IsTemplateApplicable 按 NoticeApplicable 过滤）；② 按名追加（下方门，仅基础清单未命中时补）。
+            //   再由 IsTemplateApplicable 按 NoticeApplicable 过滤）；② 按类型追加（下方门，仅基础清单未命中时补）。
             var noticeAllowed = !IsTemplateFilterMode
-                || templateFilter!.Contains(DocumentTemplateNames.ChangeNotice, StringComparer.Ordinal);
+                || docTypeFilter!.Contains(TemplateDocTypes.ChangeNotice, StringComparer.Ordinal);
             // 适用事实（与装配端方向一一对应，单点权威 = ChangeDocumentFacts.NoticeApplicable）：
             //   ① 户主死亡整户停止 → IsHouseholdDeathStop（整户已死，须告知终止；
             //      **不受"单人保排除"限制**——死亡是客观事件，无论原分类是否单人保都应告知）；
@@ -576,13 +549,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                         && !ClassificationConstants.IsCodeSingleRescue(classification)));
             if (appendChangeNotice)
             {
-                var changeNoticeResult = await _templateService.GetByNameAsync(DocumentTemplateNames.ChangeNotice);
+                // 按文档类型精确定位（方案B；原 GetByNameAsync 按模板名）
+                var changeNoticeResult = await _templateService.GetByDocTypeAsync(TemplateDocTypes.ChangeNotice);
                 if (changeNoticeResult.IsFailure)
                     throw new BusinessException(changeNoticeResult.ErrorCode!, changeNoticeResult.Message!);
-                var changeNotice = changeNoticeResult.Value;
+                var changeNotice = changeNoticeResult.Value.FirstOrDefault();
                 if (changeNotice == null)
                 {
-                    _logger.Warn($"模板不存在，告知书无法追加: {DocumentTemplateNames.ChangeNotice}");
+                    _logger.Warn($"模板不存在，告知书无法追加: doc_type={TemplateDocTypes.ChangeNotice}");
                 }
                 else if (Templates.Any(t => t.TemplateId == changeNotice.Id))
                 {
@@ -597,6 +571,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     {
                         TemplateId = changeNotice.Id,
                         Name = changeNotice.Name,
+                        DocType = changeNotice.DocType,
                         FileType = changeNotice.FileType,
                         IsSelected = true,
                         BaseCopies = config.Copies,
@@ -623,27 +598,27 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     ("Classification", classification));
             }
 
-            // 白名单外的模板（核查报告等）一律剔除
+            // 白名单外的模板（核查报告等）一律剔除（白名单值=文档类型）
             if (IsTemplateFilterMode)
             {
-                var allowed = new HashSet<string>(templateFilter!, StringComparer.Ordinal);
-                var extra = Templates.Where(t => !allowed.Contains(t.Name)).ToList();
+                var allowed = new HashSet<string>(docTypeFilter!, StringComparer.Ordinal);
+                var extra = Templates.Where(t => !allowed.Contains(t.DocType ?? string.Empty)).ToList();
                 foreach (var x in extra) Templates.Remove(x);
             }
 
-            // 输出文书预勾选：列表仍展示分类内模板，仅按名单控制勾选状态
+            // 输出文书预勾选：列表仍展示分类内模板，仅按名单控制勾选状态（名单值=文档类型）
             // 告知书若在列表中恒勾（业务必选）
-            if (!IsTemplateFilterMode && preselect is { Length: > 0 })
+            if (!IsTemplateFilterMode && preselectDocTypes is { Length: > 0 })
             {
-                var pre = new HashSet<string>(preselect, StringComparer.Ordinal);
+                var pre = new HashSet<string>(preselectDocTypes, StringComparer.Ordinal);
                 foreach (var t in Templates)
-                    t.IsSelected = pre.Contains(t.Name);
-                var notice = Templates.FirstOrDefault(t => t.Name == DocumentTemplateNames.ChangeNotice);
+                    t.IsSelected = pre.Contains(t.DocType ?? string.Empty);
+                var notice = Templates.FirstOrDefault(t => t.DocType == TemplateDocTypes.ChangeNotice);
                 if (notice != null) notice.IsSelected = true;
                 // 补挂的入户调查表恒勾（与告知书同待遇）：变更流程 Prefilter 名单不含它，不强制会被置为不勾
-                foreach (var surveyName in addedSurveyNames)
+                foreach (var surveyId in addedSurveyIds)
                 {
-                    var survey = Templates.FirstOrDefault(t => t.Name == surveyName);
+                    var survey = Templates.FirstOrDefault(t => t.TemplateId == surveyId);
                     if (survey != null) survey.IsSelected = true;
                 }
             }
@@ -664,7 +639,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             else
             {
                 var missing = IsTemplateFilterMode
-                    ? $"模板未上传：{string.Join("、", templateFilter!)}"
+                    ? $"未输出：白名单文档类型 {string.Join("、", docTypeFilter!)} 无匹配模板"
                     : IsStandaloneOutput
                         ? $"模板未上传：{NearRelativeConstants.TemplateLinkInfo}、{NearRelativeConstants.TemplateObjectInfo}"
                         : "未找到匹配模板";
@@ -704,18 +679,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         return (config.ResolveCopies(classification), config.IsDirectoryTemplate, config.DirectoryDateField ?? string.Empty);
     }
 
-    /// <summary>
-    /// 判断家庭是否有土地（依据档案字段 FAMILY_LAND_AREA，非 0/非空即有土地）。
-    /// 入参取自 InitializeCoreAsync 开头的快照，避免 await 期间静态上下文被清导致误判。
-    /// </summary>
-    private static bool HasFamilyLand(Dictionary<string, string>? fieldData)
-    {
-        if (fieldData == null) return false;
-        if (!fieldData.TryGetValue(FieldKeys.FAMILY_LAND_AREA, out var area))
-            return false;
-        if (string.IsNullOrWhiteSpace(area)) return false;
-        return area != "0" && decimal.TryParse(area, out var value) && value > 0;
-    }
+    // 原 HasFamilyLand（土地判定）已随土地二选一门檻迁入 Helpers/TemplateApplicability.cs 单点（方案B）。
 
     private void LoadPrinterList()
     {
@@ -786,12 +750,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (Constants.DocumentTemplateNames.IsSupporterPledge(SelectedPreviewTemplate.Name))
+            else if (TemplateDocTypes.IsSupporterPledge(SelectedPreviewTemplate.DocType))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }
             // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
-            else if (SelectedPreviewTemplate.Name.Contains("近亲属"))
+            else if (SelectedPreviewTemplate.DocType == TemplateDocTypes.NearRelative)
             {
                 tableRows = PrintNavigationData.NearRelativePairs ?? new();
             }
@@ -802,7 +766,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows,
                 CancellationToken);
 
-            if (pdfResult.IsSuccess && pdfResult.Value != null)
+            if (pdfResult.HasValue)
             {
                 _currentPdfData = pdfResult.Value;
                 TryDeleteFile(_currentTempPreviewPath);
@@ -891,7 +855,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
 
         // 封面模板打印前确认：需先插入牛皮纸（批量静默模式与「保存」跳过——保存不调打印机）
-        if (interactive && printToPrinter && Constants.DocumentTemplateNames.IsCover(template.Name))
+        if (interactive && printToPrinter && TemplateDocTypes.IsCover(template.DocType))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -917,12 +881,12 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
+            else if (TemplateDocTypes.IsSupporterPledge(template.DocType))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }
             // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
-            else if (template.Name.Contains("近亲属"))
+            else if (template.DocType == TemplateDocTypes.NearRelative)
             {
                 tableRows = PrintNavigationData.NearRelativePairs ?? new();
             }
@@ -957,7 +921,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                     ("BatchNo", _batchNo),
                     ("RecordId", result.Value.Id));
                 StatusText = $"{action}完成";
-                AddOutputFiles(template.TemplateId, template.Name, result.Value.FilePath, result.Value.PdfPath);
+                AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
                 return true;
             }
 
@@ -980,8 +944,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         }
     }
 
-    /// <summary>把生成产物（源文件/PDF）加入输出列表（打印与保存共用）</summary>
-    private void AddOutputFiles(long templateId, string templateName, string? sourceFilePath, string? pdfPath)
+    /// <summary>把生成产物（源文件/PDF）加入输出列表（打印与保存共用）。docType=文档类型（打印/保存分派用）</summary>
+    private void AddOutputFiles(long templateId, string templateName, string docType, string? sourceFilePath, string? pdfPath)
     {
         // 将源文件（Excel/Word）加入输出列表
         if (!string.IsNullOrEmpty(sourceFilePath) && _fileService.FileExists(sourceFilePath))
@@ -1001,7 +965,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 Status = "已生成",
                 IsCompleted = true,
                 FilePath = sourceFilePath,
-                TemplateName = templateName
+                TemplateName = templateName,
+                DocType = docType
             });
         }
 
@@ -1016,7 +981,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
                 Status = "已生成",
                 IsCompleted = true,
                 FilePath = pdfPath,
-                TemplateName = templateName
+                TemplateName = templateName,
+                DocType = docType
             });
         }
     }
@@ -1033,6 +999,10 @@ public partial class TemplateSelectItem : ObservableObject
 
     [ObservableProperty]
     private string _name = string.Empty;
+
+    /// <summary>文档类型（nc_biz_templates.doc_type，方案B精准定位与数据分派判定用；词表见 TemplateDocTypes）</summary>
+    [ObservableProperty]
+    private string _docType = string.Empty;
 
     /// <summary>模板类型规范值（xlsx/docx），来自 nc_biz_templates.file_type</summary>
     [ObservableProperty]
@@ -1094,6 +1064,10 @@ public partial class OutputFileItem : ObservableObject
 
     [ObservableProperty]
     private string _templateName = string.Empty;
+
+    /// <summary>文档类型（nc_biz_templates.doc_type；重打印/保存分派按类型判定，原按 TemplateName 子串）</summary>
+    [ObservableProperty]
+    private string _docType = string.Empty;
 
     /// <summary>是否 PDF 行（仅 PDF 可页面内预览）；构造时 FileType 即定，无需变更通知</summary>
     public bool IsPdf => string.Equals(FileType, "PDF", System.StringComparison.OrdinalIgnoreCase);

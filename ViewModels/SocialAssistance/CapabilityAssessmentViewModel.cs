@@ -115,7 +115,7 @@ public partial class CapabilityAssessmentViewModel : ViewModelBase
         try
         {
             var result = await _assessmentService.GetByApplicationIdAsync(applicationId);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var assessment = result.Value;
                 _assessmentId = assessment.Id;

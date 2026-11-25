@@ -73,8 +73,9 @@ public class LotteryDraw
         {
             return JsonSerializer.Deserialize<int[]>(RedNumbersJson) ?? Array.Empty<int>();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[LotteryDraw] 红球号码 JSON 解析失败，号码显示为空");
             return Array.Empty<int>();
         }
     }
@@ -96,8 +97,9 @@ public class LotteryDraw
         {
             return JsonSerializer.Deserialize<int[]>(BlueNumbersJson) ?? Array.Empty<int>();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[LotteryDraw] 蓝球号码 JSON 解析失败，号码显示为空");
             return Array.Empty<int>();
         }
     }

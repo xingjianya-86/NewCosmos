@@ -75,8 +75,10 @@ public static class ArchiveCategoryResolver
 
     /// <summary>
     /// 补打中心批量模板库的域级分类范围（取并集，跨记录混合分类也能一次列出）：
-    /// 与 GetRecordCategories 同源分类常量；返回 null 表示未接入该域，调用方回退名称前缀过滤。
+    /// 与 GetRecordCategories 同源分类常量；返回 null 表示未接入该域，调用方按「全量放行」保守处理。
     /// FamilyApplication 并入变动分类集：保证增减员表/渐退审批/保障金减少/变更告知书可被补打选到。
+    /// DynamicManagementRecord（2026-11-18 方案B）：接入「变更档案」分类（= 模板 248 唯一挂载分类），
+    /// 取代原 MatchesDomainTemplate 名称前缀兜底——名称模糊过滤全库废除。
     /// </summary>
     public static string[]? GetReprintDomainCategories(string domainKey) => domainKey switch
     {
@@ -87,6 +89,7 @@ public static class ArchiveCategoryResolver
         "ElderlyBenefits" =>
             ["普惠高龄/新增", "普惠高龄/停止", "普惠高龄/变更", "普惠高龄/月报"],
         "AssetVerification" => [ClassificationConstants.AssetVerification],
+        "DynamicManagementRecord" => ["变更档案"],
         _ => null
     };
 

@@ -565,8 +565,9 @@ public class UpdateService : BaseService, IUpdateService
             var hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
             return string.Equals(hash, expectedSha256, StringComparison.OrdinalIgnoreCase);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[UpdateService] 校验文件哈希失败（按不匹配处理）: {Path}", path);
             return false;
         }
     }

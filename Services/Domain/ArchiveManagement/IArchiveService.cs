@@ -23,7 +23,5 @@ public interface IArchiveService
     /// </summary>
     Task<Result<Archive>> CreateOrAppendFilesAsync(long applicationId, string archiveType, string classification, string archivedBy, IReadOnlyList<ArchiveFile> files, CancellationToken ct = default);
 
-    Task<List<ArchiveFile>> GetFilesAsync(long archiveId, CancellationToken ct = default);
-
     Task<Result> SyncSchemaAsync(IProgress<ProgressContext> progress = null, CancellationToken ct = default);
 }

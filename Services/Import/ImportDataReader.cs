@@ -15,6 +15,7 @@ public static class ImportDataReader
         if (string.IsNullOrEmpty(val)) return 0;
         if (int.TryParse(val, out var result)) return result;
         if (decimal.TryParse(val, out var dec)) return (int)dec;
+        Serilog.Log.Warning("[ImportDataReader] 整数列解析失败，按 0 导入: Column={Column}, Value={Value}", columnName, val);
         return 0;
     }
 
@@ -23,6 +24,7 @@ public static class ImportDataReader
         var val = ReadString(columnMap, row, columnName);
         if (string.IsNullOrEmpty(val)) return 0;
         if (decimal.TryParse(val, out var result)) return result;
+        Serilog.Log.Warning("[ImportDataReader] 金额列解析失败，按 0 导入: Column={Column}, Value={Value}", columnName, val);
         return 0;
     }
 

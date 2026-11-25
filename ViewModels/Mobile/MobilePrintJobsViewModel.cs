@@ -85,7 +85,7 @@ public partial class MobilePrintJobsViewModel : PagedSearchViewModelBase
             };
 
             var result = await _queueService.GetPagedAsync(status, PageIndex, PageSize, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 Jobs.Clear();
                 foreach (var job in result.Value.Items) Jobs.Add(job);

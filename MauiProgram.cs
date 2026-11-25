@@ -95,6 +95,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAlbumExportService, Platforms.Windows.WindowsAlbumExportService>();
         // 系统栏控制：桌面无系统栏，注入空实现以统调用点
         builder.Services.AddSingleton<ISystemBarsService, Platforms.Windows.WindowsSystemBarsService>();
+        // 屏幕常亮（OCR 识别等待期间防熄屏）：桌面走 SetThreadExecutionState
+        builder.Services.AddSingleton<IScreenAwakeService, Platforms.Windows.WindowsScreenAwakeService>();
         // 自定义标题栏（纸墨风改色）
         builder.Services.AddSingleton<Platforms.Windows.WindowsTitleBarService>();
 #elif ANDROID
@@ -105,6 +107,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAlbumExportService, NewCosmos.Platforms.Android.AndroidAlbumExportService>();
         // 系统栏控制：沉浸式全屏 / EdgeToEdge（config app.ini [Android] FullscreenMode）
         builder.Services.AddSingleton<ISystemBarsService, NewCosmos.Platforms.Android.AndroidSystemBarsService>();
+        // 屏幕常亮（OCR 识别等待期间防熄屏）：安卓走窗口 KeepScreenOn 标志
+        builder.Services.AddSingleton<IScreenAwakeService, NewCosmos.Platforms.Android.ScreenAwakeService>();
         // 原生 Camera2 预览控件（身份证扫描取景框）
         builder.ConfigureMauiHandlers(handlers =>
             handlers.AddHandler<NewCosmos.Controls.CameraPreviewView, NewCosmos.Platforms.Android.Camera.CameraPreviewViewHandler>());
@@ -547,7 +551,7 @@ public static class MauiProgram
         // 档案照片采集（手机端）
         builder.Services.AddTransient<ViewModels.Mobile.MobileArchivePhotoViewModel>();
         builder.Services.AddTransient<Pages.Mobile.MobileArchivePhotoPage>();
-        // 历史档案照片补传（高龄/低收入/临时救助，手工勾选后连续采集或推送打印）
+        // 历史档案照片补传（高龄/低收入/临时救助/资产核查，手工勾选后连续采集或推送打印）
         builder.Services.AddTransient<ViewModels.Mobile.MobilePhotoBackfillViewModel>();
         builder.Services.AddTransient<Pages.Mobile.MobilePhotoBackfillPage>();
         // P7：后补追缴手机端

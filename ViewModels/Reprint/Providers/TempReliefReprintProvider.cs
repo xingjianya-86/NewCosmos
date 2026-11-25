@@ -73,20 +73,32 @@ public class TempReliefReprintProvider : IReprintDomainProvider
         var fullApp = fullResult.Value;
 
         // 加载子表（打印需要疾病/意外/教育/成员明细）
+        // 补打正式文书：任一子表读取失败都必须中止，不能打印缺明细的版本。
         var diseases = await _tempReliefService.GetDiseasesByApplicationIdAsync(businessId, ct);
-        if (diseases.IsSuccess && diseases.Value != null) fullApp.Diseases = diseases.Value;
+        if (diseases.IsFailure)
+            return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", $"疾病明细加载失败: {diseases.Message}");
+        fullApp.Diseases = diseases.Value ?? new();
 
         var accidents = await _tempReliefService.GetAccidentsByApplicationIdAsync(businessId, ct);
-        if (accidents.IsSuccess && accidents.Value != null) fullApp.Accidents = accidents.Value;
+        if (accidents.IsFailure)
+            return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", $"灾害明细加载失败: {accidents.Message}");
+        fullApp.Accidents = accidents.Value ?? new();
 
         var educations = await _tempReliefService.GetEducationsByApplicationIdAsync(businessId, ct);
-        if (educations.IsSuccess && educations.Value != null) fullApp.Educations = educations.Value;
+        if (educations.IsFailure)
+            return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", $"教育明细加载失败: {educations.Message}");
+        fullApp.Educations = educations.Value ?? new();
 
         var membersResult = await _tempReliefService.GetMembersByApplicationIdAsync(businessId, ct);
-        var memberList = membersResult.IsSuccess ? membersResult.Value ?? new() : new List<TempReliefMember>();
+        if (membersResult.IsFailure)
+            return Result.Failure<ReprintArchivePayload>("ARCHIVE_DATA_INCOMPLETE", $"成员明细加载失败: {membersResult.Message}");
+        var memberList = membersResult.Value ?? new();
 
         var (acceptanceDate, investigationDate) = await TempReliefPrintDataBuilder.ResolveScheduleAsync(_timelineService, fullApp);
-        var contactUnitPhone = (await _tempReliefService.GetReportUnitPhoneAsync(fullApp.ReportUnit, ct)).Value ?? string.Empty;
+        var phoneResult = await _tempReliefService.GetReportUnitPhoneAsync(fullApp.ReportUnit, ct);
+        if (phoneResult.IsFailure)
+            Serilog.Log.Warning("[TempReliefReprint] 报告单位电话读取失败，文书该字段将为空: {Message}", phoneResult.Message);
+        var contactUnitPhone = phoneResult.Value ?? string.Empty;
         var fields = TempReliefPrintDataBuilder.BuildSingleFields(
             fullApp, memberList, contactUnitPhone, acceptanceDate, investigationDate);
 

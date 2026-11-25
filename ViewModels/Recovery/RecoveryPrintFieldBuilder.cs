@@ -27,7 +27,7 @@ internal static class RecoveryPrintFieldBuilder
         {
             var orgService = serviceProvider.GetRequiredService<IOrganizationService>();
             var result = await orgService.GetByIdAsync(orgId.Value, CancellationToken.None);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var org = result.Value;
                 if (!string.IsNullOrWhiteSpace(org.Name)) return org.Name;
@@ -72,6 +72,9 @@ internal static class RecoveryPrintFieldBuilder
         var reportUnit = await GetReportUnitAsync(serviceProvider);
         // 编号取库内已分配值（保存时落库）——补打/多次打印同号；存量记录首次打印时补分配回写
         var codeResult = await recoveryService.GetOrAssignRecoveryCodeAsync(recordId);
+        if (codeResult.IsFailure)
+            Serilog.Log.Warning("[RecoveryPrintFieldBuilder] 追缴编号获取失败，文书编号将为空: RecordId={RecordId}, {Code} {Message}",
+                recordId, codeResult.ErrorCode, codeResult.Message);
 
         return new Dictionary<string, string>(StringComparer.Ordinal)
         {

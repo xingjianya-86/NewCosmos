@@ -44,7 +44,7 @@ public class StatisticsService : BaseService, IStatisticsService
             return Result<int>.Success(count);
         }
 
-        LogError($"操作失败");
+        LogError($"查询待审批申请数失败: {result.ErrorCode} {result.Message}");
         return Result<int>.Failure(ErrorCodes.DB_QUERY_ERROR, result.Message ?? "未知错误");
     }
 
@@ -68,7 +68,7 @@ public class StatisticsService : BaseService, IStatisticsService
             return Result<int>.Success(count);
         }
 
-        LogError($"操作失败");
+        LogError($"查询月归档数失败: {result.ErrorCode} {result.Message}");
         return Result<int>.Failure(ErrorCodes.DB_QUERY_ERROR, result.Message ?? "未知错误");
     }
 
@@ -88,7 +88,7 @@ public class StatisticsService : BaseService, IStatisticsService
             return Result<int>.Success(count);
         }
 
-        LogError($"操作失败");
+        LogError($"查询待处理资产核查数失败: {result.ErrorCode} {result.Message}");
         return Result<int>.Failure(ErrorCodes.DB_QUERY_ERROR, result.Message ?? "未知错误");
     }
 
@@ -105,7 +105,7 @@ public class StatisticsService : BaseService, IStatisticsService
             return Result<int>.Success(count);
         }
 
-        LogError($"操作失败");
+        LogError($"查询活跃用户数失败: {result.ErrorCode} {result.Message}");
         return Result<int>.Failure(ErrorCodes.DB_QUERY_ERROR, result.Message ?? "未知错误");
     }
 
@@ -142,7 +142,9 @@ public class StatisticsService : BaseService, IStatisticsService
                     (SELECT COUNT(*) FILTER (WHERE status = $5 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
                             COUNT(*) FILTER (WHERE status = $6 AND stop_date >= $1::date AND stop_date < $2::date
                                 {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
-                                {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS monthly_exits
+                                {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}
+                                -- 真·首拒（从未享受）不是退出（app110 实测错例）
+                                {StoppedArchiveFilter.NotFirstRefusalSql("nc_biz_applications")}) AS monthly_exits
                      FROM nc_biz_applications
                      WHERE deleted_at IS NULL) f
                 CROSS JOIN
@@ -212,7 +214,9 @@ public class StatisticsService : BaseService, IStatisticsService
                     COUNT(*) FILTER (WHERE status = $3 AND first_approved_at >= $1 AND first_approved_at < $2) AS monthly_new_additions,
                     COUNT(*) FILTER (WHERE status = $4 AND stop_date >= $1::date AND stop_date < $2::date
                         {StoppedArchiveFilter.NotRebuildContinuationSql("nc_biz_applications")}
-                        {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}) AS monthly_exits
+                        {StoppedArchiveFilter.NotGraceContinuationSql("nc_biz_applications")}
+                        -- 真·首拒（从未享受）不是退出（app110 实测错例）
+                        {StoppedArchiveFilter.NotFirstRefusalSql("nc_biz_applications")}) AS monthly_exits
                 FROM nc_biz_applications
                 WHERE deleted_at IS NULL";
 

@@ -93,7 +93,7 @@ public partial class LotteryPredictionViewModel : ViewModelBase
     private async Task LoadLatestDrawDateAsync()
     {
         var result = await _lotteryDataService.GetLatestDrawAsync(SelectedLotteryType);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             LatestDrawDate = result.Value.DrawDate.ToString("yyyy-MM-dd (ddd)");
         }

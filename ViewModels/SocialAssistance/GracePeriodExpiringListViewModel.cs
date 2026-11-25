@@ -81,7 +81,7 @@ public partial class GracePeriodExpiringListViewModel : PagedSearchViewModelBase
         try
         {
             var activeResult = await _statisticsService.GetSocialAssistanceStatsAsync();
-            ActiveCountText = activeResult.IsSuccess && activeResult.Value != null
+            ActiveCountText = activeResult.HasValue
                 ? activeResult.Value.ActiveCount.ToString("N0") : StatNA;
         }
         catch (Exception ex)
@@ -141,7 +141,7 @@ public partial class GracePeriodExpiringListViewModel : PagedSearchViewModelBase
 
             // 已登记死亡成员（历史数据未软删，统一过滤）
             var deathResult = await _familyMemberService.GetDeadIdCardsByApplicationIdAsync(applicationId);
-            var deathIdCards = (deathResult.IsSuccess && deathResult.Value != null)
+            var deathIdCards = (deathResult.HasValue)
                 ? deathResult.Value.ToHashSet()
                 : new HashSet<string>();
 

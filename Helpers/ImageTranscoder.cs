@@ -119,8 +119,9 @@ public static class ImageTranscoder
             result = data.ToArray();
             return result.Length > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[ImageTranscoder] 图片转码失败");
             return false;
         }
     }

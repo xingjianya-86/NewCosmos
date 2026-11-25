@@ -70,8 +70,9 @@
                 <BoxView HeightRequest="1" BackgroundColor="{StaticResource Gray200}"/>
                 <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4">
                     <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                    <!-- 2026-11-18 解锁：与 Step1 同口径（2026-10-27 已改）——全国 34 省可选，城市全国可查 -->
                     <Picker Grid.Column="1" ItemsSource="{Binding Host.ProvinceOptions, Source={x:Reference Card}}"
-                            SelectedItem="{Binding HomeProvince}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" IsEnabled="False"/>
+                            SelectedItem="{Binding HomeProvince}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Label Grid.Column="2" Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Picker Grid.Column="3" ItemsSource="{Binding MemberCityOptions}"
                             SelectedItem="{Binding HomeCity}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
@@ -114,8 +115,9 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="4" RowSpacing="4"
                       IsVisible="{Binding HukouEditable, Source={x:Reference Card}}">
                     <Label Text="省份" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
+                    <!-- 2026-11-18 解锁：与 Step1 同口径——全国 34 省可选（赡养人可为外省户籍） -->
                     <Picker Grid.Column="1" ItemsSource="{Binding Host.ProvinceOptions, Source={x:Reference Card}}"
-                            SelectedItem="{Binding HukouProvince}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}" IsEnabled="False"/>
+                            SelectedItem="{Binding HukouProvince}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Label Grid.Column="2" Text="城市" Style="{StaticResource FormFieldLabelStyle}" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>
                     <Picker Grid.Column="3" ItemsSource="{Binding MemberCityOptions}"
                             SelectedItem="{Binding HukouCity}" HeightRequest="38" FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"/>

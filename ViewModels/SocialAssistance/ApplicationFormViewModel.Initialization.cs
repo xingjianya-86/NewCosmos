@@ -30,11 +30,35 @@ namespace NewCosmos.ViewModels.SocialAssistance;
 public partial class ApplicationFormViewModel
 {
     /// <summary>
+    /// 基础数据是否加载不完整（字典/区划等）。为 true 时禁用保存/提交，避免把空默认值写入正式档案。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSavable))]
+    [NotifyPropertyChangedFor(nameof(IsSaveDraftVisible))]
+    [NotifyPropertyChangedFor(nameof(IsSubmitVisible))]
+    private bool _hasInitializationError;
+
+    /// <summary>缺失项描述（诊断与提示用）。</summary>
+    [ObservableProperty]
+    private string _initializationError = string.Empty;
+
+    /// <summary>初始化过程中已发生的加载失败（即使兜底后集合非空，也要计入不完整）。</summary>
+    private readonly List<string> _initializationMissing = new();
+
+    private void MarkInitializationIncomplete(string item)
+    {
+        if (!_initializationMissing.Contains(item))
+            _initializationMissing.Add(item);
+    }
+
+    /// <summary>
     /// 初始化（加载字典数据和配置）
     /// </summary>
     public async Task InitializeAsync()
     {
         if (IsInitialized) return;
+
+        _initializationMissing.Clear();
 
         try
         {
@@ -65,6 +89,43 @@ public partial class ApplicationFormViewModel
             // 加载调查员所属机构
             await LoadSurveyorOrganizationAsync();
 
+            // 基础数据完整性检查：任一关键字典/区划为空 → 禁用保存，避免空默认值落库。
+            var missing = new List<string>();
+            if (GenderOptions.Count == 0) missing.Add("性别字典");
+            if (EthnicityOptions.Count == 0) missing.Add("民族字典");
+            if (MaritalStatusOptions.Count == 0) missing.Add("婚姻状况字典");
+            if (EducationLevelOptions.Count == 0) missing.Add("文化程度字典");
+            if (PoliticalStatusOptions.Count == 0) missing.Add("政治面貌字典");
+            if (SupportModeOptions.Count == 0) missing.Add("供养方式字典");
+            if (ApplicationReasonOptions.Count == 0) missing.Add("申请理由字典");
+            if (DiseaseCategoryOptions.Count == 0) missing.Add("疾病分类字典");
+            if (ProvinceOptions.Count == 0) missing.Add("省级区划");
+            if (CityOptions.Count == 0) missing.Add("市级区划");
+            missing.AddRange(_initializationMissing);
+
+            if (missing.Count > 0)
+            {
+                HasInitializationError = true;
+                InitializationError = string.Join("、", missing);
+                _logger.Error($"初始化不完整，缺失: {InitializationError}");
+                try
+                {
+                    await _serviceProvider.GetRequiredService<IDialogService>().DisplayAlertAsync(
+                        "基础数据未加载完整",
+                        $"以下基础数据未加载：{InitializationError}。\n为避免写入错误数据，保存/提交已禁用。请检查数据库与网络后重新进入本页。",
+                        "确定");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"初始化不完整提示弹窗失败: {ex.Message}");
+                }
+            }
+            else
+            {
+                HasInitializationError = false;
+                InitializationError = string.Empty;
+            }
+
             IsInitialized = true;
             _logger.LogBusiness("初始化完成");
 
@@ -81,7 +142,9 @@ public partial class ApplicationFormViewModel
         }
         catch (Exception ex)
         {
-            _logger.Error($"初始化失败: {ex.Message}");
+            HasInitializationError = true;
+            InitializationError = ex.Message;
+            _logger.Error($"初始化失败，保存/提交已禁用: {ex.Message}");
         }
         finally
         {
@@ -391,6 +454,7 @@ public partial class ApplicationFormViewModel
         }
         catch (Exception ex)
         {
+            MarkInitializationIncomplete("省市区数据(加载失败)");
             _logger.Error($"加载省市区数据失败: {ex.Message}");
         }
         finally
@@ -436,7 +500,10 @@ public partial class ApplicationFormViewModel
             {
                 // 省表缺失/查询失败 → 退回单值占位（原行为），不阻断表单
                 if (provincesResult.IsFailure)
+                {
+                    MarkInitializationIncomplete("省级区划(查询失败)");
                     _logger.Warn($"省级选项加载失败（回退单值）: {provincesResult.Message}");
+                }
                 ProvinceOptions.Add(DefaultValuesConstants.HOME_PROVINCE);
                 if (string.IsNullOrEmpty(SelectedProvince))
                     SelectedProvince = DefaultValuesConstants.HOME_PROVINCE;
@@ -444,6 +511,7 @@ public partial class ApplicationFormViewModel
         }
         catch (Exception ex)
         {
+            MarkInitializationIncomplete("省级区划(加载异常)");
             _logger.Error($"加载省级数据失败（回退单值）: {ex.Message}");
             if (ProvinceOptions.Count == 0)
             {
@@ -518,6 +586,7 @@ public partial class ApplicationFormViewModel
         }
         else if (citiesResult.IsFailure)
         {
+            MarkInitializationIncomplete("市级区划(查询失败)");
             _logger.Warn($"城市数据加载失败: {citiesResult.Message}");
         }
     }
@@ -540,7 +609,7 @@ public partial class ApplicationFormViewModel
             else
             {
                 var orgResult = await _organizationService.GetByIdAsync(orgId.Value);
-                if (orgResult.IsSuccess && orgResult.Value != null)
+                if (orgResult.HasValue)
                 {
                     var org = orgResult.Value;
                     orgCity = org.CityName;
@@ -659,6 +728,7 @@ public partial class ApplicationFormViewModel
         catch (Exception ex)
         {
             _isLoadingDefaults = false;
+            MarkInitializationIncomplete("默认地区(加载失败)");
             _logger.Error($"加载默认地区失败: {ex.Message}");
         }
     }
@@ -671,11 +741,12 @@ public partial class ApplicationFormViewModel
             if (!orgId.HasValue) return;
 
             var orgResult = await _organizationService.GetByIdAsync(orgId.Value);
-            if (orgResult.IsSuccess && orgResult.Value != null)
+            if (orgResult.HasValue)
                 SurveyorOrganization = orgResult.Value.Name ?? "";
         }
         catch (Exception ex)
         {
+            MarkInitializationIncomplete("调查员机构(加载失败)");
             _logger.Error($"加载调查员机构失败: {ex.Message}");
         }
     }
@@ -695,7 +766,7 @@ public partial class ApplicationFormViewModel
 
             var result = await _applicationService.GetByIdAsync(applicationId, ct);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var app = result.Value;
                 // 向导入口固化复核前快照：Step5 判定与 SaveEconomicDetailsAsync 随后会覆写本档，
@@ -898,7 +969,7 @@ public partial class ApplicationFormViewModel
 
                 // 渐退期：主表列已迁移到独立表 nc_biz_grace_periods
                 var graceRes = await _gracePeriodService.GetActiveAsync(applicationId, ct);
-                if (graceRes.IsSuccess && graceRes.Value != null)
+                if (graceRes.HasValue)
                 {
                     IsInGracePeriod = true;
                     GracePeriodMonths = graceRes.Value.GracePeriodMonths ?? 0;
@@ -931,7 +1002,7 @@ public partial class ApplicationFormViewModel
                 if (app.OriginalApplicationId > 0)
                 {
                     var oldAppRes = await _applicationService.GetByIdAsync(app.OriginalApplicationId, ct);
-                    if (oldAppRes.IsSuccess && oldAppRes.Value != null)
+                    if (oldAppRes.HasValue)
                     {
                         _originalClassificationContext = oldAppRes.Value.ClassificationResult;
                         // 渐退封顶原额 = 上游"户月保障金"（不含分类施保；原取 TotalGuaranteeAmount 会把
@@ -1479,7 +1550,7 @@ public partial class ApplicationFormViewModel
         var countiesResult = await _regionService.GetCountiesByCityAsync(city, ct);
         if (ct.IsCancellationRequested) return;
 
-        if (countiesResult.IsSuccess && countiesResult.Value != null)
+        if (countiesResult.HasValue)
         {
             foreach (var county in countiesResult.Value)
             {
@@ -1502,7 +1573,7 @@ public partial class ApplicationFormViewModel
         var countiesResult = await _regionService.GetCountiesAsync(ct);
         if (ct.IsCancellationRequested) return;
 
-        if (countiesResult.IsSuccess && countiesResult.Value != null)
+        if (countiesResult.HasValue)
         {
             var county = countiesResult.Value.FirstOrDefault(c => c.CountyName == district);
             if (county != null)
@@ -1511,7 +1582,7 @@ public partial class ApplicationFormViewModel
                 var townsResult = await _regionService.GetTownsByCountyIdAsync(county.Id, ct);
                 if (ct.IsCancellationRequested) return;
 
-                if (townsResult.IsSuccess && townsResult.Value != null)
+                if (townsResult.HasValue)
                 {
                     foreach (var town in townsResult.Value)
                     {
@@ -1540,7 +1611,7 @@ public partial class ApplicationFormViewModel
         {
             var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId.Value, ct);
             if (ct.IsCancellationRequested) return;
-            if (townsResult.IsSuccess && townsResult.Value != null)
+            if (townsResult.HasValue)
             {
                 townId = townsResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
             }
@@ -1550,7 +1621,7 @@ public partial class ApplicationFormViewModel
         {
             var searchResult = await _regionService.SearchTownsAsync(town, ct);
             if (ct.IsCancellationRequested) return;
-            if (searchResult.IsSuccess && searchResult.Value != null)
+            if (searchResult.HasValue)
             {
                 townId = searchResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
             }
@@ -1562,7 +1633,7 @@ public partial class ApplicationFormViewModel
         var villagesResult = await _regionService.GetVillagesByTownIdAsync(townId.Value, ct);
         if (ct.IsCancellationRequested) return;
 
-        if (villagesResult.IsSuccess && villagesResult.Value != null)
+        if (villagesResult.HasValue)
         {
             foreach (var village in villagesResult.Value)
             {
@@ -1588,7 +1659,7 @@ public partial class ApplicationFormViewModel
         if (cityId.HasValue)
         {
             var cityResult = await _regionService.GetCityByIdAsync(cityId.Value);
-            if (cityResult.IsSuccess && cityResult.Value != null)
+            if (cityResult.HasValue)
             {
                 HukouCity = cityResult.Value.CityName;
                 _hukouCityId = cityId;
@@ -1603,7 +1674,7 @@ public partial class ApplicationFormViewModel
         if (countyId.HasValue)
         {
             var countyResult = await _regionService.GetCountyByIdAsync(countyId.Value);
-            if (countyResult.IsSuccess && countyResult.Value != null)
+            if (countyResult.HasValue)
             {
                 HukouDistrict = countyResult.Value.CountyName;
                 _hukouCountyId = countyId;
@@ -1618,7 +1689,7 @@ public partial class ApplicationFormViewModel
         if (townId.HasValue)
         {
             var townResult = await _regionService.GetTownByIdAsync(townId.Value);
-            if (townResult.IsSuccess && townResult.Value != null)
+            if (townResult.HasValue)
             {
                 HukouTown = townResult.Value.TownName;
                 _hukouTownId = townId;
@@ -1633,7 +1704,7 @@ public partial class ApplicationFormViewModel
         if (villageId.HasValue)
         {
             var villageResult = await _regionService.GetVillageByIdAsync(villageId.Value);
-            if (villageResult.IsSuccess && villageResult.Value != null)
+            if (villageResult.HasValue)
             {
                 HukouVillage = villageResult.Value.VillageName;
                 _hukouVillageId = villageId;
@@ -1655,14 +1726,14 @@ public partial class ApplicationFormViewModel
             if (!string.IsNullOrEmpty(city))
             {
                 var cityResult = await _regionService.GetCityByNameAsync(city);
-                if (cityResult.IsSuccess && cityResult.Value != null)
+                if (cityResult.HasValue)
                     _hukouCityId = cityResult.Value.Id;
             }
 
             if (!string.IsNullOrEmpty(town) && _hukouCountyId.HasValue)
             {
                 var townsResult = await _regionService.GetTownsByCountyIdAsync(_hukouCountyId.Value);
-                if (townsResult.IsSuccess && townsResult.Value != null)
+                if (townsResult.HasValue)
                     _hukouTownId = townsResult.Value.FirstOrDefault(t => t.TownName == town)?.Id;
             }
         }
@@ -1686,7 +1757,7 @@ public partial class ApplicationFormViewModel
             }
 
             var villagesResult = await _regionService.GetVillagesByTownIdAsync(_hukouTownId.Value);
-            if (villagesResult.IsSuccess && villagesResult.Value != null)
+            if (villagesResult.HasValue)
                 _hukouVillageId = villagesResult.Value.FirstOrDefault(v => v.VillageName == village)?.Id;
         }
         catch (Exception ex)

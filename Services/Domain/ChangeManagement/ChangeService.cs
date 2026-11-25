@@ -541,6 +541,13 @@ public interface IChangeService
     Task<Result<TriggeredStopChangeRecord?>> GetLatestTriggeredStopRecordAsync(long applicationId, IReadOnlyCollection<string> newClassifications, CancellationToken ct = default);
 
     /// <summary>
+    /// 查询档案链上的"在保前分类"（告知书方向② 停止/不予认定 判定 + 归档终结拒保补写 CategoryStop 用）：
+    /// ① 链上最近一条 old_classification 非空的变更记录；② 回退上游档案链最近非空分类；皆无 → Value=null。
+    /// 单点实现 <c>Helpers\ChainPreClassification</c>（装配端与写入侧共用，两侧口径不劈叉）。
+    /// </summary>
+    Task<Result<string?>> GetLatestChainPreClassificationAsync(long applicationId, CancellationToken ct = default);
+
+    /// <summary>
     /// 是否存在触发停保的 CategoryStop 变更记录（档案输出追加变更告知书判定用）
     /// </summary>
     Task<Result<bool>> HasTriggeredCategoryStopAsync(long applicationId, IReadOnlyCollection<string> stopCategoryCodes, CancellationToken ct = default);

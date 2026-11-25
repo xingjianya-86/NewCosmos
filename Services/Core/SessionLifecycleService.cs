@@ -122,7 +122,10 @@ public sealed class SessionLifecycleService : ISessionLifecycleService
                 await MainThread.InvokeOnMainThreadAsync(async () =>
                     await _dialogService.ShowSnackBarAsync(message, Components.SnackBarType.Warning, 10000));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Debug($"会话终止提示送达失败（SnackBar 宿主可能未就绪）: {ex.Message}");
+            }
 
             await Task.Delay(TimeSpan.FromSeconds(graceSeconds));
 
@@ -138,7 +141,14 @@ public sealed class SessionLifecycleService : ISessionLifecycleService
         catch (Exception ex)
         {
             _logger.LogError(ex, "[SessionLifecycle] 被顶号退出流程异常，强制回登录页");
-            try { await EndLocalAsync(); } catch { }
+            try
+            {
+                await EndLocalAsync();
+            }
+            catch (Exception endEx)
+            {
+                _logger.LogError(endEx, "[SessionLifecycle] 强制退出收尾失败");
+            }
         }
         finally
         {

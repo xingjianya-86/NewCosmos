@@ -108,6 +108,12 @@ public partial class OrganizationImportViewModel : ViewModelBase
 
             var preview = await Task.Run(() => _organizationService.PreviewImport(SelectedFilePath, 5));
 
+            if (preview.Error != null)
+            {
+                await ShowSnackBarAsync($"文件预览失败: {preview.Error}", SnackBarType.Error);
+                return;
+            }
+
             if (preview.TotalRows == 0)
             {
                 await ShowSnackBarAsync("文件无有效数据或缺少「名称」列", SnackBarType.Warning);

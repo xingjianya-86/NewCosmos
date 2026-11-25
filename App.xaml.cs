@@ -488,6 +488,8 @@ public partial class App : Application
                             Serilog.Log.Warning(ex, "[APP] 会话心跳启动失败");
                         }
 
+                        // 分流：会话有效 → 动画接着自动演完五步序列与终幕（全片）
+                        splashGate.SetIntent(StartupIntent.Full);
                         await splashGate.WhenCompleted;
                         SwitchToMainPage(window, appOptions, windowTitleService);
                         Serilog.Log.Information("[APP] 会话已恢复: UserId={UserId}", session.UserId);
@@ -504,9 +506,11 @@ public partial class App : Application
 
                 ClearSession();
                 if (sessionStore != null)
-                    _ = sessionStore.ClearAsync();
+                    await sessionStore.ClearAsync();
             }
 
+            // 分流：需要登录 → 片头收尾，交序列登录接手（授权/账号密码步骤停下等待）
+            splashGate.SetIntent(StartupIntent.Skip);
             await splashGate.WhenCompleted;
             SwitchToLoginPage(window, appOptions, windowTitleService);
             Serilog.Log.Information("[APP] 启动完成（登录页）");
@@ -514,6 +518,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "[APP] 后台会话恢复异常");
+            Services.GetService<ISplashGate>()?.SetIntent(StartupIntent.Skip);
             window.Page = CreateErrorWindow($"启动初始化失败:\n{ex.Message}").Page;
         }
     }
@@ -551,6 +556,8 @@ public partial class App : Application
     private static async Task ShowConnectionRetryPageAsync(Window window, AppOptions appOptions,
         IWindowTitleService windowTitleService, ISplashGate splashGate)
     {
+        // 分流：进连接重试页 → 片头收尾（不再演序列，主页/登录页都不会出现）
+        splashGate.SetIntent(StartupIntent.Skip);
         await splashGate.WhenCompleted;
 
         var retryButton = new Button { Text = "重试", HorizontalOptions = LayoutOptions.Fill };
@@ -604,7 +611,10 @@ public partial class App : Application
             {
                 await Services.GetRequiredService<ISessionStore>().ClearAsync();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "[APP] 重新登录前清除本地会话异常");
+            }
             ClearSession();
             SwitchToLoginPage(window, appOptions, windowTitleService);
         };

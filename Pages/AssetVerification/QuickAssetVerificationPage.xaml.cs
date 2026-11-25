@@ -22,7 +22,7 @@ public partial class QuickAssetVerificationPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CRITICAL] 快速核查页面 OnAppearing 异常: {ex}");
+            Serilog.Log.Error(ex, "[QuickAssetVerificationPage] OnAppearing 初始化异常，页面可能保持空白");
         }
     }
 }

@@ -444,15 +444,15 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
     {
         if (!File.Exists(filePath))
         {
-            LogError("操作失败");
-            return 0;
+            LogError($"导入文件不存在，已中止: {filePath}");
+            throw new BusinessException(ErrorCodes.FILE_NOT_FOUND, $"导入文件不存在: {filePath}");
         }
 
         using var reader = SheetReaderFactory.Create(filePath);
         if (reader.IsEmpty)
         {
-            LogError("操作失败");
-            return 0;
+            LogError($"导入文件工作表为空，已中止: {filePath}");
+            throw new BusinessException(ErrorCodes.VALIDATION_FAILED, $"导入文件工作表为空: {filePath}");
         }
 
         ValidateTableName(tableName);
@@ -579,7 +579,10 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         {
             var apps = await DatabaseService.QueryAsync<string>(
                 "SELECT applicant_id_card FROM nc_biz_applications WHERE deleted_at IS NULL AND applicant_id_card IS NOT NULL", ct);
-            if (apps.IsSuccess && apps.Value != null)
+            if (apps.IsFailure)
+                throw new BusinessException(apps.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"加载申请库查重集失败，已中止导入: {apps.Message}");
+            if (apps.Value != null)
             {
                 foreach (var id in apps.Value)
                 {
@@ -589,7 +592,10 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
 
             var members = await DatabaseService.QueryAsync<string>(
                 "SELECT id_card FROM nc_biz_family_members WHERE deleted_at IS NULL AND id_card IS NOT NULL", ct);
-            if (members.IsSuccess && members.Value != null)
+            if (members.IsFailure)
+                throw new BusinessException(members.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"加载成员库查重集失败，已中止导入: {members.Message}");
+            if (members.Value != null)
             {
                 foreach (var id in members.Value)
                 {
@@ -599,7 +605,10 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
 
             var deaths = await DatabaseService.QueryAsync<string>(
                 "SELECT member_id_card FROM nc_biz_death_records WHERE member_id_card IS NOT NULL", ct);
-            if (deaths.IsSuccess && deaths.Value != null)
+            if (deaths.IsFailure)
+                throw new BusinessException(deaths.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"加载死亡库查重集失败，已中止导入: {deaths.Message}");
+            if (deaths.Value != null)
             {
                 foreach (var id in deaths.Value)
                 {
@@ -611,7 +620,8 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         }
         catch (Exception ex)
         {
-            LogError($"加载当前库查重集失败: {ex.Message}");
+            LogError($"加载当前库查重集失败，已中止导入: {ex.Message}");
+            throw;
         }
     }
 
@@ -623,7 +633,7 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
     {
         if (!File.Exists(personFilePath))
         {
-            LogError("操作失败");
+            LogError($"人员文件不存在，无法预读家庭关系: {personFilePath}");
             return;
         }
 
@@ -828,7 +838,9 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         var clearDangling = await DatabaseService.ExecuteNonQueryAsync(clearDanglingSql, ct);
         if (clearDangling.IsFailure)
         {
-            LogWarn($"清理悬挂家庭关联失败: {clearDangling.Message}");
+            LogError($"清理悬挂家庭关联失败，已中止导入: {clearDangling.ErrorCode} {clearDangling.Message}");
+            throw new BusinessException(clearDangling.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"清理悬挂家庭关联失败: {clearDangling.Message}");
         }
 
         var linkSql = $@"
@@ -837,10 +849,13 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
             WHERE p.head_id_card = f.applicant_id_card";
 
         var linkResult = await DatabaseService.ExecuteNonQueryAsync(linkSql, ct);
-        if (linkResult.IsSuccess)
+        if (linkResult.IsFailure)
         {
-            linkedCount = linkResult.Value; // 语义：当前已关联总数（含既有关联的重申）
+            LogError($"家庭—人员关联失败，已中止导入: {linkResult.ErrorCode} {linkResult.Message}");
+            throw new BusinessException(linkResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"家庭—人员关联失败: {linkResult.Message}");
         }
+        linkedCount = linkResult.Value; // 语义：当前已关联总数（含既有关联的重申）
 
         var unlinkedSql = $@"
             SELECT name, id_card, head_id_card FROM {PersonTableName}
@@ -850,7 +865,7 @@ public abstract class BaseCombinedImportService : BaseService, ICombinedImportSe
         // 注意不能用 QueryAsync<dynamic>：dynamic 在泛型实参位置就是 object，
         // 映射层会返回空 object，随后任何成员访问必抛 RuntimeBinderException
         var unlinkedResult = await DatabaseService.QueryAsync<UnlinkedPersonRow>(unlinkedSql, ct);
-        if (unlinkedResult.IsSuccess && unlinkedResult.Value != null)
+        if (unlinkedResult.HasValue)
         {
             foreach (var row in unlinkedResult.Value)
             {

@@ -36,9 +36,10 @@ public class PinyinConverter : IPinyinConverter
             }
             return string.Join(" ", pinyinList);
         }
-        catch
+        catch (Exception ex)
         {
-            return chineseText;
+            Serilog.Log.Debug(ex, "[PinyinConverter] 拼音转换失败，回退中文原文: {Length}", chineseText?.Length ?? 0);
+            return chineseText ?? string.Empty;
         }
     }
 }

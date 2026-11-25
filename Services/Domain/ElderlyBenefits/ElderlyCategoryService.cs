@@ -65,8 +65,14 @@ public class ElderlyCategoryService : BaseService
             var unionSql = string.Join(" UNION ALL ", unionParts);
             var sql = $"SELECT COALESCE(MIN(prio), 0) FROM ({unionSql}) p";
             var result = await _db.ExecuteScalarAsync(sql, ct, idCard);
-            if (result.IsSuccess && result.Value > 0
-                && tableToFlag.TryGetValue((int)result.Value, out var hit))
+            if (result.IsFailure)
+            {
+                LogError($"导入库身份比对失败: {result.ErrorCode} {result.Message}");
+                return Result.Failure<ElderlyIdentityResult>(
+                    result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"导入库身份比对失败: {result.Message}");
+            }
+            if (result.Value > 0 && tableToFlag.TryGetValue((int)result.Value, out var hit))
             {
                 LogDebug($"身份证命中导入库: {hit.Table}");
                 return Result.Success(new ElderlyIdentityResult(hit.Flag, hit.Table));
@@ -75,9 +81,11 @@ public class ElderlyCategoryService : BaseService
 
         // 未命中导入台账 → 扩展查低保申请库（nc_biz_applications）：
         // 身份证为已审批(Approved)档案的户主或家庭成员即按分类识别身份（低保>低保边缘>特困，刚性支出不算）。
-        var appIdentity = await MatchApplicationIdentityAsync(idCard, ct);
-        if (appIdentity != null)
-            return Result.Success(appIdentity);
+        var appIdentityResult = await MatchApplicationIdentityAsync(idCard, ct);
+        if (appIdentityResult.IsFailure)
+            return Result.Failure<ElderlyIdentityResult>(appIdentityResult.ErrorCode!, appIdentityResult.Message!);
+        if (appIdentityResult.Value != null)
+            return Result.Success(appIdentityResult.Value);
 
         return Result.Success(new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityNone, string.Empty));
     }
@@ -86,7 +94,7 @@ public class ElderlyCategoryService : BaseService
     /// 从低保申请库（nc_biz_applications）识别身份：已审批档案的户主或家庭成员按 classification_result 映射。
     /// 优先级：最低生活保障 > 低保边缘 > 特困（刚性支出等不视为高身份）；未命中返回 null。
     /// </summary>
-    private async Task<ElderlyIdentityResult?> MatchApplicationIdentityAsync(string idCard, CancellationToken ct)
+    private async Task<Result<ElderlyIdentityResult?>> MatchApplicationIdentityAsync(string idCard, CancellationToken ct)
     {
         try
         {
@@ -101,30 +109,40 @@ public class ElderlyCategoryService : BaseService
                 ORDER BY a.updated_at DESC
                 LIMIT 5";
             var result = await _db.QueryAsync<string>(sql, ct, idCard, ApplicationStatusCodes.APPROVED);
-            if (result.IsFailure || result.Value == null || result.Value.Count == 0)
-                return null;
+            if (result.IsFailure)
+            {
+                LogError($"申请库身份比对失败: {result.ErrorCode} {result.Message}");
+                return Result.Failure<ElderlyIdentityResult?>(
+                    result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"申请库身份比对失败: {result.Message}");
+            }
+            if (result.Value == null || result.Value.Count == 0)
+                return Result.Success<ElderlyIdentityResult?>(null);
 
             foreach (var code in result.Value)
             {
                 if (ClassificationConstants.IsCodeSubsistence(code))
-                    return new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityLowSubsidy, "nc_biz_applications");
+                    return Result.Success<ElderlyIdentityResult?>(
+                        new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityLowSubsidy, "nc_biz_applications"));
             }
             foreach (var code in result.Value)
             {
                 if (ClassificationConstants.IsCodeLowIncome(code))
-                    return new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityLowIncomeEdge, "nc_biz_applications");
+                    return Result.Success<ElderlyIdentityResult?>(
+                        new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityLowIncomeEdge, "nc_biz_applications"));
             }
             foreach (var code in result.Value)
             {
                 if (ClassificationConstants.IsCodeDestitute(code))
-                    return new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityDestitute, "nc_biz_applications");
+                    return Result.Success<ElderlyIdentityResult?>(
+                        new ElderlyIdentityResult(ElderlyBenefitConstants.IdentityDestitute, "nc_biz_applications"));
             }
-            return null;
+            return Result.Success<ElderlyIdentityResult?>(null);
         }
         catch (Exception ex)
         {
-            LogWarn($"申请库身份比对失败: {ex.Message}");
-            return null;
+            LogError($"申请库身份比对异常: {ex.Message}");
+            return Result.FromException<ElderlyIdentityResult?>(ex);
         }
     }
 

@@ -135,7 +135,19 @@ tables:
         type: character varying(30)
         nullable: true
         defaultValue: Draft
-        comment: 申报表状态：Draft草稿/Submitted已提交/Approved审议通过/Rejected审议驳回
+        comment: 申报表状态：Draft草稿/Submitted已上报/Returned已返回结论（待备案）/NotPassed不通过/Filed已备案/ReturnedForCorrection退回补正（兼容历史 Approved/Rejected/NotApplicable）
+      - name: case_type
+        type: character varying(40)
+        nullable: true
+        comment: 适用情形代码（新规 8 类）
+      - name: submitted_at
+        type: date
+        nullable: true
+        comment: 报县日期（10 个工作日评议计时起点）
+      - name: filed_at
+        type: date
+        nullable: true
+        comment: 备案日期（5 个工作日备案终点）
       - name: created_by
         type: character varying(100)
         nullable: true

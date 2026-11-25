@@ -85,8 +85,8 @@ public partial class LandContractImportService : BaseImportService
     {
         try
         {
-            await DatabaseService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_biz_land_contract_plot RESTART IDENTITY CASCADE", ct);
-            await DatabaseService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_biz_land_contract_contractor RESTART IDENTITY CASCADE", ct);
+            await ExecOrThrowAsync(DatabaseService, "TRUNCATE TABLE nc_biz_land_contract_plot RESTART IDENTITY CASCADE", ct);
+            await ExecOrThrowAsync(DatabaseService, "TRUNCATE TABLE nc_biz_land_contract_contractor RESTART IDENTITY CASCADE", ct);
             LogInfo("清空表: nc_biz_land_contract_contractor");
             return Result.Success();
         }
@@ -434,7 +434,7 @@ public partial class LandContractImportService : BaseImportService
             }
 
             var sql = sqlBuilder.ToString() + string.Join(", ", valueClauses);
-            await DatabaseService.ExecuteNonQueryAsync(sql, ct, paramValues.ToArray());
+            await ExecOrThrowAsync(DatabaseService, sql, ct, paramValues.ToArray());
         }
     }
 

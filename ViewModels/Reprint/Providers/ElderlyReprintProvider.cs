@@ -37,9 +37,9 @@ public class ElderlyReprintProvider : IReprintDomainProvider
                 confirmedResult.Message ?? stoppedResult.Message ?? "普惠高龄搜索失败");
 
         var merged = new List<ElderlyApplication>();
-        if (confirmedResult.IsSuccess && confirmedResult.Value != null)
+        if (confirmedResult.HasValue)
             merged.AddRange(confirmedResult.Value.Items);
-        if (stoppedResult.IsSuccess && stoppedResult.Value != null)
+        if (stoppedResult.HasValue)
             merged.AddRange(stoppedResult.Value.Items);
 
         var items = merged.Take(limit).Select(app => new ReprintArchiveItem(
@@ -69,9 +69,9 @@ public class ElderlyReprintProvider : IReprintDomainProvider
                 confirmedResult.Message ?? stoppedResult.Message ?? "普惠高龄按月查询失败");
 
         var merged = new List<ElderlyApplication>();
-        if (confirmedResult.IsSuccess && confirmedResult.Value != null)
+        if (confirmedResult.HasValue)
             merged.AddRange(confirmedResult.Value);
-        if (stoppedResult.IsSuccess && stoppedResult.Value != null)
+        if (stoppedResult.HasValue)
             merged.AddRange(stoppedResult.Value);
 
         var items = merged

@@ -85,11 +85,11 @@ public partial class ElderlyStopListViewModel : PagedSearchViewModelBase
             var result = await _statisticsService.GetElderlyStopStatsAsync();
             var activeResult = await _statisticsService.GetElderlyStatsAsync();
 
-            MonthlyStoppedText = result.IsSuccess && result.Value != null
+            MonthlyStoppedText = result.HasValue
                 ? result.Value.MonthlyStopped.ToString("N0") : StatNA;
-            YearStoppedText = result.IsSuccess && result.Value != null
+            YearStoppedText = result.HasValue
                 ? result.Value.YearStopped.ToString("N0") : StatNA;
-            ActiveCountText = activeResult.IsSuccess && activeResult.Value != null
+            ActiveCountText = activeResult.HasValue
                 ? activeResult.Value.ActiveCount.ToString("N0") : StatNA;
         }
         catch (Exception ex)
@@ -144,7 +144,7 @@ public partial class ElderlyStopListViewModel : PagedSearchViewModelBase
             var currentResult = await _applicationService.GetPagedAsync(
                 keyword, ElderlyBenefitConstants.StatusConfirmed, 1, 20, ct);
 
-            if (currentResult.IsSuccess && currentResult.Value != null)
+            if (currentResult.HasValue)
             {
                 foreach (var app in currentResult.Value.Items)
                 {
@@ -158,7 +158,7 @@ public partial class ElderlyStopListViewModel : PagedSearchViewModelBase
 
             // 2. 搜索导入库
             var importedResult = await _applicationService.SearchImportedLibraryAsync(keyword, ct);
-            if (importedResult.IsSuccess && importedResult.Value != null)
+            if (importedResult.HasValue)
             {
                 foreach (var item in importedResult.Value)
                 {

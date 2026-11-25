@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Graphics;
 using Android.Hardware.Camera2;
 using Android.Hardware.Camera2.Params;
+using Android.Hardware.Display;
 using Android.Media;
 using Android.OS;
 using Android.Runtime;
@@ -36,6 +37,8 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
     private bool _isOpening;
     private TaskCompletionSource<byte[]>? _captureTcs;
     private readonly object _sync = new();
+    private DisplayManager? _displayManager;
+    private readonly DisplayListener _displayListener;
 
     /// <summary>回调内统一兜底：Java 相机回调线程上的异常若越过 JNI 边界会直接终结进程（已实测闪退）。</summary>
     private static void SafeInvoke(string what, Action action)
@@ -50,7 +53,10 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         }
     }
 
-    public CameraPreviewViewHandler() : base(PropertyMapper) { }
+    public CameraPreviewViewHandler() : base(PropertyMapper)
+    {
+        _displayListener = new DisplayListener(this);
+    }
 
     protected override FrameLayout CreatePlatformView()
     {
@@ -75,6 +81,7 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
     public Task StartAsync()
     {
         StartBackgroundThread();
+        RegisterDisplayListener();
         if (_textureView?.IsAvailable == true)
             OpenCamera();
         return Task.CompletedTask;
@@ -84,6 +91,7 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
     {
         try
         {
+            UnregisterDisplayListener();
             _captureSession?.Close();
             _captureSession = null;
             _cameraDevice?.Close();
@@ -171,7 +179,9 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
         catch (Exception ex)
         {
             _isOpening = false;
-            System.Diagnostics.Debug.WriteLine($"打开相机失败: {ex.Message}");
+            Serilog.Log.Error(ex, "[CameraPreview] 打开相机失败");
+            // 拍照等待中必须结束，否则扫描页会一直停在"正在拍照…"。
+            _captureTcs?.TrySetResult(Array.Empty<byte>());
         }
     }
 
@@ -304,32 +314,121 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
 
     // ---------------- 方向处理 ----------------
 
-    private int GetJpegOrientation()
+    /// <summary>
+    /// 注册显示旋转监听：Application 已声明 ConfigChanges.Orientation，转屏不重建 Activity；
+    /// 180° 翻转（或布局未变尺寸时）<c>OnSurfaceTextureSizeChanged</c> 不会触发，
+    /// 只靠尺寸回调会让取景画面停在上一方向（用户实测"预览歪/倒，转手机不跟"）。
+    /// </summary>
+    private void RegisterDisplayListener()
     {
-        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
-        var display = activity?.WindowManager?.DefaultDisplay;
-        var rotation = display?.Rotation ?? SurfaceOrientation.Rotation0;
+        if (_displayManager != null)
+            return;
 
-        var deviceOrientation = rotation switch
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity?.GetSystemService(Context.DisplayService) is not DisplayManager manager)
+            return;
+
+        var handler = _backgroundHandler ??= new Handler(Looper.MainLooper!);
+        try
         {
-            SurfaceOrientation.Rotation90 => 270,
-            SurfaceOrientation.Rotation180 => 180,
-            SurfaceOrientation.Rotation270 => 90,
-            _ => 0
-        };
-        return (_sensorOrientation + deviceOrientation + 360) % 360;
+            manager.RegisterDisplayListener(_displayListener, handler);
+            _displayManager = manager;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CameraPreview] 注册显示监听失败: {ex.Message}");
+        }
     }
 
+    private void UnregisterDisplayListener()
+    {
+        try
+        {
+            _displayManager?.UnregisterDisplayListener(_displayListener);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CameraPreview] 注销显示监听失败: {ex.Message}");
+        }
+        _displayManager = null;
+    }
+
+    /// <summary>屏幕旋转变化：回主线程按控件当前尺寸重算预览矩阵（尺寸没变也必须重算）。</summary>
+    private void OnDisplayRotated()
+    {
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity == null)
+        {
+            ApplyTransformToCurrentView();
+            return;
+        }
+        activity.RunOnUiThread(() => SafeInvoke("DisplayRotated", ApplyTransformToCurrentView));
+    }
+
+    private void ApplyTransformToCurrentView()
+    {
+        var texture = _textureView;
+        if (texture == null)
+            return;
+
+        var width = texture.Width > 0 ? texture.Width : _viewWidth;
+        var height = texture.Height > 0 ? texture.Height : _viewHeight;
+        ConfigureTransform(width, height);
+    }
+
+    /// <summary>JPEG 输出方向：传感器方向 + 设备物理旋转（后置相机）。</summary>
+    private int GetJpegOrientation()
+        => (_sensorOrientation + GetDeviceOrientationDegrees() + 360) % 360;
+
     /// <summary>
-    /// 预览方向校正：将传感器方向的缓冲区旋转到与屏幕一致的朝向，并等比裁切铺满控件。
-    /// relative = 传感器方向 − 屏幕旋转（后置相机）；90/270 时宽高互换后再计算缩放。
+    /// 设备相对自然方向的物理旋转角（JPEG 方向用）：与屏幕旋转相反——
+    /// ROTATION_90（屏幕内容顺时针转 90°）对应设备逆时针 270°。
+    /// </summary>
+    private static int GetDeviceOrientationDegrees() => GetDisplayRotation() switch
+    {
+        SurfaceOrientation.Rotation90 => 270,
+        SurfaceOrientation.Rotation180 => 180,
+        SurfaceOrientation.Rotation270 => 90,
+        _ => 0
+    };
+
+    /// <summary>当前屏幕旋转——预览与拍照方向计算的唯一取数点（勿另抄一份）。</summary>
+    private static SurfaceOrientation GetDisplayRotation()
+    {
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity == null)
+            return SurfaceOrientation.Rotation0;
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(30) && activity.Display is { } display)
+            return display.Rotation;
+
+#pragma warning disable CA1422 // DefaultDisplay 在 API 30+ 标记过时，仅为 API 24–29 兜底
+        return activity.WindowManager?.DefaultDisplay?.Rotation ?? SurfaceOrientation.Rotation0;
+#pragma warning restore CA1422
+    }
+
+    private static int GetDisplayRotationDegrees() => GetDisplayRotation() switch
+    {
+        SurfaceOrientation.Rotation90 => 90,
+        SurfaceOrientation.Rotation180 => 180,
+        SurfaceOrientation.Rotation270 => 270,
+        _ => 0
+    };
+
+    /// <summary>
+    /// 预览方向校正：将传感器方向的缓冲区旋转到与屏幕一致的朝向，并等比放大铺满控件（多余部分居中裁切）。
+    /// relative = 传感器方向 − 屏幕旋转（后置相机，均以顺时针为正）；90/270 时宽高互换后再计算缩放。
     /// </summary>
     private void ConfigureTransform(int viewWidth, int viewHeight)
     {
+        if (viewWidth <= 0 || viewHeight <= 0)
+            return;
+
         _viewWidth = viewWidth;
         _viewHeight = viewHeight;
 
-        if (_textureView == null || _previewSize == null || viewWidth == 0 || viewHeight == 0)
+        var textureView = _textureView;
+        if (textureView == null || _previewSize == null)
             return;
 
         try
@@ -346,28 +445,16 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
             var scale = Math.Max(viewWidth / (float)rotatedWidth, viewHeight / (float)rotatedHeight);
 
             using var matrix = new Matrix();
+            // 依次：缓冲区中点对齐控件中心 → 按屏幕方向旋转 → 等比放大到铺满（居中裁切）
             matrix.PostTranslate(centerX - bufferWidth / 2f, centerY - bufferHeight / 2f);
             matrix.PostRotate(relative, centerX, centerY);
             matrix.PostScale(scale, scale, centerX, centerY);
-            _textureView.SetTransform(matrix);
+            textureView.SetTransform(matrix);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[CameraPreview] ConfigureTransform 异常: {ex.Message}");
         }
-    }
-
-    private static int GetDisplayRotationDegrees()
-    {
-        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
-        var rotation = activity?.WindowManager?.DefaultDisplay?.Rotation ?? SurfaceOrientation.Rotation0;
-        return rotation switch
-        {
-            SurfaceOrientation.Rotation90 => 90,
-            SurfaceOrientation.Rotation180 => 180,
-            SurfaceOrientation.Rotation270 => 270,
-            _ => 0
-        };
     }
 
     // ---------------- 线程 ----------------
@@ -397,6 +484,27 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
     }
 
     // ---------------- 回调 ----------------
+
+    /// <summary>默认显示器 id（android.view.Display.DEFAULT_DISPLAY = 0）。</summary>
+    private const int DefaultDisplayId = 0;
+
+    /// <summary>显示旋转监听：转屏 / 180° 翻转时主动重算预览矩阵。</summary>
+    private sealed class DisplayListener : Java.Lang.Object, DisplayManager.IDisplayListener
+    {
+        private readonly CameraPreviewViewHandler _owner;
+        public DisplayListener(CameraPreviewViewHandler owner) => _owner = owner;
+
+        public void OnDisplayAdded(int displayId) { }
+
+        public void OnDisplayRemoved(int displayId) { }
+
+        public void OnDisplayChanged(int displayId)
+        {
+            if (displayId != DefaultDisplayId)
+                return;
+            SafeInvoke("OnDisplayChanged", _owner.OnDisplayRotated);
+        }
+    }
 
     private sealed class SurfaceListener : Java.Lang.Object, TextureView.ISurfaceTextureListener
     {
@@ -464,7 +572,11 @@ public class CameraPreviewViewHandler : ViewHandler<CameraPreviewView, FrameLayo
             });
 
         public override void OnConfigureFailed(CameraCaptureSession session)
-            => System.Diagnostics.Debug.WriteLine("相机会话配置失败");
+        {
+            Serilog.Log.Error("[CameraPreview] 相机会话配置失败");
+            // 配置失败若只写 Debug，CaptureAsync 会永久挂起（页面无超时）。
+            _owner._captureTcs?.TrySetResult(Array.Empty<byte>());
+        }
     }
 
     private sealed class ImageListener : Java.Lang.Object, ImageReader.IOnImageAvailableListener

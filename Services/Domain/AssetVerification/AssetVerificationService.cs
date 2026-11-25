@@ -151,7 +151,13 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             ORDER BY created_at DESC LIMIT 1";
 
         var result = await _db.QuerySingleAsync<ApplicationRecord>(sql, ct, idCard);
-        if (result.IsFailure || result.Value == null)
+        if (result.IsFailure)
+        {
+            // 查询失败会表现为"无档案可带出"，用户会当新户重新录入；必须留痕。
+            LogWarn($"核查表单带出救助档案字段失败: IdCard={DataMasker.MaskIdCard(idCard)}, {result.ErrorCode} {result.Message}");
+            return null;
+        }
+        if (result.Value == null)
             return null;
 
         var app = result.Value;
@@ -266,7 +272,9 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
         var monthStart = new DateTime(year, month, 1);
         var monthEnd = monthStart.AddMonths(1);
         var batchResult = await _db.QuerySingleAsync<string>(batchSql, ct, headIdCard, monthStart, monthEnd);
-        if (batchResult.IsSuccess && batchResult.Value != null)
+        if (batchResult.IsFailure)
+            LogWarn($"查询月度批次失败，代理人/经办人清理将跳过: {batchResult.ErrorCode} {batchResult.Message}");
+        if (batchResult.HasValue)
         {
             var batchId = batchResult.Value;
             await ExecOrThrowAsync(_db, "DELETE FROM nc_biz_asset_check_agents WHERE batch_id = $1", ct, batchId);
@@ -656,7 +664,9 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                      WHERE applicant_id_card = $1 AND deleted_at IS NULL
                      ORDER BY created_at DESC LIMIT 1";
         var result1 = await _db.QuerySingleAsync<AssetCheckHistoryResult>(sql1, ct, idCard);
-        if (result1.IsSuccess && result1.Value != null)
+        if (result1.IsFailure)
+            LogWarn($"查询历史核查记录失败，将按无历史处理: IdCard={DataMasker.MaskIdCard(idCard)}, {result1.ErrorCode} {result1.Message}");
+        if (result1.HasValue)
         {
             var history = result1.Value;
 
@@ -666,7 +676,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                              WHERE batch_id = $1 AND deleted_at IS NULL
                              ORDER BY is_head DESC, id ASC";
             var batchResult = await _db.QueryAsync<FamilyMemberResult>(batchSql, ct, history.BatchId);
-            if (batchResult.IsSuccess && batchResult.Value != null)
+            if (batchResult.HasValue)
             {
                 history.FamilyMembers = batchResult.Value;
             }
@@ -675,7 +685,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                              FROM nc_biz_asset_check_agents
                              WHERE batch_id = $1 LIMIT 1";
             var agentResult = await _db.QuerySingleAsync<AssetCheckHistoryResult>(agentSql, ct, history.BatchId);
-            if (agentResult.IsSuccess && agentResult.Value != null)
+            if (agentResult.HasValue)
             {
                 history.HasAgent = true;
                 history.AgentName = agentResult.Value.AgentName;
@@ -702,7 +712,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                          FROM nc_biz_applications a
                          WHERE a.id = $1";
             var result2 = await _db.QuerySingleAsync<AssetCheckHistoryResult>(sql2, ct, applicationId);
-            if (result2.IsSuccess && result2.Value != null)
+            if (result2.HasValue)
             {
                 var history = result2.Value;
                 history.ApplicantIdCard = idCard;
@@ -715,7 +725,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                   WHERE m.application_id = $1 AND m.deleted_at IS NULL
                                   ORDER BY m.is_applicant DESC, m.id ASC";
                 var memberResult = await _db.QueryAsync<FamilyMemberResult>(memberSql, ct, applicationId);
-                if (memberResult.IsSuccess && memberResult.Value != null)
+                if (memberResult.HasValue)
                 {
                     history.FamilyMembers = memberResult.Value;
                 }
@@ -783,7 +793,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
             WHERE p.id_card = $1
             LIMIT 1";
         var result3 = await _db.QuerySingleAsync<AssetCheckHistoryResult>(sql3, ct, idCard);
-        if (result3.IsSuccess && result3.Value != null)
+        if (result3.HasValue)
         {
             var history = result3.Value;
             history.ApplicantIdCard = idCard;
@@ -897,16 +907,22 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                               ORDER BY applicant_name;
 ";
             var memberResult = await _db.QueryAsync<AssetVerificationFamilyMember>(memberSql, ct, detail.HeadIdCard);
-            if (memberResult.IsSuccess && memberResult.Value != null)
+            if (memberResult.IsFailure)
             {
-                detail.FamilyMembers = memberResult.Value;
+                // 成员查询失败若按空集合继续，保存详情时会把真实成员清空。
+                LogError($"核查详情家庭成员查询失败: {memberResult.ErrorCode} {memberResult.Message}");
+                return Result.Failure<AssetVerificationDetail>(
+                    memberResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"核查详情家庭成员查询失败: {memberResult.Message}");
             }
+            if (memberResult.Value != null)
+                detail.FamilyMembers = memberResult.Value;
 
             var agentSql = @"SELECT agent_name, agent_id_card, agent_relationship, agent_id_type
                              FROM nc_biz_asset_check_agents
                              WHERE batch_id = $1 LIMIT 1";
             var agentResult = await _db.QuerySingleAsync<AssetCheckHistoryResult>(agentSql, ct, detail.BatchId);
-            if (agentResult.IsSuccess && agentResult.Value != null)
+            if (agentResult.HasValue)
             {
                 detail.HasAgent = true;
                 detail.AgentName = agentResult.Value.AgentName;
@@ -919,7 +935,7 @@ public class AssetVerificationService : BaseService, IAssetVerificationService
                                 FROM nc_biz_asset_check_operators
                                 WHERE batch_id = $1 LIMIT 1";
             var operatorResult = await _db.QuerySingleAsync<OperatorDto>(operatorSql, ct, detail.BatchId);
-            if (operatorResult.IsSuccess && operatorResult.Value != null)
+            if (operatorResult.HasValue)
             {
                 detail.OperatorName = operatorResult.Value.OperatorName;
                 detail.OperatorUnitName = operatorResult.Value.OperatorUnitName;

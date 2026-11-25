@@ -132,7 +132,7 @@ public partial class LotteryHomeViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             var result = await _lotteryDataService.GetLatestDrawAsync(SelectedLotteryType);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var draw = result.Value;
                 LatestDrawNumber = draw.DrawNumber;
@@ -149,6 +149,7 @@ public partial class LotteryHomeViewModel : ViewModelBase
             }
             else
             {
+                _logger.Warn($"最新开奖记录加载失败，首页按无数据处理: {result.ErrorCode} {result.Message}");
                 HasData = false;
             }
             return Result.Success();
@@ -166,7 +167,7 @@ public partial class LotteryHomeViewModel : ViewModelBase
             // 增量起点 = 本地最新开奖日期；已存在的最新一期会被重新 upsert 以刷新奖级
             DateTime? sinceDate = null;
             var latestResult = await _lotteryDataService.GetLatestDrawAsync(SelectedLotteryType);
-            if (latestResult.IsSuccess && latestResult.Value != null)
+            if (latestResult.HasValue)
                 sinceDate = latestResult.Value.DrawDate;
 
             LoadingMessage = sinceDate.HasValue

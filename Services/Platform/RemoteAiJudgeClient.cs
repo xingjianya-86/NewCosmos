@@ -168,8 +168,9 @@ public sealed class RemoteAiJudgeClient : IAiJudgeClient
                 verdict, matched, confidence, reason, source, policyVersion, model);
             return (judgment, elapsed);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            Serilog.Log.Warning(ex, "[RemoteAiJudge] AI 判定响应解析失败，按无建议处理");
             return null;
         }
 

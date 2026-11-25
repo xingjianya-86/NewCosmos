@@ -60,7 +60,10 @@ public partial class SignaturePopupView : ContentView
         var hostPage = Helpers.WindowNavigator.CurrentPage;
         var navigation = hostPage?.Navigation;
         if (navigation == null)
+        {
+            Serilog.Log.Warning("[SignaturePopup] 当前无导航栈，签名弹窗未打开（调用方会把结果当取消）");
             return null;
+        }
 
         var tcs = new TaskCompletionSource<byte[]?>();
         var popup = new SignaturePopupView();

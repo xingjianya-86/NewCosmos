@@ -236,7 +236,7 @@ public partial class UnifiedReprintViewModel
         {
             IsBusy = true;
             var result = await AssetCapability!.RenderPreviewAsync(SelectedRecord.BusinessId, SelectedAssetTemplate, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 Output.PdfFilePath = result.Value;
                 Output.HasPdf = true;
@@ -326,7 +326,7 @@ public partial class UnifiedReprintViewModel
         {
             IsBusy = true;
             var result = await DynamicCapability!.ReprintOriginalAsync(SelectedDynamicHistory.Id, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 Output.PdfFilePath = result.Value;
                 Output.HasPdf = true;
@@ -356,7 +356,7 @@ public partial class UnifiedReprintViewModel
             // 选中历史档案(Stopped)时按该版本原样生成；否则归一到现役
             var normalize = !string.Equals(SelectedRecord.Status, "Stopped", StringComparison.OrdinalIgnoreCase);
             var result = await DynamicCapability!.RegenerateAsync(SelectedRecord.BusinessId, normalize, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 Output.PdfFilePath = result.Value;
                 Output.HasPdf = true;
@@ -454,16 +454,18 @@ public partial class UnifiedReprintViewModel
             return;
         }
         var all = allResult.Value ?? new List<NewCosmos.Models.Entities.Template>();
-        // 优先按模板分类（与档案制作同源）；未接入域回退名称前缀
+        // 按模板分类（与档案制作同源）；未接入域（scope=null）→ 全量放行（保守，宁多不漏）。
+        // 2026-11-18 方案B：原 MatchesDomainTemplate 名称前缀兜底已删——DynamicManagementRecord 已
+        // 接入 GetReprintDomainCategories（「变更档案」分类），名称模糊过滤全库废除。
         var scope = ArchiveCategoryResolver.GetReprintDomainCategories(provider.DomainKey);
         foreach (var t in all.Where(t => scope is null
-                     ? MatchesDomainTemplate(t.Name, provider.DomainKey)
-                     : t.Categories.Intersect(scope).Any()))
+                     || t.Categories.Intersect(scope).Any()))
         {
             BatchTemplates.Add(new TemplateSelectItem
             {
                 TemplateId = t.Id,
                 Name = t.Name,
+                DocType = t.DocType,
                 FileType = t.FileType,
                 IsSelected = true,
                 IsApplicable = true,
@@ -473,16 +475,6 @@ public partial class UnifiedReprintViewModel
         SelectedBatchTemplate = BatchTemplates.Count > 0 ? BatchTemplates[0] : null;
         OnPropertyChanged(nameof(ShowBatchTemplatePicker));
     }
-
-    /// <summary>域模板过滤兜底（名称前缀；已接入域走 ArchiveCategoryResolver.GetReprintDomainCategories）</summary>
-    private static bool MatchesDomainTemplate(string name, string domainKey) => domainKey switch
-    {
-        "FamilyApplication" => name.StartsWith("档案_") || name.StartsWith("通用_"),
-        "TempRelief" => name.StartsWith("临时救助"),
-        "ElderlyBenefits" => name.StartsWith("普惠高龄"),
-        "DynamicManagementRecord" => name.Contains("动态管理记录"),
-        _ => true
-    };
 
     /// <summary>批量筛选：按域 + 关键词 + 月份（B线周期区间）拉取记录集</summary>
     [RelayCommand]
@@ -595,7 +587,7 @@ public partial class UnifiedReprintViewModel
         foreach (var (year, month) in SpannedMonths(from, to))
         {
             var r = await provider.SearchByMonthAsync(year, month, 500, ct);
-            if (r.IsSuccess && r.Value != null) all.AddRange(r.Value);
+            if (r.HasValue) all.AddRange(r.Value);
             else { failed = true; failMsg = r.Message; }
         }
         if (failed && all.Count == 0)
@@ -723,7 +715,7 @@ public partial class UnifiedReprintViewModel
 
         BatchProgressText = $"正在按 {BatchScopeText(range, provider.MonthWindow)} 变更人群导出...";
         var result = await capability.BatchExportRangeAsync(range.Value.From, range.Value.To, CancellationToken);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             BatchProgress = 1;
             BatchProgressText = "批量导出完成";

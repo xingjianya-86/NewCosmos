@@ -186,8 +186,9 @@ public sealed class RemoteOcrRecognizeClient : IOcrRecognizeClient
                 ElapsedMs = root.TryGetProperty(OcrConstants.ResponseKeys.ElapsedMs, out var e) ? e.GetInt64() : 0
             };
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            Serilog.Log.Warning(ex, "[RemoteOcr] OCR 响应解析失败，按未识别处理");
             return null;
         }
     }

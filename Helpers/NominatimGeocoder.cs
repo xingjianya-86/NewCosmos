@@ -47,8 +47,9 @@ public static class NominatimGeocoder
 
             return null;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            Serilog.Log.Debug(ex, "[NominatimGeocoder] 地理编码响应解析失败，水印省略坐标");
             return null;
         }
     }

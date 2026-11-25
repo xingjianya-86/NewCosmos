@@ -23,7 +23,6 @@ public class UserService : BaseService, IUserService
 
     public async Task<Result<User>> GetByIdAsync(int id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = @"SELECT u.*, o.name as organization_name 
                     FROM nc_sys_users u 
                     LEFT JOIN nc_sys_organizations o ON u.organization_id = o.id 
@@ -34,7 +33,6 @@ public class UserService : BaseService, IUserService
     public async Task<Result<User>> GetByUsernameAsync(string username, CancellationToken ct = default)
     {
         ValidateNotNullOrEmpty(username, nameof(username));
-        LogInfo($"执行操作");
         var sql = @"SELECT u.*, o.name as organization_name 
                     FROM nc_sys_users u 
                     LEFT JOIN nc_sys_organizations o ON u.organization_id = o.id 
@@ -86,7 +84,6 @@ public class UserService : BaseService, IUserService
         ValidateNotNullOrEmpty(request.Password, nameof(request.Password));
         ValidateNotNullOrEmpty(request.Phone, nameof(request.Phone));
 
-        LogInfo($"执行操作");
 
         var existsResult = await CheckUsernameExistsAsync(request.Username, null, ct);
         if (existsResult.IsSuccess && existsResult.Value)
@@ -122,7 +119,6 @@ public class UserService : BaseService, IUserService
             await AssignRoleAsync(userId, request.DefaultRoleId.Value, request.CreatedBy, ct);
         }
 
-        LogInfo($"执行操作");
         Logger.LogSecurity("创建用户", ("UserId", userId), ("Username", request.Username), ("CreatedBy", request.CreatedBy));
         return Result.Success(userId);
     }
@@ -131,7 +127,6 @@ public class UserService : BaseService, IUserService
     {
         ValidateNotNull(request, nameof(request));
 
-        LogInfo($"执行操作");
 
         var userResult = await GetByIdAsync(request.UserId, ct);
         if (userResult.IsFailure)
@@ -153,7 +148,6 @@ public class UserService : BaseService, IUserService
         if (updateResult.IsFailure)
             return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
 
-        LogInfo($"执行操作");
         // 停用用户：所有在线端立即失效
         if (request.IsActive == false)
             await RevokeSessionsAsync(request.UserId, SessionConstants.EndReasonAccountDisabled, null, ct);
@@ -162,7 +156,6 @@ public class UserService : BaseService, IUserService
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         var userResult = await GetByIdAsync(id, ct);
         if (userResult.IsFailure)
@@ -178,7 +171,6 @@ public class UserService : BaseService, IUserService
         if (deleteResult.IsFailure)
             return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
 
-        LogInfo($"执行操作");
         Logger.LogSecurity("删除用户", ("UserId", id), ("Username", user.Username));
         await RevokeSessionsAsync(id, SessionConstants.EndReasonAccountDisabled, null, ct);
         return Result.Success();
@@ -188,7 +180,6 @@ public class UserService : BaseService, IUserService
     {
         ValidateNotNullOrEmpty(newPassword, nameof(newPassword));
 
-        LogInfo($"执行操作");
 
         var userResult = await GetByIdAsync(userId, ct);
         if (userResult.IsFailure)
@@ -208,7 +199,6 @@ public class UserService : BaseService, IUserService
         if (updateResult.IsFailure)
             return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
 
-        LogInfo($"执行操作");
         Logger.LogSecurity("重置密码", ("UserId", userId), ("UpdatedBy", updatedBy));
         // 管理员重置密码：该用户所有端立即失效，必须用新密码重新登录
         await RevokeSessionsAsync(userId, SessionConstants.EndReasonPasswordChanged, null, ct);
@@ -220,7 +210,6 @@ public class UserService : BaseService, IUserService
         ValidateNotNullOrEmpty(oldPassword, nameof(oldPassword));
         ValidateNotNullOrEmpty(newPassword, nameof(newPassword));
 
-        LogInfo($"执行操作");
 
         var userResult = await GetByIdAsync(userId, ct);
         if (userResult.IsFailure)
@@ -243,7 +232,6 @@ public class UserService : BaseService, IUserService
         if (updateResult.IsFailure)
             return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
 
-        LogInfo($"执行操作");
         Logger.LogSecurity("修改密码", ("UserId", userId));
         // 本人改密：保留当前端会话，踢掉其他端
         var current = _sessionGuard.SessionId;
@@ -335,7 +323,6 @@ public class UserService : BaseService, IUserService
         if (insertResult.IsFailure)
             return Result.Failure(insertResult.ErrorCode!, insertResult.Message!);
 
-        LogInfo($"执行操作");
         Logger.LogSecurity("分配角色", ("UserId", userId), ("RoleId", roleId), ("AssignedBy", assignedBy));
         await RevokeSessionsAsync(userId, SessionConstants.EndReasonPermissionsChanged, null, ct);
         return Result.Success();
@@ -351,14 +338,12 @@ public class UserService : BaseService, IUserService
         if (deleteResult.IsFailure)
             return Result.Failure(deleteResult.ErrorCode!, deleteResult.Message!);
 
-        LogInfo($"执行操作");
         await RevokeSessionsAsync(userId, SessionConstants.EndReasonPermissionsChanged, null, ct);
         return Result.Success();
     }
 
     public async Task<Result<List<Role>>> GetUserRolesAsync(int userId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = @"SELECT r.* FROM nc_sys_roles r 
                     INNER JOIN nc_sys_user_roles ur ON r.id = ur.role_id 
                     WHERE ur.user_id = $1";
@@ -367,7 +352,6 @@ public class UserService : BaseService, IUserService
 
     public async Task<Result<List<User>>> GetByOrganizationAsync(int organizationId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = @"SELECT u.*, o.name as organization_name 
                     FROM nc_sys_users u 
                     LEFT JOIN nc_sys_organizations o ON u.organization_id = o.id 
@@ -397,24 +381,20 @@ public class UserService : BaseService, IUserService
 
     public async Task<Result> DisableAsync(int id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = "UPDATE nc_sys_users SET is_active = false, updated_at = NOW() WHERE id = $1";
         var result = await _db.ExecuteNonQueryAsync(sql, ct, id);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
-        LogInfo($"执行操作");
         await RevokeSessionsAsync(id, SessionConstants.EndReasonAccountDisabled, null, ct);
         return Result.Success();
     }
 
     public async Task<Result> EnableAsync(int id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = "UPDATE nc_sys_users SET is_active = true, updated_at = NOW() WHERE id = $1";
         var result = await _db.ExecuteNonQueryAsync(sql, ct, id);
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
-        LogInfo($"执行操作");
         return Result.Success();
     }
 
@@ -459,9 +439,10 @@ public class UserService : BaseService, IUserService
         {
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
-        catch (ArgumentException)
+        catch (ArgumentException ex)
         {
-            // hash 格式无效时返回 false
+            // hash 格式无效时返回 false（语义即校验失败，不算异常业务流）
+            Serilog.Log.Debug(ex, "[UserService] BCrypt hash 格式无效，校验按失败处理");
             return false;
         }
     }

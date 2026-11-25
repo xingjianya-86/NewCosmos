@@ -385,7 +385,11 @@ public partial class ArchiveProductionViewModel
         foreach (var item in economicDetail.RigidExpenditures)
         {
             var typeName = RigidExpenditureConstants.GetDescription(item.ExpenditureType);
-            parts.Add($"{typeName}{item.PersonDescription}{FormatDecimal(item.Amount * 12)}元{(!string.IsNullOrEmpty(item.Remark) ? $"（{item.Remark}）" : "")}");
+            // 2026-11-19 起刚性支出落户到人：优先显示成员姓名；旧数据回退自由文本 PersonDescription
+            var person = !string.IsNullOrWhiteSpace(item.MemberName)
+                ? $"（{item.MemberName}）"
+                : item.PersonDescription;
+            parts.Add($"{typeName}{person}{FormatDecimal(item.Amount * 12)}元{(!string.IsNullOrEmpty(item.Remark) ? $"（{item.Remark}）" : "")}");
         }
         return string.Join("；", parts) + "。";
     }

@@ -68,7 +68,7 @@ public partial class ElderlyApplicationFormViewModel
         if (org.CityId.HasValue)
         {
             var city = await _regionService.GetCityByIdAsync(org.CityId.Value, CancellationToken);
-            if (city.IsSuccess && city.Value != null && HukouCityOptions.Contains(city.Value.CityName))
+            if (city.HasValue && HukouCityOptions.Contains(city.Value.CityName))
                 cityName = city.Value.CityName;
         }
         if (string.IsNullOrEmpty(cityName)) return;
@@ -206,7 +206,7 @@ public partial class ElderlyApplicationFormViewModel
 
             // 回填补发分段明细（编辑/查看草稿时保留分段，避免保存时被清空）
             var segmentsResult = await _applicationService.GetSegmentsAsync(id, CancellationToken);
-            if (segmentsResult.IsSuccess && segmentsResult.Value != null)
+            if (segmentsResult.HasValue)
             {
                 Segments.Clear();
                 foreach (var segment in segmentsResult.Value)
@@ -234,7 +234,7 @@ public partial class ElderlyApplicationFormViewModel
         if (app.HukouCityId.HasValue)
         {
             var city = await _regionService.GetCityByIdAsync(app.HukouCityId.Value, CancellationToken);
-            if (city.IsSuccess && city.Value != null && HukouCityOptions.Contains(city.Value.CityName))
+            if (city.HasValue && HukouCityOptions.Contains(city.Value.CityName))
             {
                 SelectedHukouCity = city.Value.CityName;
                 await LoadHukouCountiesAsync();
@@ -270,7 +270,7 @@ public partial class ElderlyApplicationFormViewModel
         if (app.FamilyCityId.HasValue)
         {
             var city = await _regionService.GetCityByIdAsync(app.FamilyCityId.Value, CancellationToken);
-            if (city.IsSuccess && city.Value != null && FamilyCityOptions.Contains(city.Value.CityName))
+            if (city.HasValue && FamilyCityOptions.Contains(city.Value.CityName))
             {
                 SelectedFamilyCity = city.Value.CityName;
                 await LoadFamilyCountiesAsync();
@@ -378,7 +378,7 @@ public partial class ElderlyApplicationFormViewModel
 
             // 输入身份证后从导入台账自动带出人员信息（直接填充，可改）
             var imported = await _applicationService.GetImportedByIdCardAsync(IdCard, CancellationToken);
-            if (imported.IsSuccess && imported.Value != null)
+            if (imported.HasValue)
             {
                 Name = imported.Value.Name ?? string.Empty;
                 Phone = imported.Value.Phone ?? string.Empty;
@@ -572,6 +572,8 @@ public partial class ElderlyApplicationFormViewModel
                  })
         {
             var r = await _applicationService.GetMonthlyAmountAsync(cat, CancellationToken);
+            if (r.IsFailure)
+                _logger.Warn($"读取高龄月标准失败（{cat}），本次分段计算按 0 处理: {r.ErrorCode} {r.Message}");
             map[cat] = r.IsSuccess ? r.Value : 0m;
         }
         return map;
@@ -764,6 +766,8 @@ public partial class ElderlyApplicationFormViewModel
     {
         if (string.IsNullOrEmpty(category)) return 0m;
         var result = await _applicationService.GetMonthlyAmountAsync(category, ct);
+        if (result.IsFailure)
+            _logger.Warn($"读取高龄月标准失败（{category}），按 0 显示: {result.ErrorCode} {result.Message}");
         return result.IsSuccess ? result.Value : 0m;
     }
 

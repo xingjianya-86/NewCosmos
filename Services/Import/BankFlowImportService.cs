@@ -52,7 +52,12 @@ public partial class BankFlowImportService : BaseImportService
         {
             var affected = await DatabaseService.ExecuteNonQueryAsync(
                 "UPDATE nc_biz_bank_flow_imports SET deleted_at = NOW() WHERE deleted_at IS NULL", ct);
-            LogInfo($"软删核对批次: {affected} 个");
+            if (affected.IsFailure)
+            {
+                LogError($"软删核对批次失败: {affected.ErrorCode} {affected.Message}");
+                return Result.Failure(affected.ErrorCode ?? "CLEAR_TABLE_FAILED", $"软删核对批次失败: {affected.Message}");
+            }
+            LogInfo($"软删核对批次: {affected.Value} 个");
             return Result.Success();
         }
         catch (Exception ex)
@@ -156,7 +161,7 @@ public partial class BankFlowImportService : BaseImportService
             var dup = await DatabaseService.QuerySingleAsync<ExistingImport>(
                 "SELECT id, batch_no FROM nc_biz_bank_flow_imports WHERE file_hash = $1 AND deleted_at IS NULL LIMIT 1",
                 ct, fileHash);
-            if (dup.IsSuccess && dup.Value != null)
+            if (dup.HasValue)
             {
                 result.Warnings.Add($"该文件已导入过（批次 {dup.Value.BatchNo}），已跳过；如需重新导入请勾选「导入前清空」");
                 progress?.Report("文件已导入过，跳过");
@@ -177,7 +182,7 @@ public partial class BankFlowImportService : BaseImportService
         // 明细行：拿回 record_id 映射（row_no 批内唯一，一次查询替代逐行 RETURNING）
         var idMap = await DatabaseService.QueryAsync<RecordIdMap>(
             "SELECT id, row_no FROM nc_biz_bank_flow_records WHERE import_id = $1", ct, batchId);
-        if (idMap.IsSuccess && idMap.Value != null)
+        if (idMap.HasValue)
         {
             var mapById = idMap.Value.ToDictionary(r => r.RowNo, r => r.Id);
             var items = rows
@@ -577,7 +582,12 @@ public partial class BankFlowImportService : BaseImportService
         }
     }
 
-    /// <summary>阈值 = 30 × 月低保标准（城乡取较低者从严提示）。两标准均读取失败 → 0（不判定、告警，禁止硬编码回退）。</summary>
+    /// <summary>
+    /// 阈值 = 30 × 月低保标准（城乡取较低者从严提示）。两标准均读取失败 → 0（不判定、告警，禁止硬编码回退）。
+    /// **不分 36 个月边缘档（2026-11-18 拍板）**：本方法服务批量流水文件初筛，无申请类别信息；
+    /// 初筛从严取 30 个月（宁严勿漏），超阈值仅标红供人工核定——类别分档只在申请表单提示侧
+    /// （`ApplicationFormViewModel.BankFlow.BuildExceedHintAsync` 经 `BankFlowConstants.MonthsFor`）。
+    /// </summary>
     private async Task<decimal> ResolvePerCapitaThresholdAsync(ImportResult result, CancellationToken ct)
     {
         try

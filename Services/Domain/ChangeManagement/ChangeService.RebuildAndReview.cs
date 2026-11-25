@@ -986,6 +986,14 @@ public partial class ChangeService
         if (memberCopyResult.IsFailure)
             return Result.Failure<(long, Dictionary<long, long>)>(memberCopyResult.ErrorCode!, memberCopyResult.Message ?? "复制家庭成员失败");
 
+        // 成员集合变化后清理"无照顾目标"的豁免残留（2026-11-19 张桂秋 app115 同型收口）：
+        // 减员可能剔除唯一的重病/重残照顾目标，原"因照顾重病重残亲属免于劳动力判定"标记随即失效，
+        // 不清会在新档表单保存时被联动校验拦截；经济复核/户主变更（成员未变）时为空操作（幂等）。
+        var exemptClearResult = await ClearInvalidLaborExemptAsync(newApplicationId, ct);
+        if (exemptClearResult.IsFailure)
+            return Result.Failure<(long, Dictionary<long, long>)>(exemptClearResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                exemptClearResult.Message ?? "豁免残留清理失败");
+
         // 成员ID映射（按身份证/姓名匹配）
         var newMembersResult = await _db.QueryAsync<FamilyMember>(
             "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, newApplicationId);
@@ -1329,7 +1337,7 @@ public partial class ChangeService
             if (application.OriginalApplicationId > 0)
             {
                 var upstreamResult = await _applicationService.GetByIdAsync(application.OriginalApplicationId, ct);
-                if (upstreamResult.IsSuccess && upstreamResult.Value != null
+                if (upstreamResult.HasValue
                     && !string.IsNullOrEmpty(upstreamResult.Value.ClassificationResult))
                 {
                     graceOldClassification = upstreamResult.Value.ClassificationResult!;
@@ -1705,7 +1713,7 @@ public partial class ChangeService
             if (application.OriginalApplicationId > 0)
             {
                 var upstreamResult = await _applicationService.GetByIdAsync(application.OriginalApplicationId, ct);
-                if (upstreamResult.IsSuccess && upstreamResult.Value != null
+                if (upstreamResult.HasValue
                     && !string.IsNullOrEmpty(upstreamResult.Value.ClassificationResult))
                 {
                     graceOldClassification = upstreamResult.Value.ClassificationResult!;

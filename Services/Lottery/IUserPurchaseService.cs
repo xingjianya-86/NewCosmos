@@ -150,13 +150,21 @@ public class UserPurchaseRecord
     public int[] GetRedNumbers()
     {
         try { return global::System.Text.Json.JsonSerializer.Deserialize<int[]>(RedNumbersJson) ?? Array.Empty<int>(); }
-        catch { return Array.Empty<int>(); }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[Lottery] 红球号码 JSON 解析失败，号码显示为空");
+            return Array.Empty<int>();
+        }
     }
 
     public int[] GetBlueNumbers()
     {
         try { return global::System.Text.Json.JsonSerializer.Deserialize<int[]>(BlueNumbersJson) ?? Array.Empty<int>(); }
-        catch { return Array.Empty<int>(); }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[Lottery] 蓝球号码 JSON 解析失败，号码显示为空");
+            return Array.Empty<int>();
+        }
     }
 
     /// <summary>号码显示（红球 + 蓝球）</summary>
@@ -200,7 +208,11 @@ public class UserPurchaseRecord
     private static int[] DeserializeInts(string json)
     {
         try { return JsonSerializer.Deserialize<int[]>(json) ?? Array.Empty<int>(); }
-        catch { return Array.Empty<int>(); }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[Lottery] 号码 JSON 解析失败，按空号码处理");
+            return Array.Empty<int>();
+        }
     }
 }
 

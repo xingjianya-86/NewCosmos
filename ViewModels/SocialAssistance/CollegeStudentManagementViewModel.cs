@@ -419,7 +419,7 @@ public partial class CollegeStudentManagementViewModel : ViewModelBase
                     await vm.SearchApplicationsCommand.ExecuteAsync(null);
             }
 
-            ServiceProvider?.GetService<IWindowTitleService>()?.Register(page);
+            ServiceProvider.GetRequiredService<IWindowTitleService>().Register(page);
 
             await Helpers.WindowNavigator.CurrentPage!.Navigation.PushAsync(page);
         }

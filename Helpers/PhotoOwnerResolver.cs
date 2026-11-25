@@ -6,7 +6,7 @@ namespace NewCosmos.Helpers;
 /// ① 查询关键词本身是合法 18 位身份证 → 用它（用户显式指定）；
 /// ② 否则若当前查询结果全部同属一人且身份证合法 → 用该人（"已经被查询到的人"）；
 /// ③ 否则解析不出 → 返回 null，由调用方提示"请先指定档案人员"。
-/// 本方法只做身份证定位；"是否真在低收入/高龄/临时救助档案中存在"
+/// 本方法只做身份证定位；"是否真在低收入/高龄/临时救助/资产核查档案中存在"
 /// 由 <c>IArchivePhotoService.ResolveOwnerAsync</c> 查库判定。
 /// </summary>
 public static class PhotoOwnerResolver

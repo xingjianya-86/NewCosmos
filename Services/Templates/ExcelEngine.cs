@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using NewCosmos.Models.Options;
 using NewCosmos.Services.Core;
 using OfficeOpenXml;
@@ -43,7 +42,6 @@ public class ExcelEngine : ITemplateEngine
             throw new InvalidOperationException("ExcelEngine: 未加载模板");
 
         _worksheet = _package.Workbook.Worksheets[0];
-        _logger.Info("执行操作");
     }
 
     public void LoadFromFile(string filePath)
@@ -61,7 +59,6 @@ public class ExcelEngine : ITemplateEngine
 
         _worksheet = _package.Workbook.Worksheets[0];
         _tempFilePath = filePath;
-        _logger.Info("执行操作");
     }
 
     public void ReplaceField(string placeholder, string value)
@@ -223,7 +220,7 @@ public class ExcelEngine : ITemplateEngine
 
         if (templateRowIndex < 0)
         {
-            _logger.Warn("警告");
+            _logger.Warn("未找到模板行，跳过行数据填充");
             return;
         }
 
@@ -240,7 +237,6 @@ public class ExcelEngine : ITemplateEngine
             FillRowData(targetRow, rows[i]);
         }
 
-        _logger.Info("执行操作");
     }
 
     private void FillRowData(int targetRow, Dictionary<string, string> data)
@@ -333,7 +329,7 @@ public class ExcelEngine : ITemplateEngine
 
         if (templateRowIndex < 0)
         {
-            _logger.Warn("警告");
+            _logger.Warn("未找到模板行，跳过行数据填充");
             return;
         }
 
@@ -397,7 +393,6 @@ public class ExcelEngine : ITemplateEngine
 
         _logger.Debug("调试");
         var bytes = await _package.GetAsByteArrayAsync();
-        _logger.Info("执行操作");
         return bytes;
     }
 
@@ -416,7 +411,6 @@ public class ExcelEngine : ITemplateEngine
 
         var fileInfo = new FileInfo(outputPath);
         await _package.SaveAsAsync(fileInfo);
-        _logger.Info("执行操作");
     }
 
 #if WINDOWS
@@ -473,7 +467,6 @@ public class ExcelEngine : ITemplateEngine
         {
             await SaveToFileAsync(xlsxPath, ct);
             await OfficeComDocuments.ExportToPdfAsync(OfficeAppKind.Excel, xlsxPath, pdfPath, _logger, ct);
-            _logger.Info("执行操作");
             return pdfPath;
         }
         finally
@@ -491,7 +484,6 @@ public class ExcelEngine : ITemplateEngine
 
         await OfficeComDocuments.PrintFileAsync(OfficeAppKind.Excel, filePath, PrinterName, IsDuplex, copies, _logger, ct);
 
-        _logger.Info("执行操作");
     }
 
     public async Task<byte[]> ExportPdfFromFileAsync(string sourceFilePath, string pdfOutputPath = null, CancellationToken ct = default)
@@ -512,7 +504,6 @@ public class ExcelEngine : ITemplateEngine
         try
         {
             var pdfBytes = await OfficeComDocuments.ExportToPdfAsync(OfficeAppKind.Excel, sourceFilePath, pdfOutputPath, _logger, ct);
-            _logger.Info("执行操作");
 
             if (deleteAfterRead)
             {
@@ -540,33 +531,6 @@ public class ExcelEngine : ITemplateEngine
     public Task<byte[]> ExportPdfFromFileAsync(string sourceFilePath, string pdfOutputPath = null, CancellationToken ct = default)
         => throw new NotSupportedException("PDF 导出仅 Windows 可用（需 Office COM）");
 #endif
-
-    public List<string> GetUnresolvedPlaceholders()
-    {
-        if (_worksheet == null)
-            return new List<string>();
-
-        var placeholders = new HashSet<string>();
-        var pattern = new Regex(@"\{\w+\}");
-        var dimension = _worksheet.Dimension;
-        if (dimension == null) return placeholders.ToList();
-
-        for (int row = dimension.Start.Row; row <= dimension.End.Row; row++)
-        {
-            for (int col = dimension.Start.Column; col <= dimension.End.Column; col++)
-            {
-                var cellText = _worksheet.Cells[row, col].Text;
-                if (string.IsNullOrEmpty(cellText)) continue;
-
-                foreach (Match match in pattern.Matches(cellText))
-                {
-                    placeholders.Add(match.Value);
-                }
-            }
-        }
-
-        return placeholders.ToList();
-    }
 
     private string GetRowText(int row)
     {

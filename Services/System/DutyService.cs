@@ -559,9 +559,9 @@ public partial class DutyService : BaseService, IDutyService
         var result = memberId.HasValue
             ? await _dbService.QueryAsync<DutyLeaveView>(sql, ct, memberId.Value)
             : await _dbService.QueryAsync<DutyLeaveView>(sql, ct);
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DutyLeaveView>());
+        if (result.IsFailure)
+            return Result.Failure<List<DutyLeaveView>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DutyLeaveView>());
     }
 
     public async Task<Result<List<string>>> SaveLeaveAsync(DutyLeaveSave leave, CancellationToken ct = default)
@@ -1280,9 +1280,9 @@ public partial class DutyService : BaseService, IDutyService
             FROM nc_duty_schedules
             WHERE member_id = $1 AND duty_date >= $2
             ORDER BY duty_date", ct, memberId, DateTime.Today);
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DutyFutureSchedule>());
+        if (result.IsFailure)
+            return Result.Failure<List<DutyFutureSchedule>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DutyFutureSchedule>());
     }
 
     /// <summary>统计某日期班次上生效的班务调整记录数（同组同日唯一班次；excludeChangeId 用于改期排除自身）</summary>

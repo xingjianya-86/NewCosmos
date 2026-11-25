@@ -34,6 +34,12 @@ public interface ITempReliefService
     /// </summary>
     Task<Result<List<Models.Entities.ConfigStandard>>> GetSmallAmountLevelsAsync(string? hukouType, CancellationToken ct = default);
 
+    /// <summary>
+    /// 临时救助金额基数：当前有效的城市低保月标准最高值（政策第十条，不按户籍分流）。
+    /// 未配置显式失败。
+    /// </summary>
+    Task<Result<decimal>> GetReliefBaseStandardAsync(CancellationToken ct = default);
+
     Task<Result<TempReliefApplication>> GetByIdAsync(long id, CancellationToken ct = default);
 
     /// <summary>
@@ -45,6 +51,22 @@ public interface ITempReliefService
     /// 分页查询（关键字：姓名/身份证；状态：空=全部）
     /// </summary>
     Task<Result<PagedResult<TempReliefApplication>>> GetPagedAsync(string keyword, string status, int pageIndex, int pageSize, CancellationToken ct = default);
+
+    /// <summary>
+    /// 分页查询（支持两大类 × 三小类筛选：人群状态 / 救助类型 / 发放渠道）。
+    /// </summary>
+    Task<Result<PagedResult<TempReliefApplication>>> GetPagedAsync(
+        string keyword, string? status, string? populationStatus, string? reliefType, string? paymentChannel,
+        int pageIndex, int pageSize, CancellationToken ct = default);
+
+    /// <summary>按状态集合分页（办理中/已终结 Tab 用）。</summary>
+    Task<Result<PagedResult<TempReliefApplication>>> GetPagedByStatusesAsync(
+        string keyword, string[] statuses, int pageIndex, int pageSize, CancellationToken ct = default);
+
+    /// <summary>按状态集合 + 两大类/三小类筛选分页。</summary>
+    Task<Result<PagedResult<TempReliefApplication>>> GetPagedByStatusesAsync(
+        string keyword, string[] statuses, string? populationStatus, string? reliefType, string? paymentChannel,
+        int pageIndex, int pageSize, CancellationToken ct = default);
 
     /// <summary>
     /// 分页查询已完结记录（已确认+已终止，供历史补打用）
@@ -70,6 +92,19 @@ public interface ITempReliefService
     /// 确认生效（草稿→已确认）
     /// </summary>
     Task<Result> ConfirmAsync(long id, string operatorName, CancellationToken ct = default);
+
+    /// <summary>提交（草稿/退回补正 → 已提交），写受理时间作为时限起点。</summary>
+    Task<Result> SubmitAsync(long id, string operatorName, CancellationToken ct = default);
+
+    /// <summary>不予救助（草稿/已提交 → 不予救助），理由与告知时间必填。</summary>
+    Task<Result> RejectAsync(long id, string reason, string operatorName, DateTime? notifiedAt,
+        string? noticeMethod, CancellationToken ct = default);
+
+    /// <summary>退回补正（已提交 → 退回补正），原因必填。</summary>
+    Task<Result> ReturnAsync(long id, string reason, string operatorName, CancellationToken ct = default);
+
+    /// <summary>登记备案完成（上级部门发放：已确认 + 待备案 → 已备案）。</summary>
+    Task<Result> MarkFiledAsync(long id, string operatorName, CancellationToken ct = default);
 
     /// <summary>
     /// 归档完成（打印页「完成归档」入口）：记录存在即幂等成功——保存并确认后状态已是终态 Confirmed，

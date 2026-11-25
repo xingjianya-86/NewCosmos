@@ -110,7 +110,7 @@ public partial class AssetVerificationHomeViewModel : ModuleHomeViewModelBase
         try
         {
             var result = await _statisticsService.GetAssetVerificationStatsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 PendingReportCountText = result.Value.PendingReportCount.ToString("N0");
                 MonthlyCompletedText = result.Value.MonthlyCompleted.ToString("N0");

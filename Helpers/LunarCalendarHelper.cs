@@ -54,9 +54,10 @@ public static class LunarCalendarHelper
             var dayName = LunarDays[Math.Clamp(day, 1, 30) - 1];
             return $"{monthName}{dayName}";
         }
-        catch (ArgumentOutOfRangeException)
+        catch (ArgumentOutOfRangeException ex)
         {
             // 超出 ChineseLunisolarCalendar 支持范围（<1901 或 >2100 等），降级为仅星期
+            Serilog.Log.Debug(ex, "[LunarCalendarHelper] 日期超出农历支持范围，仅显示星期: {Date}", date);
             return string.Empty;
         }
     }

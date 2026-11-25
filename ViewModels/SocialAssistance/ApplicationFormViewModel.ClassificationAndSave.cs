@@ -203,7 +203,7 @@ public partial class ApplicationFormViewModel
                 Caregivers.ToList(),
                 CancellationToken);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var classification = result.Value;
 
@@ -233,7 +233,15 @@ public partial class ApplicationFormViewModel
                         : application.TotalFamilyIncome;
                     var lockedGuarantee = await _classificationService.CalculateGuaranteeAmountAsync(
                         lockedCode, lockedFamilySize, lockedIsRural, lockedMonthlyIncome, CancellationToken);
-                    classification.GuaranteeAmount = lockedGuarantee.IsSuccess ? lockedGuarantee.Value : 0m;
+                    if (lockedGuarantee.IsFailure)
+                    {
+                        // 保障金取数失败绝不能按 0 落库（正式审批金额）。
+                        _logger.Error($"一事一议保障金计算失败: {lockedGuarantee.ErrorCode} {lockedGuarantee.Message}");
+                        throw new BusinessException(
+                            lockedGuarantee.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                            $"一事一议保障金计算失败，本次判定未完成: {lockedGuarantee.Message}");
+                    }
+                    classification.GuaranteeAmount = lockedGuarantee.Value;
                 }
 
                 _lastClassificationResult = classification;
@@ -597,7 +605,7 @@ public partial class ApplicationFormViewModel
             {
                 // 本次更新改变了 updated_at，刷新并发令牌，避免后续保存误报冲突
                 var refreshed = await _applicationService.GetByIdAsync(_applicationId, CancellationToken);
-                if (refreshed.IsSuccess && refreshed.Value != null && refreshed.Value.UpdatedAt != default)
+                if (refreshed.HasValue && refreshed.Value.UpdatedAt != default)
                     _loadedUpdatedAt = refreshed.Value.UpdatedAt;
 
                 _logger.LogBusiness("分类结果已保存到数据库",
@@ -901,7 +909,7 @@ public partial class ApplicationFormViewModel
         if (wasCreateMode && !string.IsNullOrWhiteSpace(ApplicantIdCard))
         {
             var oldDrafts = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
-            var draftList = oldDrafts.IsSuccess && oldDrafts.Value != null
+            var draftList = oldDrafts.HasValue
                 ? oldDrafts.Value.Where(a => a.Status == ApplicationStatusCodes.DRAFT).ToList()
                 : new List<Application>();
             if (draftList.Count > 0)
@@ -952,12 +960,8 @@ public partial class ApplicationFormViewModel
             application.Id = _applicationId;
             var updateResult = await _applicationService.UpdateAsync(application, ct, IsCompletionMode || IsEditFamilyInfoMode || IsFamilyCorrectionMode);
             if (!updateResult.IsSuccess)
-            {
                 _logger.Error($"申请保存失败: {updateResult.Message}");
-                throw new BusinessException(
-                    string.IsNullOrEmpty(updateResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : updateResult.ErrorCode,
-                    updateResult.Message ?? "申请保存失败");
-            }
+            updateResult.ThrowIfFailure("申请保存");
         }
         else
         {
@@ -971,12 +975,8 @@ public partial class ApplicationFormViewModel
                     {
                         var deleteResult = await _applicationService.DeleteAsync(existing.Id, ct);
                         if (!deleteResult.IsSuccess)
-                        {
                             _logger.Error($"删除旧草稿失败: {deleteResult.Message}");
-                            throw new BusinessException(
-                                string.IsNullOrEmpty(deleteResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : deleteResult.ErrorCode,
-                                $"删除旧草稿失败: {deleteResult.Message}");
-                        }
+                        deleteResult.ThrowIfFailure("删除旧草稿");
                         _logger.LogBusiness("已删除旧草稿", ("OldApplicationId", existing.Id));
                     }
                 }
@@ -984,12 +984,8 @@ public partial class ApplicationFormViewModel
 
             var createResult = await _applicationService.CreateAsync(application, ct);
             if (!createResult.IsSuccess)
-            {
                 _logger.Error($"申请创建失败: {createResult.Message}");
-                throw new BusinessException(
-                    string.IsNullOrEmpty(createResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : createResult.ErrorCode,
-                    createResult.Message ?? "申请创建失败");
-            }
+            createResult.ThrowIfFailure("申请创建");
             _applicationId = createResult.Value;
             OperationMode = FormOperationMode.Edit;
         }
@@ -997,6 +993,12 @@ public partial class ApplicationFormViewModel
         // 保存家庭成员（失败抛异常），返回 IdCard → 新 ID 映射
         LoadingMessage = "正在保存家庭成员...";
         var memberIdCardToNewId = await SaveFamilyMembersAsync(ct);
+
+        // 户主成员行：主表 → 成员表单向同步（历史遗留：表单建档曾不写户主行，导致户主死亡/月报/打印定位不到户主）
+        var headSyncResult = await _familyMemberService.UpsertHouseholdHeadFromApplicationAsync(_applicationId, ct);
+        if (headSyncResult.IsFailure)
+            _logger.Error($"户主成员行同步失败: {headSyncResult.Message}");
+        headSyncResult.ThrowIfFailure("户主成员行同步");
 
         // 保存赡养人（失败抛异常），传入新 ID 映射避免 DB 查询
         LoadingMessage = "正在保存赡养人...";
@@ -1016,12 +1018,7 @@ public partial class ApplicationFormViewModel
         // 刷新乐观并发令牌：在事务内读取本次写入的 updated_at，
         // 避免下一次保存因令牌过期而误报并发冲突
         var refreshedResult = await _applicationService.GetByIdAsync(_applicationId, ct);
-        if (!refreshedResult.IsSuccess)
-        {
-            throw new BusinessException(
-                string.IsNullOrEmpty(refreshedResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : refreshedResult.ErrorCode,
-                refreshedResult.Message ?? "读取保存结果失败");
-        }
+        refreshedResult.ThrowIfFailure("读取保存结果");
         if (refreshedResult.Value != null && refreshedResult.Value.UpdatedAt != default)
             _loadedUpdatedAt = refreshedResult.Value.UpdatedAt;
     }
@@ -1048,12 +1045,7 @@ public partial class ApplicationFormViewModel
                 OriginalGuaranteeAmount > 0 ? OriginalGuaranteeAmount : null,
                 GraceGrantAmount,
                 ct);
-            if (!actRes.IsSuccess)
-            {
-                throw new BusinessException(
-                    string.IsNullOrEmpty(actRes.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : actRes.ErrorCode,
-                    actRes.Message ?? "渐退期记录保存失败");
-            }
+            actRes.ThrowIfFailure("渐退期记录保存");
             _gracePeriodEvaluated = true;
 
             // 超限封顶产生减发 → 补写 FundChange，供月报「保障金减发表」捕获（幂等：同户同额只写一次）
@@ -1067,12 +1059,7 @@ public partial class ApplicationFormViewModel
         else if (_gracePeriodEvaluated)
         {
             var clrRes = await _gracePeriodService.ClearAsync(_applicationId, ct);
-            if (!clrRes.IsSuccess)
-            {
-                throw new BusinessException(
-                    string.IsNullOrEmpty(clrRes.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : clrRes.ErrorCode,
-                    clrRes.Message ?? "渐退期记录清除失败");
-            }
+            clrRes.ThrowIfFailure("渐退期记录清除");
         }
     }
 
@@ -1103,12 +1090,8 @@ public partial class ApplicationFormViewModel
         var supporters = Supporters.ToList();
         var result = await supporterService.SaveAsync(_applicationId, supporters, ct);
         if (!result.IsSuccess)
-        {
             _logger.Error($"赡养人保存失败: {result.Message}");
-            throw new BusinessException(
-                string.IsNullOrEmpty(result.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : result.ErrorCode,
-                $"赡养人保存失败: {result.Message}");
-        }
+        result.ThrowIfFailure("赡养人保存");
 
         // 新增赡养人 Id 反填（2026-11-12）：SaveFamilyMembersAsync 已跳过赡养行，成员实体的 Id
         // 只能从 SupporterService 的 RETURNING 回填取——否则同一会话内该成员下次保存仍按 Id=0
@@ -1165,12 +1148,8 @@ public partial class ApplicationFormViewModel
         var caregiverService = _caregiverService;
         var caregiverResult = await caregiverService.SaveAsync(_applicationId, Caregivers.ToList(), ct);
         if (!caregiverResult.IsSuccess)
-        {
             _logger.Error($"照料人保存失败: {caregiverResult.Message}");
-            throw new BusinessException(
-                string.IsNullOrEmpty(caregiverResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : caregiverResult.ErrorCode,
-                $"照料人保存失败: {caregiverResult.Message}");
-        }
+        caregiverResult.ThrowIfFailure("照料人保存");
 
         _logger.LogBusiness("入户调查+照料人保存完成");
     }
@@ -1210,10 +1189,7 @@ public partial class ApplicationFormViewModel
         else
         {
             _logger.Error($"经济明细保存失败: {result.Message}");
-            // 注意：Result.ErrorCode 非 null（默认空串），必须用 IsNullOrEmpty 判断
-            throw new BusinessException(
-                string.IsNullOrEmpty(result.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : result.ErrorCode,
-                result.Message ?? "经济明细保存失败");
+            result.ThrowIfFailure("经济明细保存");
         }
     }
 
@@ -1245,12 +1221,8 @@ public partial class ApplicationFormViewModel
 
         var updateResult = await _applicationService.UpdateEconomicInfoAsync(request, ct);
         if (!updateResult.IsSuccess)
-        {
             _logger.Error($"Application收入汇总更新失败: {updateResult.Message}");
-            throw new BusinessException(
-                string.IsNullOrEmpty(updateResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : updateResult.ErrorCode,
-                $"收入汇总更新失败: {updateResult.Message}");
-        }
+        updateResult.ThrowIfFailure("收入汇总更新");
 
         _logger.LogBusiness("Application收入汇总已更新",
             ("ApplicationId", _applicationId),
@@ -1273,12 +1245,8 @@ public partial class ApplicationFormViewModel
         //  "同刻创建即删除"孤儿行、且有效赡养行在代际间跳变导致赡养费跳变）。
         var deleteResult = await _familyMemberService.DeleteNonSupportByApplicationIdAsync(_applicationId, ct);
         if (deleteResult.IsFailure)
-        {
             _logger.Error($"删除旧家庭成员失败: {deleteResult.Message}");
-            throw new BusinessException(
-                string.IsNullOrEmpty(deleteResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : deleteResult.ErrorCode,
-                $"删除旧家庭成员失败: {deleteResult.Message}");
-        }
+        deleteResult.ThrowIfFailure("删除旧家庭成员");
         if (deleteResult.Value > 0)
             _logger.LogBusiness("已软删旧家庭成员", ("DeletedCount", deleteResult.Value.ToString()));
 
@@ -1291,6 +1259,7 @@ public partial class ApplicationFormViewModel
         var seenIdCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skippedDuplicates = new List<string>();
         var supportSkipped = 0;
+        var headSkipped = 0;
         var requests = new List<FamilyMemberCreateRequest>(FamilyMembers.Count);
         foreach (var member in FamilyMembers)
         {
@@ -1299,6 +1268,15 @@ public partial class ApplicationFormViewModel
             if (member.MemberCategory == MemberCategoryConstants.SUPPORT)
             {
                 supportSkipped++;
+                continue;
+            }
+
+            // 户主行不参与"全删全插"：由 FamilyMemberService.UpsertHouseholdHeadFromApplicationAsync
+            // 从主表单向同步（2026-11-19）。否则会把界面加载时的旧快照写回，覆盖主表刚改的户主信息。
+            if (member.IsHouseholdHead
+                || string.Equals(member.MemberCategory, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase))
+            {
+                headSkipped++;
                 continue;
             }
 
@@ -1389,9 +1367,7 @@ public partial class ApplicationFormViewModel
         {
             // 显式失败（§7）：批插整体回滚，绝不静默丢成员
             _logger.Error($"批量保存家庭成员失败: {insertResult.ErrorCode} {insertResult.Message}");
-            throw new BusinessException(
-                string.IsNullOrEmpty(insertResult.ErrorCode) ? ErrorCodes.DB_QUERY_ERROR : insertResult.ErrorCode!,
-                $"家庭成员保存失败：{insertResult.Message}");
+            insertResult.ThrowIfFailure("家庭成员保存");
         }
 
         foreach (var (idCard, newId) in insertResult.Value)
@@ -1400,7 +1376,8 @@ public partial class ApplicationFormViewModel
         _logger.LogBusiness("家庭成员保存完成",
             ("Total", FamilyMembers.Count.ToString()),
             ("Saved", requests.Count.ToString()),
-            ("SupportSkipped", supportSkipped.ToString()));   // 赡养行由 SupporterService 保存
+            ("SupportSkipped", supportSkipped.ToString()),
+            ("HeadSkipped", headSkipped.ToString()));   // 赡养行由 SupporterService、户主行由 UpsertHouseholdHeadFromApplicationAsync 维护
         return idCardToNewId;
     }
 

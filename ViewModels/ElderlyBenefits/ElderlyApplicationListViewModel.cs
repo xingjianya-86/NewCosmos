@@ -120,7 +120,7 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
         try
         {
             var result = await _statisticsService.GetElderlyStatsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 ActiveCountText = result.Value.ActiveCount.ToString("N0");
                 MonthlyNewText = result.Value.MonthlyNew.ToString("N0");
@@ -146,8 +146,9 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
             await LoadDataAsync();
             _ = LoadHeaderStatsAsync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.Error($"普惠高龄列表页加载失败: {ex.Message}");
             ErrorMessage = "页面加载失败，请重试";
         }
     }
@@ -224,20 +225,20 @@ public partial class ElderlyApplicationListViewModel : PagedSearchViewModelBase
         try
         {
             var draftResult = await _applicationService.GetPagedAsync(string.Empty, ElderlyBenefitConstants.StatusDraft, 1, 1);
-            if (draftResult.IsSuccess && draftResult.Value != null)
+            if (draftResult.HasValue)
                 DraftCount = draftResult.Value.TotalCount;
 
             var confirmedResult = await _applicationService.GetPagedAsync(string.Empty, ElderlyBenefitConstants.StatusConfirmed, 1, 1);
-            if (confirmedResult.IsSuccess && confirmedResult.Value != null)
+            if (confirmedResult.HasValue)
                 ConfirmedCount = confirmedResult.Value.TotalCount;
 
             var stoppedResult = await _applicationService.GetPagedAsync(string.Empty, ElderlyBenefitConstants.StatusStopped, 1, 1);
-            if (stoppedResult.IsSuccess && stoppedResult.Value != null)
+            if (stoppedResult.HasValue)
                 StoppedCount = stoppedResult.Value.TotalCount;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 计数加载失败不影响主列表
+            _logger.Warn($"普惠高龄计数加载失败，Tab 徽标可能为 0: {ex.Message}");
         }
     }
 

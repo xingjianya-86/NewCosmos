@@ -262,6 +262,8 @@ public partial class PrintService : BaseService, IPrintService
         var pagesResult = await BuildMonthlyFormDataAsync(year, month, baseForm, category, town, ct);
         if (pagesResult.IsFailure)
             return Result.Failure<List<MonthlySourceFile>>(pagesResult.ErrorCode!, pagesResult.Message!);
+        if (pagesResult.Value.Count == 0)
+            return Result.Failure<List<MonthlySourceFile>>(ErrorCodes.NOT_FOUND, $"月报表单无数据: {formKey}");
 
         var extension = baseForm is "会议记录" or "会议记录_一事一议" ? ".docx" : ".xlsx";
         var files = new List<MonthlySourceFile>();
@@ -299,6 +301,8 @@ public partial class PrintService : BaseService, IPrintService
         var pagesResult = await BuildMonthlyFormDataAsync(year, month, baseForm, category, town, ct);
         if (pagesResult.IsFailure)
             return Result.Failure<bool>(pagesResult.ErrorCode!, pagesResult.Message!);
+        if (pagesResult.Value.Count == 0)
+            return Result.Failure<bool>(ErrorCodes.NOT_FOUND, $"月报表单无数据: {formKey}");
 
         var extension = baseForm is "会议记录" or "会议记录_一事一议" ? ".docx" : ".xlsx";
         foreach (var page in pagesResult.Value)
@@ -436,6 +440,9 @@ public partial class PrintService : BaseService, IPrintService
                 // 其他困难人员：停止、减员汇总表（复用边缘家庭版式，数据源为独立停止表）
                 var isOtherDifficultyStopForm = baseForm == "停保汇总表"
                     && string.Equals(category, "其他困难人员", StringComparison.Ordinal);
+                // 特困人群：停保汇总表（专用模板，固定标题）
+                var isDestituteStopForm = baseForm == "停保汇总表"
+                    && string.Equals(category, "特困人员", StringComparison.Ordinal);
                 var isSubsistenceStopForm = baseForm == "停保汇总表"
                     && string.Equals(catTag, "最低生活保障", StringComparison.Ordinal);
                 foreach (var rural in new[] { true, false })
@@ -449,7 +456,9 @@ public partial class PrintService : BaseService, IPrintService
                             ? $"林口县{titleYear}年{titleMonth}月城乡低保边缘家庭停止、减员汇总表"
                             : isOtherDifficultyStopForm
                                 ? $"林口县{titleYear}年{titleMonth}月其他困难人员停止、减员汇总表"
-                                : reportTit + pageAreaTag,
+                                : isDestituteStopForm
+                                    ? $"林口县城乡特困人员停止表（{titleYear}年{titleMonth}月）"
+                                    : reportTit + pageAreaTag,
                         ["REPORT_UNIT"] = fillUnit,
                         ["REPORT_DATE"] = fillDate
                     };
@@ -622,7 +631,7 @@ public partial class PrintService : BaseService, IPrintService
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
                 {
-                    [FieldKeys.REPORT_TITLE] = reportTit + (string.IsNullOrWhiteSpace(category) ? "" : $"（{category}）"),
+                    [FieldKeys.REPORT_TITLE] = BuildNaturalReductionTitle(category, titleYear, titleMonth),
                     ["REPORT_UNIT"] = fillUnit,
                     ["REPORT_DATE"] = fillDate
                 };
@@ -645,7 +654,7 @@ public partial class PrintService : BaseService, IPrintService
             }
             case "档案_退出对象兜底情况纠治表":
             {
-                var src = await _monthlyReportService.GetExitRectificationRowsAsync(year, month, townSafe, ct);
+                var src = await _monthlyReportService.GetExitRectificationRowsAsync(year, month, townSafe, category, ct);
                 if (src.IsFailure)
                     return Result.Failure<List<MonthlyFormPageData>>(src.ErrorCode!, src.Message!);
                 var fields = new Dictionary<string, string>
@@ -686,13 +695,16 @@ public partial class PrintService : BaseService, IPrintService
                 // 申报月份 = 所选月份本身（2026-11-17 用户口径：临时救助报表时间不再顺延次月）
                 var reportMonth = $"{year}年{month}月";
 
-                // 一项表单、文档内两段：无额度（大额→报县局审批）在前，有额度（小额定额→备用金发放）在后；
-                // 分段与分类判定点单点实现见 TempReliefSummaryGrouper / TempReliefConstants.IsFixedQuotaType
-                var (noQuota, withQuota) = TempReliefSummaryGrouper.SplitByQuota(src.Value);
+                // 一项表单、文档内四段：发放渠道 × 人群状态（上级·在册/非在册、备用金·在册/非在册）；
+                // 小额快救归入备用金段。分段与分类判定点单点实现见 TempReliefSummaryGrouper。
+                var (countyInsured, countyUninsured, reserveInsured, reserveUninsured) =
+                    TempReliefSummaryGrouper.SplitByCategory(src.Value);
                 var segments = new (string Tag, List<MonthlyTempReliefRow> SegmentRows)[]
                 {
-                    (TempReliefConstants.SegmentTagCountyApproval, noQuota),
-                    (TempReliefConstants.SegmentTagReservePayout, withQuota)
+                    (TempReliefConstants.SegmentTagCountyInsured, countyInsured),
+                    (TempReliefConstants.SegmentTagCountyUninsured, countyUninsured),
+                    (TempReliefConstants.SegmentTagReserveInsured, reserveInsured),
+                    (TempReliefConstants.SegmentTagReserveUninsured, reserveUninsured)
                 };
 
                 // 分页：模板表体槽位 1..10，超 10 条拆多页（每段独立分页）
@@ -910,15 +922,24 @@ public partial class PrintService : BaseService, IPrintService
     /// 拆分 "基础名_分类"（分类: 最低生活保障/最低生活保障边缘家庭/特困人员/刚性支出困难家庭/其他困难人员）；无分类后缀则原样返回
     /// </summary>
     private static (string BaseForm, string? Category) SplitMonthlyFormKey(string formKey)
+        => MonthlyReportCategoryConstants.SplitFormKey(formKey);
+
+    /// <summary>
+    /// 自然减员月报表标题（全分类统一格式）：林口县城乡{分类名}自然减员月报表（{年}年{月}月）。
+    /// 空分类 = 社会救助；月份沿用月报业务周期（周期结束日次月），不补零。
+    /// </summary>
+    private static string BuildNaturalReductionTitle(string? category, int year, int month)
     {
-        var tail = formKey.LastIndexOf('_');
-        if (tail > 0)
+        var categoryName = category switch
         {
-            var suffix = formKey[(tail + 1)..];
-            if (suffix is "最低生活保障" or "最低生活保障边缘家庭" or "特困人员" or "刚性支出困难家庭" or "其他困难人员")
-                return (formKey[..tail], suffix);
-        }
-        return (formKey, null);
+            null or "" => "社会救助",
+            MonthlyReportCategoryConstants.Subsistence => "低保",
+            MonthlyReportCategoryConstants.LowIncomeEdge => "低保边缘家庭",
+            MonthlyReportCategoryConstants.Destitute => "特困",
+            MonthlyReportCategoryConstants.RigidExpenditure => "刚性支出困难家庭",
+            _ => category
+        };
+        return $"林口县城乡{categoryName}自然减员月报表（{year}年{month}月）";
     }
 
     /// <summary>
@@ -931,7 +952,9 @@ public partial class PrintService : BaseService, IPrintService
         {
             var org = await _db.QuerySingleAsync<OrgNameRow>(
                 "SELECT name FROM nc_sys_organizations WHERE id = $1", ct, orgId.Value);
-            if (org.IsSuccess && org.Value != null && !string.IsNullOrWhiteSpace(org.Value.Name))
+            if (org.IsFailure)
+                LogWarn($"填报单位查询失败，回退乡镇参数: {org.ErrorCode} {org.Message}");
+            else if (org.Value != null && !string.IsNullOrWhiteSpace(org.Value.Name))
                 return org.Value.Name;
         }
         return string.IsNullOrEmpty(town) ? "全部" : town;
@@ -954,7 +977,10 @@ public partial class PrintService : BaseService, IPrintService
               LEFT JOIN nc_sys_organizations p ON o.parent_id = p.id
               WHERE o.id = $1", ct, orgId.Value);
         if (org.IsFailure || org.Value == null)
+        {
+            LogWarn($"批复机构查询失败，批复机构栏将以「全部」占位: {org.ErrorCode} {org.Message}");
             return ("全部", string.Empty);
+        }
 
         var town = !string.IsNullOrWhiteSpace(org.Value.TownName)
             ? org.Value.TownName
@@ -983,9 +1009,12 @@ public partial class PrintService : BaseService, IPrintService
         var name = baseForm switch
         {
             "新增救助明细" => category == "最低生活保障边缘家庭" ? "月报_新增救助明细_最低生活保障边缘家庭" : "月报_新增救助明细",
-            "停保汇总表" => category is "最低生活保障边缘家庭" or "其他困难人员"
-                ? "月报_停保汇总表_最低生活保障边缘家庭"
-                : "月报_停保汇总表",
+            "停保汇总表" => category switch
+            {
+                "最低生活保障边缘家庭" or "其他困难人员" => "月报_停保汇总表_最低生活保障边缘家庭",
+                "特困人员" => "月报_特困人群_停保汇总表",
+                _ => "月报_停保汇总表"
+            },
             "保障金增发表" => "月报_保障金增发表",
             "保障金减发表" => "月报_保障金减发表",
             "施保金减发" => "月报_施保金减发",

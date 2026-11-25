@@ -154,7 +154,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         {
             _logger.Info("加载省级行政区列表");
             var result = await _regionService.GetProvincesAsync(default);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Provinces.Clear();
                 foreach (var province in result.Value)
@@ -190,7 +190,9 @@ public partial class RegionManagementViewModel : ViewModelBase
             var result = (provinceId.HasValue && provinceId.Value > 0)
                 ? await _regionService.GetCitiesByProvinceIdAsync(provinceId.Value, default)
                 : await _regionService.GetCitiesAsync(default);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.IsFailure)
+                _logger.Warn($"加载地级市列表失败，保留旧列表: {result.ErrorCode} {result.Message}");
+            else if (result.Value is not null)
             {
                 Cities.Clear();
                 foreach (var city in result.Value)
@@ -199,7 +201,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"加载地级市列表异常: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"加载地级市列表失败: {ex.Message}", "确定");
         }
         finally
@@ -216,9 +218,8 @@ public partial class RegionManagementViewModel : ViewModelBase
 
         try
         {
-            _logger.Info($"执行操作");
             var result = await _regionService.GetCountiesAsync(default);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Counties.Clear();
                 foreach (var county in result.Value)
@@ -227,7 +228,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"加载县区列表失败: {ex.Message}", "确定");
         }
         finally
@@ -259,7 +260,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         try
         {
             var result = await _regionService.GetCountiesByCityIdAsync(cityId);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Counties.Clear();
                 foreach (var county in result.Value)
@@ -322,7 +323,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         try
         {
             var result = await _regionService.GetTownsByCountyIdAsync(countyId);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Towns.Clear();
                 foreach (var town in result.Value)
@@ -332,7 +333,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"加载乡镇列表失败: {ex.Message}", "确定");
         }
     }
@@ -342,7 +343,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         try
         {
             var result = await _regionService.GetVillagesByTownIdAsync(townId);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Villages.Clear();
                 foreach (var village in result.Value)
@@ -352,7 +353,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"加载村/社区列表失败: {ex.Message}", "确定");
         }
     }
@@ -386,7 +387,6 @@ public partial class RegionManagementViewModel : ViewModelBase
         {
             if (SelectedCity != null)
                 await LoadCountiesByCityAsync(SelectedCity.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -421,7 +421,6 @@ public partial class RegionManagementViewModel : ViewModelBase
             CancelEdit();
             if (SelectedCity != null)
                 await LoadCountiesByCityAsync(SelectedCity.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -469,7 +468,6 @@ public partial class RegionManagementViewModel : ViewModelBase
         if (result.IsSuccess)
         {
             await LoadTownsAsync(SelectedCounty!.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -513,7 +511,6 @@ public partial class RegionManagementViewModel : ViewModelBase
         {
             CancelEdit();
             await LoadTownsAsync(SelectedCounty.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -561,7 +558,6 @@ public partial class RegionManagementViewModel : ViewModelBase
         if (result.IsSuccess)
         {
             await LoadVillagesAsync(SelectedTown!.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -605,7 +601,6 @@ public partial class RegionManagementViewModel : ViewModelBase
         {
             CancelEdit();
             await LoadVillagesAsync(SelectedTown.Id);
-            _logger.Info($"执行操作");
         }
         else
         {
@@ -670,7 +665,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"Schema同步失败: {ex.Message}", "确定");
             Progress.CanCloseProgress = true;
         }
@@ -733,7 +728,7 @@ public partial class RegionManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"初始化失败: {ex.Message}", "确定");
             Progress.CanCloseProgress = true;
         }

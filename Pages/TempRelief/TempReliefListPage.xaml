@@ -25,7 +25,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center">
-                                    <Label Text="草稿" Style="{StaticResource ChipDangerText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipDangerText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -49,11 +49,12 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="救助类型" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding ReliefTypeName}" FontSize="14"
+                            <Label Text="{Binding CategoryDisplayName}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
@@ -77,7 +78,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center">
-                                    <Label Text="草稿" Style="{StaticResource ChipDangerText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipDangerText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -101,11 +102,12 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="救助类型" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding ReliefTypeName}" FontSize="14"
+                            <Label Text="{Binding CategoryDisplayName}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
@@ -134,7 +136,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipSuccess}" VerticalOptions="Center">
-                                    <Label Text="已确认" Style="{StaticResource ChipSuccessText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipSuccessText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -162,11 +164,12 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="救助类型" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding ReliefTypeName}" FontSize="14"
+                            <Label Text="{Binding CategoryDisplayName}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
@@ -190,7 +193,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipSuccess}" VerticalOptions="Center">
-                                    <Label Text="已确认" Style="{StaticResource ChipSuccessText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipSuccessText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -218,11 +221,12 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
                             <Label Text="救助类型" FontSize="13" TextColor="{StaticResource TextTertiary}"/>
-                            <Label Text="{Binding ReliefTypeName}" FontSize="14"
+                            <Label Text="{Binding CategoryDisplayName}" FontSize="14"
                                    TextColor="{StaticResource TextSecondary}"/>
                         </VerticalStackLayout>
                         <VerticalStackLayout Grid.Column="1" Spacing="2">
@@ -251,7 +255,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center">
-                                    <Label Text="已终止" Style="{StaticResource ChipDangerText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipDangerText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -261,6 +265,7 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
@@ -289,7 +294,7 @@
                                 <Label Text="{Binding ApplicantName}" FontSize="18" FontAttributes="Bold"
                                        TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
                                 <Border Style="{StaticResource ChipDanger}" VerticalOptions="Center">
-                                    <Label Text="已终止" Style="{StaticResource ChipDangerText}"/>
+                                    <Label Text="{Binding StatusName}" Style="{StaticResource ChipDangerText}"/>
                                 </Border>
                             </HorizontalStackLayout>
                             <Label Text="{Binding ApplicantIdCard}" FontSize="15"
@@ -299,6 +304,7 @@
                     <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Text="{Binding ApplicationNo, StringFormat='编号: {0}'}" FontSize="15"
                                TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding DeadlineText}" FontSize="13" TextColor="{StaticResource WarningDark}" IsVisible="{Binding DeadlineText, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
                         <VerticalStackLayout Spacing="2">
@@ -320,7 +326,7 @@
             OddTemplate="{StaticResource TempStoppedOddRow}"/>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="0">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="0">
 
         <!-- 渐变英雄头部（橙色） -->
         <!-- 统一页头（纸墨档案风报头 · Phase 6，操作按钮映射到 HeaderActions 插槽） -->
@@ -346,7 +352,7 @@
             <!-- 统计胶囊（Phase 6 迁移时漏迁，20261105 补回；浅色变体适配纸底页头） -->
             <components:PageHeaderView.Stats>
                 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
-                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding DraftCount}" Caption="草稿（件）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="0" Value="{Binding DraftCount}" Caption="办理中（件）"/>
                     <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding ConfirmedCount}" Caption="已确认累计（件）"/>
                     <components:StatCapsule IsLight="True" Grid.Column="2" Value="{Binding YearConfirmedText}" Caption="本年确认（人次）"/>
                     <components:StatCapsule IsLight="True" Grid.Column="3" Value="{Binding YearAmountText}" Caption="本年确认金额（元）"/>
@@ -375,7 +381,7 @@
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
-                           Text="草稿"
+                           Text="办理中"
                            FontSize="15"
                            FontAttributes="{Binding IsTab0Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
@@ -449,7 +455,7 @@
                            VerticalOptions="Center"
                            TextColor="{StaticResource Primary}"/>
                     <Label Grid.Column="1"
-                           Text="已终止"
+                           Text="已终结"
                            FontSize="15"
                            FontAttributes="{Binding IsTab2Selected, Converter={StaticResource BoolToFontAttributeConverter}}"
                            VerticalOptions="Center"
@@ -473,8 +479,18 @@
             </Border>
         </Grid>
 
+        <!-- 两大类 / 三小类筛选 -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12" Padding="16,4,16,8">
+            <Picker ItemsSource="{Binding PopulationFilterOptions}"
+                    SelectedItem="{Binding SelectedPopulationFilter}"
+                    Style="{StaticResource FormFieldPickerStyle}"/>
+            <Picker Grid.Column="1" ItemsSource="{Binding CategoryFilterOptions}"
+                    SelectedItem="{Binding SelectedCategoryFilter}"
+                    Style="{StaticResource FormFieldPickerStyle}"/>
+        </Grid>
+
         <!-- 搜索栏 -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 BackgroundColor="{StaticResource White}"
                 StrokeThickness="0"
                 Padding="16,8">
@@ -501,7 +517,7 @@
         </Border>
 
         <!-- 数据列表 -->
-        <Grid Grid.Row="3" Padding="16,8" RowDefinitions="*,Auto" VerticalOptions="Fill">
+        <Grid Grid.Row="4" Padding="16,8" RowDefinitions="*,Auto" VerticalOptions="Fill">
 
             <!-- Tab 0: 草稿列表 -->
             <CollectionView x:Name="TempDraftList" ItemsSource="{Binding DraftApps}"
@@ -515,7 +531,7 @@
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
                         <Label Text="{OnPlatform WinUI='&#xE74F;', Android='&#x1F552;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                        <Label Text="暂无草稿记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                        <Label Text="暂无办理中记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
             </CollectionView>
@@ -549,7 +565,7 @@
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="0,60">
                         <Label Text="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}" FontFamily="{OnPlatform WinUI='Segoe MDL2 Assets', Android=''}" FontSize="50" TextColor="{StaticResource Gray400}" HorizontalOptions="Center"/>
-                        <Label Text="暂无已终止记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
+                        <Label Text="暂无已终结记录" Style="{StaticResource EmptyStateLabel}" Margin="0,12,0,0"/>
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
             </CollectionView>

@@ -205,7 +205,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     var result0 = await _verificationService.SearchByDateRangePagedAsync(
                         UIConstants.FullRangeStart, UIConstants.FullRangeEnd,
                         SearchText, "0", PageIndex, PageSize, ct, onlyHead: true);
-                    if (result0.IsSuccess && result0.Value != null)
+                    if (result0.HasValue)
                         assetPage = result0.Value;
                     else
                     {
@@ -218,7 +218,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                     var result1 = await _verificationService.SearchByDateRangePagedAsync(
                         UIConstants.FullRangeStart, UIConstants.FullRangeEnd,
                         SearchText, "1", PageIndex, PageSize, ct, onlyHead: true);
-                    if (result1.IsSuccess && result1.Value != null)
+                    if (result1.HasValue)
                         assetPage = result1.Value;
                     else
                     {
@@ -229,7 +229,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 case 2:
                     // 草稿
                     var result2 = await _applicationService.GetDraftPagedAsync(SearchText, PageIndex, PageSize, ct);
-                    if (result2.IsSuccess && result2.Value != null)
+                    if (result2.HasValue)
                         appPage = result2.Value;
                     else
                     {
@@ -240,7 +240,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 case 3:
                     // 已建档未提交
                     var result3 = await _applicationService.GetArchiveBuiltNotSubmittedPagedAsync(SearchText, PageIndex, PageSize, ct);
-                    if (result3.IsSuccess && result3.Value != null)
+                    if (result3.HasValue)
                         appPage = result3.Value;
                     else
                     {
@@ -251,7 +251,7 @@ public partial class ApplicationWorkflowViewModel : PagedSearchViewModelBase
                 case 4:
                     // 已完结档案
                     var result4 = await _applicationService.GetArchivedPagedAsync(SearchText, PageIndex, PageSize, ct);
-                    if (result4.IsSuccess && result4.Value != null)
+                    if (result4.HasValue)
                         appPage = result4.Value;
                     else
                     {

@@ -91,7 +91,7 @@ public static class WideTableColumns
     public const string SpecialApprovalFormsColumns =
         "id, application_id, form_no, basic_situation, special_matters, template_key," +
         "report_unit, handler_name, form_date, audit_result, audit_date, status, created_by," +
-        "created_at, updated_at, deleted_at";
+        "created_at, updated_at, deleted_at, case_type, submitted_at, filed_at";
 
     /// <summary>nc_biz_special_approvals 全列（按列序）</summary>
     public const string SpecialApprovalsColumns =
@@ -112,5 +112,9 @@ public static class WideTableColumns
         "updated_by, deleted_at, difficulty_type, family_province, family_city," +
         "family_district, family_town, family_detail, hukou_province, hukou_city," +
         "hukou_district, hukou_town, beneficiary_name, beneficiary_id_card, beneficiary_gender," +
-        "beneficiary_age, beneficiary_relation, hukou_type, bank_name, bank_account";
+        "beneficiary_age, beneficiary_relation, hukou_type, bank_name, bank_account," +
+        "relief_person_count, standard_tier, standard_multiplier, accepted_at," +
+        "investigation_done_at, county_confirmed_at, county_confirmed_by, filing_status," +
+        "reject_reason, reject_notified_at, reject_notice_method," +
+        "population_status, payment_channel";
 }

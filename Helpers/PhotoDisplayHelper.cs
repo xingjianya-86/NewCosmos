@@ -67,7 +67,12 @@ public static class PhotoDisplayHelper
             try
             {
                 var data = await photoService.GetPhotoDataAsync(item.Id, ct);
-                if (data.IsFailure || data.Value == null || data.Value.Length == 0) return;
+                if (data.IsFailure)
+                {
+                    logger.Warn($"照片缩略图读取失败，已跳过 Id={item.Id}: {data.ErrorCode} {data.Message}");
+                    return;
+                }
+                if (data.Value == null || data.Value.Length == 0) return;
 
                 // 输出 JPEG（该页手机/桌面都会打开，WinUI 对 WebP 支持不稳定）
                 var thumb = ImageCompressor.CreateThumbnail(data.Value, maxEdge: ThumbnailMaxEdge, jpeg: true);

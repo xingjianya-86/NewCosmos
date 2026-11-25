@@ -46,7 +46,11 @@ public class PdfPreviewView : ContentView
 
         var appDir = AppDomain.CurrentDomain.BaseDirectory;
         var viewerPath = Path.Combine(appDir, "Resources", "PdfJs", "viewer.html");
-        if (!File.Exists(viewerPath)) return;
+        if (!File.Exists(viewerPath))
+        {
+            Serilog.Log.Warning("[PdfPreviewView] PDF 预览器缺失，预览区将保持空白: {Path}", viewerPath);
+            return;
+        }
 
         // 序号防乱序：属性快速变化时只应用最新一次的结果
         var sequence = ++_loadSequence;
@@ -60,9 +64,10 @@ public class PdfPreviewView : ContentView
                 var pdfBytes = File.ReadAllBytes(filePath);
                 base64 = Convert.ToBase64String(pdfBytes);
             }
-            catch
+            catch (Exception ex)
             {
-                // 读取失败（文件被占用/已删除等）时静默放弃本次加载
+                // 读取失败（文件被占用/已删除等）时放弃本次加载，但必须留痕：预览区空白不能与"尚未加载"混淆。
+                Serilog.Log.Warning(ex, "[PdfPreviewView] 读取 PDF 失败，本次预览放弃: {Path}", filePath);
                 return;
             }
 

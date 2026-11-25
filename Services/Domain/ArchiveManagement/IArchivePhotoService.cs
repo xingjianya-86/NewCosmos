@@ -40,7 +40,7 @@ public interface IArchivePhotoService
         string? keyword, string? category, int pageIndex, int pageSize, CancellationToken ct = default);
 
     /// <summary>
-    /// 解析照片插入归属人：身份证须 18 位合法，且在低收入/高龄/临时救助任一业务域存在——
+    /// 解析照片插入归属人：身份证须 18 位合法，且在低收入/高龄/临时救助/资产核查任一业务域存在——
     /// PC 端「插入照片 / 拖拽插入 / 打开采集页」的前置校验（必须指定已存在的档案人员）。
     /// 查不到返回 NOT_FOUND，不静默放行。
     /// </summary>

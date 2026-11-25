@@ -91,6 +91,7 @@ if ($Manifest -ne "") {
             Categories  = @($it.categories | ForEach-Object { [string]$_ })
             ConfigFile  = [string]$it.configFile
             SortOrder   = if ($null -ne $it.sortOrder) { [int]$it.sortOrder } else { $DefaultSortOrder }
+            DocType     = [string]$it.docType   # 文档类型（方案B精准定位词表 TemplateDocTypes；缺省空=导入后须在模板管理补选）
             BaseDir     = $manifestDir
         })
     }
@@ -106,6 +107,7 @@ elseif ($SourceDir -ne "") {
             Categories  = $DefaultCategories
             ConfigFile  = if (Test-Path -LiteralPath $cfg) { $cfg } else { "" }
             SortOrder   = $DefaultSortOrder
+            DocType     = ""   # SourceDir 模式无类型信息：导入后须在「模板管理」补选文档类型
             BaseDir     = $dir
         })
     }
@@ -162,16 +164,18 @@ foreach ($e in $entries) {
 
     $nameSql = ConvertTo-SqlLiteral $e.Name
     $configSql = ConvertTo-SqlLiteral $configJson
+    $docTypeSql = ConvertTo-SqlLiteral ([string]$e.DocType)
 
-    Write-Host ("  - {0}  [{1}]  {2:N0} bytes  cats={3}  cfg={4}" -f `
+    Write-Host ("  - {0}  [{1}]  {2:N0} bytes  cats={3}  cfg={4}  docType={5}" -f `
         $e.Name, $fileType, $bytes.Length,
         ($(if ($e.Categories.Count) { $e.Categories -join ',' } else { '-' })),
-        $(if ($cfgPath -ne "") { Split-Path -Leaf $cfgPath } else { '(default)' }))
+        $(if ($cfgPath -ne "") { Split-Path -Leaf $cfgPath } else { '(default)' }),
+        $(if ([string]::IsNullOrWhiteSpace($e.DocType)) { '(空-须补选)' } else { $e.DocType }))
 
     $sqlStatements.Add("DELETE FROM nc_biz_templates WHERE name = $nameSql;")
     $sqlStatements.Add(
-        "INSERT INTO nc_biz_templates (name, file_type, file_data, categories, config_json, sort_order, created_at) " +
-        "VALUES ($nameSql, '$fileType', decode('$hex','hex'), $catSql, $configSql::jsonb, $($e.SortOrder), NOW());")
+        "INSERT INTO nc_biz_templates (name, file_type, file_data, categories, config_json, doc_type, sort_order, created_at) " +
+        "VALUES ($nameSql, '$fileType', decode('$hex','hex'), $catSql, $configSql::jsonb, $docTypeSql, $($e.SortOrder), NOW());")
 }
 
 $sqlText = ($sqlStatements -join "`r`n")

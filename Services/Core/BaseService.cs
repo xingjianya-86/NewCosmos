@@ -47,24 +47,6 @@ public abstract class BaseService
         LogError(ex, operation);
     }
 
-    protected void EnsureNotNull(object param, string paramName)
-    {
-        if (param == null)
-            throw new ArgumentNullException(paramName, $"参数 {paramName} 不能为空");
-    }
-
-    protected void EnsureNotEmpty(string param, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(param))
-            throw new ArgumentException($"{ServiceName}: 参数 {paramName} 不能为空或空", paramName);
-    }
-
-    protected void EnsureNotNegative(decimal value, string paramName)
-    {
-        if (value < 0)
-            throw new ArgumentException($"{ServiceName}: 参数 {paramName} 不能为负", paramName);
-    }
-
     protected void ValidateNotNull(object param, string paramName)
     {
         if (param == null)

@@ -311,7 +311,7 @@ public partial class OrganizationTreeViewModel : ViewModelBase
             // 无论详情成败，统计都按当前选中项刷新（统计只依赖 SelectedOrganization，不依赖详情）
             await LoadStatisticsAsync();
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 SelectedOrganizationDetails = result.Value;
             }
@@ -742,7 +742,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             _provinceMap.Clear();
             ProvinceOptions.Add("（请选择）");
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var province in result.Value)
                 {
@@ -836,7 +836,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             CityOptions.Clear();
             _cityMap.Clear();
             CityOptions.Add("（请选择）");
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var city in result.Value)
                 {
@@ -873,7 +873,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             CountyOptions.Clear();
             _countyMap.Clear();
             CountyOptions.Add("（请选择）");
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var county in result.Value)
                 {
@@ -909,7 +909,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             CountyOptions.Clear();
             _countyMap.Clear();
             CountyOptions.Add("（请选择）");
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var county in result.Value)
                 {
@@ -942,7 +942,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             TownOptions.Clear();
             _townMap.Clear();
             TownOptions.Add("（请选择）");
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var town in result.Value)
                 {
@@ -972,7 +972,7 @@ public partial class OrganizationEditorViewModel : ViewModelBase
             VillageOptions.Clear();
             _villageMap.Clear();
             VillageOptions.Add("（请选择）");
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var village in result.Value)
                 {
@@ -1107,11 +1107,16 @@ public partial class OrganizationEditorViewModel : ViewModelBase
     private async Task<string?> WidenCountyOptionsAsync(int countyId)
     {
         var county = await _regionService.GetCountyByIdAsync(countyId, CancellationToken);
-        if (county.IsFailure || county.Value == null || string.IsNullOrEmpty(county.Value.CityName))
+        if (county.IsFailure)
+        {
+            _logger.Warn($"组织树：按县 ID 反查失败，县名将为空: CountyId={countyId}, {county.ErrorCode} {county.Message}");
+            return null;
+        }
+        if (county.Value == null || string.IsNullOrEmpty(county.Value.CityName))
             return null;
 
         var city = await _regionService.GetCityByNameAsync(county.Value.CityName, CancellationToken);
-        if (city.IsSuccess && city.Value != null && SelectedCityName != city.Value.CityName)
+        if (city.HasValue && SelectedCityName != city.Value.CityName)
         {
             SelectedCityName = city.Value.CityName;
             await LoadCountyOptionsByCityAsync(city.Value.Id);
@@ -1128,7 +1133,12 @@ public partial class OrganizationEditorViewModel : ViewModelBase
     private async Task<string?> WidenTownOptionsAsync(int townId)
     {
         var town = await _regionService.GetTownByIdAsync(townId, CancellationToken);
-        if (town.IsFailure || town.Value == null) return null;
+        if (town.IsFailure)
+        {
+            _logger.Warn($"组织树：按镇 ID 反查失败，镇名将为空: TownId={townId}, {town.ErrorCode} {town.Message}");
+            return null;
+        }
+        if (town.Value == null) return null;
 
         await LoadTownOptionsAsync(town.Value.CountyId);
         return FindName(_townMap, townId, t => t.Id);
@@ -1138,7 +1148,12 @@ public partial class OrganizationEditorViewModel : ViewModelBase
     private async Task<string?> WidenVillageOptionsAsync(int villageId)
     {
         var village = await _regionService.GetVillageByIdAsync(villageId, CancellationToken);
-        if (village.IsFailure || village.Value == null) return null;
+        if (village.IsFailure)
+        {
+            _logger.Warn($"组织树：按村 ID 反查失败，村名将为空: VillageId={villageId}, {village.ErrorCode} {village.Message}");
+            return null;
+        }
+        if (village.Value == null) return null;
 
         await LoadVillageOptionsAsync(village.Value.TownId);
         return FindName(_villageMap, villageId, v => v.Id);

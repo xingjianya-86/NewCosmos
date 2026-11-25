@@ -46,9 +46,10 @@ public static class LotteryPrizeResolver
                     : 0m;
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // 奖级明细格式异常不影响主流程，按未知奖金处理
+            // 格式异常不影响主流程，但必须留痕：否则"中奖金额 0 元"与"未中奖"无法区分。
+            Serilog.Log.Warning(ex, "[LotteryPrizeResolver] 奖级明细 JSON 解析失败，奖金按 0 处理");
         }
 
         return 0m;

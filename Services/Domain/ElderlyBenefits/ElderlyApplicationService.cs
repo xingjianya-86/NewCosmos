@@ -458,8 +458,19 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
         if (result.Value == 0)
             return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "登记记录不存在、已删除或已不是草稿状态（仅草稿可确认）");
 
+        // 联动标记导入名册（同停发联动）：确认即视为已并入当前库，名册行 Active→Stopped，
+        // 否则名册侧"待建档"语义残留（统计/待办不双计，但名册搜索仍当在册）。
+        // 联动失败不回滚确认——主操作已提交，仅随结果带警告（同 StopAsync 口径）。
+        var idCardResult = await _db.QuerySingleAsync<string?>(
+            "SELECT id_card FROM nc_biz_elderly_applications WHERE id = $1 AND deleted_at IS NULL", ct, id);
+        var linkageOk = idCardResult.IsSuccess
+            && !string.IsNullOrWhiteSpace(idCardResult.Value)
+            && (await MarkHistoryMigratedAsync(idCardResult.Value!, ct)).IsSuccess;
+
         Logger.LogBusiness("确认普惠高龄登记", ("ApplicationId", id));
-        return Result.Success();
+        return linkageOk
+            ? Result.Success()
+            : Result.SuccessWithWarning("确认已保存，但导入名册联动标记失败（该人员可能仍在名册待建档名单中）。可稍后办理停发或联系管理员处理。");
     }
 
     public async Task<Result> CompleteArchiveAsync(long id, CancellationToken ct = default)
@@ -839,11 +850,21 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             // 2. 检查是否已建档（幂等）
             var existingSql = "SELECT id FROM nc_biz_elderly_applications WHERE id_card = $1 AND deleted_at IS NULL LIMIT 1";
             var existingResult = await _db.QuerySingleAsync<long?>(existingSql, ct, history.IdCard);
-            if (existingResult.IsSuccess && existingResult.Value.HasValue)
+            if (existingResult.IsFailure)
+            {
+                LogError($"导入库建档前查重失败，已中止: {existingResult.ErrorCode} {existingResult.Message}");
+                return Result.Failure<long>(
+                    existingResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"导入库建档前查重失败: {existingResult.Message}");
+            }
+            if (existingResult.Value.HasValue)
             {
                 LogInfo($"导入库记录已建档: historyId={historyId}, existingAppId={existingResult.Value.Value}");
                 return Result.Success(existingResult.Value.Value);
             }
+
+            // 3-6 步在同一事务内：评估/补全失败必须回滚，不能留下无类别空档。
+            await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
             // 3. 生成申请编号
             var appNoResult = await GetNextApplicationNoAsync(ct);
@@ -875,7 +896,14 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
 
             // 6. 调用评估逻辑补全 category/identity/issue 字段
             var evaluateResult = await EvaluateAsync(history.IdCard, applyDate, ct);
-            if (evaluateResult.IsSuccess && evaluateResult.Value != null)
+            if (evaluateResult.IsFailure || evaluateResult.Value == null)
+            {
+                // 建档成功但评估失败会留下无类别/无发放月份的空档，必须显式失败由上层重试。
+                LogError($"导入库建档后评估失败: HistoryId={historyId}, {evaluateResult.ErrorCode} {evaluateResult.Message}");
+                return Result.Failure<long>(
+                    evaluateResult.ErrorCode ?? ErrorCodes.UNKNOWN_ERROR,
+                    $"导入库建档后评估失败: {evaluateResult.Message}");
+            }
             {
                 var eval = evaluateResult.Value;
                 var updateSql = @"
@@ -884,11 +912,20 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
                         issue_start_month = $4, issue_amount = $5,
                         updated_at = NOW()
                     WHERE id = $6 AND deleted_at IS NULL";
-                await _db.ExecuteNonQueryAsync(updateSql, ct,
+                var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct,
                     eval.Category, eval.IdentityFlag, eval.IdentitySource,
                     eval.IssueStartMonth, eval.IssueAmount,
                     newAppId);
+                if (updateResult.IsFailure)
+                {
+                    LogError($"导入库建档后补全类别失败: NewApplicationId={newAppId}, {updateResult.ErrorCode} {updateResult.Message}");
+                    return Result.Failure<long>(
+                        updateResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        $"导入库建档后补全类别失败: {updateResult.Message}");
+                }
             }
+
+            await tx.CommitAsync(ct);
 
             Logger.LogBusiness("从导入库建档",
                 ("HistoryId", historyId),
@@ -995,7 +1032,7 @@ public partial class ElderlyApplicationService : BaseService, IElderlyApplicatio
             var registeredResult = await _db.QueryAsync<string>(
                 "SELECT id_card FROM nc_biz_elderly_applications WHERE id_card = ANY($1) AND deleted_at IS NULL",
                 ct, new object[] { candidates.Keys.ToArray() });
-            if (registeredResult.IsSuccess && registeredResult.Value != null)
+            if (registeredResult.HasValue)
             {
                 foreach (var c in registeredResult.Value)
                     if (!string.IsNullOrWhiteSpace(c)) registeredSet.Add(c.Trim());

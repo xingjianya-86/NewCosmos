@@ -4,8 +4,8 @@ namespace NewCosmos.Models.Entities;
 
 /// <summary>
 /// 档案照片归属人（PC 端「插入照片 / 打开采集页」的前置校验结果）：
-/// 插入的照片必须挂到**已存在的档案人员**名下——身份证须 18 位合法且在低收入/高龄/临时救助
-/// 任一业务域存在。数据源与 <see cref="PhotoBackfillCandidate"/> 同一段三域 UNION CTE，
+/// 插入的照片必须挂到**已存在的档案人员**名下——身份证须 18 位合法且在低收入/高龄/临时救助/资产核查
+/// 任一业务域存在。数据源与 <see cref="PhotoBackfillCandidate"/> 同一段四域 UNION CTE，
 /// 差别仅在本类型按身份证精确定位到一个人（而非按关键词分页模糊检索）。
 /// </summary>
 public class PhotoOwner
@@ -16,7 +16,7 @@ public class PhotoOwner
     /// <summary>人员姓名（照片命名规则 2026-11-04 的姓名段）。</summary>
     public string PersonName { get; set; } = string.Empty;
 
-    /// <summary>所属业务域，'/' 分隔：ElderlyBenefits/SocialAssistance/TempRelief。</summary>
+    /// <summary>所属业务域，'/' 分隔：ElderlyBenefits/SocialAssistance/TempRelief/AssetVerification。</summary>
     public string BusinessTypes { get; set; } = string.Empty;
 
     /// <summary>代表业务 ID（写入照片 application_id 追溯用；跨域聚合取其一，无法确定为 null）。</summary>

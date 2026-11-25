@@ -87,6 +87,9 @@
                                                         <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
                                                             <Label Text="{Binding FileType}" Style="{StaticResource ChipInfoText}"/>
                                                         </Border>
+                                                        <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                                                            <Label Text="{Binding DocType}" Style="{StaticResource ChipInfoText}"/>
+                                                        </Border>
                                                         <Label Text="{Binding Categories, Converter={StaticResource CategoryDisplayConverter}}"
                                                                FontSize="{OnPlatform WinUI=16, Android=15, Default=16}" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                                                     </HorizontalStackLayout>
@@ -325,6 +328,15 @@
                                 <Picker Grid.Column="3" ItemsSource="{Binding TemplateTypes}"
                                         SelectedItem="{Binding TemplateType}"
                                         WidthRequest="100" HeightRequest="40"/>
+                            </Grid>
+
+                            <!-- 文档类型（方案B精准定位维度，必选；词表=TemplateDocTypes.All，与分类正交） -->
+                            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="12">
+                                <Label Grid.Column="0" Text="文档类型" FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                                <Picker Grid.Column="1" ItemsSource="{Binding DocTypes}"
+                                        SelectedItem="{Binding SelectedDocType}"
+                                        Title="选择文档类型（必选）" HeightRequest="40"/>
                             </Grid>
 
                             <!-- 分类 + 配置 两列布局 -->

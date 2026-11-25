@@ -54,8 +54,9 @@ public class SplashAssetsService : BaseService, ISplashAssetsService
             var username = Preferences.Get(_preferences.RememberedUsernameKey, string.Empty);
             return string.IsNullOrWhiteSpace(username) ? null : username.Trim();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[SplashAssets] 读取记住的用户名失败");
             return null;
         }
     }

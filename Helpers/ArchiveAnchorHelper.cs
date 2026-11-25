@@ -59,6 +59,9 @@ public static class ArchiveAnchorHelper
         if (firstApprovedAt is { } approved && approved != default) return approved;
         if (dataCompletedAt is { } completed && completed != default) return completed;
         if (updatedAt != default) return updatedAt;
+
+        // 所有可追溯日期均缺失：只能按今天锚定。正式文书日期可能与真实受理日不符，必须留痕。
+        Serilog.Log.Warning("[ArchiveAnchorHelper] 申请编号/创建/审批/补全/更新时间全部缺失，业务锚点回退今天");
         return DateTime.Today;
     }
 

@@ -107,7 +107,6 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result<ApplicationEntity>> GetByIdAsync(long id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = $"SELECT {ApplicationColumns.Full} FROM nc_biz_applications WHERE id = $1 AND deleted_at IS null";
         return await _db.QuerySingleAsync<ApplicationEntity>(sql, ct, id);
     }
@@ -331,7 +330,6 @@ public class ApplicationService : BaseService, IApplicationService
     {
         ValidateNotNull(request, nameof(request));
 
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -504,7 +502,6 @@ public class ApplicationService : BaseService, IApplicationService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -654,7 +651,6 @@ public class ApplicationService : BaseService, IApplicationService
 
     public async Task<Result> DeleteAsync(long id, string deletedBy, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -691,7 +687,6 @@ public class ApplicationService : BaseService, IApplicationService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -706,7 +701,6 @@ public class ApplicationService : BaseService, IApplicationService
     {
         ValidateNotNull(request, nameof(request));
 
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -745,7 +739,6 @@ public class ApplicationService : BaseService, IApplicationService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -816,7 +809,6 @@ public class ApplicationService : BaseService, IApplicationService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -1269,9 +1261,17 @@ public class ApplicationService : BaseService, IApplicationService
 
             var source = sourceResult.Value;
 
-            // 获取下一个申请编号
+            // 获取下一个申请编号：失败必须中止，禁止伪造 SR- 编号落库（会绕开编号规则）
             var appNoResult = await GetNextApplicationNoAsync(ct);
-            var appNo = appNoResult.IsSuccess ? appNoResult.Value : $"SR-{DateTime.Now:yyyyMMddHHmmss}";
+            if (appNoResult.IsFailure || string.IsNullOrWhiteSpace(appNoResult.Value))
+            {
+                await tx.RollbackAsync(ct);
+                LogError($"生成申请编号失败: {appNoResult.ErrorCode} {appNoResult.Message}");
+                return Result.Failure<long>(
+                    appNoResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"生成申请编号失败: {appNoResult.Message}");
+            }
+            var appNo = appNoResult.Value;
 
             // ── 计算单人保保障金额 ──
             var isRural = ClassificationConstants.HukouType.IsHukouRural(source.HukouType);
@@ -1283,7 +1283,15 @@ public class ApplicationService : BaseService, IApplicationService
             var guaranteeResult = await _classificationService.CalculateGuaranteeAmountAsync(
                 classificationCode, familySize: 1, isRural,
                 totalFamilyIncome: source.TotalFamilyIncome, ct);
-            var householdMonthly = guaranteeResult.IsSuccess ? guaranteeResult.Value : 0m;
+            if (guaranteeResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                LogError($"单人保保障金计算失败: {guaranteeResult.ErrorCode} {guaranteeResult.Message}");
+                return Result.Failure<long>(
+                    guaranteeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"单人保保障金计算失败: {guaranteeResult.Message}");
+            }
+            var householdMonthly = guaranteeResult.Value;
 
             // 分类施保（重病/重残/高龄/未成年）
             var subsidyResult = await _classificationService.CalculateClassifiedSubsidyAsync(
@@ -1427,8 +1435,8 @@ public class ApplicationService : BaseService, IApplicationService
 
         // 复制刚性支出
         var rigidSql = @"INSERT INTO nc_biz_rigid_expenditures 
-            (application_id, person_description, expenditure_type, amount, created_at)
-            SELECT $1, person_description, expenditure_type, amount, NOW()
+            (application_id, member_id, member_name, member_id_card, person_description, expenditure_type, amount, created_at)
+            SELECT $1, member_id, member_name, member_id_card, person_description, expenditure_type, amount, NOW()
             FROM nc_biz_rigid_expenditures WHERE application_id = $2 AND deleted_at IS NULL";
         await ExecOrThrowAsync(_db, rigidSql, ct, targetAppId, sourceAppId);
 

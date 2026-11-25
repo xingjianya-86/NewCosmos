@@ -58,6 +58,46 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
 
     #endregion
 
+    #region 两大类 / 三小类筛选
+
+    public ObservableCollection<string> PopulationFilterOptions { get; } =
+        new() { "全部人群", "在保障人群内", "不在保障人群内" };
+
+    public ObservableCollection<string> CategoryFilterOptions { get; } =
+        new() { "全部小类", "常规·上级发放", "常规·备用金发放", "小额快救" };
+
+    [ObservableProperty]
+    private string _selectedPopulationFilter = "全部人群";
+
+    [ObservableProperty]
+    private string _selectedCategoryFilter = "全部小类";
+
+    partial void OnSelectedPopulationFilterChanged(string value) => ReloadByFilter();
+    partial void OnSelectedCategoryFilterChanged(string value) => ReloadByFilter();
+
+    private void ReloadByFilter()
+    {
+        PageIndex = 1;
+        SafeFireAndForget(async () => await LoadDataAsync());
+    }
+
+    private string? CurrentPopulationFilter => SelectedPopulationFilter switch
+    {
+        "在保障人群内" => TempReliefConstants.PopulationInsured,
+        "不在保障人群内" => TempReliefConstants.PopulationUninsured,
+        _ => null
+    };
+
+    private (string? ReliefType, string? PaymentChannel) CurrentCategoryFilter => SelectedCategoryFilter switch
+    {
+        "常规·上级发放" => (TempReliefConstants.ReliefTypeLarge, TempReliefConstants.PaymentCounty),
+        "常规·备用金发放" => (TempReliefConstants.ReliefTypeLarge, TempReliefConstants.PaymentReserve),
+        "小额快救" => (TempReliefConstants.ReliefTypeSmall, TempReliefConstants.PaymentReserve),
+        _ => (null, null)
+    };
+
+    #endregion
+
     #region 数据集合
 
     [ObservableProperty]
@@ -148,7 +188,7 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
         try
         {
             var result = await _statisticsService.GetTempReliefStatsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 YearConfirmedText = result.Value.YearConfirmed.ToString("N0");
                 YearAmountText = result.Value.YearConfirmedAmount.ToString("N0");
@@ -174,8 +214,9 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
             await LoadDataAsync();
             _ = LoadHeaderStatsAsync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.Error($"临时救助列表页加载失败: {ex.Message}");
             ErrorMessage = "页面加载失败，请重试";
         }
     }
@@ -216,14 +257,26 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
 
     private async Task LoadCurrentTabDataAsync(CancellationToken ct, int version)
     {
-        var status = SelectedTabIndex switch
+        var statuses = SelectedTabIndex switch
         {
-            0 => TempReliefConstants.StatusDraft,
-            1 => TempReliefConstants.StatusConfirmed,
-            _ => TempReliefConstants.StatusStopped
+            0 => new[]
+            {
+                TempReliefConstants.StatusDraft,
+                TempReliefConstants.StatusSubmitted,
+                TempReliefConstants.StatusReturned
+            },
+            1 => new[] { TempReliefConstants.StatusConfirmed },
+            _ => new[]
+            {
+                TempReliefConstants.StatusStopped,
+                TempReliefConstants.StatusRejected
+            }
         };
 
-        var result = await _applicationService.GetPagedAsync(SearchText, status, PageIndex, PageSize, ct);
+        var result = await _applicationService.GetPagedByStatusesAsync(
+            SearchText, statuses, CurrentPopulationFilter,
+            CurrentCategoryFilter.ReliefType, CurrentCategoryFilter.PaymentChannel,
+            PageIndex, PageSize, ct);
         if (result.IsFailure || result.Value == null)
         {
             _logger.LogError(new Exception(result.Message ?? "未知错误"), "加载临时救助列表失败");
@@ -251,21 +304,30 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
     {
         try
         {
-            var draftResult = await _applicationService.GetPagedAsync(string.Empty, TempReliefConstants.StatusDraft, 1, 1);
-            if (draftResult.IsSuccess && draftResult.Value != null)
+            var draftResult = await _applicationService.GetPagedByStatusesAsync(string.Empty,
+                new[] { TempReliefConstants.StatusDraft, TempReliefConstants.StatusSubmitted, TempReliefConstants.StatusReturned },
+                CurrentPopulationFilter, CurrentCategoryFilter.ReliefType, CurrentCategoryFilter.PaymentChannel,
+                1, 1);
+            if (draftResult.HasValue)
                 DraftCount = draftResult.Value.TotalCount;
 
-            var confirmedResult = await _applicationService.GetPagedAsync(string.Empty, TempReliefConstants.StatusConfirmed, 1, 1);
-            if (confirmedResult.IsSuccess && confirmedResult.Value != null)
+            var confirmedResult = await _applicationService.GetPagedByStatusesAsync(string.Empty,
+                new[] { TempReliefConstants.StatusConfirmed },
+                CurrentPopulationFilter, CurrentCategoryFilter.ReliefType, CurrentCategoryFilter.PaymentChannel,
+                1, 1);
+            if (confirmedResult.HasValue)
                 ConfirmedCount = confirmedResult.Value.TotalCount;
 
-            var stoppedResult = await _applicationService.GetPagedAsync(string.Empty, TempReliefConstants.StatusStopped, 1, 1);
-            if (stoppedResult.IsSuccess && stoppedResult.Value != null)
+            var stoppedResult = await _applicationService.GetPagedByStatusesAsync(string.Empty,
+                new[] { TempReliefConstants.StatusStopped, TempReliefConstants.StatusRejected },
+                CurrentPopulationFilter, CurrentCategoryFilter.ReliefType, CurrentCategoryFilter.PaymentChannel,
+                1, 1);
+            if (stoppedResult.HasValue)
                 StoppedCount = stoppedResult.Value.TotalCount;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 计数加载失败不影响主列表
+            _logger.Warn($"临时救助计数加载失败，Tab 徽标可能为 0: {ex.Message}");
         }
     }
 
@@ -417,19 +479,44 @@ public partial class TempReliefListViewModel : PagedSearchViewModelBase
                 return Result.Failure(ErrorCodes.NOT_FOUND, "加载失败");
             }
             var fullApp = fullResult.Value;
+            var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
 
             // 加载子表（打印需要疾病/意外/教育/成员明细）
             var diseases = await _applicationService.GetDiseasesByApplicationIdAsync(app.Id, CancellationToken);
-            if (diseases.IsSuccess && diseases.Value != null) fullApp.Diseases = diseases.Value;
+            if (diseases.IsFailure)
+            {
+                _logger.Error($"临时救助补打：疾病明细加载失败，已中止: {diseases.Message}");
+                await dialogService.DisplayAlertAsync("打印未开始", $"疾病明细加载失败，未生成文书：{diseases.Message}", "确定");
+                return Result.Failure(diseases.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, diseases.Message ?? "疾病明细加载失败");
+            }
+            fullApp.Diseases = diseases.Value ?? new();
 
             var accidents = await _applicationService.GetAccidentsByApplicationIdAsync(app.Id, CancellationToken);
-            if (accidents.IsSuccess && accidents.Value != null) fullApp.Accidents = accidents.Value;
+            if (accidents.IsFailure)
+            {
+                _logger.Error($"临时救助补打：灾害明细加载失败，已中止: {accidents.Message}");
+                await dialogService.DisplayAlertAsync("打印未开始", $"灾害明细加载失败，未生成文书：{accidents.Message}", "确定");
+                return Result.Failure(accidents.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, accidents.Message ?? "灾害明细加载失败");
+            }
+            fullApp.Accidents = accidents.Value ?? new();
 
             var educations = await _applicationService.GetEducationsByApplicationIdAsync(app.Id, CancellationToken);
-            if (educations.IsSuccess && educations.Value != null) fullApp.Educations = educations.Value;
+            if (educations.IsFailure)
+            {
+                _logger.Error($"临时救助补打：教育明细加载失败，已中止: {educations.Message}");
+                await dialogService.DisplayAlertAsync("打印未开始", $"教育明细加载失败，未生成文书：{educations.Message}", "确定");
+                return Result.Failure(educations.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, educations.Message ?? "教育明细加载失败");
+            }
+            fullApp.Educations = educations.Value ?? new();
 
             var membersResult = await _applicationService.GetMembersByApplicationIdAsync(app.Id, CancellationToken);
-            var memberList = membersResult.IsSuccess ? membersResult.Value ?? new() : new List<TempReliefMember>();
+            if (membersResult.IsFailure)
+            {
+                _logger.Error($"临时救助补打：成员明细加载失败，已中止: {membersResult.Message}");
+                await dialogService.DisplayAlertAsync("打印未开始", $"成员明细加载失败，未生成文书：{membersResult.Message}", "确定");
+                return Result.Failure(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, membersResult.Message ?? "成员明细加载失败");
+            }
+            var memberList = membersResult.Value ?? new();
 
             // 构建打印字段
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();

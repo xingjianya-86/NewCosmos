@@ -21,12 +21,33 @@ public static class SpecialApprovalConstants
     /// <summary>会议审议驳回</summary>
     public const string StatusRejected = "Rejected";
 
+    // ── 黑民规〔2026〕10 号（2026-11-25） ──
+    /// <summary>已返回结论（县级线下评议结论已登记，待备案）</summary>
+    public const string StatusReturned = "Returned";
+
+    /// <summary>不通过（终态：禁止提交申请）</summary>
+    public const string StatusNotPassed = "NotPassed";
+
+    /// <summary>已备案（终态）</summary>
+    public const string StatusFiled = "Filed";
+
+    /// <summary>退回补正（乡镇可修改后重新上报）</summary>
+    public const string StatusReturnedForCorrection = "ReturnedForCorrection";
+
+    /// <summary>历史：不予受理（只读兼容）</summary>
+    public const string StatusNotApplicable = "NotApplicable";
+
     private static readonly Dictionary<string, string> StatusDescriptions = new()
     {
         [StatusDraft] = "草稿",
-        [StatusSubmitted] = "已提交",
-        [StatusApproved] = "审议通过",
-        [StatusRejected] = "审议驳回"
+        [StatusSubmitted] = "已上报（待县级评议）",
+        [StatusApproved] = "历史：审议通过（未备案）",
+        [StatusRejected] = "历史：审议驳回",
+        [StatusReturned] = "已返回结论（待备案）",
+        [StatusNotPassed] = "不通过（禁止提交）",
+        [StatusFiled] = "已备案",
+        [StatusReturnedForCorrection] = "退回补正",
+        [StatusNotApplicable] = "历史：不予受理"
     };
 
     /// <summary>

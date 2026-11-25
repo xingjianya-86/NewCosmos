@@ -41,9 +41,10 @@ public static class FontFamilyReader
             var names = ReadFamilyNames(data);
             return names.Count > 0 ? names : Fallback(fallback);
         }
-        catch
+        catch (Exception ex)
         {
-            // 坏文件/IO 失败：回退文件名，不中断检查
+            // 坏文件/IO 失败：回退文件名，不中断检查；留痕便于定位字体误判。
+            Serilog.Log.Debug(ex, "[FontFamilyReader] 读取字体文件失败，回退文件名: {File}", filePath);
             return Fallback(fallback);
         }
     }
@@ -70,8 +71,9 @@ public static class FontFamilyReader
 
             return ParseNameTable(data, offsetTableOffset);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[FontFamilyReader] 解析字体字节失败，返回空族名列表");
             return Array.Empty<string>();
         }
     }

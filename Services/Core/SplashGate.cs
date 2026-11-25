@@ -10,6 +10,7 @@ namespace NewCosmos.Services.Core;
 public sealed class SplashGate : ISplashGate
 {
     private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<StartupIntent> _intentTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public SplashGate(AppOptions options, ILoggerService logger)
     {
@@ -37,4 +38,15 @@ public sealed class SplashGate : ISplashGate
     public Task WhenCompleted => _tcs.Task;
 
     public void Complete() => _tcs.TrySetResult();
+
+    public Task<StartupIntent> WhenIntentDecided => _intentTcs.Task;
+
+    /// <summary>首次定论生效（会话恢复的各出口只会有一个到达；重试再入为 no-op，不影响已放行的动画）</summary>
+    public void SetIntent(StartupIntent intent)
+    {
+        if (intent == StartupIntent.Pending)
+            return;
+
+        _intentTcs.TrySetResult(intent);
+    }
 }

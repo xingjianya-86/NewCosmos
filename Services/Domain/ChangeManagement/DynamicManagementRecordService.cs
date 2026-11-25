@@ -216,7 +216,9 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
 
             // 8. 入户调查结论（乡镇街道意见）
             var surveyResult = await _householdSurveyService.GetByApplicationIdAsync(applicationId, ct);
-            var townOpinion = surveyResult.IsSuccess && surveyResult.Value != null
+            if (surveyResult.IsFailure)
+                LogWarn($"动态管理记录：入户调查结论查询失败，乡镇意见栏将为空: ApplicationId={applicationId}, {surveyResult.Message}");
+            var townOpinion = surveyResult.HasValue
                 ? surveyResult.Value.SurveyConclusion ?? ""
                 : "";
 
@@ -512,8 +514,8 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
                 var latestId = normalizeResult.Value;
 
                 var appResult = await _applicationService.GetByIdAsync(latestId, ct);
-                var name = appResult.IsSuccess && appResult.Value != null ? appResult.Value.ApplicantName ?? "" : "";
-                var idCard = appResult.IsSuccess && appResult.Value != null ? appResult.Value.ApplicantIdCard ?? "" : "";
+                var name = appResult.HasValue ? appResult.Value.ApplicantName ?? "" : "";
+                var idCard = appResult.HasValue ? appResult.Value.ApplicantIdCard ?? "" : "";
 
                 var fieldsResult = await BuildFieldsAsync(latestId, ct);
                 if (fieldsResult.IsFailure)
@@ -826,7 +828,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
         var orgId = App.CurrentUserOrganizationId;
         if (!orgId.HasValue) return "-";
         var orgResult = await _organizationService.GetByIdAsync(orgId.Value, ct);
-        return orgResult.IsSuccess && orgResult.Value != null
+        return orgResult.HasValue
             ? orgResult.Value.Name
             : "-";
     }

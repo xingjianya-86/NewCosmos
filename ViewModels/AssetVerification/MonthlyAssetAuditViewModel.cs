@@ -287,7 +287,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
 
                 // 优先用文件名里的身份证精确匹配；没有身份证再按姓名
                 var searchResult = await _verificationService.SearchByNameOrIdCardAsync(identity.Keyword, token);
-                if (searchResult.IsSuccess && searchResult.Value != null && searchResult.Value.Count > 0)
+                if (searchResult.HasValue && searchResult.Value.Count > 0)
                 {
                     // 多条结果时让用户选择
                     AssetVerificationTask? match = null;
@@ -1112,7 +1112,7 @@ public partial class MonthlyAssetAuditViewModel : ViewModelBase
             var result = await _verificationService.GetStatsByDateRangeAsync(start, end, token);
             if (token.IsCancellationRequested) return;
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 SubmittedCount = result.Value.SubmittedCount;
                 HasReportCount = result.Value.HasReportCount;

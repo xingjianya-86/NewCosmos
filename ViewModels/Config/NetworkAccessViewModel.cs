@@ -113,8 +113,9 @@ public partial class NetworkAccessViewModel : ViewModelBase
             var db = _configService.GetDatabaseOptions();
             return $"{db.Host}:{db.Port}";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"读取数据库端点失败，界面显示「—」: {ex.Message}");
             return "—";
         }
     }

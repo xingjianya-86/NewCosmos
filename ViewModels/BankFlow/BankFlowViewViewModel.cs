@@ -77,7 +77,7 @@ public partial class BankFlowViewViewModel : PagedSearchViewModelBase
     private async Task LoadBatchesAsync()
     {
         var result = await _bankFlowQueryService.GetImportsAsync(CancellationToken);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             var keepId = SelectedBatch?.Id;
             Batches.Clear();

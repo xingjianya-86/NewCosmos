@@ -37,13 +37,12 @@ public class PrintRecordService : BaseService, IPrintRecordService
 
         if (result.IsFailure)
         {
-            LogError($"操作失败");
+            LogError($"保存打印记录失败: {result.ErrorCode} {result.Message}");
             return result;
         }
 
         record.Id = result.Value!.Id;
         record.CreatedAt = result.Value.CreatedAt;
-        LogInfo($"执行操作");
         return Result.Success(record);
     }
 
@@ -66,7 +65,6 @@ public class PrintRecordService : BaseService, IPrintRecordService
 
     public async Task<Result<List<PrintRecord>>> GetByBatchNoAsync(string batchNo, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         var sql = @"SELECT id, batch_no, business_type, business_id, template_id, template_name,
                             pdf_size, source_type, source_size, printer_name, copies,
@@ -94,7 +92,6 @@ public class PrintRecordService : BaseService, IPrintRecordService
 
     public async Task<Result<List<PrintRecord>>> GetByTemplateAsync(long templateId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         var sql = @"SELECT id, batch_no, business_type, business_id, template_id, template_name,
                             pdf_size, source_type, source_size, printer_name, copies,

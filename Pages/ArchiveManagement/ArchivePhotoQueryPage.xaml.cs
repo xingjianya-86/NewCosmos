@@ -146,8 +146,9 @@ public partial class ArchivePhotoQueryPage : ContentPage, IParameterizedPage<Arc
         }
         catch (Exception ex)
         {
-            // 拖放失败不打断页面（按钮插入链路不受影响）
-            System.Diagnostics.Debug.WriteLine($"拖拽插入失败: {ex.Message}");
+            // 拖放失败不打断页面（按钮插入链路不受影响），但必须给用户可见反馈 + 日志。
+            Serilog.Log.Warning(ex, "[ArchivePhotoQueryPage] 拖拽插入照片失败");
+            await DisplayAlertAsync("插入失败", $"拖拽的照片未能插入：{ex.Message}", "确定");
         }
     }
 #endif

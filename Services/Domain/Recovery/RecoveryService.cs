@@ -257,7 +257,7 @@ public class RecoveryService : BaseService, IRecoveryService
                 idCard.Trim(), ApplicationStatusCodes.STOPPED);
 
             // 无行 = 未命中（Success(null)），由界面提示转手工填写；失败才上抛
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 LogInfo($"手工追缴查档命中: sourceType={result.Value.SourceType}, " +
                         $"stopped={result.Value.IsStopped}, " +
@@ -437,7 +437,7 @@ public class RecoveryService : BaseService, IRecoveryService
 
             var result = await _db.QuerySingleAsync<RecoveryRecord>(sql, ct, id);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 LogInfo($"获取到追缴记录: {DataMasker.MaskName(result.Value.PersonName ?? string.Empty)}");
             }
@@ -986,7 +986,7 @@ public class RecoveryService : BaseService, IRecoveryService
 
             var result = await _db.QuerySingleAsync<StoppedPersonStats>(sql, ct, ApplicationStatusCodes.STOPPED);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 LogInfo($"停止人员统计: 总数={result.Value.TotalCount}, 农村低保={result.Value.RuralSubsistenceCount}, 城市低保={result.Value.UrbanSubsistenceCount}, 刚性支出={result.Value.RigidExpenditureCount}");
             }

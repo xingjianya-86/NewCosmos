@@ -37,6 +37,10 @@ tables:
         type: jsonb
         nullable: true
         comment: 字段映射配置JSON
+      - name: doc_type
+        type: character varying(60)
+        nullable: true
+        comment: 文档类型（方案B精准定位维度，词表见 Constants/TemplateDocTypes.cs；与 categories 项目类型维度正交）
       - name: created_at
         type: timestamp without time zone
         nullable: false

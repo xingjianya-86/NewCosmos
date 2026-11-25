@@ -31,6 +31,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
     private readonly ILoggerService _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly IOcrRecognizeClient _ocrClient;
+    private readonly IScreenAwakeService _screenAwake;
 
     /// <summary>识别回填上下文（表单传入；null = 只存档不识别）</summary>
     private IOcrAssignContext? _assignContext;
@@ -67,7 +68,8 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         IDialogService dialogService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
-        IOcrRecognizeClient ocrClient)
+        IOcrRecognizeClient ocrClient,
+        IScreenAwakeService screenAwake)
     {
         _photoService = photoService;
         _printQueueService = printQueueService;
@@ -76,6 +78,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         _logger = logger;
         _serviceProvider = serviceProvider;
         _ocrClient = ocrClient;
+        _screenAwake = screenAwake;
         Title = "档案照片";
 
         foreach (var (code, name) in PhotoCategoryConstants.All)
@@ -499,8 +502,15 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         // 保存前取一次现有照片算基准号，本批内逐张递增。
         var existingResult = await _photoService.GetByPersonAsync(
             ApplicantIdCard.Trim(), SelectedCategoryCode, CancellationToken);
-        var nextSeq = PhotoNameBuilder.NextSequence(
-            existingResult.IsSuccess ? existingResult.Value ?? new List<ArchivePhoto>() : new List<ArchivePhoto>());
+        if (existingResult.IsFailure)
+        {
+            // 现有照片流水号读不到时若从 1 重算，会与已有照片同名覆盖。
+            _logger.Error($"读取现有照片流水失败，已中止本批保存: {existingResult.ErrorCode} {existingResult.Message}");
+            await _dialogService.DisplayAlertAsync("保存失败",
+                $"读取现有照片编号失败，为避免覆盖已有照片，本批未保存：{existingResult.Message}", "确定");
+            return;
+        }
+        var nextSeq = PhotoNameBuilder.NextSequence(existingResult.Value ?? new List<ArchivePhoto>());
 
         // 水印上下文（仅「入户排查/公示核查」类别）：整批一次 —— GPS 一次 + 户主姓名/地址补齐，
         // 避免逐张查库/逐张定位；批次内各张共享同一拍摄时间与坐标。
@@ -651,29 +661,33 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
         }
 
         // 3. 并发识别（3 路；进度按完成张数推进）。每条结果带来源照片溯源信息。
+        //    识别期间保持屏幕常亮：冷启动 + 多张并发可能数十秒，熄屏会打断等待。
         var results = new OcrRecognizeResult?[photos.Count];
-        await ExecuteAsync(async () =>
+        using (_screenAwake.KeepAwake())
         {
-            using var gate = new SemaphoreSlim(OcrConstants.BatchConcurrency);
-            var done = 0;
-            var tasks = photos.Select(async (photo, index) =>
+            await ExecuteAsync(async () =>
             {
-                await gate.WaitAsync(CancellationToken);
-                try
+                using var gate = new SemaphoreSlim(OcrConstants.BatchConcurrency);
+                var done = 0;
+                var tasks = photos.Select(async (photo, index) =>
                 {
-                    results[index] = await RecognizeOnePhotoAsync(photo);
-                    var n = Interlocked.Increment(ref done);
-                    MainThread.BeginInvokeOnMainThread(() =>
-                        LoadingMessage = string.Format(OcrConstants.ProgressTextFormat, n, photos.Count));
-                }
-                finally
-                {
-                    gate.Release();
-                }
-            });
-            await Task.WhenAll(tasks);
-            return Result.Success();
-        }, string.Format(OcrConstants.ProgressTextFormat, 0, photos.Count));
+                    await gate.WaitAsync(CancellationToken);
+                    try
+                    {
+                        results[index] = await RecognizeOnePhotoAsync(photo);
+                        var n = Interlocked.Increment(ref done);
+                        MainThread.BeginInvokeOnMainThread(() =>
+                            LoadingMessage = string.Format(OcrConstants.ProgressTextFormat, n, photos.Count));
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+                });
+                await Task.WhenAll(tasks);
+                return Result.Success();
+            }, string.Format(OcrConstants.ProgressTextFormat, 0, photos.Count));
+        }
 
         var ordered = results.Where(r => r is not null).Cast<OcrRecognizeResult>().ToList();
         var successCount = ordered.Count(r => r.HasAny);
@@ -736,7 +750,7 @@ public partial class MobileArchivePhotoViewModel : ViewModelBase
             using var stream = new MemoryStream(bytes);
             var result = await _ocrClient.RecognizeAsync(stream, photo.PhotoCategory, CancellationToken);
 
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 var value = result.Value;
                 value.PhotoId = photo.Id;

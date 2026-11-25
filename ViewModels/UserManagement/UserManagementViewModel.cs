@@ -386,7 +386,7 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"打开编辑器失败: {ex.Message}", "确定");
         }
     }
@@ -710,7 +710,7 @@ public partial class UserManagementViewModel : PagedSearchViewModelBase
             }
             else
             {
-                _logger.Error($"操作失败");
+                _logger.Error($"保存权限配置失败: {result.ErrorCode} {result.Message}");
                 await _dialogService.DisplayAlertAsync("保存失败", result.Message, "确定");
             }
         }, "确定");
@@ -846,7 +846,7 @@ public partial class UserEditorViewModel : ViewModelBase
             var result = await _dictionaryService.GetItemsByCategoryAsync(
                 DictionaryTypeCodes.Positions);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 foreach (var item in result.Value.Where(i => i.IsActive).OrderBy(i => i.SortOrder))
                 {
@@ -883,8 +883,9 @@ public partial class UserEditorViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.Warn($"可管理组织解析失败，回退全量: {ex.Message}");
-                    manageableOrgIds = result.Value.Select(o => o.Id).ToList();
+                    // 权限边界必须 fail-closed：解析失败时绝不能回退全量组织（否则等于放大授权范围）。
+                    _logger.LogError(ex, "可管理组织解析失败，已按最小范围处理");
+                    manageableOrgIds = new List<int>();
                 }
 
                 AvailableOrganizations.Clear();
@@ -1030,7 +1031,7 @@ public partial class UserEditorViewModel : ViewModelBase
                 }
                 else
                 {
-                    _logger.Error($"操作失败");
+                    _logger.Error($"创建用户失败: {result.ErrorCode} {result.Message}");
                     await _dialogService.DisplayAlertAsync("创建失败", result.Message, "确定");
                 }
             }
@@ -1122,7 +1123,7 @@ public partial class UserEditorViewModel : ViewModelBase
                 }
                 else
                 {
-                    _logger.Error($"操作失败");
+                    _logger.Error($"更新用户失败: {result.ErrorCode} {result.Message}");
                     await _dialogService.DisplayAlertAsync("更新失败", result.Message, "确定");
                 }
             }

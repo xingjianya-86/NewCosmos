@@ -202,8 +202,9 @@ public class UpdateHistoryService : BaseService, IUpdateHistoryService
             var items = ChangelogMarkdownParser.Parse(reader.ReadToEnd());
             return items;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[UpdateHistoryService] 解析随包 CHANGELOG 失败，更新日志将只显示服务端记录");
             return Array.Empty<UpdateHistoryItem>();
         }
     }

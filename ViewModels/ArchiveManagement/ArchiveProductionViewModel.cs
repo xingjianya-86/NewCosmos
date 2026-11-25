@@ -393,14 +393,14 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         PrintNavigationData.TableData = _tableData;
         PrintNavigationData.SupporterTableData = _supporterTableData;
         PrintNavigationData.NearRelativePairs = _nearRelativePairs;
-        // 注意：不清理 OutputCategories / PrefilterTemplateNames / OperationOverride / TemplateFilter
+        // 注意：不清理 OutputCategories / PrefilterDocTypes / OperationOverride / TemplateDocTypeFilter
         // —— 输出文书入口在导航到本页前已写入，进入 Output 时按其收窄/预勾选。
 
         _logger.LogBusiness("档案制作中心 - 准备导航到档案输出",
             ("BusinessType", _currentBusinessType),
             ("BusinessId", _currentBusinessId?.ToString() ?? "null"),
             ("ApplicantName", DataMasker.MaskName(ApplicantName)),
-            ("DocMode", PrintNavigationData.OutputCategories != null || PrintNavigationData.PrefilterTemplateNames != null));
+            ("DocMode", PrintNavigationData.OutputCategories != null || PrintNavigationData.PrefilterDocTypes != null));
 
         await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
     }
@@ -660,9 +660,15 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             try
             {
                 var surveyResult = await _householdSurveyService.GetByApplicationIdAsync(applicationId, CancellationToken);
-                if (surveyResult.IsSuccess) _cachedHouseholdSurvey = surveyResult.Value;
+                if (surveyResult.IsSuccess)
+                    _cachedHouseholdSurvey = surveyResult.Value;
+                else
+                    _logger.Warn($"预加载入户调查失败（政府意见/调查日期将缺失）: {surveyResult.ErrorCode} {surveyResult.Message}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Warn($"预加载入户调查异常（政府意见/调查日期将缺失）: {ex.Message}");
+            }
         }
 
         // B线时间轴：公示起止/审核确认日/档案生效/卷号/入户调查日期（统一走 BusinessTimelineService）
@@ -997,13 +1003,29 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         {
             var stopRecordResult = await _changeService.GetLatestTriggeredStopRecordAsync(
                 applicationId, ClassificationConstants.StopCategoryCodes, CancellationToken);
+            if (stopRecordResult.IsFailure)
+                _logger.Warn($"告知书：查询停保变更记录失败，按无记录继续: ApplicationId={applicationId}, {stopRecordResult.Message}");
             var stopRecord = stopRecordResult.IsSuccess ? stopRecordResult.Value : null;
 
-            // 归档终结拒保兜底：CompleteArchiveAsync 对"首次申请即被拒"的独立新档直接置 Stopped
+            // 链上前分类（方向②"原分类"的回退源，单点 Helpers\ChainPreClassification，与归档终结
+            // 补写 CategoryStop 的写入侧同源）：查询失败降级为 null（沿用 stopRecord 降级模式）+ 告警。
+            async Task<string?> ResolveChainPreClassificationAsync()
+            {
+                var preResult = await _changeService.GetLatestChainPreClassificationAsync(applicationId, CancellationToken);
+                if (preResult.IsFailure)
+                    _logger.Warn($"链上前分类查询失败，告知书方向按回退口径判定: ApplicationId={applicationId}, {preResult.Message}");
+                return preResult.IsSuccess ? preResult.Value : null;
+            }
+
+            // 归档终结拒保兜底：CompleteArchiveAsync 对判不合格的档案直接置 Stopped
             // （只写 stop_reason/stop_date，不写变更记录）→ stopRecord 恒 null，下方"待遇调整"
             // 分支也落空，NOTICE_* 一个都不装配，打印出空白告知书（仲立亮 app95 实测错例）。
-            // 此场景按档案自身停保码装配"不予认定"告知：原分类=新分类=停保码 →
-            // wasInScope=false 自然成立（下述分支注释本就写明"首次申请即被拒"适用不予认定）。
+            // 方向按"原分类是否在保"装配（2026-11-19 丁玉花 app113 实测错例收口）：
+            //  ① 链上有在保前分类（停旧建新产物，如户主死亡 112→113、前分类=农村低保）→ 原分类=链上前分类
+            //     → wasInScope=true 出「停止」（曾享受、因收入超标被拒，业务口径为停止告知）；
+            //  ② 取不到（真·首次申请即被拒，app110 同型）→ 原分类=档案自身停保码 → 出「不予认定」。
+            // 写入侧（ApplicationStatusService）补写的 CategoryStop 命中时 stopRecord 非空、本兜底不触发，
+            // 两侧共用同一 ChainPreClassification，口径不劈叉。
             var stopNewClassification = stopRecord?.NewClassification;
             var stopOldClassification = stopRecord?.OldClassification;
             if (stopRecord == null
@@ -1011,20 +1033,27 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 && ClassificationConstants.IsCodeStop(app.ClassificationResult ?? string.Empty))
             {
                 stopNewClassification = app.ClassificationResult;
-                stopOldClassification = app.ClassificationResult;
-                _logger.LogBusiness("归档终结拒保：按档案自身停保码装配不予认定告知书",
+                var chainPre = await ResolveChainPreClassificationAsync();
+                stopOldClassification = NoticeStopDirection.ResolveArchiveRefusedOriginal(
+                    chainPre, app.ClassificationResult ?? "");
+                _logger.LogBusiness("归档终结拒保：按链上前分类/档案自身停保码装配告知书方向",
                     ("ApplicationId", applicationId.ToString()),
-                    ("ClassificationResult", app.ClassificationResult ?? ""));
+                    ("ClassificationResult", app.ClassificationResult ?? ""),
+                    ("OriginalClassification", stopOldClassification ?? ""));
             }
 
             // 单人户户主死亡整户停止：无 CategoryStop 记录、分类未变（非停保码），按死亡事实装配
             // "停止/停止享受"告知书（理由复用现有户主死亡句式）。走最前——死亡停保最具体，优先于通用分支。
             var deathStopResult = await _changeService.GetLatestHouseholdDeathStopRecordAsync(applicationId, CancellationToken);
+            if (deathStopResult.IsFailure)
+                _logger.Warn($"告知书：查询户主死亡停保记录失败，按无记录继续: ApplicationId={applicationId}, {deathStopResult.Message}");
             var deathStopRecord = deathStopResult.IsSuccess ? deathStopResult.Value : null;
 
             // 核验停止（动态管理「拒绝配合核验工作」）记录：无 CategoryStop、分类未变（非停保码），
             // 走专用分支装配"停止/停止享受"告知书
             var verifyStopResult = await _changeService.GetLatestVerifyStopRecordAsync(applicationId, CancellationToken);
+            if (verifyStopResult.IsFailure)
+                _logger.Warn($"告知书：查询核验停止记录失败，按无记录继续: ApplicationId={applicationId}, {verifyStopResult.Message}");
             var verifyStopRecord = verifyStopResult.IsSuccess ? verifyStopResult.Value : null;
 
             if (deathStopRecord != null)
@@ -1076,12 +1105,19 @@ public partial class ArchiveProductionViewModel : ViewModelBase
                 // 判断是"停止告知"还是"不予认定告知"
                 // 停止告知：原先在低收入人口认定范围内（原分类为有效分类），因收入超标被停保
                 // 不予认定告知：首次申请即被拒（原分类为 IncomeExceeded/Ineligible 等停保类）
-                // 原分类取变更记录：成员变更输出的是停保类新档案，直接取 app 分类会误判为"不予认定"
-                // （归档终结拒保无变更记录，stopOldClassification 已按上文置为档案自身停保码）
-                var originalClassification = string.IsNullOrEmpty(stopOldClassification)
-                    ? (app.ClassificationResult ?? "")
-                    : stopOldClassification;
-                bool wasInScope = !ClassificationConstants.IsCodeStop(originalClassification);
+                // 原分类三级回退：变更记录 old → 链上前分类（Helpers\ChainPreClassification）→ 档案自身分类。
+                // 成员变更输出的是停保类新档案，直接取 app 分类会误判为"不予认定"（既有坑，故第一级取记录 old）；
+                // 记录 old 为空的存量行同理会落进 app 分类，2026-11-19 补链上前分类一级收口
+                //（丁玉花 app113 同型；归档终结拒保无变更记录的场景 stopOldClassification 已按上文置妥）。
+                var originalClassification = stopOldClassification;
+                if (string.IsNullOrEmpty(originalClassification))
+                {
+                    var chainPre = await ResolveChainPreClassificationAsync();
+                    originalClassification = string.IsNullOrEmpty(chainPre)
+                        ? (app.ClassificationResult ?? "")
+                        : chainPre;
+                }
+                bool wasInScope = NoticeStopDirection.WasInScope(originalClassification);
 
                 _fieldData[FieldKeys.NOTICE_BUSINESS_CATEGORY] = wasInScope ? "停止" : "不予认定";
                 // 批4 双写→批D2 清理（2026-10-16）：原 NOTICE_TOWN/NOTICE_VILLAGE 已删（T241 config 已迁
@@ -1218,7 +1254,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
             _nearRelativePairs = new List<Dictionary<string, string>>();
             var nearRelativeService = _serviceProvider.GetRequiredService<INearRelativeService>();
             var pairsResult = await nearRelativeService.GetPairsByApplicationIdAsync(applicationId, CancellationToken);
-            if (pairsResult.IsSuccess && pairsResult.Value != null && pairsResult.Value.Count > 0)
+            if (pairsResult.HasValue && pairsResult.Value.Count > 0)
             {
                 _fieldData[FieldKeys.NEAR_RELATIVE_HAS_DATA] = "1";
                 _nearRelativePairs = pairsResult.Value
@@ -1280,7 +1316,7 @@ public partial class ArchiveProductionViewModel : ViewModelBase
         using var memberCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var membersResult = await _familyMemberService.GetByApplicationIdAsync(applicationId, memberCts.Token);
         _logger.LogBusiness("家庭成员查询完成", ("IsSuccess", membersResult.IsSuccess.ToString()), ("Count", membersResult.Value?.Count.ToString() ?? "0"));
-if (membersResult.IsSuccess && membersResult.Value != null)
+if (membersResult.HasValue)
         {
             // 聚合为一条 Debug 且脱敏（原逐成员 Info：热路径刷日志 + 姓名/身份证明文入盘，违反 AGENTS §10）
             _logger.Debug($"家庭成员明细({membersResult.Value.Count}): " + string.Join("; ", membersResult.Value.Select(m =>
@@ -1289,7 +1325,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             // 查询已死亡登记成员（历史数据未软删，生成档案时须统一过滤）
             var deathIdCards = new List<string>();
             var deathResult = await _familyMemberService.GetDeadIdCardsByApplicationIdAsync(applicationId, CancellationToken);
-            if (deathResult.IsSuccess && deathResult.Value != null)
+            if (deathResult.HasValue)
                 deathIdCards = deathResult.Value;
 
             // 共同生活成员（索引字段，不含户主本人、不含已死亡成员）
@@ -1428,7 +1464,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         // 赡养人（索引字段）— 从家庭成员表中筛选 member_category=赡养抚养扶养
         StatusText = "正在加载赡养人...";
         _logger.LogBusiness("开始加载赡养人", ("ApplicationId", applicationId.ToString()));
-        var supporters = membersResult.IsSuccess && membersResult.Value != null
+        var supporters = membersResult.HasValue
             ? membersResult.Value.Where(m => m.MemberCategory == MemberCategoryConstants.SUPPORT).ToList()
             : new List<FamilyMember>();
         _logger.LogBusiness("赡养人加载完成", ("Count", supporters.Count.ToString()));
@@ -1489,7 +1525,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         List<Caregiver>? caregivers = null;
         using var careCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var caregiversResult = await _caregiverService.GetByApplicationIdAsync(applicationId, careCts.Token);
-        if (caregiversResult.IsSuccess && caregiversResult.Value != null)
+        if (caregiversResult.HasValue)
         {
             caregivers = caregiversResult.Value;
             _cachedCaregivers = caregivers;
@@ -1497,7 +1533,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
 
         CapabilityAssessment? capability = null;
         var capResult = await _capabilityAssessmentService.GetByApplicationIdAsync(applicationId, careCts.Token);
-        if (capResult.IsSuccess && capResult.Value != null)
+        if (capResult.HasValue)
         {
             capability = capResult.Value;
             _cachedCapabilityAssessment = capability;
@@ -1548,7 +1584,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         _fieldData[FieldKeys.SPOUSE_ID_CARD] = "";
         _fieldData[FieldKeys.HEAD_CITY] = app.City ?? "";
         _fieldData[FieldKeys.CURRENT_DATE] = DateTime.Now.ToString("yyyy年M月d日");
-        if (membersResult.IsSuccess && membersResult.Value != null)
+        if (membersResult.HasValue)
         {
             var spouse = membersResult.Value.FirstOrDefault(m =>
                 m.RelationshipToHead == "Spouse" && !m.IsHouseholdHead);
@@ -1616,7 +1652,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         // 农业补贴折算条件注记（比例≠100% 时非空），经济明细加载成功后计算，供下方 INCOME_SUBSIDY 等输出附加
         var subsidyRatioNote = "";
 
-        if (economicResult.IsSuccess && economicResult.Value != null)
+        if (economicResult.HasValue)
         {
             var economic = economicResult.Value;
             subsidyRatioNote = SubsidyRatioHelper.BuildNote(economic.Subsidies);
@@ -1783,7 +1819,11 @@ if (membersResult.IsSuccess && membersResult.Value != null)
     private async Task<bool> LoadApplicationBasicInfoAsync(long applicationId)
     {
         var result = await _applicationService.GetByIdAsync(applicationId);
-        if (result.IsFailure || result.Value == null) return false;
+        if (result.IsFailure || result.Value == null)
+        {
+            _logger.Warn($"档案制作：加载申请基本信息失败: ApplicationId={applicationId}, {result.ErrorCode} {result.Message}");
+            return false;
+        }
 
         _cachedApplication = result.Value;
 
@@ -1809,33 +1849,76 @@ if (membersResult.IsSuccess && membersResult.Value != null)
 
     private async Task LoadFamilyMembersDataAsync(long applicationId)
     {
-        _cachedFamilyMembers = (await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken)).Value ?? new();
+        var result = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
+        if (result.IsFailure)
+        {
+            _logger.Warn($"加载家庭成员失败（文书成员表将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedFamilyMembers = new();
+            return;
+        }
+        _cachedFamilyMembers = result.Value ?? new();
     }
 
     private async Task LoadSupportersDataAsync(long applicationId)
     {
-        _cachedSupporters = (await _supporterService.GetByApplicationIdAsync(applicationId, CancellationToken)).Value ?? new();
+        var result = await _supporterService.GetByApplicationIdAsync(applicationId, CancellationToken);
+        if (result.IsFailure)
+        {
+            _logger.Warn($"加载赡养人失败（文书赡养信息将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedSupporters = new();
+            return;
+        }
+        _cachedSupporters = result.Value ?? new();
     }
 
     private async Task LoadCaregiversDataAsync(long applicationId)
     {
-        _cachedCaregivers = (await _caregiverService.GetByApplicationIdAsync(applicationId, CancellationToken)).Value ?? new();
+        var result = await _caregiverService.GetByApplicationIdAsync(applicationId, CancellationToken);
+        if (result.IsFailure)
+        {
+            _logger.Warn($"加载照料人失败（文书照料信息将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedCaregivers = new();
+            return;
+        }
+        _cachedCaregivers = result.Value ?? new();
     }
 
     private async Task LoadHouseholdSurveyDataAsync(long applicationId)
     {
-        _cachedHouseholdSurvey = (await _householdSurveyService.GetByApplicationIdAsync(applicationId, CancellationToken)).Value;
+        var result = await _householdSurveyService.GetByApplicationIdAsync(applicationId, CancellationToken);
+        if (result.IsFailure)
+        {
+            _logger.Warn($"加载入户调查失败（政府意见/调查日期将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedHouseholdSurvey = null;
+            return;
+        }
+        _cachedHouseholdSurvey = result.Value;
     }
 
     private async Task LoadCapabilityAssessmentDataAsync(long applicationId)
     {
         var result = await _capabilityAssessmentService.GetByApplicationIdAsync(applicationId, CancellationToken);
-        if (result.IsSuccess) _cachedCapabilityAssessment = result.Value;
+        if (result.IsSuccess)
+        {
+            _cachedCapabilityAssessment = result.Value;
+        }
+        else
+        {
+            _logger.Warn($"加载能力评估失败（文书评估信息将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedCapabilityAssessment = null;
+        }
     }
 
     private async Task LoadEconomicDetailsDataAsync(long applicationId)
     {
-        _cachedEconomicDetails = (await _economicDetailService.LoadAllAsync(applicationId, CancellationToken)).Value;
+        var result = await _economicDetailService.LoadAllAsync(applicationId, CancellationToken);
+        if (result.IsFailure)
+        {
+            _logger.Warn($"加载经济明细失败（补贴/财产字段将缺失）: {result.ErrorCode} {result.Message}");
+            _cachedEconomicDetails = null;
+            return;
+        }
+        _cachedEconomicDetails = result.Value;
     }
 
     private async Task BuildFieldDataFromCacheAsync()
@@ -1864,9 +1947,15 @@ if (membersResult.IsSuccess && membersResult.Value != null)
         {
             var econService = _serviceProvider.GetRequiredService<IEconomicDetailService>();
             var detailResult = await econService.LoadAllAsync(app.Id, CancellationToken);
-            if (detailResult.IsSuccess) economicDetail = detailResult.Value;
+            if (detailResult.IsSuccess)
+                economicDetail = detailResult.Value;
+            else
+                _logger.Warn($"预加载经济明细失败（补贴/财产字段将缺失）: {detailResult.ErrorCode} {detailResult.Message}");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.Warn($"预加载经济明细异常（补贴/财产字段将缺失）: {ex.Message}");
+        }
 
         // B线时间轴：公示起止/审核确认日/卷号/入户调查日期（统一走 BusinessTimelineService）
         // 锚点 = 业务锚点（申请日期=调查日期新口径；周期差 {0,+1} 生效，否则回退受理锚点）
@@ -2109,7 +2198,7 @@ if (membersResult.IsSuccess && membersResult.Value != null)
             // 查询已死亡登记成员（历史数据未软删，生成档案时须统一过滤）
             var deathIdCards = new List<string>();
             var deathResult = await _familyMemberService.GetDeadIdCardsByApplicationIdAsync(app.Id, CancellationToken);
-            if (deathResult.IsSuccess && deathResult.Value != null)
+            if (deathResult.HasValue)
                 deathIdCards = deathResult.Value;
 
             var sortedMembers = _cachedFamilyMembers

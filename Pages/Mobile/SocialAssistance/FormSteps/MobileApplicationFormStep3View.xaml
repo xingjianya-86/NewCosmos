@@ -526,6 +526,10 @@
                                 <Border Padding="10" Margin="0,4" StrokeShape="RoundRectangle 8"
                                         BackgroundColor="{StaticResource Gray50}" Stroke="{StaticResource Gray200}" StrokeThickness="1">
                                     <VerticalStackLayout Spacing="6">
+                                        <Picker ItemsSource="{Binding BindingContext.IncomeMemberOptions, Source={x:Reference StepRoot}}"
+                                                SelectedItem="{Binding SelectedMember, Mode=TwoWay}" ItemDisplayBinding="{Binding Name}"
+                                                Title="支出人员" Style="{StaticResource FormFieldPickerStyle}"
+                                                IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>
                                         <Picker ItemsSource="{Binding BindingContext.RigidExpenditureTypeOptions, Source={x:Reference StepRoot}}"
                                                 SelectedItem="{Binding ExpenditureType}" Style="{StaticResource FormFieldPickerStyle}"
                                                 IsEnabled="{Binding BindingContext.IsEconomyEditable, Source={x:Reference StepRoot}}"/>

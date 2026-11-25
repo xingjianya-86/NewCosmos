@@ -59,9 +59,11 @@ public sealed class ChangeDocumentFacts
 
     /// <summary>
     /// 归档终结拒保：本档已停保（Stopped）且档案自身分类为停保码（收入超标/不予认定族）。
-    /// 首次申请即被拒的独立新档（CompleteArchiveAsync 直接置 Stopped，**不写变更记录**）——
-    /// 装配端《ArchiveProductionViewModel》告知书方向②有同口径兜底（按档案自身停保码出"不予认定"），
-    /// 而 IsIncomeStopChange 恒 false。清单门若不同步，此类档案在「变动文书」清单里会被过滤漏打
+    /// CompleteArchiveAsync 直接置 Stopped、**不写变更记录**的老口径；2026-11-19 起链上有在保前分类时
+    /// 写入侧会补写 CategoryStop（change_reason_type=归档终结拒保），此时本事实与 IsIncomeStopChange 并存。
+    /// 本事实只管"清单里出不出告知书"，**方向（停止/不予认定）由装配端按链上前分类决定**：
+    /// 有在保前分类 → 停止，无（真·首次申请即被拒）→ 不予认定（app110 同型）。
+    /// 清单门若缺本兜底，无变更记录的拒保档在「变动文书」清单里会被过滤漏打
     ///（整档路径靠停保码命中模板不受影响；模板 241 挂上变动叶子后本判定即成为它的过滤依据）。
     /// </summary>
     public bool IsArchiveRefusedStop { get; init; }
@@ -70,7 +72,8 @@ public sealed class ChangeDocumentFacts
     /// 《档案_变更告知书》适用门（与装配端四个方向逐一对齐，**模板唯一、方向由装配端决定**）：
     ///  ① 户主死亡整户停 → IsHouseholdDeathStop；
     ///  ①' 核验停止（拒绝配合核验工作）→ IsVerifyStop（同为客观停保事件，不受单人保排除限制）；
-    ///  ② 停保/不予认定 → IsIncomeStopChange，或归档终结拒保兜底 IsArchiveRefusedStop；
+    ///  ② 停保/不予认定 → IsIncomeStopChange，或归档终结拒保兜底 IsArchiveRefusedStop
+///     （本门只管出不出模板；方向由装配端按链上前分类判：有在保前分类=停止、无=不予认定）；
     ///  ③ 待遇调整——两个**互斥**子场景，装配端按 **登记优先** 顺序判定：
     ///     a. 保障金变更登记 → HasFundChangeRegistration（②③受单人保排除：单人保不产生停保，也不写登记记录）；
     ///     b. 渐退封顶减发 → HasGrantReduce（原额 &gt; 渐退现发 &gt; 0；渐退活跃时登记被服务端跳过，
@@ -179,17 +182,18 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
                 : archiveState!.ClassificationResult;
 
             // 7. 链上变更类型命中（经济复核类 FundChange/CategoryStop/CategoryAdd / 户主变更·户主死亡；
-            //    记录可能挂旧档+new_application_id，须链感知）
+            //    记录可能挂旧档+new_application_id，须链感知）。CategoryStop 中归档终结拒保补写行
+            //    （change_reason_type=归档终结拒保）不算复核——该档从未经过复核行为，
+            //    计入会让《档案_定期复核审批表》/「经济复核」叶子对拒保档误开放（CountsAsEconomicReview 单点）。
             var typesRes = await QueryLinkedChangeTypesAsync(applicationId, ct);
             if (typesRes.IsFailure)
                 return Result.Failure<ChangeDocumentFacts>(typesRes.ErrorCode!, typesRes.Message!);
-            var types = typesRes.Value ?? new HashSet<string>(StringComparer.Ordinal);
+            var linked = typesRes.Value ?? new List<ChangeTypeRow>();
 
-            var hasEconomicReview = types.Contains(DictionaryConstants.ChangeType.FUND_CHANGE)
-                                 || types.Contains(DictionaryConstants.ChangeType.CATEGORY_STOP)
-                                 || types.Contains(DictionaryConstants.ChangeType.CATEGORY_ADD);
-            var hasHeadChange = types.Contains(DictionaryConstants.ChangeType.HOUSEHOLD_HEAD_CHANGE)
-                             || types.Contains(DictionaryConstants.ChangeType.HOUSEHOLD_DEATH);
+            var hasEconomicReview = linked.Any(r => CountsAsEconomicReview(r.ChangeType, r.ChangeReasonType));
+            var hasHeadChange = linked.Any(r =>
+                string.Equals(r.ChangeType, DictionaryConstants.ChangeType.HOUSEHOLD_HEAD_CHANGE, StringComparison.Ordinal)
+                || string.Equals(r.ChangeType, DictionaryConstants.ChangeType.HOUSEHOLD_DEATH, StringComparison.Ordinal));
 
             return Result.Success(new ChangeDocumentFacts
             {
@@ -217,12 +221,12 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
     }
 
     /// <summary>
-    /// 链感知取本档关联（application_id 或 new_application_id）变更记录的 change_type 去重集合。
+    /// 链感知取本档关联（application_id 或 new_application_id）变更记录的 (change_type, change_reason_type) 去重组。
     /// 批量条件走 = ANY($2)（§8），一次查询覆盖三类判定，不做循环逐行 SQL。
     /// </summary>
-    private async Task<Result<HashSet<string>>> QueryLinkedChangeTypesAsync(long applicationId, CancellationToken ct)
+    private async Task<Result<List<ChangeTypeRow>>> QueryLinkedChangeTypesAsync(long applicationId, CancellationToken ct)
     {
-        const string sql = @"SELECT DISTINCT change_type
+        const string sql = @"SELECT DISTINCT change_type, change_reason_type
                              FROM nc_biz_change_records
                              WHERE (application_id = $1 OR new_application_id = $1)
                                AND deleted_at IS NULL
@@ -237,10 +241,22 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
         };
         var result = await _db.QueryAsync<ChangeTypeRow>(sql, ct, applicationId, wanted);
         if (result.IsFailure)
-            return Result.Failure<HashSet<string>>(result.ErrorCode!, result.Message!);
-        return Result.Success(new HashSet<string>(
-            (result.Value ?? new List<ChangeTypeRow>()).Select(r => r.ChangeType ?? string.Empty),
-            StringComparer.Ordinal));
+            return Result.Failure<List<ChangeTypeRow>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<ChangeTypeRow>());
+    }
+
+    /// <summary>
+    /// 链上记录是否计为"经济复核类"（清单门 hasEconomicReview 单点；纯逻辑，NewCosmos.Tests 直测）。
+    /// FundChange/CategoryAdd/CategoryStop 命中；CategoryStop 中 change_reason_type=归档终结拒保 的
+    /// 补写行**不算**——该档从未经过复核行为，计入会让《档案_定期复核审批表》/「经济复核」叶子
+    /// 对归档终结拒保档误开放（2026-11-19 丁玉花 app113 同型收口）。
+    /// </summary>
+    public static bool CountsAsEconomicReview(string? changeType, string? changeReasonType)
+    {
+        if (string.Equals(changeType, DictionaryConstants.ChangeType.CATEGORY_STOP, StringComparison.Ordinal))
+            return !string.Equals(changeReasonType, ChangeReasonTypeConstants.ArchiveRefusalStop, StringComparison.Ordinal);
+        return string.Equals(changeType, DictionaryConstants.ChangeType.FUND_CHANGE, StringComparison.Ordinal)
+            || string.Equals(changeType, DictionaryConstants.ChangeType.CATEGORY_ADD, StringComparison.Ordinal);
     }
 
     /// <summary>查询本档当前状态与档案自身分类（死亡停保旧档 / 归档终结拒保判定用；0 行返回 Success(null)）</summary>
@@ -254,10 +270,13 @@ public class ChangeDocumentApplicabilityService : IChangeDocumentApplicabilitySe
         return Result.Success<ArchiveStateRow?>(result.Value);
     }
 
-    /// <summary>单列 change_type 映射行（snake_case → PascalCase 由映射层转换）</summary>
+    /// <summary>变更记录类型行（snake_case → PascalCase 由映射层转换）</summary>
     private sealed class ChangeTypeRow
     {
         public string? ChangeType { get; set; }
+
+        /// <summary>change_reason_type（归档终结拒保补写的 CategoryStop 从经济复核类判定中排除用）</summary>
+        public string? ChangeReasonType { get; set; }
     }
 
     /// <summary>status + classification_result 映射行（snake_case → PascalCase 由映射层转换）</summary>

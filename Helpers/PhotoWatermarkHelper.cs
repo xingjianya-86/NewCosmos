@@ -35,9 +35,10 @@ public static class PhotoWatermarkHelper
             using var encoded = bitmap.Encode(SKEncodedImageFormat.Jpeg, 95);
             return encoded != null && encoded.Size > 0 ? encoded.ToArray() : null;
         }
-        catch
+        catch (Exception ex)
         {
-            return null; // 水印失败不阻断保存（调用方记 Warn）
+            Serilog.Log.Warning(ex, "[PhotoWatermark] 水印生成失败，按无水印继续");
+            return null; // 水印失败不阻断保存
         }
         finally
         {

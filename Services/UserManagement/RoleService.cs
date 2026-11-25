@@ -36,7 +36,12 @@ public class RoleService : BaseService, IRoleService
     {
         const string sql = "SELECT id, name, code, description, level, data_scope FROM nc_sys_roles ORDER BY level, id";
         var result = await _dbService.QueryAsync<Role>(sql, ct);
-        return result.IsSuccess && result.Value is not null ? result.Value : new List<Role>();
+        if (result.IsFailure)
+        {
+            LogError($"查询全部角色失败，按空集合返回（fail-closed）: {result.ErrorCode} {result.Message}");
+            return new List<Role>();
+        }
+        return result.Value ?? new List<Role>();
     }
 
     public async Task<IReadOnlyCollection<Role>> GetUserRolesAsync(int userId, CancellationToken ct = default)
@@ -48,7 +53,12 @@ JOIN nc_sys_user_roles ur ON r.id = ur.role_id
 WHERE ur.user_id = $1
 ORDER BY r.level, r.id";
         var result = await _dbService.QueryAsync<Role>(sql, ct, userId);
-        return result.IsSuccess && result.Value is not null ? result.Value : new List<Role>();
+        if (result.IsFailure)
+        {
+            LogError($"查询用户角色失败，按空集合返回（fail-closed）: UserId={userId}, {result.ErrorCode} {result.Message}");
+            return new List<Role>();
+        }
+        return result.Value ?? new List<Role>();
     }
 
     // 角色分配/移除用户入口已收敛至 UserService.AssignRoleAsync/RemoveRoleAsync（唯一入口：
@@ -69,7 +79,6 @@ WHERE ur.user_id = $1 AND r.code = $2";
 
     public async Task<Result<int>> CreateRoleAsync(RoleCreateRequest request, CancellationToken ct = default)
     {
-        LogInfo("执行操作");
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return Result.Failure<int>("VALIDATION_FAILED", "角色名称不能为空");
@@ -94,7 +103,6 @@ RETURNING id";
             return Result.Failure<int>(ErrorCodes.OPERATION_FAILED, "创建角色失败：未返回新角色ID");
 
         var roleId = result.Value.Value;
-        LogInfo("执行操作");
         Logger.LogSecurity("创建角色", ("RoleId", roleId), ("Name", request.Name), ("CreatedBy", request.CreatedBy));
 
         return Result.Success(roleId);
@@ -102,7 +110,6 @@ RETURNING id";
 
     public async Task<Result> UpdateRoleAsync(RoleUpdateRequest request, CancellationToken ct = default)
     {
-        LogInfo("执行操作");
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return Result.Failure("VALIDATION_FAILED", "角色名称不能为空");
@@ -121,7 +128,6 @@ WHERE id = $5";
         if (versionResult.IsFailure)
             LogWarn($"递增权限缓存版本失败（角色数据范围变更可能延迟生效）: {versionResult.Message}");
 
-        LogInfo("执行操作");
         Logger.LogSecurity("更新角色", ("RoleId", request.RoleId), ("UpdatedBy", request.UpdatedBy));
 
         return Result.Success();
@@ -129,7 +135,6 @@ WHERE id = $5";
 
     public async Task<Result> DeleteRoleAsync(int roleId, CancellationToken ct = default)
     {
-        LogInfo("执行操作");
 
         var checkSql = "SELECT COUNT(1) FROM nc_sys_user_roles WHERE role_id = $1";
         var checkResult = await _dbService.ExecuteScalarAsync(checkSql, ct, roleId);
@@ -141,7 +146,6 @@ WHERE id = $5";
         if (result.IsFailure)
             return Result.Failure(result.ErrorCode!, result.Message!);
 
-        LogInfo("执行操作");
         Logger.LogSecurity("删除角色", ("RoleId", roleId));
 
         return Result.Success();
@@ -149,7 +153,6 @@ WHERE id = $5";
 
     public async Task<Result<IReadOnlyCollection<string>>> GetRolePermissionsAsync(int roleId, CancellationToken ct = default)
     {
-        LogInfo("执行操作");
 
         const string sql = "SELECT permission_code FROM nc_perm_role_permissions WHERE role_id = $1";
         var result = await _dbService.QueryAsync<string>(sql, ct, roleId);
@@ -209,7 +212,6 @@ VALUES
             }
 
             await tx.CommitAsync(ct);
-            LogInfo("执行操作");
 
             return Result.Success();
         }

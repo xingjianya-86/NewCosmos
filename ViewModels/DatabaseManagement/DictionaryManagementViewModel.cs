@@ -109,7 +109,7 @@ public partial class DictionaryManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error("操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             ErrorMessage = $"同步失败: {ex.Message}";
             Progress.CanCloseProgress = true;
         }
@@ -168,7 +168,7 @@ public partial class DictionaryManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error("操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             ErrorMessage = $"初始化失败: {ex.Message}";
             Progress.CanCloseProgress = true;
         }
@@ -235,7 +235,7 @@ public partial class DictionaryManagementViewModel : ViewModelBase
             _logger.Info("正在加载字典分类");
 
             var result = await _dictionaryService.GetCategoriesAsync(ct);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Categories.Clear();
                 foreach (var category in result.Value)
@@ -271,7 +271,7 @@ public partial class DictionaryManagementViewModel : ViewModelBase
             _logger.Info($"正在加载字典项: {SelectedCategory.Category}");
 
             var result = await _dictionaryService.GetItemsByCategoryAsync(SelectedCategory.Category, ct);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 Items.Clear();
                 foreach (var item in result.Value)

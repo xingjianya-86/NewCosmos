@@ -36,6 +36,31 @@ public partial class TempReliefFormViewModel
             var app = result.Value;
             isDraft = string.Equals(app.Status, TempReliefConstants.StatusDraft, StringComparison.Ordinal);
             ReliefType = app.ReliefType;
+            PopulationStatus = string.IsNullOrEmpty(app.PopulationStatus)
+                ? TempReliefConstants.PopulationInsured
+                : app.PopulationStatus;
+            PaymentChannel = TempReliefConstants.ResolvePaymentChannel(app.ReliefType, app.PaymentChannel);
+            _lastLargePaymentChannel = app.ReliefType == TempReliefConstants.ReliefTypeLarge
+                ? PaymentChannel
+                : TempReliefConstants.PaymentCounty;
+            if (app.ReliefType == TempReliefConstants.ReliefTypeLarge
+                && PaymentChannel == TempReliefConstants.PaymentReserve)
+            {
+                await LoadSmallAmountLevelsAsync();
+                var prevSuppress = _suppressReload;
+                _suppressReload = true;
+                try
+                {
+                    _confirmAmount = app.ConfirmAmount ?? 0m;
+                    ConfirmAmountInput = _confirmAmount > 0
+                        ? _confirmAmount.ToString("0.##", CultureInfo.InvariantCulture)
+                        : string.Empty;
+                }
+                finally
+                {
+                    _suppressReload = prevSuppress;
+                }
+            }
             _sourceTable = app.SourceTable;
             _sourceFamilyId = app.SourceFamilyId;
             _hukouType = app.HukouType;
@@ -73,6 +98,8 @@ public partial class TempReliefFormViewModel
             }
             _familySizeSeed = app.FamilySize;
             ApplicantFamilySize = app.FamilySize;
+            ReliefPersonCountInput = TempReliefConstants.ResolveReliefPersonCount(app.ReliefPersonCount, app.FamilySize)
+                .ToString(CultureInfo.InvariantCulture);
             ApplicantFamilyCategory = TempReliefConstants.NormalizeFamilyCategory(app.FamilyCategory);
             BankName = app.BankName;
             BankAccount = app.BankAccount;
@@ -135,19 +162,38 @@ public partial class TempReliefFormViewModel
             BatchHintText = string.Empty;
         }
 
-        // 小额：加载档位并回显（档位=户籍对应低保月标准；存量旧档位名走附加选项兜底，金额不丢）
+        // 小额：加载政策档位并回显（档位码优先；存量旧档位名走附加选项兜底，金额不丢）
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {
             await LoadSmallAmountLevelsAsync();
             var app0 = (await _applicationService.GetByIdAsync(id, CancellationToken)).Value;
-            if (app0 != null && !string.IsNullOrEmpty(app0.SmallAmountLevel))
+            if (app0 != null)
             {
                 _suppressReload = true;
-                EnsureLegacySmallAmountOption(app0.SmallAmountLevel, app0.ConfirmAmount);
-                SelectedSmallAmountLevel = app0.SmallAmountLevel;
-                _confirmAmount = app0.ConfirmAmount ?? 0m;
-                ConfirmAmountInput = _confirmAmount > 0 ? _confirmAmount.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty;
-                _suppressReload = false;
+                try
+                {
+                    if (!string.IsNullOrEmpty(app0.StandardTier)
+                        && SmallAmountLevels.Any(s => s.StandardType == app0.StandardTier))
+                    {
+                        SelectedSmallAmountLevel =
+                            $"{TempReliefConstants.GetTierLabel(app0.StandardTier)}档";
+                        UpdateConfirmAmount();
+                    }
+                    else if (!string.IsNullOrEmpty(app0.SmallAmountLevel))
+                    {
+                        EnsureLegacySmallAmountOption(app0.SmallAmountLevel, app0.ConfirmAmount);
+                        SelectedSmallAmountLevel = app0.SmallAmountLevel;
+                    }
+
+                    _confirmAmount = app0.ConfirmAmount ?? _confirmAmountMax;
+                    ConfirmAmountInput = _confirmAmount > 0
+                        ? _confirmAmount.ToString("0.##", CultureInfo.InvariantCulture)
+                        : string.Empty;
+                }
+                finally
+                {
+                    _suppressReload = false;
+                }
             }
         }
     }
@@ -176,7 +222,15 @@ public partial class TempReliefFormViewModel
     private async Task LoadMembersAsync(long id)
     {
         var membersResult = await _applicationService.GetMembersByApplicationIdAsync(id, CancellationToken);
-        if (membersResult.IsFailure || membersResult.Value == null) return;
+        if (membersResult.IsFailure)
+        {
+            // 成员加载失败不能按空集合继续：随后保存会用空集合覆盖真实成员（数据丢失）。
+            _logger.Error($"加载临时救助成员失败: {membersResult.ErrorCode} {membersResult.Message}");
+            throw new BusinessException(
+                membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"加载临时救助成员失败: {membersResult.Message}");
+        }
+        if (membersResult.Value == null) return;
 
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
@@ -230,7 +284,7 @@ public partial class TempReliefFormViewModel
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             Diseases.Clear();
-            if (diseases.IsSuccess && diseases.Value != null)
+            if (diseases.HasValue)
                 foreach (var d in diseases.Value)
                 {
                     // 成员名去空白：避免 "胡希连 " 与候选 "胡希连" 不等导致 Picker 匹配失败显示空
@@ -242,7 +296,7 @@ public partial class TempReliefFormViewModel
             // 检测逐行模式（原"多家医院"）：医院/治疗起止/费用 任一在行间不同即开启。
             // ⚠️ 旧口径只比医院名——"同一家医院、不同住院日期的多次就诊"会被误判成共享模式，
             // 保存时被顶部共享值整体压平（2026-10-22 申请 22 的逐行日期全部丢失），勿退回只比医院。
-            IsMultiHospitalMode = diseases.IsSuccess && diseases.Value != null
+            IsMultiHospitalMode = diseases.HasValue
                 && HasRowValueDivergence(diseases.Value);
 
             if (IsMultiHospitalMode)
@@ -253,11 +307,11 @@ public partial class TempReliefFormViewModel
             else
             {
                 // 共享模式：回填第一条非空记录到顶部共享字段
-                Hospital = diseases.IsSuccess && diseases.Value != null
+                Hospital = diseases.HasValue
                     ? diseases.Value.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.Hospital))?.Hospital ?? string.Empty
                     : string.Empty;
 
-                if (diseases.IsSuccess && diseases.Value != null)
+                if (diseases.HasValue)
                 {
                     var first = diseases.Value.FirstOrDefault();
                     if (first != null)
@@ -272,11 +326,11 @@ public partial class TempReliefFormViewModel
             }
 
             Accidents.Clear();
-            if (accidents.IsSuccess && accidents.Value != null)
+            if (accidents.HasValue)
                 foreach (var a in accidents.Value) { SubscribeDetailChanges(a); Accidents.Add(a); }
 
             Educations.Clear();
-            if (educations.IsSuccess && educations.Value != null)
+            if (educations.HasValue)
                 foreach (var e in educations.Value) { SubscribeDetailChanges(e); Educations.Add(e); }
 
             // 明细装载后补齐成员候选：已存明细里的成员名即使不在家庭成员行里也要能回显
@@ -355,6 +409,10 @@ public partial class TempReliefFormViewModel
             }
 
             var list = result.Value;
+            // 在册只认四类在册台账；非在册保留其他困难台账 + 低保申请库候选（手工登记仍可用）
+            list = IsInsured
+                ? list.Where(c => TempReliefConstants.IsInsuredSourceTable(c.SourceTable)).ToList()
+                : list.Where(c => !TempReliefConstants.IsInsuredSourceTable(c.SourceTable)).ToList();
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 Candidates.Clear();
@@ -543,24 +601,47 @@ public partial class TempReliefFormViewModel
 
             // 保存确认成功 → 跳转档案输出页（复用 ArchiveOutputPage）
             var savedResult = await _applicationService.GetByIdAsync(_id, CancellationToken);
-            if (savedResult.IsSuccess && savedResult.Value != null)
+            if (savedResult.IsFailure || savedResult.Value == null)
             {
-                var savedApp = savedResult.Value;
+                _logger.Error($"保存成功后回读申请失败: {savedResult.ErrorCode} {savedResult.Message}");
+                await _dialogService.DisplayAlertAsync("打印未开始", "保存已成功，但回读申请失败，请稍后重新进入再打印", "确定");
+                return Result.Failure(savedResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"保存成功后回读申请失败: {savedResult.Message}");
+            }
 
-                // 加载困难明细子表（GetByIdAsync 仅主表，打印需携带明细）
+            var savedApp = savedResult.Value;
+
+            // 加载困难明细子表（GetByIdAsync 仅主表，打印需携带明细）
                 var diseaseResult = await _applicationService.GetDiseasesByApplicationIdAsync(_id, CancellationToken);
-                if (diseaseResult.IsSuccess && diseaseResult.Value != null)
+                if (diseaseResult.HasValue)
                     savedApp.Diseases = diseaseResult.Value;
+                else if (diseaseResult.IsFailure)
+                    _logger.Warn($"保存并确认后加载疾病明细失败，打印将缺少该段: {diseaseResult.Message}");
                 var accidentResult = await _applicationService.GetAccidentsByApplicationIdAsync(_id, CancellationToken);
-                if (accidentResult.IsSuccess && accidentResult.Value != null)
+                if (accidentResult.HasValue)
                     savedApp.Accidents = accidentResult.Value;
+                else if (accidentResult.IsFailure)
+                    _logger.Warn($"保存并确认后加载灾害明细失败，打印将缺少该段: {accidentResult.Message}");
                 var educationResult = await _applicationService.GetEducationsByApplicationIdAsync(_id, CancellationToken);
-                if (educationResult.IsSuccess && educationResult.Value != null)
+                if (educationResult.HasValue)
                     savedApp.Educations = educationResult.Value;
+                else if (educationResult.IsFailure)
+                    _logger.Warn($"保存并确认后加载教育明细失败，打印将缺少该段: {educationResult.Message}");
 
                 var membersResult = await _applicationService.GetMembersByApplicationIdAsync(_id, CancellationToken);
-                var memberList = membersResult.IsSuccess ? membersResult.Value ?? new() : new List<TempReliefMember>();
-                var contactUnitPhone = (await _applicationService.GetReportUnitPhoneAsync(savedApp.ReportUnit, CancellationToken)).Value ?? string.Empty;
+                if (membersResult.IsFailure)
+                {
+                    _logger.Error($"保存并确认后加载成员失败，已中止打印: {membersResult.ErrorCode} {membersResult.Message}");
+                    await _dialogService.DisplayAlertAsync("打印未开始",
+                        $"成员明细加载失败，为避免打印出缺成员的文书，已中止打印：{membersResult.Message}", "确定");
+                    return Result.Failure(membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        $"成员明细加载失败，已中止打印: {membersResult.Message}");
+                }
+                var memberList = membersResult.Value ?? new();
+                var phoneResult = await _applicationService.GetReportUnitPhoneAsync(savedApp.ReportUnit, CancellationToken);
+                if (phoneResult.IsFailure)
+                    _logger.Warn($"加载报告单位电话失败，文书该字段将为空: {phoneResult.Message}");
+                var contactUnitPhone = phoneResult.Value ?? string.Empty;
                 var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
                 var (acceptanceDate, investigationDate) = await TempReliefPrintDataBuilder.ResolveScheduleAsync(timelineService, savedApp);
                 var fields = TempReliefPrintDataBuilder.BuildSingleFields(
@@ -575,12 +656,7 @@ public partial class TempReliefFormViewModel
                 PrintNavigationData.TableData = new();
                 PrintNavigationData.SupporterTableData = null;
 
-                await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
-            }
-            else
-            {
-                await CloseAsync();
-            }
+            await NavigateToPageAsync<Pages.ArchiveManagement.ArchiveOutputPage>();
             return Result.Success();
         }, "保存并确认...");
     }
@@ -897,11 +973,28 @@ public partial class TempReliefFormViewModel
 
     private string? Validate()
     {
-        if (!IsCandidateSelected && string.IsNullOrEmpty(ApplicantName))
-            return "请先从导入台账或低保申请库中选择申请人";
+        if (IsManualEntry)
+        {
+            if (string.IsNullOrWhiteSpace(ApplicantName))
+                return "请填写申请人姓名";
+            if (string.IsNullOrWhiteSpace(ApplicantIdCard))
+                return "请填写申请人身份证号";
+            if (!IdCardValidator.IsValid(ApplicantIdCard.Trim()))
+                return "申请人身份证号格式不正确";
+        }
+        else if (!IsCandidateSelected && string.IsNullOrEmpty(ApplicantName))
+        {
+            return "请先从四类在册台账中选择申请人；不在保障人群内请切换为「非在册登记」";
+        }
 
         if (string.IsNullOrEmpty(ApplicantIdCard))
             return "申请人身份证号缺失";
+
+        if (ReliefPersonCount <= 0)
+            return "家庭遇困人数（含户主）须大于 0";
+
+        if (ApplicantFamilySize is > 0 && ReliefPersonCount > ApplicantFamilySize.Value)
+            return $"家庭遇困人数（{ReliefPersonCount}）不能大于家庭人口（{ApplicantFamilySize}）";
 
         if (string.IsNullOrWhiteSpace(BeneficiaryIdCard) || string.IsNullOrWhiteSpace(BeneficiaryName))
             return "请选择申请成员作为救助对象";
@@ -937,15 +1030,35 @@ public partial class TempReliefFormViewModel
         if (DifficultyType == TempReliefConstants.DifficultyTypeEducation && Educations.Count == 0)
             return "困难类型为教育支出，请至少添加一条教育支出明细";
 
+        if (ReliefType == TempReliefConstants.ReliefTypeLarge && IsReserveChannel)
+        {
+            if (!TempReliefConstants.TryParseConfirmAmount(ConfirmAmountInput, out var reserveAmount)
+                || reserveAmount <= 0)
+                return "备用金发放请填写救助金额";
+
+            var reserveCap = TempReliefConstants.GetReserveCap(_baseStandard, ReliefPersonCount);
+            if (reserveCap > 0 && reserveAmount > reserveCap)
+                return $"备用金发放金额不能超过上限 {reserveCap:F2} 元（{ReliefPersonCount} 人 × 城市低保标准 {_baseStandard:F2} × 6）";
+        }
+
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {
             if (string.IsNullOrEmpty(SelectedSmallAmountLevel))
-                return "小额快速救助请选择定额档位";
+                return "小额快救请选择定额档位";
 
-            // 确定金额可下调，但不得超过户籍对应低保月标准（标准缺失时跳过上限校验）
+            if (ReliefPersonCount <= 0)
+                return "家庭遇困人数（含户主）须大于 0";
+
+            if (ApplicantFamilySize is > 0 && ReliefPersonCount > ApplicantFamilySize.Value)
+                return $"家庭遇困人数（{ReliefPersonCount}）不能大于家庭人口（{ApplicantFamilySize}）";
+
             var selectedLevel = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
-            var maxAmount = selectedLevel?.StandardValue ?? _confirmAmountMax;
-            if (!TempReliefConstants.TryValidateConfirmAmount(ConfirmAmountInput, maxAmount, out _, out var amountError))
+            if (selectedLevel == null || TempReliefConstants.TierMultiplier(selectedLevel.StandardType) <= 0)
+                return "请选择小额快救政策档位（50%/75%/100%）";
+
+            if (!TempReliefConstants.TryValidateSmallAmount(
+                    ConfirmAmountInput, _baseStandard, ReliefPersonCount, selectedLevel.StandardType,
+                    out _, out var amountError))
                 return amountError;
         }
 
@@ -968,15 +1081,25 @@ public partial class TempReliefFormViewModel
         // 口径唯一实现见 TempReliefConstants.ResolveFamilySize；此处同时刷新只读显示字段
         var resolvedFamilySize = RefreshApplicantFamilySize();
 
+        var sourceType = IsManualEntry
+            ? TempReliefConstants.SourceManual
+            : (TempReliefConstants.IsAllowedSourceTable(_sourceTable) && _sourceTable == "nc_biz_applications"
+                ? TempReliefConstants.SourceApplication
+                : TempReliefConstants.SourceImportTab);
+        var sourceTable = IsManualEntry ? string.Empty : _sourceTable;
+        var sourceFamilyId = IsManualEntry ? 0L : _sourceFamilyId;
+
         var app = new TempReliefApplication
         {
             Id = _id,
             ReliefType = ReliefType,
-            SourceType = TempReliefConstants.IsAllowedSourceTable(_sourceTable) && _sourceTable == "nc_biz_applications"
-                ? TempReliefConstants.SourceApplication
-                : TempReliefConstants.SourceImportTab,
-            SourceTable = _sourceTable,
-            SourceFamilyId = _sourceFamilyId,
+            PopulationStatus = IsManualEntry
+                ? TempReliefConstants.PopulationUninsured
+                : TempReliefConstants.ResolvePopulationStatus(sourceType, sourceTable),
+            PaymentChannel = TempReliefConstants.ResolvePaymentChannel(ReliefType, PaymentChannel),
+            SourceType = sourceType,
+            SourceTable = sourceTable,
+            SourceFamilyId = sourceFamilyId,
             HukouType = _hukouType,
             ApplicantName = ApplicantName,
             ApplicantIdCard = ApplicantIdCard,
@@ -1057,18 +1180,36 @@ public partial class TempReliefFormViewModel
             }
         }
 
+        app.ReliefPersonCount = TempReliefConstants.ResolveReliefPersonCount(ReliefPersonCount, resolvedFamilySize);
+
         if (ReliefType == TempReliefConstants.ReliefTypeSmall)
         {
+            var level = SmallAmountLevels.FirstOrDefault(s => s.StandardName == SelectedSmallAmountLevel);
+            var tierCode = TempReliefConstants.TierMultiplier(level?.StandardType) > 0 ? level!.StandardType : null;
+            app.StandardTier = tierCode;
+            app.StandardMultiplier = tierCode == null ? null : TempReliefConstants.TierMultiplier(tierCode);
             app.SmallAmountLevel = SelectedSmallAmountLevel;
-            // 确定金额以输入框为准（可下调）；校验在 ValidateBeforeSave 已拦截非法/超上限值
+            // 确定金额以输入框为准（可下调）；校验在 Validate 已拦截非法/超上限值
             app.ConfirmAmount = TempReliefConstants.TryParseConfirmAmount(ConfirmAmountInput, out var confirmAmount)
                 ? confirmAmount
                 : null;
         }
+        else if (IsReserveChannel)
+        {
+            // 常规·备用金：手工填金额（校验在 Validate 已拦截非法/超上限值）
+            app.SmallAmountLevel = string.Empty;
+            app.StandardTier = null;
+            app.StandardMultiplier = null;
+            app.ConfirmAmount = TempReliefConstants.TryParseConfirmAmount(ConfirmAmountInput, out var reserveAmount)
+                ? reserveAmount
+                : null;
+        }
         else
         {
-            // 大额救助金额不填写
+            // 常规·上级发放：金额由上级核定，系统不计算、不落库
             app.SmallAmountLevel = string.Empty;
+            app.StandardTier = null;
+            app.StandardMultiplier = null;
             app.ConfirmAmount = null;
         }
 

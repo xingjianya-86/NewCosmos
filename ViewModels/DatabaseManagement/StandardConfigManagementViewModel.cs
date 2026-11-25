@@ -222,9 +222,10 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
             var result = await _standardConfigService.GetStandardValueAsync(standardType, ct: ct);
             return result.IsSuccess ? result.Value : 0m;
         }
-        catch
+        catch (Exception ex)
         {
             // 公示文案刷新失败不阻断页面（值显示"配置缺失"）
+            Serilog.Log.Debug(ex, "[StandardConfig] 读取工资标准失败: {Type}", standardType);
             return 0m;
         }
     }
@@ -239,7 +240,7 @@ public partial class StandardConfigManagementViewModel : ViewModelBase
             _logger.Info("加载标准列表");
 
             var result = await _standardConfigService.GetConfigStandardsAsync(null, ct);
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 ConfigStandards.Clear();
 

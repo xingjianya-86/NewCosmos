@@ -298,9 +298,10 @@ public class OutputRootMigrationService : BaseService, IOutputRootMigrationServi
             var root = state?.LastAppliedRoot?.Trim();
             return string.IsNullOrWhiteSpace(root) ? null : root;
         }
-        catch
+        catch (Exception ex)
         {
-            // 状态文件损坏：回退旧默认根，下次成功迁移时重写
+            // 状态文件损坏：回退旧默认根，下次成功迁移时重写；但必须留痕，避免迁移到错误目录。
+            Serilog.Log.Warning(ex, "[OutputRootMigration] 读取迁移状态文件失败，按首次迁移处理");
             return null;
         }
     }

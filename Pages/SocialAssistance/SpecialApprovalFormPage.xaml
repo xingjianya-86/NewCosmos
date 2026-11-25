@@ -77,7 +77,7 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="填报时间" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <DatePicker Date="{Binding FormDate, Mode=TwoWay}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
+                                <DatePicker Date="{Binding FormDate, Mode=TwoWay}" Format="yyyy年M月d日" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="乡镇民政办审核结果" Style="{StaticResource FormFieldLabelStyle}"/>
@@ -102,7 +102,7 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowSpacing="8">
                             <VerticalStackLayout Spacing="4">
                                 <Label Text="会议日期" Style="{StaticResource FormFieldLabelStyle}"/>
-                                <DatePicker Date="{Binding MeetingDate}" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
+                                <DatePicker Date="{Binding MeetingDate}" Format="yyyy年M月d日" FontSize="{OnPlatform WinUI=17, Android=16, Default=17}" HeightRequest="38"/>
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="1" Spacing="4">
                                 <Label Text="参会人员" Style="{StaticResource FormFieldLabelStyle}"/>

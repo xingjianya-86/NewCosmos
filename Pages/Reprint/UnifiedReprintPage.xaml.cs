@@ -1,4 +1,6 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.NavigationData;
+using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
 using NewCosmos.ViewModels.Reprint;
 
@@ -62,7 +64,7 @@ public partial class UnifiedReprintPage : ContentPage
     // ── WebView2 打印：PdfJs 渲染 PDF → window.print() 弹系统打印对话框 ──
     // 与 ArchiveOutputPage.PrintPdfViaWebViewAsync 同款（页面各自持有隐藏 WebView 实例）
 
-    private TaskCompletionSource? _printTcs;
+    private TaskCompletionSource<Result>? _printTcs;
     private string? _pendingPrintBase64;
     private bool _printStep; // false=等待 viewer.html 导航完成，true=等待 PDF 注入后打印
 
@@ -70,7 +72,7 @@ public partial class UnifiedReprintPage : ContentPage
     /// 通过 MAUI WebView（Windows 底层 WebView2）+ PdfJs 渲染 PDF 并打印。
     /// 不依赖系统默认 PDF 关联（解决搜狗 PDF 无 print verb 问题）。
     /// </summary>
-    private async Task PrintPdfViaWebViewAsync(string pdfPath)
+    private async Task<Result> PrintPdfViaWebViewAsync(string pdfPath)
     {
         var pdfBytes = await File.ReadAllBytesAsync(pdfPath);
         _pendingPrintBase64 = Convert.ToBase64String(pdfBytes);
@@ -80,10 +82,12 @@ public partial class UnifiedReprintPage : ContentPage
         if (!File.Exists(viewerPath))
         {
             _pendingPrintBase64 = null;
-            return;
+            _logger.Error($"[UnifiedReprint] PDF 预览器缺失，无法打印: {viewerPath}");
+            return Result.Failure(ErrorCodes.PRINT_FAILED, $"PDF 预览器缺失，无法打印：{viewerPath}");
         }
 
-        _printTcs = new TaskCompletionSource();
+        var tcs = new TaskCompletionSource<Result>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _printTcs = tcs;
         _printStep = false;
 
         // 订阅 Navigated 事件处理打印流程
@@ -103,19 +107,28 @@ public partial class UnifiedReprintPage : ContentPage
             PdfWebView.Source = new UrlWebViewSource { Url = viewerUrl };
         });
 
-        // 等待打印完成（带超时保护）
+        // 等待打印完成（带超时保护）：超时=失败，不再伪装成功
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        cts.Token.Register(() => _printTcs.TrySetResult());
-        await _printTcs.Task;
+        cts.Token.Register(() => tcs.TrySetResult(Result.Failure(
+            ErrorCodes.PRINT_JOB_TIMEOUT, "打印等待超时（60 秒），请确认打印对话框是否已打开")));
+        var result = await tcs.Task;
 
         // 清理
         PdfWebView.Navigated -= OnPrintWebViewNavigated;
         _pendingPrintBase64 = null;
+        return result;
     }
 
     private void OnPrintWebViewNavigated(object? sender, WebNavigatedEventArgs e)
     {
-        if (e.Result != WebNavigationResult.Success || _printTcs == null) return;
+        if (_printTcs == null) return;
+
+        if (e.Result != WebNavigationResult.Success)
+        {
+            _logger.Error($"[UnifiedReprint] 打印预览导航失败: {e.Result} {e.Url}");
+            _printTcs.TrySetResult(Result.Failure(ErrorCodes.PRINT_FAILED, $"加载打印预览失败：{e.Result}"));
+            return;
+        }
 
         Dispatcher.Dispatch(async () =>
         {
@@ -136,13 +149,13 @@ public partial class UnifiedReprintPage : ContentPage
                     // 第二步：触发系统打印对话框（window.print() 在 WebView2 中阻塞至对话框关闭）
                     await PdfWebView.EvaluateJavaScriptAsync("window.print()");
 
-                    _printTcs?.TrySetResult();
+                    _printTcs?.TrySetResult(Result.Success());
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[UnifiedReprint] 打印注入失败: {ex.Message}");
-                _printTcs?.TrySetResult();
+                _logger.Error($"[UnifiedReprint] 打印注入失败: {ex.Message}");
+                _printTcs?.TrySetResult(Result.FromException(ex, ErrorCodes.PRINT_FAILED));
             }
         });
     }

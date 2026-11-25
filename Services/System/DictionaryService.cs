@@ -98,7 +98,14 @@ public class DictionaryService : BaseService, IDictionaryService
 
         var checkSql = "SELECT COUNT(*) FROM nc_dict_items";
         var countResult = await _dbService.ExecuteScalarAsync(checkSql, ct);
-        if (countResult.IsSuccess && Convert.ToInt64(countResult.Value) > 0)
+        if (countResult.IsFailure)
+        {
+            // 计数失败若当"空表"处理，会触发 allowDrop 整表重建（瞬时故障即清空字典）。
+            LogError($"检查字典初始化状态失败，已中止（不重建）: {countResult.ErrorCode} {countResult.Message}");
+            return Result.Failure(countResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"检查字典初始化状态失败: {countResult.Message}");
+        }
+        if (Convert.ToInt64(countResult.Value) > 0)
         {
             _dataInitialized = true;
             return Result.Success();
@@ -214,8 +221,8 @@ public class DictionaryService : BaseService, IDictionaryService
         await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
         try
         {
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_dict_categories", ct);
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_dict_items", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_dict_categories", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_dict_items", ct);
             await tx.CommitAsync(ct);
 
             Logger.LogBusiness("种子表清空完成");

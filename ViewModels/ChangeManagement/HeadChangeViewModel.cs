@@ -105,7 +105,7 @@ public partial class HeadChangeViewModel : ViewModelBase
 
             // 加载申请信息
             var appResult = await _applicationService.GetByIdAsync(applicationId, CancellationToken);
-            if (appResult.IsSuccess && appResult.Value != null)
+            if (appResult.HasValue)
             {
                 var app = appResult.Value;
                 CurrentHeadName = app.ApplicantName;
@@ -118,7 +118,7 @@ public partial class HeadChangeViewModel : ViewModelBase
 
             // 加载可选新户主（排除原户主）；同时记住原户主成员 ID（变更记录溯源用，原为硬编码 0 的 TODO）
             var membersResult = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
-            if (membersResult.IsSuccess && membersResult.Value != null)
+            if (membersResult.HasValue)
             {
                 var members = membersResult.Value;
                 _oldHeadMemberId = members.FirstOrDefault(m => m.IsHouseholdHead)?.Id ?? 0;
@@ -200,7 +200,7 @@ public partial class HeadChangeViewModel : ViewModelBase
 
                 // 成功后直接进档案产出页（整档模式）。原「整套档案 / 仅出文书 / 稍后再说」三选一已合并为单一出口：
                 //  · 户主变更停旧建新的新档必须归档才算收尾——旧档已 Stopped，新档不归档则本户无在保档案；
-                //  ·「仅出文书」会设 OutputCategories/OperationOverride/PrefilterTemplateNames，
+                //  ·「仅出文书」会设 OutputCategories/OperationOverride/PrefilterDocTypes，
                 //    触发 ArchiveOutputViewModel 的 IsDocumentMode=true →「完成归档」按钮被隐藏、
                 //    CompleteAsync 入口直接 return，新档永远无法归档（该绑定本是为渐退草稿设的护栏，
                 //    户主变更复用同一上下文时被误伤）；
@@ -208,8 +208,8 @@ public partial class HeadChangeViewModel : ViewModelBase
                 // 三字段清空 → IsDocumentMode=false，归档能力天然可用；退路为用户直接返回、不点归档。
                 PrintNavigationData.OutputCategories = null;
                 PrintNavigationData.OperationOverride = null;
-                PrintNavigationData.PrefilterTemplateNames = null;
-                PrintNavigationData.TemplateFilter = null;
+                PrintNavigationData.PrefilterDocTypes = null;
+                PrintNavigationData.TemplateDocTypeFilter = null;
 
                 // 未停旧建新（NewApplicationId 为 0/null）时新旧档同为当前档，此时不该把当前档
                 // 自己当作"变更前旧档案"传入（会让停保告知书判定拿到自指的原始档）→ 置 null。

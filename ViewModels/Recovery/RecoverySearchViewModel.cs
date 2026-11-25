@@ -123,6 +123,8 @@ public partial class RecoverySearchViewModel : ViewModelBase
         try
         {
             var result = await _recoveryService.GetStoppedPersonStatsAsync();
+            if (result.IsFailure)
+                Logger.Warn($"加载停止人员统计失败，页头统计保持原值: {result.ErrorCode} {result.Message}");
             if (result.IsSuccess)
             {
                 var stats = result.Value;

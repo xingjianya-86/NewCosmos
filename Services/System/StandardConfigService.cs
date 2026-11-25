@@ -80,7 +80,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
 
         var result = await _dbService.QueryAsync<IncomeStandard>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             LogInfo($"获取到{result.Value.Count} 条收入标准");
             return Result.Success(result.Value.ToList());
@@ -101,7 +101,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
 
         var result = await _dbService.QueryAsync<ClassifiedSubsidyStandard>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             LogInfo($"获取到{result.Value.Count} 条补贴标准");
             return Result.Success(result.Value.ToList());
@@ -122,7 +122,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
 
         var result = await _dbService.QueryAsync<DestituteSupportStandard>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             LogInfo($"获取到{result.Value.Count} 条特困供养标准");
             return Result.Success(result.Value.ToList());
@@ -143,7 +143,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
             ? await _dbService.QueryAsync<SystemConfigStandard>(sql, ct)
             : await _dbService.QueryAsync<SystemConfigStandard>(sql, ct, category);
 
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             LogInfo($"获取到{result.Value.Count} 条系统配置");
             return Result.Success(result.Value.ToList());
@@ -182,37 +182,45 @@ public class StandardConfigService : BaseService, IStandardConfigService
             var overview = new StandardConfigOverview();
 
             var incomeResult = await GetActiveIncomeStandardsAsync(ct);
-            if (incomeResult.IsSuccess && incomeResult.Value is not null)
+            if (incomeResult.HasValue)
             {
                 overview.IncomeStandardsCount = incomeResult.Value.Count;
                 overview.RuralIncomeStandard = incomeResult.Value.FirstOrDefault(s => s.HukouType == "Rural")?.MonthlyStandard ?? 0;
                 overview.UrbanIncomeStandard = incomeResult.Value.FirstOrDefault(s => s.HukouType == "Urban")?.MonthlyStandard ?? 0;
             }
+            else if (incomeResult.IsFailure)
+                LogWarn($"概览：收入标准查询失败，相关统计显示为 0: {incomeResult.ErrorCode} {incomeResult.Message}");
 
             var subsidyResult = await GetActiveSubsidyStandardsAsync(ct);
-            if (subsidyResult.IsSuccess && subsidyResult.Value is not null)
+            if (subsidyResult.HasValue)
             {
                 overview.SubsidyStandardsCount = subsidyResult.Value.Count;
                 overview.RuralSubsidyAmount = subsidyResult.Value.FirstOrDefault(s => s.HukouType == "Rural")?.PerPersonAmount ?? 0;
                 overview.UrbanSubsidyAmount = subsidyResult.Value.FirstOrDefault(s => s.HukouType == "Urban")?.PerPersonAmount ?? 0;
             }
+            else if (subsidyResult.IsFailure)
+                LogWarn($"概览：分类施保标准查询失败，相关统计显示为 0: {subsidyResult.ErrorCode} {subsidyResult.Message}");
 
             var destituteResult = await GetActiveDestituteStandardsAsync(ct);
-            if (destituteResult.IsSuccess && destituteResult.Value is not null)
+            if (destituteResult.HasValue)
             {
                 overview.DestituteStandardsCount = destituteResult.Value.Count;
             }
+            else if (destituteResult.IsFailure)
+                LogWarn($"概览：特困标准查询失败，相关统计显示为 0: {destituteResult.ErrorCode} {destituteResult.Message}");
 
             var configResult = await GetSystemConfigsAsync(null, ct);
-            if (configResult.IsSuccess && configResult.Value is not null)
+            if (configResult.HasValue)
             {
                 overview.SystemConfigsCount = configResult.Value.Count;
             }
+            else if (configResult.IsFailure)
+                LogWarn($"概览：系统配置查询失败，相关统计显示为 0: {configResult.ErrorCode} {configResult.Message}");
 
             try
             {
                 var configStandardsResult = await GetConfigStandardsAsync(null, ct);
-                if (configStandardsResult.IsSuccess && configStandardsResult.Value is not null)
+                if (configStandardsResult.HasValue)
                 {
                     overview.ConfigStandardsCount = configStandardsResult.Value.Count;
                 }
@@ -250,9 +258,9 @@ public class StandardConfigService : BaseService, IStandardConfigService
                 ? await _dbService.QueryAsync<ConfigStandard>(sql, ct)
                 : await _dbService.QueryAsync<ConfigStandard>(sql, ct, standardType);
 
-            return result.IsSuccess && result.Value is not null
-                ? Result.Success(result.Value.ToList())
-                : Result.Success(new List<ConfigStandard>());
+            if (result.IsFailure)
+                return Result.Failure<List<ConfigStandard>>(result.ErrorCode!, result.Message!);
+            return Result.Success(result.Value?.ToList() ?? new List<ConfigStandard>());
         }
         catch (Exception ex) when (ex.Message.Contains("nc_config_standards") || ex.Message.Contains("does not exist"))
         {
@@ -295,19 +303,22 @@ public class StandardConfigService : BaseService, IStandardConfigService
             _standardCache[cacheKey] = new CachedStandard(result.Value, DateTime.UtcNow);
         }
 
-        return result.IsSuccess ? Result<ConfigStandard>.Success(result.Value) : Result<ConfigStandard>.Success(null);
+        if (result.IsFailure)
+            return Result<ConfigStandard>.Failure(result.ErrorCode!, result.Message!);
+        return Result<ConfigStandard>.Success(result.Value);
     }
 
     public async Task<Result<decimal>> GetStandardValueAsync(string standardType, string hukouType = null, string supportMode = null, CancellationToken ct = default)
     {
         var result = await GetConfigStandardByTypeAsync(standardType, hukouType, supportMode, ct);
 
-        if (result.IsSuccess && result.Value is not null)
-        {
-            return Result.Success(result.Value.StandardValue);
-        }
+        if (result.IsFailure)
+            return Result.Failure<decimal>(result.ErrorCode!, result.Message!);
 
-        return Result.Success(0m);
+        // 未配置 ≠ 查询失败：未配置按 0（业务既有语义），查询失败必须上抛。
+        return result.Value is not null
+            ? Result.Success(result.Value.StandardValue)
+            : Result.Success(0m);
     }
 
     public async Task<Result<int>> CreateConfigStandardAsync(ConfigStandard standard, CancellationToken ct = default)
@@ -478,7 +489,7 @@ public class StandardConfigService : BaseService, IStandardConfigService
         try
         {
             await ReportProgressWithDelayAsync(progress, 4, totalSteps, "清空并插入标准配置数据");
-            await _dbService.ExecuteNonQueryAsync("TRUNCATE TABLE nc_config_standards", ct);
+            await ExecOrThrowAsync(_dbService, "TRUNCATE TABLE nc_config_standards", ct);
 
             if (standards.Count > 0)
             {

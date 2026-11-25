@@ -57,16 +57,22 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         _organizationService = organizationService;
     }
 
-    /// <summary>
-    /// 申报表模板文件名关键词（档案_乡镇社会救助一事一议申报表）
-    /// </summary>
-    private const string TemplateNameKeyword = "一事一议申报表";
+    // 原 TemplateNameKeyword（"一事一议申报表" 名称关键词）已删：模板定位改按
+    // TemplateDocTypes.SpecialApprovalDeclaration 文档类型（方案B，2026-11-18）。
 
     public async Task<SpecialApprovalForm?> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
         var sql = "SELECT " + WideTableColumns.SpecialApprovalFormsColumns + " FROM nc_biz_special_approval_forms WHERE application_id = $1 AND deleted_at IS NULL LIMIT 1";
         var result = await _db.QuerySingleAsync<SpecialApprovalForm>(sql, ct, applicationId);
-        return result.IsSuccess ? result.Value : null;
+        if (result.IsFailure)
+        {
+            // 查询失败不能当成"未保存"：SaveDraftAsync 会据此走 INSERT，产生一申请多份申报表。
+            LogError($"查询一事一议申报表失败: {result.ErrorCode} {result.Message}");
+            throw new BusinessException(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"查询一事一议申报表失败: {result.Message}");
+        }
+        return result.Value;
     }
 
     /// <summary>
@@ -353,14 +359,19 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
     }
 
     /// <summary>
-    /// 查找申报表模板（按名称关键词在"新增"分类中匹配）
+    /// 查找申报表模板（按文档类型精准定位，方案B；原按名称关键词在"新增"分类中子串匹配）。
+    /// 找不到返回 null → 调用方 GenerateDocumentAsync 显式报 SPECIAL_APPROVAL_TEMPLATE_NOT_FOUND
+    ///（原 `?? templates.FirstOrDefault()` 兜底会拿任意模板渲染，已随模糊过滤一并废除）。
     /// </summary>
     private async Task<Template?> FindSpecialApprovalTemplateAsync(CancellationToken ct = default)
     {
-        var templates = await _templateService.GetByCategoriesAsync(new[] { "新增" }, ct);
-        var match = templates.FirstOrDefault(t =>
-            !string.IsNullOrEmpty(t.Name) && t.Name.Contains(TemplateNameKeyword, StringComparison.OrdinalIgnoreCase));
-        return match ?? templates.FirstOrDefault();
+        var result = await _templateService.GetByDocTypeAsync(TemplateDocTypes.SpecialApprovalDeclaration, ct);
+        if (result.IsFailure)
+        {
+            LogWarn($"按文档类型查申报表模板失败: {result.Message}");
+            return null;
+        }
+        return result.Value.FirstOrDefault();
     }
 
     /// <summary>
@@ -373,8 +384,8 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         var reportUnit = string.IsNullOrWhiteSpace(form.ReportUnit)
             ? await GetOperatorUnitNameAsync()
             : form.ReportUnit;
-        var confirmTime = form.AuditDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd");
-        var auditDate = form.AuditDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd");
+        var confirmTime = form.AuditDate?.ToString("yyyy年M月d日") ?? DateTime.Today.ToString("yyyy年M月d日");
+        var auditDate = form.AuditDate?.ToString("yyyy年M月d日") ?? DateTime.Today.ToString("yyyy年M月d日");
 
         return new Dictionary<string, string>
         {
@@ -403,10 +414,16 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
         try
         {
             var result = await _organizationService.GetByIdAsync(orgId.Value);
-            return result.IsSuccess && result.Value != null ? result.Value.Name ?? string.Empty : string.Empty;
+            if (result.IsFailure || result.Value == null)
+            {
+                LogWarn($"获取填报单位失败，文书该字段将为空: {result.ErrorCode} {result.Message}");
+                return string.Empty;
+            }
+            return result.Value.Name ?? string.Empty;
         }
-        catch
+        catch (Exception ex)
         {
+            LogWarn($"获取填报单位名称异常，文书该字段将为空: {ex.Message}");
             return string.Empty;
         }
     }
@@ -417,7 +434,9 @@ public class SpecialApprovalFormService : BaseService, ISpecialApprovalFormServi
     private async Task<string> GenerateFormNoAsync(long applicationId, CancellationToken ct = default)
     {
         var appResult = await _applicationService.GetByIdAsync(applicationId, ct);
-        var appNo = appResult.IsSuccess && appResult.Value != null ? appResult.Value.ApplicationNo : string.Empty;
+        if (appResult.IsFailure || appResult.Value == null)
+            LogWarn($"生成申报表编号：读取申请号失败，编号将退化为随机串: ApplicationId={applicationId}, {appResult.ErrorCode} {appResult.Message}");
+        var appNo = appResult.HasValue ? appResult.Value.ApplicationNo : string.Empty;
         return SpecialApprovalConstants.BuildFormNo(appNo, Random.Shared.Next(1, 9999));
     }
 }

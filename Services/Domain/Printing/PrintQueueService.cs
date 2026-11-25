@@ -79,7 +79,12 @@ public class PrintQueueService : BaseService, IPrintQueueService
         LogInfo($"打印任务入队: {jobNo} ({request.BusinessType}, Kind={jobKind})");
 
         var full = await GetByIdAsync(job.Id, ct);
-        return full.IsSuccess && full.Value != null ? Result.Success(full.Value) : Result.Success(job);
+        if (full.HasValue)
+            return Result.Success(full.Value);
+
+        // 回读失败不改变"已入队"事实，但不能静默：返回入队结果并留痕，避免 DB 默认字段缺失无从定位。
+        LogWarn($"打印任务回读失败，返回入队结果: JobNo={jobNo}, {full.ErrorCode} {full.Message}");
+        return Result.Success(job);
     }
 
     public async Task<Result<List<PrintJob>>> ClaimPendingAsync(int max, string agentMachine, CancellationToken ct = default)

@@ -311,7 +311,7 @@ public partial class ElderlyStopViewModel : ViewModelBase
     private async Task NavigateToArchiveOutputAsync()
     {
         var savedResult = await _applicationService.GetByIdAsync(_applicationId, CancellationToken);
-        if (savedResult.IsSuccess && savedResult.Value != null)
+        if (savedResult.HasValue)
         {
             var fields = ElderlyPrintDataBuilder.BuildSingleFields(savedResult.Value);
             // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承

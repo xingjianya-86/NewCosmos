@@ -1098,7 +1098,9 @@ public partial class DutyService
 
         // 下游已生成月份（供"一键重排"：本月轮转变化后，后续月份需按新链条重排才一致）
         var downstreamResult = await LoadDownstreamGeneratedMonthsAsync(year, month, ct);
-        if (downstreamResult.IsSuccess)
+        if (downstreamResult.IsFailure)
+            LogWarn($"查询下游已生成月份失败，一键重排可能漏排后续月份: {downstreamResult.ErrorCode} {downstreamResult.Message}");
+        else
             summary.DownstreamMonths.AddRange(downstreamResult.Value);
 
         summary.ScheduleCount = pendingSchedules.Count;
@@ -1257,9 +1259,9 @@ public partial class DutyService
             LEFT JOIN nc_duty_members m ON m.id = r.last_member_id
             ORDER BY r.group_code, r.date_type";
         var result = await _dbService.QueryAsync<DutyRotationStateView>(sql, ct);
-        return result.IsSuccess && result.Value is not null
-            ? Result.Success(result.Value)
-            : Result.Success(new List<DutyRotationStateView>());
+        if (result.IsFailure)
+            return Result.Failure<List<DutyRotationStateView>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<DutyRotationStateView>());
     }
 
     public async Task<Result> ResetRotationAsync(string groupCode, string dateType, CancellationToken ct = default)

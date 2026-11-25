@@ -23,6 +23,7 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
     private readonly ILoggerService _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IScreenAwakeService _screenAwake;
 
     /// <summary>可识别类别（PERSON_PHOTO 纯照片跳过；显示序号 ↔ 类别代码映射表）</summary>
     private static readonly (string Code, string Name)[] RecognizableCategories =
@@ -33,18 +34,22 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
     private bool _capturing;
     private bool _completed;
     private CancellationTokenSource? _scanCts;
+    /// <summary>扫描会话期间的屏幕常亮租约（进页申请、离页释放）</summary>
+    private IDisposable? _awakeLease;
 
     /// <summary>当前类别（默认身份证；取景框仅身份证类别显示）</summary>
     private string _categoryCode = PhotoCategoryConstants.ID_CARD;
 
     public MobileOcrScanPage(IOcrRecognizeClient ocrClient, ILoggerService logger,
-        IDialogService dialogService, IServiceProvider serviceProvider)
+        IDialogService dialogService, IServiceProvider serviceProvider,
+        IScreenAwakeService screenAwake)
     {
         InitializeComponent();
         _ocrClient = ocrClient;
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
+        _screenAwake = screenAwake;
 
         foreach (var (code, name) in RecognizableCategories)
         {
@@ -87,6 +92,9 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
             return;
         }
 
+        // 取景 + 识别全程保持常亮：模型冷启动可能数十秒，熄屏会打断等待（用户 2026-11-25 反馈）
+        _awakeLease ??= _screenAwake.KeepAwake();
+
         try
         {
             await Preview.StartAsync();
@@ -105,6 +113,8 @@ public partial class MobileOcrScanPage : ContentPage, IParameterizedPage<OcrScan
         _scanCts?.Cancel();
         _scanCts?.Dispose();
         _scanCts = null;
+        _awakeLease?.Dispose();
+        _awakeLease = null;
         try
         {
             Preview.Stop();

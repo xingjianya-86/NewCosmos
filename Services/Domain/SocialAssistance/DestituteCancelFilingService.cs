@@ -51,8 +51,8 @@ public class DestituteCancelFilingService : BaseService, IDestituteCancelFilingS
         PrintNavigationData.FieldData = fields;
         PrintNavigationData.TableData = new();
         PrintNavigationData.SupporterTableData = null;
-        // TemplateFilter 强白名单：仅出取消备案表、跳过变动文书事实过滤/补挂核查报告（退出时专用）
-        PrintNavigationData.TemplateFilter = [DocumentTemplateNames.DestituteCancelFiling];
+        // TemplateDocTypeFilter 强白名单（文档类型，方案B）：仅出取消备案表、跳过变动文书事实过滤/补挂核查报告（退出时专用）
+        PrintNavigationData.TemplateDocTypeFilter = [TemplateDocTypes.DestituteCancelFiling];
         PrintNavigationData.OutputCategories = CancelFilingCategories;
 
         LogInfo($"特困取消备案表：申请 {applicationId} 直出已就绪（分类={classification}，原因={stopReasonKey}）");

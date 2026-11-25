@@ -43,12 +43,6 @@ public static class DocumentTemplateNames
 
     // ── 模板名判定单点（原 ArchiveOutputViewModel 两文件共 12 处散落 Contains("封面") 等魔串）──
     // 实机模板名带分类前缀（如 "档案_封面"），判定用子串匹配保持兼容；改名只改这里。
-
-    /// <summary>是否档案封面模板（封面先行打印、失败中止的判定）</summary>
-    public static bool IsCover(string? templateName) =>
-        !string.IsNullOrEmpty(templateName) && templateName.Contains("封面");
-
-    /// <summary>是否赡养费承诺书模板（按赡养人逐人生成/合并的判定）</summary>
-    public static bool IsSupporterPledge(string? templateName) =>
-        !string.IsNullOrEmpty(templateName) && templateName.Contains("赡养费承诺书");
+    // ⚠️ 2026-11-18 方案B：IsCover/IsSupporterPledge 已按文档类型重写并迁至 TemplateDocTypes
+    //（doc_type 精确匹配，取代按名子串）；本类仅保留模板名常量（GetByNameAsync 等值场景与文案）。
 }

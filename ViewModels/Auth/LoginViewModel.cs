@@ -251,7 +251,7 @@ public partial class LoginViewModel : ViewModelBase
                     {
                         var orgService = _serviceProvider.GetRequiredService<IOrganizationService>();
                         var orgResult = await orgService.GetByIdAsync(result.Value.OrganizationId.Value);
-                        if (orgResult.IsSuccess && orgResult.Value != null)
+                        if (orgResult.HasValue)
                         {
                             var org = orgResult.Value;
                             App.SetCurrentUserAddress(
@@ -491,7 +491,10 @@ public partial class LoginViewModel : ViewModelBase
                         if (!string.IsNullOrEmpty(savedPassword))
                             Password = savedPassword;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug($"读取记住的密码失败，按未保存处理: {ex.Message}");
+                    }
                 }
             }
 

@@ -13,8 +13,14 @@ public class TempReliefApplication
     /// <summary>申请编号（LZ+yyyyMMdd+seq:D4）</summary>
     public string ApplicationNo { get; set; } = string.Empty;
 
-    /// <summary>救助类型：Large大额 / Small小额</summary>
+    /// <summary>救助类型：Large常规 / Small小额快救</summary>
     public string ReliefType { get; set; } = TempReliefConstants.ReliefTypeLarge;
+
+    /// <summary>人群状态：Insured在保障人群内（四类在册）/ Uninsured不在保障人群内</summary>
+    public string PopulationStatus { get; set; } = TempReliefConstants.PopulationInsured;
+
+    /// <summary>发放渠道：County上级部门发放 / Reserve备用金发放（小额固定 Reserve）</summary>
+    public string? PaymentChannel { get; set; }
 
     /// <summary>申请年份（由申请日期派生，年度唯一约束用）</summary>
     public string ApplyYear { get; set; } = string.Empty;
@@ -161,8 +167,41 @@ public class TempReliefApplication
     /// <summary>乡镇验收人（民政助理）</summary>
     public string AcceptancePerson { get; set; } = string.Empty;
 
-    /// <summary>状态（Draft/Confirmed/Stopped）</summary>
+    /// <summary>状态（Draft/Submitted/Confirmed/Stopped/Rejected/Returned）</summary>
     public string Status { get; set; } = TempReliefConstants.StatusDraft;
+
+    /// <summary>家庭遇困人数（政策公式乘数，含户主；0=未设置，落库时按家庭人口兜底）</summary>
+    public int ReliefPersonCount { get; set; }
+
+    /// <summary>救助档位码：小额 S50/S75/S100；常规不落档</summary>
+    public string? StandardTier { get; set; }
+
+    /// <summary>档位系数：0.5/0.75/1（小额）；常规为空</summary>
+    public decimal? StandardMultiplier { get; set; }
+
+    /// <summary>乡镇受理时间（时限起算）</summary>
+    public DateTime? AcceptedAt { get; set; }
+
+    /// <summary>调查完成时间</summary>
+    public DateTime? InvestigationDoneAt { get; set; }
+
+    /// <summary>县确认日期（乡镇登记县确认件）</summary>
+    public DateTime? CountyConfirmedAt { get; set; }
+
+    /// <summary>县确认件登记人</summary>
+    public string? CountyConfirmedBy { get; set; }
+
+    /// <summary>备案状态：Pending/Filed</summary>
+    public string? FilingStatus { get; set; }
+
+    /// <summary>不予救助/退回补正原因</summary>
+    public string? RejectReason { get; set; }
+
+    /// <summary>不予救助告知时间</summary>
+    public DateTime? RejectNotifiedAt { get; set; }
+
+    /// <summary>不予救助告知方式</summary>
+    public string? RejectNoticeMethod { get; set; }
 
     public DateTime? ConfirmedAt { get; set; }
     public string ConfirmedBy { get; set; } = string.Empty;
@@ -181,6 +220,48 @@ public class TempReliefApplication
 
     /// <summary>状态中文名（界面绑定）</summary>
     public string StatusName => TempReliefConstants.GetStatusName(Status);
+
+    /// <summary>人群状态中文名（界面绑定）</summary>
+    public string PopulationStatusName => TempReliefConstants.GetPopulationStatusName(PopulationStatus);
+
+    /// <summary>发放渠道中文名（界面绑定）</summary>
+    public string PaymentChannelName => TempReliefConstants.GetPaymentChannelName(PaymentChannel);
+
+    /// <summary>6 类业务场景展示名（界面/列表用）</summary>
+    public string CategoryDisplayName => TempReliefConstants.GetCategoryDisplayName(ReliefType, PopulationStatus, PaymentChannel);
+
+    /// <summary>时限起算日：受理时间优先，草稿回退申请日期</summary>
+    public DateTime? DeadlineStartDate => AcceptedAt?.Date ?? ApplyDate?.Date;
+
+    /// <summary>办理截止日（在册 5 日 / 非在册 15 日 / 小额 2 日）</summary>
+    public DateTime? DeadlineDate => DeadlineStartDate.HasValue
+        ? TempReliefConstants.GetDeadlineDate(DeadlineStartDate.Value, ReliefType, PopulationStatus)
+        : null;
+
+    /// <summary>剩余天数（负数=已逾期）</summary>
+    public int? RemainingDays => DeadlineDate.HasValue
+        ? TempReliefConstants.GetRemainingDays(DeadlineDate.Value, DateTime.Today)
+        : null;
+
+    /// <summary>是否逾期（已终结状态不再提示）</summary>
+    public bool IsOverdue => RemainingDays is < 0
+        && Status is not (TempReliefConstants.StatusConfirmed or TempReliefConstants.StatusStopped
+            or TempReliefConstants.StatusRejected);
+
+    /// <summary>时限提示文案（列表用）</summary>
+    public string DeadlineText => Status switch
+    {
+        TempReliefConstants.StatusConfirmed => string.Empty,
+        TempReliefConstants.StatusStopped => string.Empty,
+        TempReliefConstants.StatusRejected => string.Empty,
+        _ => RemainingDays switch
+        {
+            null => string.Empty,
+            < 0 => $"已逾期 {-RemainingDays} 天",
+            0 => "今日到期",
+            var d => $"剩余 {d} 天"
+        }
+    };
 
     /// <summary>来源中文名（界面绑定）</summary>
     public string SourceName => TempReliefConstants.GetSourceName(SourceType);

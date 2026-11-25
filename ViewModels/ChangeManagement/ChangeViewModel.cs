@@ -298,7 +298,7 @@ public partial class ChangeViewModel : ViewModelBase
 
             // ① 当前库
             var current = await _applicationService.GetPagedAsync(1, 20, null, keyword, CancellationToken);
-            if (current.IsSuccess && current.Value != null)
+            if (current.HasValue)
             {
                 foreach (var app in current.Value.Items)
                 {
@@ -312,7 +312,7 @@ public partial class ChangeViewModel : ViewModelBase
 
             // ② 6 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困人员、刚性支出困难家庭、其他困难人员）
             var imported = await _importedArchiveService.SearchAsync(keyword, CancellationToken);
-            if (imported.IsSuccess && imported.Value != null)
+            if (imported.HasValue)
             {
                 foreach (var item in imported.Value)
                 {
@@ -410,7 +410,7 @@ public partial class ChangeViewModel : ViewModelBase
         try
         {
             var detailResult = await _importedArchiveService.GetImportedFamilyDetailAsync(item, CancellationToken);
-            if (detailResult.IsSuccess && detailResult.Value != null)
+            if (detailResult.HasValue)
             {
                 var detail = detailResult.Value;
                 var names = new List<string>();
@@ -660,7 +660,7 @@ public partial class ChangeViewModel : ViewModelBase
         try
         {
             var result = await call();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
                 apply(result.Value);
             else
                 _logger.Warn($"页头统计加载失败: {result.Message}");
@@ -830,7 +830,7 @@ public partial class ChangeViewModel : ViewModelBase
 
             var result = await _applicationService.GetByIdAsync(applicationId, CancellationToken);
 
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 var app = result.Value;
                 ApplicantName = app.ApplicantName;
@@ -861,7 +861,7 @@ public partial class ChangeViewModel : ViewModelBase
             }
             else
             {
-                _logger.Error($"操作失败");
+                _logger.Error($"档案信息加载失败: {result.ErrorCode} {result.Message}");
             }
 
             // 加载「本月已办」标记
@@ -945,7 +945,7 @@ public partial class ChangeViewModel : ViewModelBase
     private async Task<bool> NeedsCompletionAsync()
     {
         var appResult = await _applicationService.GetByIdAsync(ApplicationId, CancellationToken);
-        return appResult.IsSuccess && appResult.Value != null
+        return appResult.HasValue
             && string.Equals(appResult.Value.SourceType, "ImportedArchive", StringComparison.OrdinalIgnoreCase)
             && appResult.Value.DataCompletedAt == null;
     }

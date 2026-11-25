@@ -168,7 +168,7 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
 
             var result = await _dbService.QueryAsync<TableSizeRaw>(sql, ct, new object[] { yamlTables.ToArray() });
 
-            if (result.IsSuccess && result.Value is not null)
+            if (result.HasValue)
             {
                 var tables = result.Value.Select(t => new TableSizeInfo
                 {
@@ -358,6 +358,22 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
         !string.IsNullOrEmpty(name) && name.Length <= 64 &&
         global::System.Text.RegularExpressions.Regex.IsMatch(name, "^nc_[a-z0-9_]+$");
 
+    /// <summary>写操作失败即抛：清理流程任何一步失败都必须回滚，禁止"漏删仍报成功"。</summary>
+    private static void EnsureWriteSucceeded(Result result, string operation)
+    {
+        if (result.IsFailure)
+            throw new BusinessException(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"{operation}失败，已回滚本次清理: {result.Message}");
+    }
+
+    /// <summary>查询失败即抛：拿空集合继续会把"查不到"伪装成"没有待处理数据"。</summary>
+    private static void EnsureQuerySucceeded<T>(Result<T> result, string operation)
+    {
+        if (result.IsFailure)
+            throw new BusinessException(result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"{operation}失败，已中止本次清理: {result.Message}");
+    }
+
     private async Task<Result<List<string>>> GetSoftDeleteTablesAsync(CancellationToken ct)
     {
         var r = await _dbService.QueryAsync<string>(
@@ -516,62 +532,91 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             await using var tx = await _dbService.BeginTransactionScopeAsync(ct);
 
             // 2.1 恢复停保档案成员
-            result.RestoredRows += (await _dbService.ExecuteNonQueryAsync(
+            var restoreMembers = await _dbService.ExecuteNonQueryAsync(
                 @"UPDATE nc_biz_family_members fm SET deleted_at=NULL
                   FROM nc_biz_applications a
-                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status=$1", ct, ApplicationStatusCodes.STOPPED)).Value;
+                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status=$1", ct, ApplicationStatusCodes.STOPPED);
+            EnsureWriteSucceeded(restoreMembers, "恢复停保档案成员");
+            result.RestoredRows += restoreMembers.Value;
 
             // 2.2 删除活档案(非停保)下冗余软删成员
-            result.DeletedRows += (await _dbService.ExecuteNonQueryAsync(
+            var deleteOrphanMembers = await _dbService.ExecuteNonQueryAsync(
                 @"DELETE FROM nc_biz_family_members fm USING nc_biz_applications a
-                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status<>$1", ct, ApplicationStatusCodes.STOPPED)).Value;
+                  WHERE fm.application_id=a.id AND fm.deleted_at IS NOT NULL AND a.deleted_at IS NULL AND a.status<>$1", ct, ApplicationStatusCodes.STOPPED);
+            EnsureWriteSucceeded(deleteOrphanMembers, "删除冗余软删成员");
+            result.DeletedRows += deleteOrphanMembers.Value;
 
             // 2.3 待删救助档案（非停保、无变更链接、非存活档案之父）+ 从表
-            var appIds = (await _dbService.QueryAsync<long>(@"
+            var appIdsResult = await _dbService.QueryAsync<long>(@"
                 SELECT a.id FROM nc_biz_applications a
                 WHERE a.deleted_at IS NOT NULL AND a.status <> $1
                   AND NOT EXISTS (SELECT 1 FROM nc_biz_change_records cr WHERE cr.application_id=a.id OR cr.original_application_id=a.id OR cr.new_application_id=a.id)
-                  AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
+                  AND NOT EXISTS (SELECT 1 FROM nc_biz_applications c WHERE c.original_application_id=a.id AND c.deleted_at IS NULL)", ct, ApplicationStatusCodes.STOPPED);
+            EnsureQuerySucceeded(appIdsResult, "查询待删救助档案");
+            var appIds = appIdsResult.Value ?? new List<long>();
             if (appIds.Count > 0)
             {
                 var arr = appIds.ToArray();
                 foreach (var t in ApplicationDependentTables)
-                    result.DeletedRows += (await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr)).Value;
+                {
+                    var dependentDelete = await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr);
+                    EnsureWriteSucceeded(dependentDelete, $"删除 {t} 明细");
+                    result.DeletedRows += dependentDelete.Value;
+                }
                 var delApps = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_applications WHERE id = ANY($1)", ct, arr);
+                EnsureWriteSucceeded(delApps, "删除救助档案");
                 result.DeletedRows += delApps.Value;
                 result.DeletedArchives += delApps.Value;
             }
 
             // 2.4 高龄（非停止）
-            var elderlyIds = (await _dbService.QueryAsync<long>(
-                "SELECT id FROM nc_biz_elderly_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
+            var elderlyIdsResult = await _dbService.QueryAsync<long>(
+                "SELECT id FROM nc_biz_elderly_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED);
+            EnsureQuerySucceeded(elderlyIdsResult, "查询待删高龄档案");
+            var elderlyIds = elderlyIdsResult.Value ?? new List<long>();
             if (elderlyIds.Count > 0)
             {
                 var arr = elderlyIds.ToArray();
                 foreach (var t in ElderlyDependentTables)
-                    result.DeletedRows += (await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr)).Value;
+                {
+                    var dependentDelete = await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr);
+                    EnsureWriteSucceeded(dependentDelete, $"删除高龄 {t} 明细");
+                    result.DeletedRows += dependentDelete.Value;
+                }
                 var d = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_elderly_applications WHERE id = ANY($1)", ct, arr);
+                EnsureWriteSucceeded(d, "删除高龄档案");
                 result.DeletedRows += d.Value;
                 result.DeletedArchives += d.Value;
             }
 
             // 2.5 临时救助（非停止）
-            var tempIds = (await _dbService.QueryAsync<long>(
-                "SELECT id FROM nc_biz_temp_relief_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED)).Value ?? new List<long>();
+            var tempIdsResult = await _dbService.QueryAsync<long>(
+                "SELECT id FROM nc_biz_temp_relief_applications WHERE deleted_at IS NOT NULL AND status <> $1", ct, ApplicationStatusCodes.STOPPED);
+            EnsureQuerySucceeded(tempIdsResult, "查询待删临时救助档案");
+            var tempIds = tempIdsResult.Value ?? new List<long>();
             if (tempIds.Count > 0)
             {
                 var arr = tempIds.ToArray();
                 foreach (var t in TempReliefDependentTables)
-                    result.DeletedRows += (await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr)).Value;
+                {
+                    var dependentDelete = await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE application_id = ANY($1)", ct, arr);
+                    EnsureWriteSucceeded(dependentDelete, $"删除临时救助 {t} 明细");
+                    result.DeletedRows += dependentDelete.Value;
+                }
                 var d = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_temp_relief_applications WHERE id = ANY($1)", ct, arr);
+                EnsureWriteSucceeded(d, "删除临时救助档案");
                 result.DeletedRows += d.Value;
                 result.DeletedArchives += d.Value;
             }
 
             // 2.6 变更记录（连带快照/明细）
-            await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_details WHERE change_id IN (SELECT id FROM nc_biz_change_records WHERE deleted_at IS NOT NULL)", ct);
-            await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_snapshots WHERE change_id IN (SELECT id FROM nc_biz_change_records WHERE deleted_at IS NOT NULL)", ct);
-            result.DeletedRows += (await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_records WHERE deleted_at IS NOT NULL", ct)).Value;
+            var deleteDetails = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_details WHERE change_id IN (SELECT id FROM nc_biz_change_records WHERE deleted_at IS NOT NULL)", ct);
+            EnsureWriteSucceeded(deleteDetails, "删除变更明细");
+            var deleteSnapshots = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_snapshots WHERE change_id IN (SELECT id FROM nc_biz_change_records WHERE deleted_at IS NOT NULL)", ct);
+            EnsureWriteSucceeded(deleteSnapshots, "删除变更快照");
+            var deleteChanges = await _dbService.ExecuteNonQueryAsync("DELETE FROM nc_biz_change_records WHERE deleted_at IS NOT NULL", ct);
+            EnsureWriteSucceeded(deleteChanges, "删除变更记录");
+            result.DeletedRows += deleteChanges.Value;
 
             // 2.7 其它含 deleted_at 的表：删除软删行
             // 清单查询失败必须中止：拿空清单会把整段清理静默跳过却照常报"成功"
@@ -582,7 +627,9 @@ public class DatabaseManagementService : BaseService, IDatabaseManagementService
             foreach (var t in allSoftTables.Value)
             {
                 if (SpecialSoftDeleteTables.Contains(t)) continue;
-                result.DeletedRows += (await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE deleted_at IS NOT NULL", ct)).Value;
+                var softDelete = await _dbService.ExecuteNonQueryAsync($"DELETE FROM {t} WHERE deleted_at IS NOT NULL", ct);
+                EnsureWriteSucceeded(softDelete, $"清理 {t} 软删行");
+                result.DeletedRows += softDelete.Value;
             }
 
             await tx.CommitAsync(ct);

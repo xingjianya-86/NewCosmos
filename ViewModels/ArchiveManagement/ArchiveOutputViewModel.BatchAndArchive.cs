@@ -106,8 +106,8 @@ public partial class ArchiveOutputViewModel
         }
 
         // 封面单独队列：必须先打印封面，只有封面成功后才能打印后续页面
-        var coverTemplate = selectedTemplates.FirstOrDefault(t => Constants.DocumentTemplateNames.IsCover(t.Name));
-        var restTemplates = selectedTemplates.Where(t => !Constants.DocumentTemplateNames.IsCover(t.Name)).ToList();
+        var coverTemplate = selectedTemplates.FirstOrDefault(t => TemplateDocTypes.IsCover(t.DocType));
+        var restTemplates = selectedTemplates.Where(t => !TemplateDocTypes.IsCover(t.DocType)).ToList();
 
         try
         {
@@ -248,12 +248,12 @@ public partial class ArchiveOutputViewModel
             tableRows = BuildDirectoryRows(tl.MeetingDate);
         }
         // 赡养费承诺书：使用赡养人数据
-        else if (Constants.DocumentTemplateNames.IsSupporterPledge(template.Name))
+        else if (TemplateDocTypes.IsSupporterPledge(template.DocType))
         {
             tableRows = PrintNavigationData.SupporterTableData ?? new();
         }
         // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
-        else if (template.Name.Contains("近亲属"))
+        else if (template.DocType == TemplateDocTypes.NearRelative)
         {
             tableRows = PrintNavigationData.NearRelativePairs ?? new();
         }
@@ -283,7 +283,7 @@ public partial class ArchiveOutputViewModel
 
         if (result.IsSuccess)
         {
-            AddOutputFiles(template.TemplateId, template.Name, result.Value.FilePath, result.Value.PdfPath);
+            AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
             return true;
         }
         else
@@ -349,9 +349,19 @@ public partial class ArchiveOutputViewModel
             if (printToPrinter)
             {
                 if (WebViewPrintPdfFunc != null)
-                    await WebViewPrintPdfFunc(file.FilePath);
+                {
+                    var printResult = await WebViewPrintPdfFunc(file.FilePath);
+                    if (printResult.IsFailure)
+                    {
+                        _logger.Error($"打印失败: {printResult.Message}");
+                        await _dialogService.DisplayAlertAsync("打印失败", printResult.Message ?? "打印失败", "确定");
+                        return;
+                    }
+                }
                 else
+                {
                     ShellOpenPdf(file.FilePath);
+                }
                 StatusText = $"已发送打印: {file.FileName}";
             }
             else
@@ -368,7 +378,7 @@ public partial class ArchiveOutputViewModel
         }
 
         // 封面模板打印前确认：需先插入牛皮纸（保存不调打印机，跳过）
-        if (printToPrinter && Constants.DocumentTemplateNames.IsCover(file.TemplateName))
+        if (printToPrinter && TemplateDocTypes.IsCover(file.DocType))
         {
             var confirmed = await _dialogService.DisplayAlertAsync(
                 "打印确认",
@@ -386,20 +396,20 @@ public partial class ArchiveOutputViewModel
             var fields = new Dictionary<string, string>(PrintNavigationData.FieldData, StringComparer.Ordinal);
             var tableRows = PrintNavigationData.TableData ?? new();
 
-            // 目录模板：使用目录专属字段和行数据
-            if (file.TemplateName.Contains("目录"))
+            // 目录模板：使用目录专属字段和行数据（按文档类型分派，原按 TemplateName 子串）
+            if (file.DocType == TemplateDocTypes.Directory)
             {
                 var tl = _timelineService.GetTimelineForApplicationDate(await ResolveApplicationDateForTimelineAsync(), TimelineType.BusinessProcess);
                 fields = await BuildDirectoryFieldsAsync(fields);
                 tableRows = BuildDirectoryRows(tl.MeetingDate);
             }
             // 赡养费承诺书：使用赡养人数据
-            else if (Constants.DocumentTemplateNames.IsSupporterPledge(file.TemplateName))
+            else if (TemplateDocTypes.IsSupporterPledge(file.DocType))
             {
                 tableRows = PrintNavigationData.SupporterTableData ?? new();
             }
             // 近亲属备案两表：使用备案对数据（每对一页，copiesBySupporter 模式）
-            else if (file.TemplateName.Contains("近亲属"))
+            else if (file.DocType == TemplateDocTypes.NearRelative)
             {
                 tableRows = PrintNavigationData.NearRelativePairs ?? new();
             }
@@ -433,7 +443,7 @@ public partial class ArchiveOutputViewModel
                     ("BatchNo", _batchNo),
                     ("Copies", actualCopies));
                 StatusText = $"{action}完成";
-                AddOutputFiles(file.TemplateId, file.TemplateName, result.Value.FilePath, result.Value.PdfPath);
+                AddOutputFiles(file.TemplateId, file.TemplateName, file.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
             }
             else
             {
@@ -756,14 +766,20 @@ public partial class ArchiveOutputViewModel
             var reportPath = Path.Combine(reportDir, reportName);
             await _fileService.WriteAllBytesAsync(reportPath, reportResult.Value, CancellationToken);
 
-            AddOutputFiles(0, "核查报告", null, reportPath);
+            AddOutputFiles(0, "核查报告", string.Empty, null, reportPath);
 
             if (printToPrinter)
             {
                 // 通过 WebView2 打印（复用 PdfJs 渲染 + 系统打印对话框，不依赖默认 PDF 关联）
                 if (WebViewPrintPdfFunc != null)
                 {
-                    await WebViewPrintPdfFunc(reportPath);
+                    var printResult = await WebViewPrintPdfFunc(reportPath);
+                    if (printResult.IsFailure)
+                    {
+                        _logger.Error($"核查报告打印失败: {printResult.Message}");
+                        failedItems.Add(("核查报告", printResult.Message ?? "打印失败"));
+                        return false;
+                    }
                 }
                 else
                 {
@@ -1153,6 +1169,8 @@ public partial class ArchiveOutputViewModel
             {
                 var appService = _serviceProvider.GetRequiredService<IApplicationService>();
                 var result = await appService.GetByIdAsync(PrintNavigationData.BusinessId.Value, CancellationToken);
+                if (result.IsFailure)
+                    _logger.Warn($"卷号/目录锚点：读取申请失败，回退当天: {result.ErrorCode} {result.Message}");
                 var app = result.IsSuccess ? result.Value : null;
                 if (app != null)
                 {
@@ -1164,7 +1182,7 @@ public partial class ArchiveOutputViewModel
                     {
                         var surveyService = _serviceProvider.GetRequiredService<IHouseholdSurveyService>();
                         var surveyResult = await surveyService.GetByApplicationIdAsync(PrintNavigationData.BusinessId.Value, CancellationToken);
-                        if (surveyResult.IsSuccess && surveyResult.Value != null)
+                        if (surveyResult.HasValue)
                             surveyDate = surveyResult.Value.SurveyDate;
                     }
                     catch (Exception ex)

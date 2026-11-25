@@ -284,7 +284,9 @@ public class UserPurchaseService : IUserPurchaseService
         {
             var sql = "SELECT COUNT(*) FROM nc_lottery_user_purchases WHERE lottery_type = $1 AND is_verified = FALSE";
             var result = await _db.ExecuteScalarAsync<int?>(sql, ct, lotteryType.ToString());
-            return Result<int>.Success(result.Value ?? 0);
+            if (result.IsFailure)
+                return Result.Failure<int>(result.ErrorCode!, result.Message!);
+            return Result.Success(result.Value ?? 0);
         }
         catch (Exception ex)
         {
@@ -302,7 +304,9 @@ public class UserPurchaseService : IUserPurchaseService
             var filterClause = BuildFilterClause(filter);
             var sql = $"SELECT COUNT(*) FROM nc_lottery_user_purchases WHERE lottery_type = $1{filterClause}";
             var result = await _db.ExecuteScalarAsync<int?>(sql, ct, lotteryType.ToString());
-            return Result<int>.Success(result.Value ?? 0);
+            if (result.IsFailure)
+                return Result.Failure<int>(result.ErrorCode!, result.Message!);
+            return Result.Success(result.Value ?? 0);
         }
         catch (Exception ex)
         {
@@ -399,8 +403,9 @@ public class UserPurchaseService : IUserPurchaseService
         {
             return JsonSerializer.Deserialize<int[]>(json) ?? Array.Empty<int>();
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[UserPurchase] 购彩号码 JSON 解析失败，按空号码处理");
             return Array.Empty<int>();
         }
     }

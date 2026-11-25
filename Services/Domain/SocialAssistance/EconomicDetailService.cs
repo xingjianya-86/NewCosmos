@@ -378,9 +378,9 @@ public class EconomicDetailService : BaseService, IEconomicDetailService
 
     private Task InsertRigidExpendituresAsync(long applicationId, List<RigidExpenditure> items, CancellationToken ct)
         => InsertRowsAsync(@"INSERT INTO nc_biz_rigid_expenditures
-            (application_id, member_id, person_description, remark, expenditure_type, amount, created_at)", 7,
+            (application_id, member_id, member_name, member_id_card, person_description, remark, expenditure_type, amount, created_at)", 9,
             items.Select(item => new object?[] {
-                applicationId, item.MemberId, item.PersonDescription, item.Remark,
+                applicationId, item.MemberId, item.MemberName, item.MemberIdCard, item.PersonDescription, item.Remark,
                 item.ExpenditureType, item.Amount, DateTime.Now }).ToList(), ct);
 
     private Task InsertFamilyPropertiesAsync(long applicationId, List<FamilyProperty> items, CancellationToken ct)

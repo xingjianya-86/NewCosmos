@@ -241,7 +241,7 @@ public partial class DeathStatementViewModel : ViewModelBase
         }
     }
 
-    /// <summary>模板：按名精确定位「证明_死亡情况说明」，退回「证明文件」分类中名称含「死亡情况说明」者</summary>
+    /// <summary>模板：按文档类型精准定位「死亡情况说明」（doc_type 单点；原按名精确+分类内名称含子串双重兜底，方案B 废除模糊）</summary>
     private async Task LoadTemplateAsync()
     {
         try
@@ -250,46 +250,24 @@ public partial class DeathStatementViewModel : ViewModelBase
             HasTemplate = false;
             SelectedTemplateName = string.Empty;
 
-            Template? byName = null;
             try
             {
-                var nameResult = await _templateService.GetByNameAsync(DocumentTemplateNames.DeathStatement, CancellationToken);
-                if (nameResult.IsSuccess) byName = nameResult.Value;
-                else if (nameResult.IsFailure)
-                    _logger.Warn($"按名查模板失败: {nameResult.Message}");
+                var byDocType = await _templateService.GetByDocTypeAsync(TemplateDocTypes.DeathStatement, CancellationToken);
+                if (byDocType.IsFailure)
+                    _logger.Warn($"按文档类型查模板失败: {byDocType.Message}");
+                else
+                    _statementTemplate = byDocType.Value.FirstOrDefault();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "按名查模板异常");
-            }
-
-            if (byName != null)
-            {
-                _statementTemplate = byName;
-            }
-            else
-            {
-                List<Template> generic;
-                try
-                {
-                    generic = await _templateService.GetByCategoriesAsync(
-                        new[] { ProofUnitTemplateService.ProofCategory }, CancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "加载证明文件分类模板失败");
-                    generic = [];
-                }
-
-                _statementTemplate = generic.FirstOrDefault(t =>
-                    t.Name.Contains("死亡情况说明", StringComparison.Ordinal));
+                _logger.LogError(ex, "按文档类型查模板异常");
             }
 
             HasTemplate = _statementTemplate != null;
             SelectedTemplateName = _statementTemplate?.Name ?? string.Empty;
             NoTemplateHint = HasTemplate
                 ? string.Empty
-                : $"模板未上传：{DocumentTemplateNames.DeathStatement}（请到「模板管理」上传并勾选「证明文件」分类）";
+                : $"模板未上传：{DocumentTemplateNames.DeathStatement}（请到「模板管理」上传并选文档类型「{TemplateDocTypes.DeathStatement}」、勾选「证明文件」分类）";
             OnPropertyChanged(nameof(NoTemplateHint));
         }
         catch (Exception ex)

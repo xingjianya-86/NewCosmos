@@ -99,7 +99,13 @@ public class PrintAgentService : IPrintAgentService
     {
         var machine = Environment.MachineName;
         var claimResult = await _queueService.ClaimPendingAsync(BatchSize, machine, ct);
-        if (claimResult.IsFailure || claimResult.Value == null || claimResult.Value.Count == 0)
+        if (claimResult.IsFailure)
+        {
+            // 领取失败与"当前无任务"必须区分，否则队列故障时打印代理会无声停摆。
+            _logger.Error($"领取待打印任务失败: {claimResult.ErrorCode} {claimResult.Message}");
+            return;
+        }
+        if (claimResult.Value == null || claimResult.Value.Count == 0)
             return;
 
         foreach (var job in claimResult.Value)
@@ -168,25 +174,41 @@ public class PrintAgentService : IPrintAgentService
 
             if (result.IsSuccess)
             {
-                await _queueService.CompleteAsync(job.Id, ct);
+                await CompleteOrLogAsync(job, ct);
             }
             else
             {
-                await _queueService.FailAsync(job.Id, result.Message ?? "打印执行失败", ct);
+                await FailOrLogAsync(job, result.Message ?? "打印执行失败", ct);
             }
         }
         catch (OperationCanceledException)
         {
             // [CT 豁免] 交由下次轮询重试（保持 Processing 会被卡住，故标记失败以便重试）——状态回写必须完成
-            await _queueService.FailAsync(job.Id, "打印任务被取消，请重试", CancellationToken.None);
+            await FailOrLogAsync(job, "打印任务被取消，请重试", CancellationToken.None);
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"推送打印任务执行异常: JobNo={job.JobNo}");
             // [CT 豁免] 失败状态回写必须完成（取消会导致任务永久卡在 Processing）
-            await _queueService.FailAsync(job.Id, ex.Message, CancellationToken.None);
+            await FailOrLogAsync(job, ex.Message, CancellationToken.None);
         }
+    }
+
+    /// <summary>回写"完成"状态；回写失败必须留痕（否则任务会永久停在 Processing）。</summary>
+    private async Task CompleteOrLogAsync(PrintJob job, CancellationToken ct)
+    {
+        var stateResult = await _queueService.CompleteAsync(job.Id, ct);
+        if (stateResult.IsFailure)
+            _logger.Error($"打印任务完成状态回写失败: JobNo={job.JobNo}, {stateResult.ErrorCode} {stateResult.Message}");
+    }
+
+    /// <summary>回写"失败"状态；回写失败必须留痕（否则任务会永久停在 Processing）。</summary>
+    private async Task FailOrLogAsync(PrintJob job, string message, CancellationToken ct)
+    {
+        var stateResult = await _queueService.FailAsync(job.Id, message, ct);
+        if (stateResult.IsFailure)
+            _logger.Error($"打印任务失败状态回写失败: JobNo={job.JobNo}, {stateResult.ErrorCode} {stateResult.Message}");
     }
 
     /// <summary>
@@ -198,7 +220,7 @@ public class PrintAgentService : IPrintAgentService
         if (job.PhotoData == null || job.PhotoData.Length == 0)
         {
             _logger.Error($"照片打印任务缺少照片数据: JobNo={job.JobNo}");
-            await _queueService.FailAsync(job.Id, "照片打印任务缺少照片数据，无法打印", ct);
+            await FailOrLogAsync(job, "照片打印任务缺少照片数据，无法打印", ct);
             return;
         }
 
@@ -222,24 +244,24 @@ public class PrintAgentService : IPrintAgentService
                     ("Category", job.PhotoCategory ?? ""),
                     ("Layout", job.PhotoLayout ?? ""),
                     ("Applicant", DataMasker.MaskName(job.ApplicantName ?? "")));
-                await _queueService.CompleteAsync(job.Id, ct);
+                await CompleteOrLogAsync(job, ct);
             }
             else
             {
-                await _queueService.FailAsync(job.Id, result.Message ?? "照片打印失败", ct);
+                await FailOrLogAsync(job, result.Message ?? "照片打印失败", ct);
             }
         }
         catch (OperationCanceledException)
         {
             // [CT 豁免] 状态回写必须完成（取消会导致任务永久卡在 Processing）
-            await _queueService.FailAsync(job.Id, "照片打印任务被取消，请重试", CancellationToken.None);
+            await FailOrLogAsync(job, "照片打印任务被取消，请重试", CancellationToken.None);
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"照片打印任务执行异常: JobNo={job.JobNo}");
             // [CT 豁免] 失败状态回写必须完成
-            await _queueService.FailAsync(job.Id, ex.Message, CancellationToken.None);
+            await FailOrLogAsync(job, ex.Message, CancellationToken.None);
         }
     }
 

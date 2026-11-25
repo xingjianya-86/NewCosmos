@@ -139,7 +139,6 @@ public class GracePeriodService : BaseService, IGracePeriodService
         application.OriginalClassificationResult = null;
         application.OriginalGuaranteeAmount = null;
 
-        LogInfo($"执行操作");
     }
 
     /// <summary>

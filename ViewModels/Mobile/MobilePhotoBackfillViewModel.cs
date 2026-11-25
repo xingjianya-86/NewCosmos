@@ -32,7 +32,7 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
 
     #region 筛选状态
 
-    /// <summary>业务域过滤：空=全部，或 ElderlyBenefits / SocialAssistance / TempRelief。</summary>
+    /// <summary>业务域过滤：空=全部，或 ElderlyBenefits / SocialAssistance / TempRelief / AssetVerification。</summary>
     [ObservableProperty]
     private string _selectedDomain = string.Empty;
 
@@ -60,6 +60,7 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
     public bool IsDomainElderly => SelectedDomain == "ElderlyBenefits";
     public bool IsDomainAssistance => SelectedDomain == "SocialAssistance";
     public bool IsDomainTempRelief => SelectedDomain == "TempRelief";
+    public bool IsDomainAsset => SelectedDomain == "AssetVerification";
 
     partial void OnSelectedDomainChanged(string value)
     {
@@ -67,6 +68,7 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
         OnPropertyChanged(nameof(IsDomainElderly));
         OnPropertyChanged(nameof(IsDomainAssistance));
         OnPropertyChanged(nameof(IsDomainTempRelief));
+        OnPropertyChanged(nameof(IsDomainAsset));
         PageIndex = 1;
         // 域切换只在已有搜索条件时重新检索（未搜索保持空列表）
         if (HasSearched) SafeFireAndForget(LoadDataAsync);
@@ -194,6 +196,7 @@ public partial class MobilePhotoBackfillViewModel : PagedSearchViewModelBase
             "ElderlyBenefits" => "ElderlyBenefits",
             "SocialAssistance" => "SocialAssistance",
             "TempRelief" => "TempRelief",
+            "AssetVerification" => "AssetVerification",
             _ => string.Empty
         };
     }

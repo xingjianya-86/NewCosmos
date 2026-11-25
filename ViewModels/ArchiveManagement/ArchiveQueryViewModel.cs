@@ -286,7 +286,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         try
         {
             var result = await call();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
                 apply(result.Value);
             else
                 _logger.Warn($"档案页头统计加载失败: {result.Message}");
@@ -365,7 +365,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             var imported = importedTask.Result;
 
             // ① 当前库
-            if (current.IsSuccess && current.Value != null)
+            if (current.HasValue)
             {
                 foreach (var app in current.Value.Items)
                 {
@@ -378,7 +378,7 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             }
 
             // ② 6 个历史导入库（农村/城市最低生活保障、最低生活保障边缘、特困供养、刚性支出困难家庭、其他困难人员）
-            if (imported.IsSuccess && imported.Value != null)
+            if (imported.HasValue)
             {
                 foreach (var item in imported.Value)
                 {
@@ -1078,12 +1078,19 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         try
         {
             var result = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
-            if (result.IsFailure || result.Value == null || result.Value.Count == 0)
+            if (result.IsFailure)
+            {
+                _logger.Warn($"证明文书：家庭成员查询失败，成员栏将为空: {result.ErrorCode} {result.Message}");
+                return string.Empty;
+            }
+            if (result.Value == null || result.Value.Count == 0)
                 return string.Empty;
 
             // 已死亡登记成员（历史数据未软删，生成文本时须统一过滤）
             var deathResult = await _familyMemberService.GetDeadIdCardsByApplicationIdAsync(applicationId, CancellationToken);
-            var deathIdCards = (deathResult.IsSuccess && deathResult.Value != null)
+            if (deathResult.IsFailure)
+                _logger.Warn($"证明文书：死亡成员过滤查询失败，可能混入已死亡成员: {deathResult.ErrorCode} {deathResult.Message}");
+            var deathIdCards = (deathResult.HasValue)
                 ? deathResult.Value.ToHashSet()
                 : new HashSet<string>();
 
@@ -1212,7 +1219,12 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         {
             var graceService = _serviceProvider.GetRequiredService<IGracePeriodService>();
             var result = await graceService.GetActiveAsync(applicationId, ct);
-            if (result.IsFailure || result.Value == null)
+            if (result.IsFailure)
+            {
+                _logger.Warn($"证明文书：渐退期查询失败，渐退说明将为空: {result.ErrorCode} {result.Message}");
+                return string.Empty;
+            }
+            if (result.Value == null)
                 return string.Empty;
             return BuildGracePeriodInfo(result.Value);
         }
@@ -1234,12 +1246,16 @@ public partial class ArchiveQueryViewModel : ViewModelBase
             var orgService = _serviceProvider.GetRequiredService<IOrganizationService>();
             var orgResult = await orgService.GetByIdAsync(orgId.Value);
             if (orgResult.IsFailure || orgResult.Value == null)
+            {
+                _logger.Warn($"证明文书：落款单位查询失败，将以「-」占位: {orgResult.ErrorCode} {orgResult.Message}");
                 return ("-", "-");
+            }
             var org = orgResult.Value;
             return (org.Name ?? "-", org.Phone ?? "-");
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"证明文书：落款单位查询异常，将以「-」占位: {ex.Message}");
             return ("-", "-");
         }
     }

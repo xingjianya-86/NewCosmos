@@ -98,6 +98,24 @@ public partial class ChangeService
                     updNew.Message ?? "更新新户主关系失败");
             }
 
+            // 4.5 换户主后本人字段同步 + 豁免残留清理（2026-11-19 张桂秋 app115 同型收口）：
+            // 主表从旧户主整行复制，换户主后健康/疾病/残疾/就业等本人字段须镜像新户主成员行；
+            // 新户主非重病/重残且户内无其他照顾目标时，原照顾者的豁免标记清理（防表单保存校验拦截）。
+            var headSyncResult = await SyncHeadPersonFieldsAsync(newApplicationId, newHeadMemberId, ct);
+            if (headSyncResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(headSyncResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    headSyncResult.Message ?? "新户主人身字段同步失败");
+            }
+            var exemptClearResult = await ClearInvalidLaborExemptAsync(newApplicationId, ct);
+            if (exemptClearResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(exemptClearResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    exemptClearResult.Message ?? "豁免残留清理失败");
+            }
+
             // 5. 创建变更记录（挂在旧档案上，After 快照含新档案ID）
             //    写入三要素：category=MemberChange、reason 可解析、随后回填金额
             var changeContext = new ChangeContext
@@ -259,9 +277,10 @@ public partial class ChangeService
                 LogWarn($"户主死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（户主死亡）放行");
             }
 
-            // 3. 加载全部家庭成员，定位死亡原户主成员。
-            //    未显式传入时按 优先级：is_applicant=true / member_category='HouseholdHead' /
-            //    身份证号或姓名与旧档案申请人一致（存量数据常存在 is_applicant 未置位的申请人成员）
+            // 3. 加载全部家庭成员，定位死亡原户主。
+            //    优先成员表户主行（is_applicant / member_category='HouseholdHead' / 与申请人身份证或姓名一致）；
+            //    成员表没有户主行时用主表申请人字段合成"虚拟户主"（表单建档只写共同生活成员，
+            //    户主权威在主表，此时不得以"未找到成员记录"阻断办理）
             var membersResult = await _db.QueryAsync<FamilyMember>(
                 "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (membersResult.IsFailure)
@@ -271,19 +290,15 @@ public partial class ChangeService
                     membersResult.Message ?? "家庭成员查询失败");
             }
             var allMembers = membersResult.Value ?? new List<FamilyMember>();
-            var deceasedHead = context.DeceasedHeadMemberId > 0
-                ? allMembers.FirstOrDefault(m => m.Id == context.DeceasedHeadMemberId)
-                : allMembers.FirstOrDefault(m => m.IsApplicant
-                    || string.Equals(m.MemberCategory, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase)
-                    || (!string.IsNullOrEmpty(oldHeadIdCard)
-                        && string.Equals(m.IdCard, oldHeadIdCard, StringComparison.OrdinalIgnoreCase))
-                    || (!string.IsNullOrEmpty(oldHeadName)
-                        && string.Equals(m.Name, oldHeadName, StringComparison.Ordinal)));
+            var headResolution = HouseholdHeadResolver.Resolve(application, allMembers, context.DeceasedHeadMemberId);
+            var deceasedHead = headResolution.Head;
             if (deceasedHead == null)
             {
                 await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "未找到死亡原户主成员记录");
             }
+            if (headResolution.IsVirtual)
+                LogWarn($"户主死亡: 档案 {context.ApplicationId} 成员表无户主行，按主表申请人信息合成虚拟户主（成员ID=0）");
 
             // 4. 校验新户主成员（必须属于本申请、未删除、且不是死亡户主本人）
             var newHeadMember = allMembers.FirstOrDefault(m => m.Id == context.NewHeadMemberId);
@@ -342,12 +357,34 @@ public partial class ChangeService
             }
             var survivorSupporters = survivorSupportersResult.Value ?? new List<Supporter>();
 
+            // 剔除已故户主的收入/支出明细：member_id 恒为 0（表单只在成员下拉里取 id，户主行不入选），
+            // 故不能只按 member_id 过滤，必须叠加身份证/姓名身份匹配；幸存列表同时用于新档明细复制，
+            // 保证新档收入列与明细行口径一致（已故者历史仍留在旧档）。
             var deadMemberId = deceasedHead.Id;
-            var laborSurv = econ.LaborIncomes.Where(x => x.MemberId != deadMemberId).ToList();
-            var businessSurv = econ.BusinessIncomes.Where(x => x.MemberId != deadMemberId).ToList();
-            var propertySurv = econ.PropertyIncomes.Where(x => x.MemberId != deadMemberId).ToList();
-            var transferSurv = econ.TransferIncomes.Where(x => x.MemberId != deadMemberId).ToList();
-            var rigidSurv = econ.RigidExpenditures.Where(x => x.MemberId != deadMemberId).ToList();
+            bool IsDeceasedDetail(long memberId, string? idCard, string? name)
+            {
+                if (deadMemberId > 0 && memberId == deadMemberId) return true;
+                var headIdCard = (deceasedHead.IdCard ?? string.Empty).Trim();
+                var rowIdCard = (idCard ?? string.Empty).Trim();
+                if (!string.IsNullOrEmpty(headIdCard) && !string.IsNullOrEmpty(rowIdCard))
+                    return string.Equals(rowIdCard, headIdCard, StringComparison.OrdinalIgnoreCase);
+                return string.IsNullOrEmpty(rowIdCard)
+                    && !string.IsNullOrEmpty(deceasedHead.Name)
+                    && string.Equals((name ?? string.Empty).Trim(), deceasedHead.Name.Trim(), StringComparison.Ordinal);
+            }
+
+            var laborSurv = econ.LaborIncomes.Where(x => !IsDeceasedDetail(x.MemberId, x.MemberIdCard, x.MemberName)).ToList();
+            var businessSurv = econ.BusinessIncomes.Where(x => !IsDeceasedDetail(x.MemberId, x.MemberIdCard, x.MemberName)).ToList();
+            var propertySurv = econ.PropertyIncomes.Where(x => !IsDeceasedDetail(x.MemberId, x.MemberIdCard, x.MemberName)).ToList();
+            var transferSurv = econ.TransferIncomes.Where(x => !IsDeceasedDetail(x.MemberId, x.MemberIdCard, x.MemberName)).ToList();
+            // 刚性支出已按人归属（2026-11-19 起 member_name/member_id_card 落库），同样按身份剔除已故户主
+            var rigidSurv = econ.RigidExpenditures.Where(x => !IsDeceasedDetail(x.MemberId, x.MemberIdCard, x.MemberName)).ToList();
+
+            econ.LaborIncomes = laborSurv;
+            econ.BusinessIncomes = businessSurv;
+            econ.PropertyIncomes = propertySurv;
+            econ.TransferIncomes = transferSurv;
+            econ.RigidExpenditures = rigidSurv;
 
             var workIncome = _incomeCalculationService.CalculateLaborIncome(laborSurv);
             var businessIncome = _incomeCalculationService.CalculateBusinessNetIncome(businessSurv);
@@ -602,6 +639,29 @@ public partial class ChangeService
                     memberIdMap[oldMember.Id] = match.Id;
             }
 
+            // 9.5 换户主后本人字段同步 + 豁免残留清理（2026-11-19 张桂秋 app115 实测错例）：
+            // 主表 INSERT 从旧户主整行复制病情/残疾/就业等本人字段，只替换姓名/证件/性别等少数列 →
+            // 死亡原户主的"恶性肿瘤/SevereIllness"串到新户主名下（且 is_severe_disease 落默认 false，
+            // 形成"健康=重病、重病勾选=否"的矛盾）。新户主人身字段必须镜像其成员行；死亡原户主被剔除后，
+            // 原照顾者的"免于劳动力判定"在户内已无照顾目标 → 一并清理（与表单保存联动校验同口径）。
+            if (memberIdMap.TryGetValue(context.NewHeadMemberId, out var newHeadMemberId))
+            {
+                var headSyncResult = await SyncHeadPersonFieldsAsync(newApplicationId, newHeadMemberId, ct);
+                if (headSyncResult.IsFailure)
+                {
+                    await tx.RollbackAsync(ct);
+                    return Result.Failure<ChangeResult>(headSyncResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                        headSyncResult.Message ?? "新户主人身字段同步失败");
+                }
+            }
+            var exemptClearResult = await ClearInvalidLaborExemptAsync(newApplicationId, ct);
+            if (exemptClearResult.IsFailure)
+            {
+                await tx.RollbackAsync(ct);
+                return Result.Failure<ChangeResult>(exemptClearResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    exemptClearResult.Message ?? "豁免残留清理失败");
+            }
+
             // 10. 复制经济明细（复用 6.5 已加载的 econ → 重映射 member_id → SaveAll；死亡原户主的明细行 member_id 置 0，文本字段保留）
             long MapMemberId(long oldId) => oldId > 0 && memberIdMap.TryGetValue(oldId, out var nid) ? nid : 0;
             foreach (var it in econ.LaborIncomes) it.MemberId = MapMemberId(it.MemberId);
@@ -706,7 +766,7 @@ public partial class ChangeService
                  operator_name, created_by, created_at)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12,$13,$13,NOW());";
             var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
-                context.ApplicationId, deceasedHead.Id, deceasedHead.Name, deceasedHead.IdCard,
+                context.ApplicationId, deceasedHead.Id > 0 ? deceasedHead.Id : (long?)null, deceasedHead.Name, deceasedHead.IdCard,
                 string.IsNullOrEmpty(deceasedHead.RelationshipToHead) ? "本人/户主" : deceasedHead.RelationshipToHead,
                 context.DeathDate, context.DeathTime, context.DeathReason, context.DeathCertificateNo,
                 context.NewHeadIdCard, context.NewHeadName, newApplicationId,
@@ -834,7 +894,9 @@ public partial class ChangeService
     }
 
     /// <summary>
-    /// 获取变更历史
+    /// 获取变更历史（按变更时间倒序，最多 200 条）。
+    /// 必须带软删过滤：变更记录删除走 deleted_at（如经济复核重写、人工撤销停旧建新），
+    /// 漏过滤会让已失效记录继续出现在变更历史里（2026-11-19 撤销户主死亡后实测）。
     /// </summary>
     public async Task<Result<List<ChangeRecord>>> GetChangeHistoryAsync(long applicationId, CancellationToken ct = default)
     {
@@ -843,7 +905,7 @@ public partial class ChangeService
         var sql = @"SELECT id, application_id, change_no, change_type, change_reason, 
                     change_date, operator_name, changed_at, change_reason_type
                     FROM nc_biz_change_records 
-                    WHERE application_id = $1 
+                    WHERE application_id = $1 AND deleted_at IS NULL
                     ORDER BY changed_at DESC LIMIT 200;";
 
         var result = await _db.QueryAsync<ChangeRecord>(sql, ct, applicationId);
@@ -923,7 +985,7 @@ public partial class ChangeService
                 LogWarn($"单人户户主死亡触发停保: 状态 {application.Status} → Stopped 不在严格状态机允许范围内，按业务规则（户主死亡）放行");
             }
 
-            // 3. 加载全部家庭成员，定位死亡原户主成员（四重兜底，同停旧建新）
+            // 3. 加载全部家庭成员，定位死亡原户主（兜底规则同停旧建新：成员表无户主行时合成虚拟户主）
             var membersResult = await _db.QueryAsync<FamilyMember>(
                 "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL", ct, context.ApplicationId);
             if (membersResult.IsFailure)
@@ -933,19 +995,15 @@ public partial class ChangeService
                     membersResult.Message ?? "家庭成员查询失败");
             }
             var allMembers = membersResult.Value ?? new List<FamilyMember>();
-            var deceasedHead = context.DeceasedHeadMemberId > 0
-                ? allMembers.FirstOrDefault(m => m.Id == context.DeceasedHeadMemberId)
-                : allMembers.FirstOrDefault(m => m.IsApplicant
-                    || string.Equals(m.MemberCategory, MemberCategoryConstants.HOUSEHOLD_HEAD, StringComparison.OrdinalIgnoreCase)
-                    || (!string.IsNullOrEmpty(oldHeadIdCard)
-                        && string.Equals(m.IdCard, oldHeadIdCard, StringComparison.OrdinalIgnoreCase))
-                    || (!string.IsNullOrEmpty(oldHeadName)
-                        && string.Equals(m.Name, oldHeadName, StringComparison.Ordinal)));
+            var stopHeadResolution = HouseholdHeadResolver.Resolve(application, allMembers, context.DeceasedHeadMemberId);
+            var deceasedHead = stopHeadResolution.Head;
             if (deceasedHead == null)
             {
                 await tx.RollbackAsync(ct);
                 return Result.Failure<ChangeResult>(ErrorCodes.FAMILY_MEMBER_NOT_FOUND, "未找到死亡原户主成员记录");
             }
+            if (stopHeadResolution.IsVirtual)
+                LogWarn($"单人户户主死亡: 档案 {context.ApplicationId} 成员表无户主行，按主表申请人信息合成虚拟户主（成员ID=0）");
 
             // 4. 单人户护栏：必须"除死亡户主外无其他共同生活成员（非赡养人）"才允许走只停止分支；
             //    若仍有幸存成员，应走停旧建新（ExecuteHouseholdDeathAsync）——此处防御性拒绝，避免误停丢失在保成员。
@@ -966,7 +1024,7 @@ public partial class ChangeService
                  operator_name, created_by, created_at)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,NULL,NULL,NULL,$10,$10,NOW());";
             var deathInsertResult = await _db.ExecuteNonQueryAsync(deathSql, ct,
-                context.ApplicationId, deceasedHead.Id, deceasedHead.Name, deceasedHead.IdCard,
+                context.ApplicationId, deceasedHead.Id > 0 ? deceasedHead.Id : (long?)null, deceasedHead.Name, deceasedHead.IdCard,
                 string.IsNullOrEmpty(deceasedHead.RelationshipToHead) ? "本人/户主" : deceasedHead.RelationshipToHead,
                 context.DeathDate, context.DeathTime, context.DeathReason, context.DeathCertificateNo,
                 context.OperatorName);
@@ -1141,6 +1199,10 @@ public partial class ChangeService
             return Result.Failure<TriggeredStopChangeRecord?>(result.ErrorCode!, result.Message!);
         return Result.Success<TriggeredStopChangeRecord?>(result.Value);
     }
+
+    /// <inheritdoc/>
+    public Task<Result<string?>> GetLatestChainPreClassificationAsync(long applicationId, CancellationToken ct = default)
+        => ChainPreClassification.ResolveAsync(_db, applicationId, ct);
 
     public async Task<Result<bool>> HasTriggeredCategoryStopAsync(long applicationId, IReadOnlyCollection<string> stopCategoryCodes, CancellationToken ct = default)
     {

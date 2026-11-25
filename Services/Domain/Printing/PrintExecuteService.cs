@@ -74,7 +74,6 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         List<Dictionary<string, string>> tableRows,
         CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         try
         {
@@ -151,15 +150,13 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
             }
 
             if (pdfResult.IsFailure)
-            {
-                LogError($"操作失败");
-            }
+                LogError($"生成PDF失败: {pdfResult.ErrorCode} {pdfResult.Message}");
 
             return pdfResult;
         }
         catch (Exception ex)
         {
-            LogError($"操作失败");
+            LogError($"操作失败: {ex.Message}");
             return Result.Failure<byte[]>(ErrorCodes.DOCUMENT_GENERATION_FAILED, $"文档生成失败: {ex.Message}");
         }
     }
@@ -305,9 +302,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
 
                 var spSaveResult = await _printRecordService.SaveAsync(spRecord, ct);
                 if (spSaveResult.IsFailure)
-                {
-                    LogError($"操作失败");
-                }
+                    LogError($"赡养人模式打印留痕保存失败: {spSaveResult.ErrorCode} {spSaveResult.Message}");
 
                 LogInfo($"赡养人模式完成: {tableRows.Count} 份");
                 return Result.Success(spRecord);
@@ -375,9 +370,7 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 // 签名内嵌（在文本替换之后、保存之前）：无签名或模板无占位符时自然跳过
                 engine.ReplaceImageFields(sigImages);
 
-                LogInfo($"执行操作");
                 await engine.SaveToFileAsync(chunkSourcePath, ct);
-                LogInfo($"执行操作");
 
                 if (printToPrinter)
                 {
@@ -386,10 +379,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     LogInfo($"打印命令已发出");
                 }
 
-                LogInfo($"执行操作");
                 var pdfBytes = await engine.ExportPdfFromFileAsync(chunkSourcePath, chunkPdfPath, ct);
                 if (pdfBytes != null) normalChunkPdfBytes.Add(pdfBytes);
-                LogInfo($"执行操作");
             }
 
             // 多文件拆分：合并所有 PDF 写入统一 PDF 文件
@@ -403,6 +394,9 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                 catch (Exception ex)
                 {
                     LogError($"合并PDF写入失败: {ex.Message}");
+                    throw new BusinessException(
+                        ErrorCodes.PRINT_FAILED,
+                        $"合并PDF写入失败，未生成完整打印件: {ex.Message}", ex);
                 }
                 LogInfo($"超限拆分完成: 共 {chunkedRows.Count} 个文件");
             }
@@ -433,7 +427,10 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
             var saveResult = await _printRecordService.SaveAsync(record, ct);
             if (saveResult.IsFailure)
             {
-                LogError($"操作失败");
+                // 打印已实际发生，不把整个操作改判失败（否则会诱导用户重复打印）；
+                // 但留痕失败必须带全上下文，审计链缺口可定位。
+                LogError($"打印留痕保存失败（打印已发出）: Template={templateName}, BatchNo={batchNo}, " +
+                         $"{saveResult.ErrorCode} {saveResult.Message}");
             }
 
             LogInfo(printToPrinter ? $"打印完成: Template={templateName}" : $"生成完成(未打印): Template={templateName}");
@@ -441,12 +438,12 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         }
         catch (OperationCanceledException)
         {
-            LogWarn($"警告");
+            LogWarn("打印任务已取消");
             return Result.Failure<PrintRecord>(ErrorCodes.PRINT_FAILED, "打印任务已取消");
         }
         catch (Exception ex)
         {
-            LogError($"操作失败");
+            LogError($"操作失败: {ex.Message}");
 
             var failedRecord = new PrintRecord
             {
@@ -495,8 +492,11 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, $"PDF 合并失败，降级保存第一份（共 {pdfs.Count} 份）");
-            return pdfs[0];
+            // 多页文书合并失败若只出第一份，会静默丢失后续页；必须显式失败由调用方提示重试。
+            Logger.LogError(ex, $"PDF 合并失败（共 {pdfs.Count} 份），中止本次输出");
+            throw new BusinessException(
+                ErrorCodes.PRINT_FAILED,
+                $"PDF 合并失败，未生成完整打印件（共 {pdfs.Count} 份）: {ex.Message}", ex);
         }
     }
 
@@ -724,7 +724,12 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                      })
             {
                 var listResult = await _archivePhotoService.GetByPersonAsync(applicantIdCard!, category, ct);
-                var photo = listResult.IsSuccess ? listResult.Value?.FirstOrDefault() : null;
+                if (listResult.IsFailure)
+                {
+                    LogWarn($"照片嵌入：查询照片失败，打印件将无照片: Category={category}, {listResult.ErrorCode} {listResult.Message}");
+                    continue;
+                }
+                var photo = listResult.Value?.FirstOrDefault();
                 if (photo == null) continue;
 
                 var dataResult = await _archivePhotoService.GetPhotoDataAsync(photo.Id, ct);
@@ -733,6 +738,8 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
                     photoBytes = dataResult.Value;
                     break;
                 }
+                if (dataResult.IsFailure)
+                    LogWarn($"照片嵌入：读取照片数据失败，打印件将无照片: PhotoId={photo.Id}, {dataResult.ErrorCode} {dataResult.Message}");
             }
 
             if (photoBytes == null)

@@ -655,7 +655,7 @@ public partial class ApplicationFormViewModel : FormViewModelBase
 
             // 改期推进了 updated_at → 重载乐观并发令牌，防本表单下次保存报并发冲突
             var reload = await _applicationService.GetByIdAsync(_applicationId, CancellationToken);
-            if (reload.IsSuccess && reload.Value != null)
+            if (reload.HasValue)
                 _loadedUpdatedAt = reload.Value.UpdatedAt == default ? null : reload.Value.UpdatedAt;
 
             _applicationDateBase = newDay;
@@ -1121,17 +1121,17 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     /// <summary>
     /// 是否可保存（草稿/提交按钮可见性）
     /// </summary>
-    public bool IsSavable => OperationMode != FormOperationMode.View;
+    public bool IsSavable => OperationMode != FormOperationMode.View && !HasInitializationError;
 
     /// <summary>
-    /// 保存草稿按钮可见（非查看、非补全、非复核）
+    /// 保存草稿按钮可见（非查看、非补全、非复核；基础数据不完整时禁用）
     /// </summary>
-    public bool IsSaveDraftVisible => IsNotCompletionMode && IsEditable;
+    public bool IsSaveDraftVisible => IsNotCompletionMode && IsEditable && !HasInitializationError;
 
     /// <summary>
-    /// 提交按钮可见（最后一步且可编辑）
+    /// 提交按钮可见（最后一步且可编辑；基础数据不完整时禁用）
     /// </summary>
-    public bool IsSubmitVisible => IsLastStep && IsEditable;
+    public bool IsSubmitVisible => IsLastStep && IsEditable && !HasInitializationError;
 
     /// <summary>
     /// 是否非特殊模式（控制"保存草稿"按钮可见性：补全/复核/家庭修正/编辑家庭信息/成员变更模式隐藏）

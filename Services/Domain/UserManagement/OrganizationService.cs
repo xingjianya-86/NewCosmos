@@ -398,18 +398,18 @@ public class OrganizationService : BaseService, IOrganizationService
         }
         catch (Exception ex)
         {
-            LogWarn($"读取导入文件失败: {ex.Message}");
-            return new OrganizationCsvPreview { TotalRows = 0 };
+            LogError($"读取导入文件失败: {ex.Message}");
+            return new OrganizationCsvPreview { TotalRows = 0, Error = $"读取导入文件失败: {ex.Message}" };
         }
 
         if (table.IsEmpty)
-            return new OrganizationCsvPreview { TotalRows = 0 };
+            return new OrganizationCsvPreview { TotalRows = 0, Error = "文件工作表为空" };
 
         var headerMap = BuildHeaderMap(table.Headers);
         if (!headerMap.ContainsKey("名称") && !headerMap.ContainsKey("name"))
         {
             LogWarn("导入文件缺少「名称」列");
-            return new OrganizationCsvPreview { TotalRows = 0 };
+            return new OrganizationCsvPreview { TotalRows = 0, Error = "导入文件缺少「名称」列" };
         }
 
         var totalRows = table.Rows.Count;
@@ -817,11 +817,13 @@ public class OrganizationService : BaseService, IOrganizationService
             if (city == null && county != null && !string.IsNullOrWhiteSpace(county.CityName))
             {
                 var c = await _regions.GetCityByNameAsync(county.CityName, ct);
-                if (c.IsSuccess && c.Value != null)
+                if (c.IsFailure)
+                    return $"反查地级市「{county.CityName}」失败：{c.Message}";
+                if (c.Value != null)
                 {
                     city = c.Value;
                     request.CityId = city.Id;
-                request.ProvinceId = city.ProvinceId;
+                    request.ProvinceId = city.ProvinceId;
                 }
             }
 
@@ -849,18 +851,22 @@ public class OrganizationService : BaseService, IOrganizationService
             if (county == null && town != null)
             {
                 var co = await _regions.GetCountyByIdAsync(town.CountyId, ct);
-                if (co.IsSuccess && co.Value != null)
+                if (co.IsFailure)
+                    return $"反查县/区失败：{co.Message}";
+                if (co.Value != null)
                 {
                     county = co.Value;
                     request.CountyId = county.Id;
                     if (city == null && !string.IsNullOrWhiteSpace(county.CityName))
                     {
                         var c = await _regions.GetCityByNameAsync(county.CityName, ct);
-                        if (c.IsSuccess && c.Value != null)
+                        if (c.IsFailure)
+                            return $"反查地级市「{county.CityName}」失败：{c.Message}";
+                        if (c.Value != null)
                         {
                             city = c.Value;
                             request.CityId = city.Id;
-                request.ProvinceId = city.ProvinceId;
+                            request.ProvinceId = city.ProvinceId;
                         }
                     }
                 }

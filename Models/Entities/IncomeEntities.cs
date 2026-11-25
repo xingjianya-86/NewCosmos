@@ -221,8 +221,28 @@ public partial class RigidExpenditure : ObservableObject
     public long Id { get; set; }
     public long ApplicationId { get; set; }
     public long MemberId { get; set; }
+
+    /// <summary>支出人员姓名（2026-11-19 落户到人：与 member_id_card 一起作为身份快照，不随成员行重建失效）</summary>
+    public string MemberName { get; set; } = string.Empty;
+
+    /// <summary>支出人员身份证号（身份快照，死亡剔除按此匹配）</summary>
+    public string MemberIdCard { get; set; } = string.Empty;
+
+    /// <summary>历史自由文本（旧数据兼容；显示优先 MemberName）</summary>
     public string PersonDescription { get; set; } = string.Empty;
     public string Remark { get; set; } = string.Empty;
+
+    /// <summary>Picker 选择的人员（双向绑定，选择后同步 MemberId/MemberName/MemberIdCard）</summary>
+    [ObservableProperty]
+    private FamilyMember? _selectedMember;
+
+    partial void OnSelectedMemberChanged(FamilyMember? value)
+    {
+        if (value == null) return;
+        MemberId = value.Id;
+        MemberName = value.Name;
+        MemberIdCard = value.IdCard ?? "";
+    }
 
     [ObservableProperty]
     private string _expenditureType = string.Empty;

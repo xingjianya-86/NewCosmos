@@ -480,12 +480,12 @@ public partial class MonthlyReportService
 
     /// <summary>
     /// 退出对象兜底纠治表（表 7）。
-    /// 退出对象识别（本月周期）：停保(status=ApplicationStatusCodes.STOPPED) + 渐退期满(grace_periods.end_date，仅已生效档案) + 经济复核降档(change_records.triggered_grace_period，排除户主死亡/分类施保减除)。
+    /// 退出对象识别（本月周期）：停保(status=ApplicationStatusCodes.STOPPED，排除停旧建新接续与真·首拒档) + 渐退期满(grace_periods.end_date，仅已生效档案) + 经济复核降档(change_records.triggered_grace_period，排除户主死亡/分类施保减除)。
     /// 核查列：给予渐退期(事件日期落在渐退期内，连带下游接续档案匹配)；纳入低保/特困/低保边缘/刚性支出(本户原档案当前生效分类)；直接退出(均否)。
     /// 同人去重：一人多档案退出（旧档链停+新档再停）按身份证收敛为一行（停保>渐退期满>经济复核降档，同型取最晚事件）。
     /// 户主死亡：退保原因记"人员死亡"，家属兜底（渐退期/纳入类别）按下游接续档案如实体现，不再短路硬编码"直接退出"。
     /// </summary>
-    public async Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, CancellationToken ct = default)
+    public async Task<Result<List<MonthlyExitRectificationRow>>> GetExitRectificationRowsAsync(int year, int month, string town, string? category = null, CancellationToken ct = default)
     {
         var cycle = await GetCycleRangeAsync(year, month, ct);
         if (cycle.IsFailure) return Result.Failure<List<MonthlyExitRectificationRow>>(cycle.ErrorCode!, cycle.Message!);
@@ -512,6 +512,8 @@ public partial class MonthlyReportService
                   AND a.deleted_at IS NULL AND ($3 = '' OR a.town = $3)
                   -- 停旧建新接续（同大类继续享受）不算退出对象
                   {StoppedArchiveFilter.NotRebuildContinuationSql("a")}
+                  -- 真·首拒（从未审批享受、链上无在保前分类）不是退出对象（app110 实测错例）
+                  {StoppedArchiveFilter.NotFirstRefusalSql("a")}
                 UNION ALL
                 SELECT c.application_id, c.change_date AS event_date, '经济复核降档' AS event_type,
                        '经济复核转低收入' AS exit_reason, c.old_classification,
@@ -556,6 +558,37 @@ public partial class MonthlyReportService
         if (events.Count == 0)
             return Result.Success(new List<MonthlyExitRectificationRow>());
 
+        // 2. 批量查申请详情（户主信息/当前分类/当前状态）——先于同人去重取，
+        //    供「按退出前分类」过滤使用（事件 old_classification 为空时回退档案当前分类）。
+        // 注意：MemberCountSql 自带 AS family_size 别名，勿再追加别名（重复 AS 会触发 42601）
+        var eventAppIds = events
+            .Where(e => e.ApplicationId.HasValue)
+            .Select(e => e.ApplicationId!.Value)
+            .Distinct()
+            .ToArray();
+        var detailSql = $@"SELECT a.id, a.applicant_name, a.applicant_id_card,
+                                  {MemberCountSql("a")},
+                                  a.classification_result, a.status
+                           FROM nc_biz_applications a
+                           WHERE a.id = ANY($1) AND a.deleted_at IS NULL";
+        var detailResult = await _db.QueryAsync<ExitDetailRow>(detailSql, ct, eventAppIds);
+        if (detailResult.IsFailure)
+            return Result.Failure<List<MonthlyExitRectificationRow>>(detailResult.ErrorCode!, detailResult.Message!);
+        var details = (detailResult.Value ?? new List<ExitDetailRow>())
+            .ToDictionary(d => d.Id, d => d);
+
+        // 按退出前分类过滤：必须在同人去重之前——同一人跨类别有多条事件时，
+        // 先去重会让低优先级类别的事件被高优先级类别吞掉，导致该分类分表漏人。
+        // category 为空 = 「全部」汇总，不过滤（含停止码/空分类行，保持原行为）。
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            events = events
+                .Where(e => MonthlyReportCategoryConstants.Matches(category, ResolveEventClassificationCode(e, details)))
+                .ToList();
+            if (events.Count == 0)
+                return Result.Success(new List<MonthlyExitRectificationRow>());
+        }
+
         // 同人去重（2026-10 改）：一人多档案退出（旧档链停 + 新档复核不合格又停）按档案去重会漏出两行
         // （贺满程 82/83、梁玉祥 93/94 实测错例）——按身份证收敛为一行：
         // 停保 > 渐退期满 > 经济复核降档，同类型取最晚事件（真正的最终退出）；身份证为空按档案独立成行防误合并。
@@ -570,19 +603,6 @@ public partial class MonthlyReportService
                            .First())
             .ToList();
         var ids = distinctEvents.Select(e => e.ApplicationId).ToArray();
-
-        // 2. 批量查申请详情（户主信息/当前分类/当前状态）
-        // 注意：MemberCountSql 自带 AS family_size 别名，勿再追加别名（重复 AS 会触发 42601）
-        var detailSql = $@"SELECT a.id, a.applicant_name, a.applicant_id_card,
-                                  {MemberCountSql("a")},
-                                  a.classification_result, a.status
-                           FROM nc_biz_applications a
-                           WHERE a.id = ANY($1) AND a.deleted_at IS NULL";
-        var detailResult = await _db.QueryAsync<ExitDetailRow>(detailSql, ct, ids);
-        if (detailResult.IsFailure)
-            return Result.Failure<List<MonthlyExitRectificationRow>>(detailResult.ErrorCode!, detailResult.Message!);
-        var details = (detailResult.Value ?? new List<ExitDetailRow>())
-            .ToDictionary(d => d.Id, d => d);
 
         // 3.5 停旧建新：批量查停保户的下游新档案（original_application_id=本户），
         //     用于确定"退出后纳入类别"（解维平 44 → 新档案 45 特困）与退保原因；
@@ -685,7 +705,7 @@ public partial class MonthlyReportService
             if (!details.TryGetValue(appId, out var d))
                 continue;
 
-            var categoryCode = string.IsNullOrEmpty(ev.OldClassification) ? d.ClassificationResult ?? "" : ev.OldClassification;
+            var categoryCode = ResolveEventClassificationCode(ev, details);
 
             var isActive = d.Status is ApplicationStatusCodes.APPROVED or ApplicationStatusCodes.COMPLETED;
 
@@ -772,6 +792,20 @@ public partial class MonthlyReportService
         return new DateTime(business.Year, business.Month, 1).AddMonths(1);
     }
 
+    /// <summary>
+    /// 退出事件「退出前分类」：事件快照 old_classification 优先；空时回退档案当前分类
+    /// （与输出行「类别」列同源，分类过滤与展示口径一致）。
+    /// </summary>
+    private static string ResolveEventClassificationCode(ExitEventRow ev, Dictionary<long, ExitDetailRow> details)
+    {
+        if (!string.IsNullOrEmpty(ev.OldClassification))
+            return ev.OldClassification!;
+
+        return ev.ApplicationId.HasValue && details.TryGetValue(ev.ApplicationId.Value, out var d)
+            ? d.ClassificationResult ?? string.Empty
+            : string.Empty;
+    }
+
     // ─────────────────── 临时救助新增汇总 ───────────────────
 
     public async Task<Result<List<MonthlyTempReliefRow>>> GetTempReliefSummaryRowsAsync(int year, int month, string town, CancellationToken ct = default)
@@ -786,6 +820,7 @@ public partial class MonthlyReportService
         // 一卡通账号取临时救助档案自身的 bank_account（来源台账 one_card_account 优先，见预填逻辑）。
         var sql = @"SELECT t.id AS relief_id,
                            t.relief_type,
+                           t.population_status, t.payment_channel,
                            t.applicant_name, t.applicant_id_card, t.gender, t.age, t.phone,
                            t.family_size, t.family_address, t.family_category,
                            t.difficulty_type, t.confirm_amount, t.confirmed_at,
@@ -834,11 +869,12 @@ public partial class MonthlyReportService
             var accidents = accidentsByApp.GetValueOrDefault(r.ReliefId) ?? new List<TempReliefAccident>();
             var educations = educationsByApp.GetValueOrDefault(r.ReliefId) ?? new List<TempReliefEducation>();
 
-            // 分段判定单点实现（IsFixedQuotaType）：小额=有额度 → 救助金额/审批时间两列才填，大额一律留空
-            var isSmall = TempReliefConstants.IsFixedQuotaType(r.ReliefType);
+            // 分段按发放渠道 × 人群状态（TempReliefSummaryGrouper），金额/审批时间按实际值输出
             rows.Add(new MonthlyTempReliefRow
             {
                 ReliefType = r.ReliefType ?? TempReliefConstants.ReliefTypeLarge,
+                PopulationStatus = r.PopulationStatus ?? TempReliefConstants.PopulationInsured,
+                PaymentChannel = r.PaymentChannel ?? TempReliefConstants.PaymentCounty,
                 Name = r.ApplicantName ?? "",
                 IdCard = r.ApplicantIdCard ?? "",
                 Age = r.Age?.ToString() ?? "",
@@ -848,9 +884,9 @@ public partial class MonthlyReportService
                 // 个人类别用缩写（最低生活保障家庭→低保 等）
                 Category = TempReliefConstants.GetFamilyCategoryShortName(r.FamilyCategory),
                 Phone = r.Phone ?? "",
-                // 大额救助：救助金额 / 审批时间两列一律留空
-                Amount = isSmall && r.ConfirmAmount.HasValue ? r.ConfirmAmount.Value.ToString("F2") : "",
-                AuditDate = isSmall && r.ConfirmedAt.HasValue ? r.ConfirmedAt.Value.ToString("yyyy-MM-dd") : "",
+                // 有金额的（小额快救 / 常规备用金）填金额；常规上级发放留空
+                Amount = r.ConfirmAmount.HasValue ? r.ConfirmAmount.Value.ToString("F2") : "",
+                AuditDate = r.ConfirmedAt.HasValue ? r.ConfirmedAt.Value.ToString("yyyy-MM-dd") : "",
                 Reason = BuildTempReliefSummaryReason(r.DifficultyType ?? "", diseases, accidents, educations),
                 SelfPay = CalcTempReliefSelfPay(diseases, accidents, educations),
                 BankAccount = r.BankAccount ?? ""
@@ -982,6 +1018,8 @@ public partial class MonthlyReportService
     {
         public long ReliefId { get; set; }
         public string? ReliefType { get; set; }
+        public string? PopulationStatus { get; set; }
+        public string? PaymentChannel { get; set; }
         public string? ApplicantName { get; set; }
         public string? ApplicantIdCard { get; set; }
         public string? Gender { get; set; }
@@ -1003,9 +1041,13 @@ public partial class MonthlyReportService
         var t = string.IsNullOrEmpty(town) ? "全部" : town;
         var result = await _db.QuerySingleAsync<MonthlyMeeting>(
             "SELECT * FROM nc_biz_monthly_meetings WHERE year = $1 AND month = $2 AND town = $3", ct, year, month, t);
-        var meeting = result.IsSuccess && result.Value != null
-            ? result.Value
-            : new MonthlyMeeting { Year = year, Month = month, Town = t };
+        if (result.IsFailure)
+        {
+            // 查询失败若返回空会议对象，用户编辑保存就会覆盖真实会议记录。
+            LogError($"读取月报会议记录失败: {result.ErrorCode} {result.Message}");
+            return Result.Failure<MonthlyMeeting>(result.ErrorCode!, result.Message!);
+        }
+        var meeting = result.Value ?? new MonthlyMeeting { Year = year, Month = month, Town = t };
 
         // 决议段/申请分类：与周期内新增明细同源自动带出（member_info 库中为空时）
         var autoResult = await BuildMeetingAutoFieldsAsync(year, month, t, specialApproval, ct);
@@ -1020,6 +1062,10 @@ public partial class MonthlyReportService
             // 决议段姓名列表始终以周期内新增明细为准（与自动带出的成员信息同源）
             meeting.MemberNames = autoResult.Value.NameList;
             specialAttendees = autoResult.Value.SpecialAttendees;
+        }
+        else if (autoResult.IsFailure)
+        {
+            LogWarn($"会议记录自动字段带出失败，使用兜底值: {autoResult.ErrorCode} {autoResult.Message}");
         }
 
         // 字段兜底：行不存在/字段为空时按月报页同源默认补齐——否则"直接生成"时间/主持人/记录人/出席/缺席全出 "-"
@@ -1110,7 +1156,7 @@ public partial class MonthlyReportService
         var specialIds = new HashSet<long>();
         var sp = await _db.QueryAsync<SpecialApprovalIdRow>(
             @"SELECT application_id FROM nc_biz_special_approvals WHERE deleted_at IS NULL", ct);
-        if (sp.IsSuccess && sp.Value != null)
+        if (sp.HasValue)
             foreach (var s in sp.Value)
                 if (s.ApplicationId.HasValue)
                     specialIds.Add(s.ApplicationId.Value);
@@ -1251,7 +1297,12 @@ public partial class MonthlyReportService
         var exist = await _db.QuerySingleAsync<MonthlyMeeting>(
             "SELECT id FROM nc_biz_monthly_meetings WHERE year = $1 AND month = $2 AND town = $3",
             ct, meeting.Year, meeting.Month, meeting.Town);
-        if (exist.IsSuccess && exist.Value != null)
+        if (exist.IsFailure)
+        {
+            LogError($"保存会议记录前查重失败，已中止: {exist.ErrorCode} {exist.Message}");
+            return Result.Failure<MonthlyMeeting>(exist.ErrorCode!, exist.Message!);
+        }
+        if (exist.Value != null)
         {
             // member_info 为空时保留库中原值（避免覆盖自动带出的新增成员列表）
             var upd = @"UPDATE nc_biz_monthly_meetings SET meeting_time=$4, host=$5, recorder=$6, attendees=$7,

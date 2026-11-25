@@ -75,8 +75,11 @@ public class DataScopeService : BaseService, IDataScopeService
         if (_cache.TryGetValue(userId, out var cached) && !await IsCacheExpiredAsync(cached.CachedAt))
             return cached.Info;
 
-        var info = await LoadEffectiveScopeAsync(userId, ct);
-        _cache[userId] = (info, DateTime.UtcNow);
+        var (info, cacheable) = await LoadEffectiveScopeAsync(userId, ct);
+        if (cacheable)
+            _cache[userId] = (info, DateTime.UtcNow);
+        else
+            LogWarn($"数据范围解析不完整，本次不写缓存（避免故障结果被 TTL 放大）: UserId={userId}");
         LogDebug($"数据范围解析完成: UserId={userId}, Scope={info.Scope}, IsSuperAdmin={info.IsSuperAdmin}");
         return info;
     }
@@ -125,8 +128,9 @@ public class DataScopeService : BaseService, IDataScopeService
         return Task.CompletedTask;
     }
 
-    /// <summary>从数据库解析用户有效范围：角色集合取最大 data_scope；SUPER_ADMIN 角色直接判定超管</summary>
-    private async Task<DataScopeInfo> LoadEffectiveScopeAsync(int userId, CancellationToken ct)
+    /// <summary>从数据库解析用户有效范围：角色集合取最大 data_scope；SUPER_ADMIN 角色直接判定超管。
+    /// 返回 Cacheable=false 表示查询有失败，结果只用于本次 fail-closed 判定，不得写缓存。</summary>
+    private async Task<(DataScopeInfo Info, bool Cacheable)> LoadEffectiveScopeAsync(int userId, CancellationToken ct)
     {
         var rolesSql = @"
             SELECT r.code, r.data_scope
@@ -134,7 +138,9 @@ public class DataScopeService : BaseService, IDataScopeService
             JOIN nc_sys_roles r ON ur.role_id = r.id
             WHERE ur.user_id = $1";
         var rolesResult = await _dbService.QueryAsync<RoleScopeRow>(rolesSql, ct, userId);
-        var roles = rolesResult.IsSuccess && rolesResult.Value is not null ? rolesResult.Value : new List<RoleScopeRow>();
+        if (rolesResult.IsFailure)
+            LogError($"解析用户角色失败，本次按最小权限处理: UserId={userId}, {rolesResult.ErrorCode} {rolesResult.Message}");
+        var roles = rolesResult.HasValue ? rolesResult.Value : new List<RoleScopeRow>();
 
         var isSuperAdmin = roles.Any(r => string.Equals(r.Code, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase));
         var scope = DataScopeConstants.SELF;
@@ -145,10 +151,13 @@ public class DataScopeService : BaseService, IDataScopeService
 
         var orgSql = "SELECT organization_id FROM nc_sys_users WHERE id = $1 LIMIT 1";
         var orgResult = await _dbService.ExecuteScalarAsync<int>(orgSql, ct, userId);
+        if (orgResult.IsFailure)
+            LogError($"解析用户组织失败，本次按未分配组织处理: UserId={userId}, {orgResult.ErrorCode} {orgResult.Message}");
         // 无行/NULL 返回 default(0)，归一为 null（未分配组织）
         int? orgId = orgResult.IsSuccess && orgResult.Value > 0 ? orgResult.Value : null;
 
-        return new DataScopeInfo { Scope = scope, OrganizationId = orgId, IsSuperAdmin = isSuperAdmin };
+        return (new DataScopeInfo { Scope = scope, OrganizationId = orgId, IsSuperAdmin = isSuperAdmin },
+            rolesResult.IsSuccess && orgResult.IsSuccess);
     }
 
     /// <summary>组织子树（含自身），基于全量内存树计算</summary>
@@ -190,7 +199,13 @@ public class DataScopeService : BaseService, IDataScopeService
 
             var sql = "SELECT id, parent_id FROM nc_sys_organizations";
             var result = await _dbService.QueryAsync<OrgRow>(sql, ct);
-            var rows = result.IsSuccess && result.Value is not null ? result.Value : new List<OrgRow>();
+            if (result.IsFailure)
+            {
+                // 失败结果不写缓存；本次按空树（fail-closed）返回。
+                LogError($"加载组织树失败，本次按无可管理组织处理: {result.ErrorCode} {result.Message}");
+                return (new Dictionary<int, int?>(), new List<int>());
+            }
+            var rows = result.Value ?? new List<OrgRow>();
 
             var parentMap = rows.ToDictionary(r => r.Id, r => r.ParentId);
             var allIds = rows.Select(r => r.Id).ToList();

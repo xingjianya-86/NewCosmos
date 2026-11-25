@@ -117,8 +117,9 @@ public static class ImageCompressor
                 jpeg ? 85 : 75);
             return data != null && data.Size > 0 ? data.ToArray() : null;
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[ImageCompressor] 缩略图生成失败，按无缩略图继续");
             return null; // 缩略图失败不阻断主流程
         }
     }
@@ -136,9 +137,9 @@ public static class ImageCompressor
                 if (bitmap != null) return bitmap;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 继续走平台解码兜底
+            Serilog.Log.Debug(ex, "[ImageCompressor] Skia 解码失败，继续走平台解码兜底");
         }
 
         try
@@ -152,8 +153,9 @@ public static class ImageCompressor
             png.Position = 0;
             return SKBitmap.Decode(png);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[ImageCompressor] 平台解码失败，按无法解码处理");
             return null;
         }
     }

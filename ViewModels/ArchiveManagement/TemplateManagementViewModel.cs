@@ -94,6 +94,13 @@ public partial class TemplateManagementViewModel : ViewModelBase
 
     public List<string> TemplateTypes { get; } = new() { "Word", "Excel" };
 
+    /// <summary>「文档类型」下拉选项（= TemplateDocTypes.All 词表，方案B精准定位维度）</summary>
+    public List<string> DocTypes { get; } = new(TemplateDocTypes.All);
+
+    /// <summary>上传表单选中的文档类型（必选，落 nc_biz_templates.doc_type）</summary>
+    [ObservableProperty]
+    private string _selectedDocType = string.Empty;
+
     public TemplateManagementViewModel(
         IServiceProvider serviceProvider,
         ITemplateService templateService,
@@ -177,7 +184,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"加载失败: {ex.Message}", "确定");
         }
     }
@@ -260,6 +267,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         SelectedFilePath = string.Empty;
         FileName = string.Empty;
         TemplateName = string.Empty;
+        SelectedDocType = string.Empty;
         TemplateType = "Word";
         ConfigJson = string.Empty;
         IsUploading = false;
@@ -306,6 +314,13 @@ public partial class TemplateManagementViewModel : ViewModelBase
             return;
         }
 
+        // 文档类型必选（方案B精准定位：doc_type 缺失的模板无法被 GetByDocTypeAsync 定位）
+        if (string.IsNullOrWhiteSpace(SelectedDocType) || !TemplateDocTypes.All.Contains(SelectedDocType))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "请选择文档类型（精准定位用，必选）", "确定");
+            return;
+        }
+
         IsUploading = true;
         try
         {
@@ -328,7 +343,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
                 await _dialogService.DisplayAlertAsync("配置警告（不阻断上传）", text, "确定");
             }
 
-            await _templateService.SaveAsync(TemplateName, TemplateType, fileBytes, categoryArray, config!);
+            await _templateService.SaveAsync(TemplateName, TemplateType, fileBytes, categoryArray, config!, SelectedDocType);
 
             await _dialogService.DisplayAlertAsync("成功", "模板上传成功", "确定");
 
@@ -339,7 +354,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"上传失败: {ex.Message}", "确定");
         }
         finally
@@ -402,7 +417,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"删除失败: {ex.Message}", "确定");
         }
     }
@@ -478,7 +493,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"保存失败: {ex.Message}", "确定");
         }
     }
@@ -547,8 +562,9 @@ public partial class TemplateManagementViewModel : ViewModelBase
         {
             node = JsonNode.Parse(configJson);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[TemplateManagement] 模板份数配置解析失败（按默认 1 份处理）");
             return null;
         }
 
@@ -607,7 +623,7 @@ public partial class TemplateManagementViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"操作失败");
+            _logger.Error($"操作失败: {ex.Message}");
             await _dialogService.DisplayAlertAsync("错误", $"保存分类失败: {ex.Message}", "确定");
         }
     }

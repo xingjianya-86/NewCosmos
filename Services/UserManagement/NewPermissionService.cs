@@ -249,7 +249,15 @@ public class NewPermissionService : BaseService, INewPermissionService
     {
         var sql = "SELECT version FROM nc_perm_cache_version WHERE key = $1";
         var result = await _dbService.ExecuteScalarAsync<long>(sql, ct, PermissionSeedCatalog.MatrixVersionKey);
-        return result.IsSuccess && result.Value > 0 ? Convert.ToInt32(result.Value) : null;
+        if (result.IsFailure)
+        {
+            // 读版本失败若返回 null，会被当成"未播种"触发权限矩阵重建（清空用户直授权限）。
+            _logger.Error($"读取权限矩阵版本失败，已中止重建: {result.ErrorCode} {result.Message}");
+            throw new BusinessException(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"读取权限矩阵版本失败: {result.Message}");
+        }
+        return result.Value > 0 ? Convert.ToInt32(result.Value) : null;
     }
 
     /// <summary>写回权限矩阵版本标记（先改后插，不依赖 key 列唯一约束）</summary>
@@ -257,18 +265,28 @@ public class NewPermissionService : BaseService, INewPermissionService
     {
         var existsResult = await _dbService.ExecuteScalarAsync(
             "SELECT COUNT(*) FROM nc_perm_cache_version WHERE key = $1", ct, PermissionSeedCatalog.MatrixVersionKey);
-        if (existsResult.IsSuccess && Convert.ToInt32(existsResult.Value) > 0)
+        if (existsResult.IsFailure)
+            throw new BusinessException(
+                existsResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"检查权限矩阵版本标记失败: {existsResult.Message}");
+
+        Result writeResult;
+        if (Convert.ToInt32(existsResult.Value) > 0)
         {
-            await _dbService.ExecuteNonQueryAsync(
+            writeResult = await _dbService.ExecuteNonQueryAsync(
                 "UPDATE nc_perm_cache_version SET version = $2, updated_at = NOW() WHERE key = $1",
                 ct, PermissionSeedCatalog.MatrixVersionKey, PermissionSeedCatalog.MatrixVersion);
         }
         else
         {
-            await _dbService.ExecuteNonQueryAsync(
+            writeResult = await _dbService.ExecuteNonQueryAsync(
                 "INSERT INTO nc_perm_cache_version (key, version, updated_at) VALUES ($1, $2, NOW())",
                 ct, PermissionSeedCatalog.MatrixVersionKey, PermissionSeedCatalog.MatrixVersion);
         }
+        if (writeResult.IsFailure)
+            throw new BusinessException(
+                writeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"写回权限矩阵版本失败: {writeResult.Message}");
     }
 
     private async Task<HashSet<string>> LoadUserPermissionsAsync(int userId, CancellationToken ct)
@@ -365,7 +383,8 @@ public class NewPermissionService : BaseService, INewPermissionService
     {
         var sql = "SELECT id FROM nc_sys_roles WHERE code = $1 LIMIT 1";
         var result = await _dbService.QuerySingleAsync<int>(sql, ct, roleCode);
-
+        if (result.IsFailure)
+            _logger.Error($"查询角色 ID 失败: RoleCode={roleCode}, {result.ErrorCode} {result.Message}");
         return result.IsSuccess ? result.Value : null;
     }
 
@@ -375,17 +394,26 @@ public class NewPermissionService : BaseService, INewPermissionService
     private async Task IncrementCacheVersionAsync(CancellationToken ct)    {
         var checkSql = "SELECT COUNT(*) FROM nc_perm_cache_version WHERE key = 'permissions'";
         var exists = await _dbService.ExecuteScalarAsync(checkSql, ct);
-        if (exists.IsSuccess && Convert.ToInt32(exists.Value) > 0)
+        if (exists.IsFailure)
+        {
+            _logger.Error($"检查权限缓存版本标记失败，其他客户端可能无法及时失效: {exists.ErrorCode} {exists.Message}");
+            return;
+        }
+
+        Result writeResult;
+        if (Convert.ToInt32(exists.Value) > 0)
         {
             var updateSql = "UPDATE nc_perm_cache_version SET version = version + 1, updated_at = NOW() WHERE key = 'permissions'";
-            await _dbService.ExecuteNonQueryAsync(updateSql, ct);
+            writeResult = await _dbService.ExecuteNonQueryAsync(updateSql, ct);
         }
         else
         {
             var insertSql = @"INSERT INTO nc_perm_cache_version (key, version, updated_at)
                              VALUES ('permissions', 1, NOW())";
-            await _dbService.ExecuteNonQueryAsync(insertSql, ct);
+            writeResult = await _dbService.ExecuteNonQueryAsync(insertSql, ct);
         }
+        if (writeResult.IsFailure)
+            _logger.Error($"递增权限缓存版本失败，其他客户端可能无法及时失效: {writeResult.ErrorCode} {writeResult.Message}");
     }
 
     public async Task<Result> GrantPermissionToRoleAsync(int roleId, string permissionCode, CancellationToken ct = default)
@@ -428,7 +456,7 @@ VALUES ($1, $2)";
         const string sql = "SELECT code, name, module, description, sort_order FROM nc_sys_permissions ORDER BY sort_order";
         var result = await _dbService.QueryAsync<PermissionDefinition>(sql, ct);
 
-        if (result.IsSuccess && result.Value is not null && result.Value.Count > 0)
+        if (result.HasValue && result.Value.Count > 0)
         {
             LogInfo($"获取权限定义完成: Count={result.Value.Count}");
             return result.Value;

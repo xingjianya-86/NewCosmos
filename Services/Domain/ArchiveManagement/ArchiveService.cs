@@ -17,7 +17,15 @@ public class ArchiveService : BaseService, IArchiveService
     {
         var sql = "SELECT * FROM nc_biz_archives WHERE application_id = $1 AND deleted_at IS NULL ORDER BY archived_at DESC LIMIT 1";
         var result = await _db.QuerySingleAsync<Archive>(sql, ct, applicationId);
-        return result.IsSuccess ? result.Value : null;
+        if (result.IsFailure)
+        {
+            // 查询失败不能当成"无档案"：调用方（CreateOrAppendFilesAsync）会据此重复建档。
+            LogError($"查询申请档案失败: {result.ErrorCode} {result.Message}");
+            throw new BusinessException(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"查询申请档案失败: {result.Message}");
+        }
+        return result.Value;
     }
 
     public async Task<Archive> CreateAsync(Archive archive, CancellationToken ct = default)
@@ -118,13 +126,6 @@ public class ArchiveService : BaseService, IArchiveService
             LogException(ex, "归档创建（含文件）");
             return Result.FromException<Archive>(ex);
         }
-    }
-
-    public async Task<List<ArchiveFile>> GetFilesAsync(long archiveId, CancellationToken ct = default)
-    {
-        var sql = "SELECT * FROM nc_biz_archive_files WHERE archive_id = $1 ORDER BY id";
-        var result = await _db.QueryAsync<ArchiveFile>(sql, ct, archiveId);
-        return (result.IsSuccess && result.Value != null) ? result.Value : new List<ArchiveFile>();
     }
 
     /// <summary>

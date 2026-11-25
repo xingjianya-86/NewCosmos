@@ -17,7 +17,14 @@ public interface ITemplateService
     /// <summary>按名称取模板元数据。Success(null)=无此行；Failure=查询失败（禁止把 DB 故障伪装成"模板不存在"）。</summary>
     Task<Result<Template?>> GetByNameAsync(string name, CancellationToken ct = default);
 
-    Task<Template> SaveAsync(string name, string fileType, byte[] fileData, string[] categories, string configJson, CancellationToken ct = default);
+    /// <summary>
+    /// 按文档类型取模板元数据（方案B精准定位唯一口径，词表见 Constants/TemplateDocTypes.cs）。
+    /// 同类型可多张（如 近亲属 两表、入户调查 三版），按 sort_order,id 排序。
+    /// Success(空列表)=无匹配；Failure=查询失败。禁止用 Name.Contains/StartsWith 替代本方法。
+    /// </summary>
+    Task<Result<List<Template>>> GetByDocTypeAsync(string docType, CancellationToken ct = default);
+
+    Task<Template> SaveAsync(string name, string fileType, byte[] fileData, string[] categories, string configJson, string docType, CancellationToken ct = default);
 
     Task<Result> DeleteAsync(long id, CancellationToken ct = default);
 

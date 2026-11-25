@@ -159,7 +159,15 @@ public class ClassificationService : BaseService, IClassificationService
         // 计算保障金额
         var guaranteeResult = await CalculateGuaranteeAmountAsync(
             result.Classification, familySize, isRural, totalIncome, ct);
-        result.GuaranteeAmount = guaranteeResult.IsSuccess ? guaranteeResult.Value : 0;
+        if (guaranteeResult.IsFailure)
+        {
+            // 保障金是审批结果，取数失败绝不能写 0（会被当作"应发 0 元"落库）。
+            LogError($"分类判定：保障金计算失败: {guaranteeResult.ErrorCode} {guaranteeResult.Message}");
+            return Result.Failure<ClassificationResult>(
+                guaranteeResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"保障金计算失败，本次判定未完成: {guaranteeResult.Message}");
+        }
+        result.GuaranteeAmount = guaranteeResult.Value;
 
         // 检查渐退期（oldClassification 优先取变更链上游原分类，无则取当前分类）
         var oldForGrace = !string.IsNullOrEmpty(application.OriginalClassificationResult)
@@ -607,7 +615,7 @@ public class ClassificationService : BaseService, IClassificationService
         if (idCards.Count == 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var lookup = await _collegeStudentService.GetStudyingIdCardsAsync(idCards.ToList(), ct);
-        if (lookup.IsSuccess && lookup.Value != null)
+        if (lookup.HasValue)
             return new HashSet<string>(lookup.Value, StringComparer.OrdinalIgnoreCase);
 
         LogWarn($"在读大学生身份证查询失败，本次判定不应用学生劳动力豁免: {lookup.ErrorCode} {lookup.Message}");
@@ -836,7 +844,15 @@ public class ClassificationService : BaseService, IClassificationService
     public async Task<decimal> CalculateCareAllowanceAsync(long applicationId, CancellationToken ct = default)
     {
         var assessmentResult = await _capabilityAssessmentService.GetByApplicationIdAsync(applicationId, ct);
-        if (!assessmentResult.IsSuccess || assessmentResult.Value is null)
+        if (!assessmentResult.IsSuccess)
+        {
+            // 查询故障 ≠ 无鉴定记录：按 0 返回会把护理费静默算成 0。
+            LogError($"照料护理费：读取能力鉴定失败: {assessmentResult.ErrorCode} {assessmentResult.Message}");
+            throw new BusinessException(
+                assessmentResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"读取能力鉴定失败，无法计算照料护理费: {assessmentResult.Message}");
+        }
+        if (assessmentResult.Value is null)
         {
             LogInfo($"照料护理费：申请 {applicationId} 无能力鉴定记录，返回 0");
             return 0m;
@@ -897,7 +913,12 @@ public class ClassificationService : BaseService, IClassificationService
         {
             var result = await _db.QuerySingleAsync<string>(
                 "SELECT district FROM nc_biz_applications WHERE id = $1", ct, applicationId);
-            return result.IsSuccess ? result.Value : null;
+            if (result.IsFailure)
+            {
+                LogWarn($"照料护理费：查询申请区县失败，按第三档最低工资兜底: {result.ErrorCode} {result.Message}");
+                return null;
+            }
+            return result.Value;
         }
         catch (Exception ex)
         {

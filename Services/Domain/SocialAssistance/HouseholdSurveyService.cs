@@ -1,3 +1,4 @@
+using NewCosmos.Constants;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
@@ -20,7 +21,6 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
 
     public async Task<Result<HouseholdSurvey?>> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         // LIMIT 1 必须配 ORDER BY：若同一申请存在多条未删记录，无序 LIMIT 1 取哪条
         // 由执行计划决定，前后两次可能读到不同的调查记录。按 id DESC 固定取最新一条。
         var sql = "SELECT * FROM nc_biz_household_surveys WHERE application_id = $1 AND deleted_at IS NULL ORDER BY id DESC LIMIT 1";
@@ -60,7 +60,6 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
     public async Task<Result<long>> SaveAsync(long applicationId, HouseholdSurvey survey, CancellationToken ct = default)
     {
         ValidateNotNull(survey, nameof(survey));
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -68,7 +67,16 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
         {
             // 检查是否已存在
             var existing = await GetByApplicationIdAsync(applicationId, ct);
-            if (existing.IsSuccess && existing.Value != null)
+            if (existing.IsFailure)
+            {
+                // 查询失败不能走 INSERT：会产生同一申请重复入户调查行。
+                await tx.RollbackAsync(ct);
+                LogError($"查询已有入户调查失败: {existing.ErrorCode} {existing.Message}");
+                return Result.Failure<long>(
+                    existing.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"查询已有入户调查失败: {existing.Message}");
+            }
+            if (existing.Value != null)
             {
                 // 更新
                 var updateSql = @"UPDATE nc_biz_household_surveys SET 
@@ -135,7 +143,6 @@ public class HouseholdSurveyService : BaseService, IHouseholdSurveyService
 
     public async Task<Result> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = "UPDATE nc_biz_household_surveys SET deleted_at = NOW() WHERE application_id = $1 AND deleted_at IS NULL";
         return await _db.ExecuteNonQueryAsync(sql, ct, applicationId);
     }

@@ -192,7 +192,7 @@ public partial class MainViewModel : ViewModelBase
                     "\uE8D1", "#FFF3E0", "#7a5315", "进入模块", NavigateCommand, "Recovery"), CanAccessRecovery),
                 // 照片补传：历史档案照片按人补传（入口跟随档案查看权，与死亡情况说明同口径）
                 (Card("照片补传", "按人检索 · 连续采集 · 推送打印",
-                    "跨低收入/高龄/临时救助检索人员已传照片数，勾选后连续采集证件照并可推送打印",
+                    "跨低收入/高龄/临时救助/资产核查检索人员已传照片数，勾选后连续采集证件照并可推送打印",
                     "", "#ECFDF5", "#2e4738", "进入模块", NavigateCommand, "PhotoBackfill"), CanAccessArchiveQuery)
             }),
             (ModuleCategoryConstants.TOOLS, new()
@@ -767,7 +767,7 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var result = await _schemaService.GetSchemaStatusAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 SchemaStatus = result.Value;
 
@@ -883,7 +883,7 @@ public partial class MainViewModel : ViewModelBase
                 NewAssetChecks = 0;
                 MonthlyNewElderly = 0;
 
-                _logger.Warn($"统计数据加载失败");
+                _logger.Warn($"统计数据加载失败，首页统计显示为 0: {result.ErrorCode} {result.Message}");
             }
         }
         catch (Exception ex)
@@ -932,7 +932,7 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var result = await _elderlyApplicationService.GetPendingElderlyCountsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 ElderlyPendingNewCount = result.Value.PendingNew;
                 ElderlyPendingTransferCount = result.Value.PendingTransfer;

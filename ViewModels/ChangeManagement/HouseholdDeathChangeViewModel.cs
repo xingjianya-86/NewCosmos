@@ -37,8 +37,8 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
     private List<FamilyMember> _allMembers = new();
 
     /// <summary>
-    /// 死亡原户主成员（DB 无 is_household_head 列，IsHouseholdHead 恒为 false，
-    /// 须用 is_applicant / member_category='HouseholdHead' / 与旧档案申请人一致 定位）
+    /// 死亡原户主（成员表有户主行则取该行；无户主行时按主表申请人字段合成虚拟户主 Id=0，
+    /// 因表单建档只把共同生活成员写入成员表，户主权威在主表）
     /// </summary>
     private FamilyMember? _originalHeadMember;
 
@@ -179,9 +179,11 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
 
             // 加载申请信息
             var appResult = await _applicationService.GetByIdAsync(applicationId, CancellationToken);
-            if (appResult.IsSuccess && appResult.Value != null)
+            if (appResult.IsFailure)
+                _logger.Warn($"户主死亡变更：原档案读取失败，原户主信息将留空: {appResult.ErrorCode} {appResult.Message}");
+            var app = appResult.IsSuccess ? appResult.Value : null;
+            if (app != null)
             {
-                var app = appResult.Value;
                 OriginalHeadName = app.ApplicantName;
                 OriginalHeadIdCard = app.ApplicantIdCard;
                 OriginalFamilySize = app.FamilySize;
@@ -192,6 +194,14 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
             // 加载全部成员并缓存；定位死亡原户主成员（is_applicant=true / member_category='HouseholdHead' /
             // 身份证号或姓名与旧档案申请人一致——存量数据存在 is_applicant 未置位的申请人成员）
             var membersResult = await _familyMemberService.GetByApplicationIdAsync(applicationId, CancellationToken);
+            if (membersResult.IsFailure)
+            {
+                // 成员查询失败若按空集合继续，会把整户误判成单人户并走"整户停止"。
+                _logger.Error($"户主死亡变更：成员查询失败，已中止: {membersResult.ErrorCode} {membersResult.Message}");
+                throw new BusinessException(
+                    membersResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                    $"户主死亡变更：成员查询失败: {membersResult.Message}");
+            }
             if (membersResult.IsSuccess)
             {
                 _allMembers = membersResult.Value ?? new List<FamilyMember>();
@@ -202,6 +212,33 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
                         && string.Equals(m.IdCard, OriginalHeadIdCard, StringComparison.OrdinalIgnoreCase)) ||
                     (!string.IsNullOrEmpty(OriginalHeadName)
                         && string.Equals(m.Name, OriginalHeadName, StringComparison.Ordinal)));
+
+                // 成员表无户主行（表单建档只把共同生活成员写入成员表，户主权威在主表）：
+                // 用主表申请人字段合成"虚拟户主"（Id=0），保证提交时能定位死亡人员，
+                // 且单人户判定不会因户主缺失而误判（服务端有同口径兜底）。
+                if (_originalHeadMember == null && app != null
+                    && !string.IsNullOrWhiteSpace(app.ApplicantName)
+                    && !string.IsNullOrWhiteSpace(app.ApplicantIdCard))
+                {
+                    _originalHeadMember = new FamilyMember
+                    {
+                        Id = 0,
+                        ApplicationId = applicationId,
+                        Name = app.ApplicantName,
+                        IdCard = app.ApplicantIdCard,
+                        IsApplicant = true,
+                        IsHouseholdHead = true,
+                        MemberCategory = MemberCategoryConstants.HOUSEHOLD_HEAD,
+                        RelationshipToHead = "本人/户主",
+                        Gender = app.Gender ?? string.Empty,
+                        Ethnicity = app.Ethnicity ?? string.Empty,
+                        Phone = app.ApplicantPhone ?? string.Empty,
+                        HukouType = app.HukouType ?? string.Empty,
+                        HukouAddress = app.HukouAddress ?? string.Empty
+                    };
+                    _logger.LogBusiness("户主无成员行，已按主表申请人信息合成虚拟户主",
+                        ("ApplicationId", applicationId));
+                }
 
                 // 可选新户主 = 排除死亡原户主 + 排除赡养抚养扶养人（Support 不计入共同生活成员）
                 EligibleMembers.Clear();
@@ -298,7 +335,7 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
             var result = IsSinglePersonHousehold
                 ? await _changeService.ExecuteHouseholdHeadDeathStopOnlyAsync(context, CancellationToken)
                 : await _changeService.ExecuteHouseholdDeathAsync(context, CancellationToken);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 // 单人户整户停止：整户已死、家庭不存在 → 引导进档案制作中心出停保卷宗
                 //（封面/目录/变更告知书；不打入户调查表——已无家庭可调查）
@@ -314,29 +351,30 @@ public partial class HouseholdDeathChangeViewModel : ViewModelBase
 
                     // 预置文书输出上下文（PrepareAndNavigateAsync 不清这三项）：
                     // ① OutputCategories=停保码 → 候选池为停保卷宗（封面/目录/入户调查表/变更告知书，靠停保码命中）；
-                    // ② TemplateFilter=封面/目录/变更告知书 → 白名单剔除入户调查表（整户已死，无需入户调查）。
+                    // ② TemplateDocTypeFilter=封面/目录/变更告知书 → 白名单剔除入户调查表（整户已死，无需入户调查）。
+                    //    白名单值=TemplateDocTypes 文档类型（方案B，原按模板名）。
                     PrintNavigationData.OutputCategories = ClassificationConstants.StopCategoryCodes;
-                    PrintNavigationData.TemplateFilter = new[]
+                    PrintNavigationData.TemplateDocTypeFilter = new[]
                     {
-                        DocumentTemplateNames.Cover,
-                        DocumentTemplateNames.Directory,
-                        DocumentTemplateNames.ChangeNotice
+                        TemplateDocTypes.Cover,
+                        TemplateDocTypes.Directory,
+                        TemplateDocTypes.ChangeNotice
                     };
                     if (_isDestitute)
                     {
                         // 特困退出：追加《特困供养人员取消备案表》——唯一叶子「档案_特困取消备案表」使其加载命中，
-                        // TemplateFilter 白名单使其列入清单（字段已由 ArchiveProductionViewModel 停发特困分支装配）。
+                        // TemplateDocTypeFilter 白名单使其列入清单（字段已由 ArchiveProductionViewModel 停发特困分支装配）。
                         PrintNavigationData.OutputCategories = ClassificationConstants.StopCategoryCodes
                             .Concat(new[] { "档案_特困取消备案表" }).ToArray();
-                        PrintNavigationData.TemplateFilter = new[]
+                        PrintNavigationData.TemplateDocTypeFilter = new[]
                         {
-                            DocumentTemplateNames.Cover,
-                            DocumentTemplateNames.Directory,
-                            DocumentTemplateNames.ChangeNotice,
-                            DocumentTemplateNames.DestituteCancelFiling
+                            TemplateDocTypes.Cover,
+                            TemplateDocTypes.Directory,
+                            TemplateDocTypes.ChangeNotice,
+                            TemplateDocTypes.DestituteCancelFiling
                         };
                     }
-                    PrintNavigationData.PrefilterTemplateNames = null;
+                    PrintNavigationData.PrefilterDocTypes = null;
                     PrintNavigationData.OperationOverride = null;
 
                     // 弹出本页 → 进档案制作中心（加载本停保档案），用户点「档案输出」即得 3 张停保卷宗

@@ -68,6 +68,7 @@ public static class OfficeProviderDetector
             catch (Exception ex)
             {
                 Debug.WriteLine($"检测Word应用失败（预期）: {ex.Message}");
+                Serilog.Log.Debug(ex, "[OfficeProviderDetector] 检测 Word 应用失败（预期）");
             }
         }
 
@@ -174,6 +175,7 @@ public static class OfficeProviderDetector
             catch (Exception ex)
             {
                 Debug.WriteLine($"检测Word应用失败（预期）: {ex.Message}");
+                Serilog.Log.Debug(ex, "[OfficeProviderDetector] 检测 Word 应用失败（预期）");
             }
 
         return null;
@@ -187,6 +189,7 @@ public static class OfficeProviderDetector
             catch (Exception ex)
             {
                 Debug.WriteLine($"检测ProgID失败（预期）: {pid} - {ex.Message}");
+                Serilog.Log.Debug(ex, "[OfficeProviderDetector] 检测 ProgID 失败: {ProgId}", pid);
                 return false;
             }
         });

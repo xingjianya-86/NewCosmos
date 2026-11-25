@@ -30,7 +30,6 @@ public class SeedMergeService : BaseService, ISeedMergeService
         List<Dictionary<string, object>> seedRows,
         CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         TableNameValidator.ValidateOrThrow(definition.TableName);
 
         foreach (var col in definition.Columns)
@@ -124,7 +123,7 @@ public class SeedMergeService : BaseService, ISeedMergeService
         catch (Exception ex)
         {
             await tx.RollbackAsync(ct);
-            LogError($"操作失败");
+            LogError($"操作失败: {ex.Message}");
             result.IsSuccess = false;
             result.ErrorMessage = ex.Message;
             return Result.FromException<MergeResult>(ex);

@@ -37,10 +37,11 @@ public static class PrintNavigationData
     public static string Status { get; set; } = string.Empty;
 
     /// <summary>
-    /// 仅出文书模式：允许展示的模板名白名单（null/空=不按名单收窄）。
+    /// 仅出文书模式：允许展示的文档类型白名单（doc_type，null/空=不按名单收窄）。
     /// 由 ApplicationFormViewModel.OpenDocumentOutputAsync 强白名单直出时写入；Output 分类模式一般不设。
+    /// 原 TemplateFilter（按模板名）已废除——方案B 精准定位一律按 TemplateDocTypes 文档类型（2026-11-18）。
     /// </summary>
-    public static string[]? TemplateFilter { get; set; }
+    public static string[]? TemplateDocTypeFilter { get; set; }
 
     /// <summary>
     /// 输出文书模式：模板分类集（null=按 BusinessType 默认分类）。
@@ -54,23 +55,24 @@ public static class PrintNavigationData
     public static string? OperationOverride { get; set; }
 
     /// <summary>
-    /// 输出文书模式：预勾选模板名（列表仍展示分类内全部，仅控制 IsSelected）。
+    /// 输出文书模式：预勾选文档类型（doc_type；列表仍展示分类内全部，仅控制 IsSelected）。
     /// 告知书必选由调用方始终写入；人员变动/渐退/减发按业务事实追加。
+    /// 原 PrefilterTemplateNames（按模板名）已废除——方案B 改按 TemplateDocTypes 文档类型（2026-11-18）。
     /// </summary>
-    public static string[]? PrefilterTemplateNames { get; set; }
+    public static string[]? PrefilterDocTypes { get; set; }
 
     /// <summary>
     /// 仅清「文书模式」四字段，保留记录型上下文（BusinessType/Classification/FieldData…）。
     /// 由整档型入口（高龄停发/复核、临救、追缴、资产核查、月报等）在写入记录上下文时调用，
-    /// 防止上一次「仅出文书」会话的 OutputCategories/OperationOverride/Prefilter/TemplateFilter
+    /// 防止上一次「仅出文书」会话的 OutputCategories/OperationOverride/Prefilter/TemplateDocTypeFilter
     /// 静态残留被继承（曾致高龄停发档案输出误出「档案_渐退期审批表」等变动文书）。
     /// </summary>
     public static void ClearDocumentMode()
     {
         OutputCategories = null;
         OperationOverride = null;
-        TemplateFilter = null;
-        PrefilterTemplateNames = null;
+        TemplateDocTypeFilter = null;
+        PrefilterDocTypes = null;
     }
 
     public static void Clear()
@@ -84,9 +86,9 @@ public static class PrintNavigationData
         NearRelativePairs = null;
         Classification = string.Empty;
         Status = string.Empty;
-        TemplateFilter = null;
+        TemplateDocTypeFilter = null;
         OutputCategories = null;
         OperationOverride = null;
-        PrefilterTemplateNames = null;
+        PrefilterDocTypes = null;
     }
 }

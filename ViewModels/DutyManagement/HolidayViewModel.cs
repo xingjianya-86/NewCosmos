@@ -162,7 +162,7 @@ public partial class HolidayViewModel : ViewModelBase
         await ExecuteAsync(async ct =>
         {
             var result = await _holidayManageService.DownloadYearAsync(SelectedYear, ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 downloaded = true;
                 var summary = result.Value;

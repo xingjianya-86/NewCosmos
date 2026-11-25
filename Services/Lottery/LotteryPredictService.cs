@@ -205,8 +205,9 @@ public class LotteryPredictService : ILotteryPredictService
                    $"--db-name {dbOptions.DatabaseName} " +
                    $"--db-user {dbOptions.Username}";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Error($"读取数据库连接参数失败，Python 脚本将无 --db-* 参数运行: {ex.Message}");
             return string.Empty;
         }
     }
@@ -222,7 +223,11 @@ public class LotteryPredictService : ILotteryPredictService
     private string? GetDbPasswordSafe()
     {
         try { return _configService.GetDatabaseOptions().Password; }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            _logger.Error($"读取数据库密码失败，Python 脚本将无 PGPASSWORD: {ex.Message}");
+            return null;
+        }
     }
 
     private Result<List<PredictionResult>> ParsePredictions(string output, LotteryType lotteryType, string algorithm, string algorithmName)

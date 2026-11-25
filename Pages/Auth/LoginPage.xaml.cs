@@ -228,9 +228,12 @@ public partial class LoginPage : ContentPage
         {
             submit = JsonSerializer.Deserialize<LoginSubmitPayload>(payload, SubmitJsonOptions);
         }
-        catch
+        catch (Exception ex)
         {
-            return; // 载荷损坏：静默丢弃（不记录，可能含凭据）
+            // 载荷可能含凭据：只记录异常类型与长度，不记录内容。
+            Serilog.Log.Warning("[LoginPage] 登录提交载荷解析失败，已丢弃。Type={Type}, Length={Length}",
+                ex.GetType().Name, payload?.Length ?? 0);
+            return;
         }
 
         if (submit is null || string.IsNullOrEmpty(submit.Id))
@@ -276,6 +279,27 @@ public partial class LoginPage : ContentPage
                 {
                     StartDoneWatchdog();
                 }
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[LoginPage] 登录提交处理异常");
+            // 必须回执失败结果，否则 web 端会永久等待 auth-result。
+            try
+            {
+                var failJson = JsonSerializer.Serialize(new
+                {
+                    id = submit.Id,
+                    ok = false,
+                    msg = "登录处理异常，请重试"
+                });
+                if (_sequenceView != null)
+                    await _sequenceView.EvalAsync(
+                        "window.__NC_BRIDGE__ && window.__NC_BRIDGE__.dispatch('auth-result', " + failJson + ");");
+            }
+            catch (Exception notifyEx)
+            {
+                Serilog.Log.Warning(notifyEx, "[LoginPage] 回执登录失败结果失败");
             }
         }
         finally

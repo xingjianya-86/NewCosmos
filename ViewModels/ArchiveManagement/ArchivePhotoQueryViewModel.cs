@@ -497,7 +497,14 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
             {
                 var pageResult = await _photoService.GetPhotosPagedAsync(
                     Keyword, SelectedCategoryCode, page, 100, CancellationToken);
-                if (pageResult.IsFailure || pageResult.Value == null || pageResult.Value.Items.Count == 0)
+                if (pageResult.IsFailure)
+                {
+                    _logger.Error($"档案照片导出：第 {page} 页查询失败，已导出 {exported} 张: {pageResult.ErrorCode} {pageResult.Message}");
+                    await _dialogService.DisplayAlertAsync("导出中断",
+                        $"第 {page} 页查询失败，已导出 {exported} 张。请重试：{pageResult.Message}", "确定");
+                    return Result.Failure(pageResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, pageResult.Message ?? "照片分页查询失败");
+                }
+                if (pageResult.Value == null || pageResult.Value.Items.Count == 0)
                     break;
 
                 foreach (var photo in pageResult.Value.Items)
@@ -593,7 +600,14 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
                 {
                     var pageResult = await _photoService.GetPhotosPagedAsync(
                         Keyword, SelectedCategoryCode, page, 100, CancellationToken);
-                    if (pageResult.IsFailure || pageResult.Value == null || pageResult.Value.Items.Count == 0)
+                    if (pageResult.IsFailure)
+                    {
+                        _logger.Error($"档案照片另存为：第 {page} 页查询失败，已导出 {exported} 张: {pageResult.ErrorCode} {pageResult.Message}");
+                        await _dialogService.DisplayAlertAsync("导出中断",
+                            $"第 {page} 页查询失败，已导出 {exported} 张。请重试：{pageResult.Message}", "确定");
+                        return Result.Failure(pageResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR, pageResult.Message ?? "照片分页查询失败");
+                    }
+                    if (pageResult.Value == null || pageResult.Value.Items.Count == 0)
                         break;
 
                     foreach (var photo in pageResult.Value.Items)
@@ -681,7 +695,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     private const string InsertSourceDrop = "拖拽";
 
     /// <summary>
-    /// 插入照片：先锁定"已存在被查询的人"（18 位身份证 + 低收入/高龄/临时救助档案中存在）
+    /// 插入照片：先锁定"已存在被查询的人"（18 位身份证 + 低收入/高龄/临时救助/资产核查档案中存在）
     /// → 选类别 → 本机多选图片 → 走与手机端采集同一保存入口入库 → 立即刷新。
     /// 归属人解析不出或档案不存在时显式拒绝，不静默放行。
     /// </summary>
@@ -806,7 +820,7 @@ public partial class ArchivePhotoQueryViewModel : PagedSearchViewModelBase
     }
 
     /// <summary>
-    /// 打开照片补传页（复用 MobilePhotoBackfillPage：三域搜人 → 勾选 → 连续采集），返回本页时自动重查。
+    /// 打开照片补传页（复用 MobilePhotoBackfillPage：四域搜人 → 勾选 → 连续采集），返回本页时自动重查。
     /// </summary>
     [RelayCommand]
     private async Task OpenBackfillPageAsync()

@@ -162,7 +162,11 @@ public partial class ApplicationFormViewModel
         }
     }
 
-    /// <summary>超阈值提示：家庭合计 &gt; 月低保标准 × 30 × 家庭人数（仅红字提示，不自动决策）。</summary>
+    /// <summary>
+    /// 超阈值提示：家庭合计 &gt; 月低保标准 × 档位月数 × 家庭人数（仅红字提示，不自动决策）。
+    /// 档位按申请分类分档（2026-11-18 功能缺口修复）：边缘/刚性支出 → 36 个月（细则第二十五/二十六条），
+    /// 其余（低保/单人保/特困/未判定）→ 30 个月从严（`BankFlowConstants.MonthsFor` 单点）。
+    /// </summary>
     private async Task<string> BuildExceedHintAsync(decimal totalBalance, int idCardCount)
     {
         try
@@ -178,12 +182,13 @@ public partial class ApplicationFormViewModel
 
             // 家庭人数以已录入成员为准（至少 1 人 = 申请人）
             var familySize = Math.Max(1, Math.Max(FamilyMembers.Count, idCardCount));
-            var threshold = stdResult.Value * BankFlowConstants.BalanceLimitMonths * familySize;
+            var months = BankFlowConstants.MonthsFor(ClassificationResult);
+            var threshold = stdResult.Value * months * familySize;
 
             if (totalBalance <= threshold) return string.Empty;
 
             return string.Format(BankFlowConstants.BalanceExceedFormat,
-                totalBalance.ToString("N2"), familySize, threshold.ToString("N2"));
+                totalBalance.ToString("N2"), familySize, threshold.ToString("N2"), months);
         }
         catch (Exception ex)
         {
@@ -232,9 +237,8 @@ public partial class ApplicationFormViewModel
 
     private async Task ShowBankFlowMessageAsync(string message)
     {
-        var dialog = _serviceProvider.GetService<IDialogService>();
-        if (dialog != null)
-            await dialog.ShowSnackBarAsync(message, Components.SnackBarType.Warning);
+        var dialog = _serviceProvider.GetRequiredService<IDialogService>();
+        await dialog.ShowSnackBarAsync(message, Components.SnackBarType.Warning);
     }
 }
 

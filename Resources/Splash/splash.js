@@ -13,12 +13,15 @@
  *   scenes/scene-*.js      五幕场景（brand / wash / plate / verify / finale）
  * 改动清单见 THIRD-PARTY-NOTICES.md。
  *
- * 全片时序（与拆分前逐拍一致）：
+ * 片头时序（两分支共用）与分流（2026-11-18 起，去重复播）：
  *   第一幕  黑幕 + 系统标识／"民政社会救助"／"NEWCOSMOS"（字距收紧 + 扫光）
  *   过场    过曝洗白（黑 → 灰 → 暖白底板）
  *   第二幕  暖白"技术档案"底板：品牌块、页脚、进度条、六格阶段柱
- *   序列    系统访问许可 → 操作员身份确认 → 接收启动请求 → 读取操作权限
- *           → 权限核验通过 → 终幕 WELCOME（色散故障后揭幕）
+ *   分流    askIntent 问宿主（splash-intent）：
+ *           full（会话有效）→ 序列 系统访问许可 → 操作员身份确认 → 接收启动请求
+ *                 → 读取操作权限 → 权限核验通过 → 终幕 WELCOME（色散故障后揭幕）→ 进主页
+ *           skip（需要登录/重试页）→ 片头收尾（同 SKIP），交序列登录在同一底板接手
+ *                 （授权/账号密码停下等待），五步序列只演一遍
  *
  * 配置来自 window.__DSH_STARTUP__（config.js 由 C# 每次启动生成）。
  * 对外契约不变：window.__DSH_STARTUP_API__ / dsh-startup:done /
@@ -33,6 +36,7 @@
   var A = window.__NC_ANIM__
   var C = A.C
   var ROOT_ID = A.ROOT_ID
+  var bridge = window.__NC_BRIDGE__
 
   /* Host 侧已判定"这次不播"（未启用 / 本会话已播 / 今日已播）：
      这里不再建 DOM，但仍然暴露 API，方便按需重播。 */
@@ -98,14 +102,45 @@
       .then(function () { return A.scenes.brand.play(rt) })
       .then(function () { return A.scenes.wash.play(rt) })
       .then(function () { return A.scenes.plate.play(rt) })
-      /* 五个阶段 */
-      .then(function () { return A.scenes.verify.stepLoop(rt) })
-      /* 终幕 */
-      .then(function () { return A.scenes.finale.play(rt) })
+      .then(function () {
+        /* 分流点：底板就位后问宿主这次启动往哪走（会话恢复结果）——
+           full = 会话有效，接着自动演完五步序列与终幕（全片）；
+           skip = 需要登录/进连接重试页，片头就此收尾（与 SKIP 按钮同一收尾路径），
+                  由序列登录在同一块底板上接手：授权/账号密码步骤停下等待输入，
+                  五步序列只演一遍，不再"启动动画 + 序列登录"重复两趟。 */
+        return askIntent().then(function (mode) {
+          if (mode === 'skip') { requestSkip(); return null }
+          return A.scenes.verify.stepLoop(rt)
+            .then(function () { return A.scenes.finale.play(rt) })
+        })
+      })
       .catch(function (err) {
         try { console.warn('[dsh-startup-screen] 动画异常，直接揭幕：', err) } catch (e2) {}
         return A.finish()
       })
+  }
+
+  /* ── 启动分流问路：一次，先到先得（宿主 SplashPage 双路桥各到一次，dispatch 侧 settle 幂等）──
+     宿主按会话恢复结果答 full/skip；无桥 / 15 秒未答复 → 兜底 full（与既往"每次启动播全片"
+     行为一致）；宿主另有 SplashTimeoutSeconds 闸门看门狗，任何一侧都不会把用户卡住。 */
+  function askIntent() {
+    return new Promise(function (resolve) {
+      var settled = false
+      var timer = setTimeout(function () { settle('full') }, 15000)
+
+      function settle(mode) {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(mode)
+      }
+
+      if (!bridge) { settle('full'); return }
+      bridge.on('splash-intent-result', function (data) {
+        settle(data === 'skip' ? 'skip' : 'full')
+      })
+      bridge.send('splash-intent', {})
+    })
   }
 
   function requestSkip() {

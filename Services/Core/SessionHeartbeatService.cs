@@ -59,8 +59,9 @@ public sealed class SessionHeartbeatService : ISessionHeartbeatService
             interval = isAndroid ? policy.HeartbeatMobileSeconds : policy.HeartbeatDesktopSeconds;
             grace = isAndroid ? 3 : policy.GraceSeconds;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"读取会话心跳策略失败，使用默认值: {ex.Message}");
             interval = isAndroid
                 ? SessionConstants.DefaultHeartbeatMobileSeconds
                 : SessionConstants.DefaultHeartbeatDesktopSeconds;

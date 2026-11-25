@@ -84,20 +84,31 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         var fullApp = fullResult.Value;
 
         var diseases = await _tempReliefService.GetDiseasesByApplicationIdAsync(applicationId, ct);
-        if (diseases.IsSuccess && diseases.Value != null) fullApp.Diseases = diseases.Value;
+        if (diseases.IsFailure)
+            return Result.Failure<PrintJob>(ErrorCodes.NOT_FOUND, $"疾病明细加载失败，未生成打印任务: {diseases.Message}");
+        fullApp.Diseases = diseases.Value ?? new();
 
         var accidents = await _tempReliefService.GetAccidentsByApplicationIdAsync(applicationId, ct);
-        if (accidents.IsSuccess && accidents.Value != null) fullApp.Accidents = accidents.Value;
+        if (accidents.IsFailure)
+            return Result.Failure<PrintJob>(ErrorCodes.NOT_FOUND, $"灾害明细加载失败，未生成打印任务: {accidents.Message}");
+        fullApp.Accidents = accidents.Value ?? new();
 
         var educations = await _tempReliefService.GetEducationsByApplicationIdAsync(applicationId, ct);
-        if (educations.IsSuccess && educations.Value != null) fullApp.Educations = educations.Value;
+        if (educations.IsFailure)
+            return Result.Failure<PrintJob>(ErrorCodes.NOT_FOUND, $"教育明细加载失败，未生成打印任务: {educations.Message}");
+        fullApp.Educations = educations.Value ?? new();
 
         var membersResult = await _tempReliefService.GetMembersByApplicationIdAsync(applicationId, ct);
-        var memberList = membersResult.IsSuccess ? membersResult.Value ?? new() : new List<TempReliefMember>();
+        if (membersResult.IsFailure)
+            return Result.Failure<PrintJob>(ErrorCodes.NOT_FOUND, $"成员明细加载失败，未生成打印任务: {membersResult.Message}");
+        var memberList = membersResult.Value ?? new();
 
         var (acceptanceDate, investigationDate) =
             await TempReliefPrintDataBuilder.ResolveScheduleAsync(_timelineService, fullApp);
-        var contactUnitPhone = (await _tempReliefService.GetReportUnitPhoneAsync(fullApp.ReportUnit, ct)).Value ?? string.Empty;
+        var phoneResult = await _tempReliefService.GetReportUnitPhoneAsync(fullApp.ReportUnit, ct);
+        if (phoneResult.IsFailure)
+            Serilog.Log.Warning("[PrintJobFactory] 报告单位电话读取失败，文书该字段将为空: {Message}", phoneResult.Message);
+        var contactUnitPhone = phoneResult.Value ?? string.Empty;
         var fields = TempReliefPrintDataBuilder.BuildSingleFields(
             fullApp, memberList, contactUnitPhone, acceptanceDate, investigationDate);
 
@@ -136,16 +147,15 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
     }
 
     /// <summary>
-    /// 手机推送打印选模板（唯一口径）：优先「临时救助_…审核审批表…」（业务确认的主单），
-    /// 未命中回退第一张 Word 模板（与 <see cref="ResolveTemplateAsync"/> 同序）。
-    /// 2026-10-21 起大额/小额分表（临时救助_大额救助_审核审批表 / 临时救助_小额救助_审核审批表），
-    /// 旧名字前缀失效；调用方传入的分类已互斥（ReliefType→CategoryLarge/CategorySmall），
-    /// 故「名称含令牌」命中的就是本救助类型的那一张。
+    /// 手机推送打印选模板（唯一口径）：优先「临时救助审核审批表」（业务确认的主单，doc_type 精准匹配，
+    /// 2026-11-18 方案B 取代原 Name.Contains("审核审批表") 子串），未命中回退第一张 Word 模板
+    ///（与 <see cref="ResolveTemplateAsync"/> 同序）。2026-10-21 起大额/小额分表，
+    /// 调用方传入的分类已互斥（ReliefType→CategoryLarge/CategorySmall），故类型命中的就是本救助类型的那一张。
     /// </summary>
     private static Template? PickPushPrintTemplate(IReadOnlyList<Template> candidates)
     {
         if (candidates.Count == 0) return null;
-        return candidates.FirstOrDefault(t => t.Name.Contains(TempReliefConstants.TemplateAuditApprovalNameToken, StringComparison.Ordinal))
+        return candidates.FirstOrDefault(t => t.DocType == TemplateDocTypes.TempReliefAuditApproval)
                ?? candidates.FirstOrDefault(t => !string.Equals(t.FileType, "xlsx", StringComparison.OrdinalIgnoreCase))
                ?? candidates[0];
     }

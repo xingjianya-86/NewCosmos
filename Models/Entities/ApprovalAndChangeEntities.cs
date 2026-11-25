@@ -44,6 +44,16 @@ public class SpecialApprovalForm
     public string AuditResult { get; set; } = string.Empty;
     public DateTime? AuditDate { get; set; }
     public string Status { get; set; } = ApplicationStatusCodes.DRAFT;
+
+    /// <summary>适用情形代码（新规 8 类；见 SpecialApprovalConstants.CaseTypes）</summary>
+    public string? CaseType { get; set; }
+
+    /// <summary>报县日期（10 个工作日评议计时起点）</summary>
+    public DateTime? SubmittedAt { get; set; }
+
+    /// <summary>备案日期（5 个工作日备案终点）</summary>
+    public DateTime? FiledAt { get; set; }
+
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; }

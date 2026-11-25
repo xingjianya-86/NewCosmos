@@ -11,8 +11,15 @@ namespace NewCosmos.Tests.Domain;
 /// </summary>
 public class TempReliefSummaryGrouperTests
 {
-    private static MonthlyTempReliefRow Row(string name, string? reliefType)
-        => new() { Name = name, ReliefType = reliefType ?? string.Empty };
+    private static MonthlyTempReliefRow Row(string name, string? reliefType,
+        string? populationStatus = null, string? paymentChannel = null)
+        => new()
+        {
+            Name = name,
+            ReliefType = reliefType ?? string.Empty,
+            PopulationStatus = populationStatus ?? TempReliefConstants.PopulationInsured,
+            PaymentChannel = paymentChannel ?? TempReliefConstants.PaymentCounty
+        };
 
     [Theory]
     [InlineData(TempReliefConstants.ReliefTypeSmall, true)]
@@ -83,5 +90,32 @@ public class TempReliefSummaryGrouperTests
         // 输出（打印标题/文件名/预览标题）只用业务措辞，"无额度/有额度"仅作代码内用语
         Assert.Equal("报县局审批", TempReliefConstants.SegmentTagCountyApproval);
         Assert.Equal("备用金发放", TempReliefConstants.SegmentTagReservePayout);
+    }
+
+    [Fact]
+    public void SplitByCategory_按渠道与人群状态拆四段()
+    {
+        var rows = new List<MonthlyTempReliefRow>
+        {
+            Row("上级在册", TempReliefConstants.ReliefTypeLarge,
+                TempReliefConstants.PopulationInsured, TempReliefConstants.PaymentCounty),
+            Row("上级非在册", TempReliefConstants.ReliefTypeLarge,
+                TempReliefConstants.PopulationUninsured, TempReliefConstants.PaymentCounty),
+            Row("备用金在册", TempReliefConstants.ReliefTypeLarge,
+                TempReliefConstants.PopulationInsured, TempReliefConstants.PaymentReserve),
+            // 小额快救即使误传 County，也归入备用金段
+            Row("小额在册", TempReliefConstants.ReliefTypeSmall,
+                TempReliefConstants.PopulationInsured, TempReliefConstants.PaymentCounty),
+            Row("小额非在册", TempReliefConstants.ReliefTypeSmall,
+                TempReliefConstants.PopulationUninsured, TempReliefConstants.PaymentReserve)
+        };
+
+        var (countyInsured, countyUninsured, reserveInsured, reserveUninsured) =
+            TempReliefSummaryGrouper.SplitByCategory(rows);
+
+        Assert.Equal(new[] { "上级在册" }, countyInsured.Select(r => r.Name));
+        Assert.Equal(new[] { "上级非在册" }, countyUninsured.Select(r => r.Name));
+        Assert.Equal(new[] { "备用金在册", "小额在册" }, reserveInsured.Select(r => r.Name));
+        Assert.Equal(new[] { "小额非在册" }, reserveUninsured.Select(r => r.Name));
     }
 }

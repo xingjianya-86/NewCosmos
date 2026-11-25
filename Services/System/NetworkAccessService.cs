@@ -315,8 +315,9 @@ public class NetworkAccessService : BaseService, INetworkAccessService
             using var stream = File.Open(TokenPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             return stream.Length > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[NetworkAccess] 管理令牌文件不可读");
             return false;
         }
     }

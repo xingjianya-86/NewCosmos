@@ -35,7 +35,7 @@ public partial class AnnualPlantingSubsidyImportService : BaseImportService
         try
         {
             TableNameValidator.ValidateOrThrow(TableName);
-            await DatabaseService.ExecuteNonQueryAsync($"TRUNCATE TABLE {TableName} RESTART IDENTITY CASCADE", ct);
+            await ExecOrThrowAsync(DatabaseService, $"TRUNCATE TABLE {TableName} RESTART IDENTITY CASCADE", ct);
             LogInfo($"表已清空: {TableName}");
             return Result.Success();
         }

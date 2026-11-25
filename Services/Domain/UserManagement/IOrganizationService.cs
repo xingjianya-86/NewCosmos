@@ -97,6 +97,9 @@ public class OrganizationCsvPreview
 {
     public int TotalRows { get; set; }
     public List<OrganizationPreviewRow> PreviewRows { get; set; } = new();
+
+    /// <summary>读取/解析失败原因；非空表示预览失败（区别于"文件确实为空"）。</summary>
+    public string? Error { get; set; }
 }
 
 /// <summary>

@@ -451,7 +451,7 @@ public partial class ElderlyApplicationService
             if (confirmedAppId is > 0)
             {
                 var fromApplication = await BuildEvaluationFromApplicationAsync(confirmedAppId.Value, ct);
-                if (fromApplication.IsSuccess && fromApplication.Value != null)
+                if (fromApplication.HasValue)
                     eval = fromApplication.Value;
             }
         }
@@ -659,7 +659,15 @@ public partial class ElderlyApplicationService
     {
         if (string.IsNullOrWhiteSpace(category)) return 0m;
         var result = await GetMonthlyAmountAsync(category, ct);
-        return result.IsSuccess ? result.Value : 0m;
+        if (result.IsFailure)
+        {
+            // 月标准取数失败按 0 会直接把调标金额算成 0。
+            LogError($"读取高龄月标准失败（{category}）: {result.ErrorCode} {result.Message}");
+            throw new BusinessException(
+                result.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"读取高龄月标准失败（{category}）: {result.Message}");
+        }
+        return result.Value;
     }
 
     private static int ComputeAge(DateTime birthDate, DateTime onDate)
@@ -728,13 +736,19 @@ public partial class ElderlyApplicationService
         {
             var r = await _db.QuerySingleAsync<string?>(
                 "SELECT application_no FROM nc_biz_elderly_applications WHERE id = $1", ct, oldAppId);
-            if (r.IsSuccess) oldAppNo = r.Value ?? string.Empty;
+            if (r.IsFailure)
+                LogWarn($"复核记录：读取旧申请编号失败，审计链将缺号: Id={oldAppId}, {r.Message}");
+            else
+                oldAppNo = r.Value ?? string.Empty;
         }
         if (newAppId > 0)
         {
             var r = await _db.QuerySingleAsync<string?>(
                 "SELECT application_no FROM nc_biz_elderly_applications WHERE id = $1", ct, newAppId);
-            if (r.IsSuccess) newAppNo = r.Value ?? string.Empty;
+            if (r.IsFailure)
+                LogWarn($"复核记录：读取新申请编号失败，审计链将缺号: Id={newAppId}, {r.Message}");
+            else
+                newAppNo = r.Value ?? string.Empty;
         }
 
         const string updateSql = @"
@@ -1133,7 +1147,15 @@ public partial class ElderlyApplicationService
         var existingResult = await _db.QueryAsync<string>(
             "SELECT id_card FROM nc_biz_elderly_reviews WHERE id_card = ANY($1) AND status = $2 AND deleted_at IS NULL",
             ct, rows.Select(r => r.IdCard).ToArray(), ElderlyBenefitConstants.ReviewStatusPending);
-        if (existingResult.IsSuccess && existingResult.Value != null)
+        if (existingResult.IsFailure)
+        {
+            // 已入队名单读取失败若当空集，会重复生成 90 岁待复核记录。
+            LogError($"读取已入队 90 岁复核名单失败，已中止: {existingResult.ErrorCode} {existingResult.Message}");
+            return Result.Failure<int>(
+                existingResult.ErrorCode ?? ErrorCodes.DB_QUERY_ERROR,
+                $"读取已入队 90 岁复核名单失败: {existingResult.Message}");
+        }
+        if (existingResult.Value != null)
         {
             foreach (var c in existingResult.Value)
                 if (!string.IsNullOrWhiteSpace(c)) pendingSet.Add(c.Trim());

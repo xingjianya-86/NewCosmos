@@ -3,6 +3,15 @@
     "name": "模板_政务值班表",
     "file": "Resources/Templates/模板_政务值班表.xlsx",
     "categories": ["值班管理"],
+    "docType": "值班表",
+    "sortOrder": 0
+  },
+  {
+    "name": "月报_特困人群_停保汇总表",
+    "file": "Resources/Templates/月报_特困人群_停保汇总表.xlsx",
+    "configFile": "Resources/Templates/月报_特困人群_停保汇总表.config.json",
+    "categories": ["月报表"],
+    "docType": "月报汇总表",
     "sortOrder": 0
   }
 ]

@@ -126,6 +126,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
         {
             TemplateId = t.Id,
             Name = t.Name,
+            DocType = t.DocType,
             FileType = t.FileType
         }).ToList();
     }
@@ -278,6 +279,8 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
     private async Task<AssetVerificationTask?> LoadRecordAsync(long recordId, CancellationToken ct)
     {
         var result = await _verificationService.GetTaskByIdAsync(recordId, ct);
+        if (result.IsFailure)
+            _logger.Warn($"加载核查记录失败，按记录不存在处理: RecordId={recordId}, {result.ErrorCode} {result.Message}");
         return result.IsSuccess ? result.Value : null;
     }
 
@@ -402,7 +405,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             if (!string.IsNullOrWhiteSpace(record.BatchId))
             {
                 var batchResult = await _verificationService.GetFamilyMembersByBatchIdAsync(record.BatchId, ct);
-                if (batchResult.IsSuccess && batchResult.Value != null && batchResult.Value.Count > 0)
+                if (batchResult.HasValue && batchResult.Value.Count > 0)
                     return batchResult.Value;
             }
 
@@ -411,7 +414,7 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             if (!string.IsNullOrWhiteSpace(headIdCard))
             {
                 var headResult = await _verificationService.GetFamilyMembersAsync(headIdCard, ct);
-                if (headResult.IsSuccess && headResult.Value != null && headResult.Value.Count > 0)
+                if (headResult.HasValue && headResult.Value.Count > 0)
                     return headResult.Value;
             }
         }
@@ -539,14 +542,15 @@ public class AssetVerificationReprintProvider : IReprintDomainProvider, IAssetVe
             if (org.ParentId.HasValue)
             {
                 var parentResult = await _organizationService.GetByIdAsync(org.ParentId.Value);
-                if (parentResult.IsSuccess && parentResult.Value != null)
+                if (parentResult.HasValue)
                     parentPhone = parentResult.Value.Phone ?? "-";
             }
 
             return new OrganizationInfo(district, town, unitName, parentName, parentPhone, unitPhone);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"补打：获取机构信息异常，落款字段将以空/「-」占位: {ex.Message}");
             return empty;
         }
     }

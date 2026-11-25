@@ -119,7 +119,7 @@ public partial class ElderlyReviewViewModel : ViewModelBase
             await RefreshCompletionStateAsync(result.Value);
 
             var historyResult = await _applicationService.GetReviewsByPersonAsync(result.Value.IdCard, CancellationToken);
-            if (historyResult.IsSuccess && historyResult.Value != null)
+            if (historyResult.HasValue)
             {
                 HistoryRecords.Clear();
                 foreach (var item in historyResult.Value) HistoryRecords.Add(item);

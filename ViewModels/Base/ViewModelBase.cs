@@ -50,7 +50,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            global::System.Diagnostics.Debug.WriteLine($"[ERROR] NotifyAllCommandsCanExecuteChanged failed: {ex.Message}");
+            // 命令状态刷新失败会导致按钮可用性静默停更，必须进正式日志。
+            Logger.Error($"NotifyAllCommandsCanExecuteChanged 失败: {ex.Message}");
         }
     }
 
@@ -327,9 +328,10 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
                 IsSnackBarVisible = false;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // fire-and-forget：忽略异常，避免未观察的任务异常
+            // fire-and-forget：吸收异常避免未观察任务异常，但留 Debug 便于排查。
+            Logger.Debug($"SnackBar 自动隐藏失败: {ex.Message}");
         }
     }
 
@@ -388,7 +390,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             // [PERF-PROBE] 阶段0归因埋点：分"DI解析+XAML膨胀"与"PushAsync(含动画)"两段计时（对照组：侧边栏→各模块首页）
             var probe = global::System.Diagnostics.Stopwatch.StartNew();
             var resolvedPage = ResolvePage<TPage>();
-            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
+            ServiceProvider.GetRequiredService<IWindowTitleService>().Register(resolvedPage);
             
             // 2. 配置页面（Android 手机页与桌面页为兄弟类型，安全 cast 后才调用 configure）
             if (resolvedPage is TPage typedPage)
@@ -435,7 +437,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             // 1. DI 解析页面（Android 自动解析手机专用页面）
             Logger.LogDiResolution(pageName, true);
             var resolvedPage = ResolvePage<TPage>();
-            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
+            ServiceProvider.GetRequiredService<IWindowTitleService>().Register(resolvedPage);
             
             // 2. 配置页面（Android 手机页与桌面页为兄弟类型，安全 cast 后才调用 configure）
             if (resolvedPage is TPage typedPage && configure != null)
@@ -495,7 +497,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             // 1. DI 解析页面（Android 自动解析手机专用页面）
             Logger.LogDiResolution(pageName, true);
             var resolvedPage = ResolvePage<TPage>();
-            ServiceProvider.GetService<IWindowTitleService>()?.Register(resolvedPage);
+            ServiceProvider.GetRequiredService<IWindowTitleService>().Register(resolvedPage);
 
             // 2. 参数注入：桌面页与手机页统一走接口，不再受限于 resolvedPage is TPage
             if (resolvedPage is IParameterizedPage<TParam> parameterized)
@@ -541,8 +543,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             await navigation.PopAsync();
 
             // 恢复窗口标题为返回后栈顶页面的标题（子页→模块首页时保留模块前缀；→主首页时为基础标题）
-            var windowTitleService = ServiceProvider?.GetService<IWindowTitleService>();
-            windowTitleService?.RestoreFromNavigation(navigation);
+            var windowTitleService = ServiceProvider.GetRequiredService<IWindowTitleService>();
+            windowTitleService.RestoreFromNavigation(navigation);
         }
         catch (Exception ex)
         {
@@ -562,8 +564,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
             var navigation = Helpers.WindowNavigator.CurrentNavigation;
             if (navigation == null)
                 return;
-            var windowTitleService = ServiceProvider?.GetService<IWindowTitleService>();
-            windowTitleService?.RestoreFromNavigation(navigation);
+            var windowTitleService = ServiceProvider.GetRequiredService<IWindowTitleService>();
+            windowTitleService.RestoreFromNavigation(navigation);
         }
         catch (Exception ex)
         {
@@ -586,15 +588,14 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         try
         {
             if (!string.IsNullOrEmpty(result.Message))
-                Logger?.Warn($"{callerName} 失败: {result.Message}");
+                Logger.Warn($"{callerName} 失败: {result.Message}");
 
-            var dialog = ServiceProvider?.GetService<IDialogService>();
-            if (dialog != null)
-                await dialog.DisplayAlertAsync(title, result.Message ?? $"{operationName}失败", "确定");
+            var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+            await dialog.DisplayAlertAsync(title, result.Message ?? $"{operationName}失败", "确定");
         }
         catch (Exception ex)
         {
-            Logger?.LogError(ex, $"[{callerName}] 显示失败提示异常");
+            Logger.LogError(ex, $"[{callerName}] 显示失败提示异常");
         }
     }
 
@@ -610,23 +611,15 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     protected async Task<string?> PickExportFolderAsync(string title, string? initialDirectory = null,
         string cancelMessage = "已取消导出", bool promptReuse = true)
     {
-        var dialog = ServiceProvider?.GetService<IDialogService>();
-        var picker = ServiceProvider?.GetService<IFolderPickerService>();
-
-        if (picker == null)
-        {
-            Logger?.Error("[导出] 文件夹选择服务未注册");
-            if (dialog != null)
-                await dialog.DisplayAlertAsync("导出失败", "文件夹选择服务不可用，请联系管理员", "确定");
-            return null;
-        }
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+        var picker = ServiceProvider.GetRequiredService<IFolderPickerService>();
 
         // 记忆上次目录：有可用记录则先询问是否复用，避免每次都重新浏览
         var remembered = initialDirectory;
         if (string.IsNullOrWhiteSpace(remembered))
             remembered = picker.GetLastDirectory();
 
-        if (promptReuse && !string.IsNullOrWhiteSpace(remembered) && Directory.Exists(remembered) && dialog != null)
+        if (promptReuse && !string.IsNullOrWhiteSpace(remembered) && Directory.Exists(remembered))
         {
             var reuse = await dialog.DisplayAlertAsync("选择导出目录",
                 $"上次使用的目录：\n{remembered}\n\n是否继续使用该目录？", "使用上次目录", "选择其他目录");
@@ -641,9 +634,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Logger?.Error($"[导出] 选择目录异常: {ex.Message}");
-            if (dialog != null)
-                await dialog.DisplayAlertAsync("导出失败", $"无法打开文件夹选择器：{ex.Message}", "确定");
+            Logger.Error($"[导出] 选择目录异常: {ex.Message}");
+            await dialog.DisplayAlertAsync("导出失败", $"无法打开文件夹选择器：{ex.Message}", "确定");
             return null;
         }
 
@@ -652,14 +644,12 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
         if (result.Status == FolderPickStatus.Canceled)
         {
-            if (dialog != null)
-                await dialog.ShowSnackBarAsync(cancelMessage, NewCosmos.Components.SnackBarType.Info);
+            await dialog.ShowSnackBarAsync(cancelMessage, NewCosmos.Components.SnackBarType.Info);
             return null;
         }
 
-        Logger?.Error($"[导出] 选择目录失败: {result.Error}");
-        if (dialog != null)
-            await dialog.DisplayAlertAsync("导出失败", result.Error ?? "无法打开文件夹选择器", "确定");
+        Logger.Error($"[导出] 选择目录失败: {result.Error}");
+        await dialog.DisplayAlertAsync("导出失败", result.Error ?? "无法打开文件夹选择器", "确定");
         return null;
     }
 
@@ -670,16 +660,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     protected async Task<string?> PickFileWithFeedbackAsync(string title, IReadOnlyList<string> extensions,
         string cancelMessage = "已取消选择")
     {
-        var dialog = ServiceProvider?.GetService<IDialogService>();
-        var picker = ServiceProvider?.GetService<IFilePickerService>();
-
-        if (picker == null)
-        {
-            Logger?.Error("[选择文件] 文件选择服务未注册");
-            if (dialog != null)
-                await dialog.DisplayAlertAsync("选择文件失败", "文件选择服务不可用，请联系管理员", "确定");
-            return null;
-        }
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+        var picker = ServiceProvider.GetRequiredService<IFilePickerService>();
 
         FilePickResult result;
         try
@@ -688,9 +670,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Logger?.Error($"[选择文件] 异常: {ex.Message}");
-            if (dialog != null)
-                await dialog.DisplayAlertAsync("选择文件失败", $"无法打开文件选择器：{ex.Message}", "确定");
+            Logger.Error($"[选择文件] 异常: {ex.Message}");
+            await dialog.DisplayAlertAsync("选择文件失败", $"无法打开文件选择器：{ex.Message}", "确定");
             return null;
         }
 
@@ -699,14 +680,12 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
         if (result.Status == FilePickStatus.Canceled)
         {
-            if (dialog != null)
-                await dialog.ShowSnackBarAsync(cancelMessage, NewCosmos.Components.SnackBarType.Info);
+            await dialog.ShowSnackBarAsync(cancelMessage, NewCosmos.Components.SnackBarType.Info);
             return null;
         }
 
-        Logger?.Error($"[选择文件] 失败: {result.Error}");
-        if (dialog != null)
-            await dialog.DisplayAlertAsync("选择文件失败", result.Error ?? "无法打开文件选择器", "确定");
+        Logger.Error($"[选择文件] 失败: {result.Error}");
+        await dialog.DisplayAlertAsync("选择文件失败", result.Error ?? "无法打开文件选择器", "确定");
         return null;
     }
 
@@ -716,7 +695,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     protected async Task ShowExportSuccessAsync(string folder, IReadOnlyList<string?>? fileNames = null,
         string? extra = null, bool openFolder = true)
     {
-        var dialog = ServiceProvider?.GetService<IDialogService>();
+        var dialog = ServiceProvider.GetRequiredService<IDialogService>();
 
         var header = fileNames is { Count: > 0 }
             ? $"已导出 {fileNames.Count} 个文件"
@@ -732,11 +711,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         if (!string.IsNullOrEmpty(extra))
             message += $"\n{extra}";
 
-        if (dialog != null)
-        {
-            await dialog.DisplayAlertAsync("导出完成", message, "确定");
-            await dialog.ShowSnackBarAsync($"已导出至 {folder}", NewCosmos.Components.SnackBarType.Success);
-        }
+        await dialog.DisplayAlertAsync("导出完成", message, "确定");
+        await dialog.ShowSnackBarAsync($"已导出至 {folder}", NewCosmos.Components.SnackBarType.Success);
 
         if (openFolder)
             TryOpenFolder(folder);
@@ -827,7 +803,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            Logger?.Error($"[{callerName}] Fire-and-forget failed: {ex.Message}");
+            Logger.Error($"[{callerName}] Fire-and-forget failed: {ex.Message}");
         }
     }
 
@@ -1025,7 +1001,7 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
         await ExecuteAsync(async ct =>
         {
             var result = await fetch(ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 target.Clear();
                 foreach (var item in result.Value.Items)
@@ -1037,15 +1013,14 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
             {
                 // 取消=页面已离开（OnDisappearing 顶掉在飞查询），不是加载失败：
                 // 禁止弹"加载失败"阻断弹窗（曾致高龄复核出档后误报"加载失败/查询被取消"）
-                Logger?.Debug($"分页列表加载已取消: {result.Message}");
+                Logger.Debug($"分页列表加载已取消: {result.Message}");
             }
             else
             {
-                Logger?.Warn($"分页列表加载失败: {result.Message}");
+                Logger.Warn($"分页列表加载失败: {result.Message}");
                 ErrorMessage = result.Message ?? "列表加载失败，请稍后重试";
-                var dialog = ServiceProvider?.GetService<IDialogService>();
-                if (dialog != null)
-                    await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
+                var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+                await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
             }
         }, loadingHint);
     }
@@ -1063,7 +1038,7 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
         await ExecuteAsync(async ct =>
         {
             var result = await fetch(ct);
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 target.Clear();
                 foreach (var item in result.Value.Items)
@@ -1076,15 +1051,14 @@ public abstract partial class PagedSearchViewModelBase : ViewModelBase
             {
                 // 取消=页面已离开（OnDisappearing 顶掉在飞查询），不是加载失败：
                 // 禁止弹"加载失败"阻断弹窗（曾致高龄复核出档后误报"加载失败/查询被取消"）
-                Logger?.Debug($"分页列表加载已取消: {result.Message}");
+                Logger.Debug($"分页列表加载已取消: {result.Message}");
             }
             else
             {
-                Logger?.Warn($"分页列表加载失败: {result.Message}");
+                Logger.Warn($"分页列表加载失败: {result.Message}");
                 ErrorMessage = result.Message ?? "列表加载失败，请稍后重试";
-                var dialog = ServiceProvider?.GetService<IDialogService>();
-                if (dialog != null)
-                    await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
+                var dialog = ServiceProvider.GetRequiredService<IDialogService>();
+                await dialog.DisplayAlertAsync("加载失败", result.Message ?? "列表加载失败，请稍后重试", "确定");
             }
         }, loadingHint);
     }
@@ -1223,18 +1197,16 @@ public abstract partial class FormViewModelBase : ViewModelBase
             var saveResult = await ExecuteSaveAsync();
             if (!saveResult.IsSuccess)
             {
-                Logger.Error("操作失败");
-                var dialogService = ServiceProvider.GetService<IDialogService>();
-                if (dialogService != null)
-                    await dialogService.DisplayAlertAsync("保存失败", saveResult.Message ?? "保存过程中出现错误", "确定");
+                Logger.Error($"保存失败: {saveResult.ErrorCode} {saveResult.Message}");
+                var dialogService = ServiceProvider.GetRequiredService<IDialogService>();
+                await dialogService.DisplayAlertAsync("保存失败", saveResult.Message ?? "保存过程中出现错误", "确定");
             }
         }
         else
         {
-            Logger.Error("操作失败");
-            var dialogService = ServiceProvider.GetService<IDialogService>();
-            if (dialogService != null)
-                await dialogService.DisplayAlertAsync("验证失败", validateResult.Message ?? "请填写必填项", "确定");
+            Logger.Error($"保存前校验失败: {validateResult.ErrorCode} {validateResult.Message}");
+            var dialogService = ServiceProvider.GetRequiredService<IDialogService>();
+            await dialogService.DisplayAlertAsync("验证失败", validateResult.Message ?? "请填写必填项", "确定");
         }
     }
 

@@ -33,8 +33,10 @@ public static class TemplateCopiesResolver
         {
             return TemplateConfig.FromJson(configJson ?? string.Empty);
         }
-        catch
+        catch (Exception ex)
         {
+            // 损坏配置只影响份数，不阻断打印；但必须留痕，否则"配置 3 份却只打 1 份"无从排查。
+            Serilog.Log.Warning(ex, "[TemplateCopiesResolver] 模板 config_json 解析失败，份数回退默认 1 份");
             return new TemplateConfig();
         }
     }

@@ -137,7 +137,7 @@ public partial class NearRelativeEntryViewModel : ViewModelBase
 
         var fillResult = await _nearRelativeService.BuildLinkByApplicationAsync(
             applicationId, _staffId > 0 ? _staffId : null, CancellationToken);
-        if (fillResult.IsSuccess && fillResult.Value != null)
+        if (fillResult.HasValue)
         {
             ApplyArchiveFillToRow(row, fillResult.Value);
             StatusText = fillResult.Value.OccupiedByOtherStaff
@@ -374,7 +374,7 @@ public partial class NearRelativeEntryViewModel : ViewModelBase
         {
             var refreshResult = await _nearRelativeService.RefreshLinksFromArchiveAsync(
                 appIds, _staffId > 0 ? _staffId : null, CancellationToken);
-            if (refreshResult.IsSuccess && refreshResult.Value != null)
+            if (refreshResult.HasValue)
             {
                 fillsByAppId = refreshResult.Value
                     .GroupBy(f => f.ApplicationId)

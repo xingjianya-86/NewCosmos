@@ -81,9 +81,10 @@ public partial class ConfigWizardViewModel : ViewModelBase
             if (!string.IsNullOrEmpty(options.Password) && !options.Password.StartsWith("enc:"))
                 DbPassword = options.Password;
         }
-        catch
+        catch (Exception ex)
         {
-            // 使用默认值
+            // 使用默认值，但留痕：曾因静默失败让向导显示错误连接信息并覆盖配置。
+            _logger.Warn($"读取现有数据库配置失败，向导使用默认值: {ex.Message}");
         }
     }
 

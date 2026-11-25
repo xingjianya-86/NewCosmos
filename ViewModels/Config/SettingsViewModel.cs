@@ -231,6 +231,7 @@ public partial class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            Serilog.Log.Debug(ex, "[Settings] 目录可写探针失败: {Directory}", directory);
             error = ex.Message;
             return false;
         }

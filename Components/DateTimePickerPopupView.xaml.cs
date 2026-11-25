@@ -107,7 +107,10 @@ public partial class DateTimePickerPopupView : ContentView
     {
         var navigation = Helpers.WindowNavigator.CurrentPage?.Navigation;
         if (navigation == null)
+        {
+            Serilog.Log.Warning("[DateTimePickerPopup] 当前无导航栈，日期弹窗未打开（调用方会把结果当取消）");
             return null;
+        }
 
         var popup = new DateTimePickerPopupView();
         popup.Initialize(current, maximum, showTime, title);

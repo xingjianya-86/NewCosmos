@@ -67,8 +67,9 @@ public static class DestitutePrintDataBuilder
                 return null;
             return Math.Round(std.Value * 12m, 2);
         }
-        catch
+        catch (Exception ex)
         {
+            Serilog.Log.Warning(ex, "[DestitutePrintDataBuilder] 计算年保障金额异常，文书该字段将留空");
             return null;
         }
     }

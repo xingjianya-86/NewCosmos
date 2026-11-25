@@ -47,7 +47,12 @@ public sealed class SplashWebViewClient : WebViewClient
             var bytes = _assets.TryReadVirtualFile(path);
 
             if (bytes == null)
-                return new WebResourceResponse("text/plain", "utf-8", new MemoryStream(Array.Empty<byte>()));
+            {
+                // 返回 200 空正文会让脚本静默黑屏；返回 404 并留痕，便于定位缺失资产。
+                Serilog.Log.Error("[SplashWebViewClient] 虚拟主机资产缺失: {Path}", path);
+                return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found",
+                    new Dictionary<string, string>(), new MemoryStream(Array.Empty<byte>()));
+            }
 
             var headers = new Dictionary<string, string> { ["Cache-Control"] = "no-store" };
             return new WebResourceResponse(GetMimeType(path), null, 200, "OK", headers, new MemoryStream(bytes));

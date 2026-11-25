@@ -411,8 +411,9 @@ internal sealed class OfficeComWorker
             object _ = hosted.App.Version;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _log?.Debug($"[OfficeComWorker] COM 进程存活探测失败（按已退出处理）: {ex.Message}");
             return false;
         }
     }
@@ -575,9 +576,10 @@ internal sealed class OfficeComWorker
                 if (pid != 0) return (int)pid;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Word 或不支持 Hwnd 的提供方——正常回退
+            _log?.Debug($"[OfficeComWorker] 获取进程 ID 失败（正常回退）: {ex.Message}");
         }
         return null;
     }

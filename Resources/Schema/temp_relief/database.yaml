@@ -1,4 +1,4 @@
-# 临时救助Schema定义
+﻿# 临时救助Schema定义
 database: temp_relief
 version: 1.0
 description: 临时救助业务（大额救助/小额快速救助），申请人来源仅限导入台账库与低保申请库
@@ -19,7 +19,16 @@ tables:
       - name: relief_type
         type: VARCHAR(20)
         nullable: false
-        comment: 救助类型：Large大额救助 / Small小额快速救助
+        comment: 救助类型：Large常规救助 / Small小额快救（沿用存量值）
+      - name: population_status
+        type: VARCHAR(20)
+        defaultValue: Insured
+        nullable: false
+        comment: 人群状态：Insured在保障人群内（四类在册）/ Uninsured不在保障人群内
+      - name: payment_channel
+        type: VARCHAR(20)
+        nullable: true
+        comment: 发放渠道：County上级部门发放 / Reserve备用金发放（小额固定 Reserve）
       - name: apply_year
         type: VARCHAR(4)
         nullable: false
@@ -215,7 +224,7 @@ tables:
         type: VARCHAR(20)
         defaultValue: Draft
         nullable: false
-        comment: 状态：Draft草稿/Confirmed已确认/Stopped已终止
+        comment: 状态：Draft草稿/Submitted已提交/Confirmed已确认（县确认件已登记）/Stopped已终止/Rejected不予救助/Returned退回补正
       - name: confirmed_at
         type: TIMESTAMP
         nullable: true
@@ -236,6 +245,53 @@ tables:
         type: VARCHAR(200)
         nullable: true
         comment: 终止原因
+
+      # ── 两项政策改造（2026-11-25；迁移 20261125_two_policies_alignment.sql） ──
+      - name: relief_person_count
+        type: INTEGER
+        defaultValue: 1
+        nullable: false
+        comment: 家庭遇困人数（≠ family_size 家庭人口；政策公式乘数，含户主）
+      - name: standard_tier
+        type: VARCHAR(20)
+        nullable: true
+        comment: 救助档位码：小额 S50/S75/S100；常规救助不落档
+      - name: standard_multiplier
+        type: NUMERIC(6,2)
+        nullable: true
+        comment: 档位系数：0.5/0.75/1（小额）；常规为空
+      - name: accepted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 乡镇受理时间（时限起算）
+      - name: investigation_done_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 调查完成时间
+      - name: county_confirmed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 县确认日期（乡镇登记县确认件）
+      - name: county_confirmed_by
+        type: VARCHAR(100)
+        nullable: true
+        comment: 县确认件登记人
+      - name: filing_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 备案状态：Pending/Filed
+      - name: reject_reason
+        type: TEXT
+        nullable: true
+        comment: 不予救助/退回补正原因
+      - name: reject_notified_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 不予救助告知时间
+      - name: reject_notice_method
+        type: VARCHAR(30)
+        nullable: true
+        comment: 不予救助告知方式
 
       # ── 通用审计字段 ──
       - name: created_at

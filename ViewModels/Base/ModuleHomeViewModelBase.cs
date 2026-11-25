@@ -46,7 +46,7 @@ public abstract class ModuleHomeViewModelBase : ViewModelBase
         try
         {
             var result = await call();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
                 apply(result.Value);
             else
                 Logger.Warn($"{failLog}: {result.Message}");

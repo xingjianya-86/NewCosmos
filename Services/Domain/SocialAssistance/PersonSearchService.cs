@@ -270,7 +270,7 @@ public class PersonSearchService : BaseService, IPersonSearchService
                     familyIdResult.Message!);
             if (familyIdResult.Value.HasValue)
             {
-                LogInfo($"{table} 找到身份证: {DataMasker.MaskIdCard(idCard)}");
+                LogDebug($"{table} 找到身份证: {DataMasker.MaskIdCard(idCard)}");
                 var members = await GetFamilyMembersFromPersonsAsync(table, familyIdResult.Value.Value, ct);
                 if (members.IsFailure)
                     return members;

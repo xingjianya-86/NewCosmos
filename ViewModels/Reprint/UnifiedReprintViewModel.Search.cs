@@ -361,10 +361,10 @@ public partial class UnifiedReprintViewModel
             for (var i = 0; i < tasksArray.Length; i++)
             {
                 var r = await tasksArray[i];
-                if (r.IsSuccess && r.Value != null)
+                if (r.HasValue)
                     allRecords.AddRange(r.Value);
                 else
-                    Logger?.Warn($"补打搜索·域 {providerList[i].DisplayName} 失败: {r.Message}");
+                    Logger.Warn($"补打搜索·域 {providerList[i].DisplayName} 失败: {r.Message}");
             }
 
             ApplyPersonsResult(allRecords, keyword, isMonthly: false);
@@ -422,10 +422,10 @@ public partial class UnifiedReprintViewModel
             for (var i = 0; i < tasksArray.Length; i++)
             {
                 var r = await tasksArray[i];
-                if (r.IsSuccess && r.Value != null)
+                if (r.HasValue)
                     allRecords.AddRange(r.Value);
                 else
-                    Logger?.Warn($"补打按月搜索·域 {providerList[i].DisplayName} 失败: {r.Message}");
+                    Logger.Warn($"补打按月搜索·域 {providerList[i].DisplayName} 失败: {r.Message}");
             }
 
             if (!string.IsNullOrEmpty(keyword))
@@ -678,8 +678,8 @@ public partial class UnifiedReprintViewModel
             : null;
         // 其余文书模式字段逐条显式赋值（含置 null），与 OutputCategories 同一口径防残留
         PrintNavigationData.OperationOverride = null;
-        PrintNavigationData.TemplateFilter = null;
-        PrintNavigationData.PrefilterTemplateNames = null;
+        PrintNavigationData.TemplateDocTypeFilter = null;
+        PrintNavigationData.PrefilterDocTypes = null;
     }
 
     /// <summary>
@@ -727,7 +727,15 @@ public partial class UnifiedReprintViewModel
     {
         // 核查域：加载核查类模板列表（单模板直打，预览/打印走能力接口）
         AssetTemplates.Clear();
-        var templates = await (AssetCapability?.GetTemplatesAsync(CancellationToken) ?? Task.FromResult(new List<TemplateSelectItem>()));
+        if (AssetCapability == null)
+        {
+            _logger.Warn("补打：核查域能力接口未注入，模板列表为空");
+            await LoadPrintHistoryAsync(record);
+            return;
+        }
+        var templates = await AssetCapability.GetTemplatesAsync(CancellationToken);
+        if (templates.Count == 0)
+            _logger.Warn($"补打：核查域未配置任何打印模板: Record={record.Name}");
         foreach (var t in templates)
             AssetTemplates.Add(t);
         SelectedAssetTemplate = templates.Count > 0 ? templates[0] : null;
@@ -761,14 +769,14 @@ public partial class UnifiedReprintViewModel
             ? await DynamicCapability.GetPrintHistoryAsync(record.BusinessId, CancellationToken)
             : Result.Failure<List<DynamicPrintHistoryItem>>(ErrorCodes.NOT_FOUND, "动态管理补打能力未注册");
         DynamicHistory.Clear();
-        if (history.IsSuccess && history.Value != null)
+        if (history.HasValue)
         {
             foreach (var h in history.Value)
                 DynamicHistory.Add(h);
         }
         else if (history.IsFailure)
         {
-            Logger?.Warn($"动态管理留痕加载失败: {history.Message}");
+            Logger.Warn($"动态管理留痕加载失败: {history.Message}");
         }
     }
 

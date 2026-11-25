@@ -181,7 +181,7 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
             // 申请信息（applicationReasonDetail = 档案"家庭情况说明"落库值，供基本情况空时自动带出）
             var applicationReasonDetail = string.Empty;
             var appResult = await _applicationService.GetByIdAsync(applicationId, ct);
-            if (appResult.IsSuccess && appResult.Value != null)
+            if (appResult.HasValue)
             {
                 var app = appResult.Value;
                 _applicationHukouType = app.HukouType ?? string.Empty;
@@ -324,10 +324,16 @@ public partial class SpecialApprovalFormViewModel : ViewModelBase
         {
             var orgService = _serviceProvider.GetRequiredService<NewCosmos.Services.Domain.UserManagement.IOrganizationService>();
             var result = await orgService.GetByIdAsync(orgId.Value);
-            return result.IsSuccess && result.Value != null ? result.Value.Name ?? string.Empty : string.Empty;
+            if (result.IsFailure || result.Value == null)
+            {
+                _logger.Warn($"获取填报单位失败，文书该字段将为空: {result.ErrorCode} {result.Message}");
+                return string.Empty;
+            }
+            return result.Value.Name ?? string.Empty;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Warn($"获取填报单位异常，文书该字段将为空: {ex.Message}");
             return string.Empty;
         }
     }

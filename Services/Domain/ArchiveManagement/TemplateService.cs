@@ -19,7 +19,7 @@ public class TemplateService : BaseService, ITemplateService
     public async Task<Result<List<Template>>> GetAllAsync(CancellationToken ct = default)
     {
         LogInfo("获取所有模板");
-        var sql = "SELECT id, name, file_type, categories, config_json, sort_order, created_at, updated_at FROM nc_biz_templates ORDER BY sort_order, id";
+        var sql = "SELECT id, name, file_type, categories, doc_type, config_json, sort_order, created_at, updated_at FROM nc_biz_templates ORDER BY sort_order, id";
         var result = await _db.QueryAsync<Template>(sql, ct);
         // 查询失败显式上抛（原实现洗成空列表，调用方会把 DB 故障当"无模板"）
         if (result.IsFailure)
@@ -30,11 +30,11 @@ public class TemplateService : BaseService, ITemplateService
     public async Task<List<Template>> GetByCategoriesAsync(string[] categories, CancellationToken ct = default)
     {
         LogInfo($"按分类查询模板 [{string.Join(", ", categories)}]");
-        var sql = "SELECT id, name, file_type, categories, config_json, sort_order, created_at, updated_at FROM nc_biz_templates WHERE categories && $1 ORDER BY sort_order, id";
+        var sql = "SELECT id, name, file_type, categories, doc_type, config_json, sort_order, created_at, updated_at FROM nc_biz_templates WHERE categories && $1 ORDER BY sort_order, id";
         var result = await _db.QueryAsync<Template>(sql, ct, (object)categories);
         if (result.IsFailure)
         {
-            LogError($"操作失败");
+            LogError($"按分类查询模板失败: {result.ErrorCode} {result.Message}");
             throw new InvalidOperationException($"执行查询失败: {result.Message}");
         }
         return result.Value ?? [];
@@ -43,7 +43,7 @@ public class TemplateService : BaseService, ITemplateService
     public async Task<Result<Template?>> GetByIdAsync(long id, CancellationToken ct = default)
     {
         LogInfo($"获取模板: {id}");
-        var sql = "SELECT id, name, file_type, categories, config_json, created_at, updated_at FROM nc_biz_templates WHERE id = $1";
+        var sql = "SELECT id, name, file_type, categories, doc_type, config_json, created_at, updated_at FROM nc_biz_templates WHERE id = $1";
         var result = await _db.QuerySingleAsync<Template>(sql, ct, id);
         // 查询失败显式上抛（原实现失败与无行都返回 null，DB 故障被下游伪装成"模板不存在"）
         if (result.IsFailure)
@@ -54,25 +54,41 @@ public class TemplateService : BaseService, ITemplateService
     public async Task<Result<Template?>> GetByNameAsync(string name, CancellationToken ct = default)
     {
         LogInfo($"按名称获取模板: {name}");
-        var sql = "SELECT id, name, file_type, categories, config_json, created_at, updated_at FROM nc_biz_templates WHERE name = $1";
+        var sql = "SELECT id, name, file_type, categories, doc_type, config_json, created_at, updated_at FROM nc_biz_templates WHERE name = $1";
         var result = await _db.QuerySingleAsync<Template>(sql, ct, name);
         if (result.IsFailure)
             return Result.Failure<Template?>(result.ErrorCode!, result.Message!);
         return Result.Success<Template?>(result.Value);
     }
 
-    public async Task<Template> SaveAsync(string name, string fileType, byte[] fileData, string[] categories, string configJson, CancellationToken ct = default)
+    /// <summary>
+    /// 按文档类型取模板（方案B精准定位唯一口径）。同类型可多张，按 sort_order,id 排序。
+    /// </summary>
+    public async Task<Result<List<Template>>> GetByDocTypeAsync(string docType, CancellationToken ct = default)
     {
-        LogInfo($"保存模板: {name}");
+        LogInfo($"按文档类型获取模板: {docType}");
+        if (string.IsNullOrWhiteSpace(docType))
+            return Result.Success(new List<Template>());
+        var sql = "SELECT id, name, file_type, categories, doc_type, config_json, created_at, updated_at FROM nc_biz_templates WHERE doc_type = $1 ORDER BY sort_order, id";
+        var result = await _db.QueryAsync<Template>(sql, ct, docType);
+        if (result.IsFailure)
+            return Result.Failure<List<Template>>(result.ErrorCode!, result.Message!);
+        return Result.Success(result.Value ?? new List<Template>());
+    }
+
+    public async Task<Template> SaveAsync(string name, string fileType, byte[] fileData, string[] categories, string configJson, string docType, CancellationToken ct = default)
+    {
+        LogInfo($"保存模板: {name} (docType={docType})");
         fileType = TemplateFileTypes.Normalize(fileType);
 
-        var sql = @"INSERT INTO nc_biz_templates (name, file_type, file_data, categories, config_json, created_at)
-                     VALUES ($1, $2, $3, $4, $5::jsonb, NOW())
+        var sql = @"INSERT INTO nc_biz_templates (name, file_type, file_data, categories, doc_type, config_json, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
                                            RETURNING id, created_at";
 
         var result = await _db.QuerySingleAsync<Template>(sql, ct,
             name, fileType, fileData,
             categories ?? Array.Empty<string>(),
+            docType ?? string.Empty,
             string.IsNullOrEmpty(configJson) ? null : configJson);
 
         if (!result.IsSuccess || result.Value == null)

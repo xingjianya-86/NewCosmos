@@ -354,7 +354,7 @@ public partial class DatabaseManagementViewModel : ViewModelBase
             DatabaseStatistics = statsResult.Value;
         }
 
-        if (tablesResult.IsSuccess && tablesResult.Value is not null)
+        if (tablesResult.HasValue)
         {
             TableSizes.Clear();
             foreach (var table in tablesResult.Value)
@@ -380,7 +380,7 @@ public partial class DatabaseManagementViewModel : ViewModelBase
         _logger.LogBusiness("加载备份文件列表");
 
         var result = await _dbManagementService.GetBackupFilesAsync(ct);
-        if (result.IsSuccess && result.Value is not null)
+        if (result.HasValue)
         {
             BackupFiles.Clear();
             foreach (var file in result.Value)
@@ -639,7 +639,7 @@ public partial class DatabaseManagementViewModel : ViewModelBase
         _logger.LogBusiness("检查Schema状态");
 
         var result = await _schemaService.GetSchemaStatusAsync(ct);
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             SchemaStatus = result.Value;
             CanInitializeSchema = result.Value.HasMissingTables;
@@ -739,7 +739,7 @@ public partial class DatabaseManagementViewModel : ViewModelBase
 
             var fixResult = await _schemaService.FixSchemaDifferencesAsync(missingColumnDiffs, ct);
 
-            if (fixResult.IsSuccess && fixResult.Value != null)
+            if (fixResult.HasValue)
             {
                 var msg = fixResult.Value.Summary;
                 await _dialogService.DisplayAlertAsync("修复完成", msg, "确定");

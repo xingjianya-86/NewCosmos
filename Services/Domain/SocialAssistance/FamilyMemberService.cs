@@ -23,13 +23,12 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
     public async Task<Result<List<FamilyMember>>> GetByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE application_id = $1 AND deleted_at IS NULL ORDER BY is_applicant DESC, created_at";
         var result = await _db.QueryAsync<FamilyMember>(sql, ct, applicationId);
 
         // 归一化 member_category（历史/导入数据可能存中文显示值或空值），并推导户主内存标记。
         // 不归一化会导致分类不一致的成员在界面被静默过滤、被用户重复录入（曾造成整单保存失败）。
-        if (result.IsSuccess && result.Value != null)
+        if (result.HasValue)
         {
             foreach (var member in result.Value)
             {
@@ -46,7 +45,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
     public async Task<Result<FamilyMember>> GetByIdAsync(long id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
         var sql = "SELECT " + WideTableColumns.FamilyMembersColumns + " FROM nc_biz_family_members WHERE id = $1 AND deleted_at IS null";
         return await _db.QuerySingleAsync<FamilyMember>(sql, ct, id);
     }
@@ -57,7 +55,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
         ValidateNotNullOrEmpty(request.Name, nameof(request.Name));
         ValidateNotNullOrEmpty(request.IdCard, nameof(request.IdCard));
 
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -130,7 +127,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             Logger.LogBusiness("添加家庭成员", ("MemberId", insertResult.Value), ("Name", DataMasker.MaskName(request.Name)));
             return Result.Success(insertResult.Value);
         }
@@ -270,7 +266,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
     {
         ValidateNotNull(request, nameof(request));
 
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -346,7 +341,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -359,7 +353,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
     public async Task<Result> DeleteAsync(long id, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         var memberResult = await GetByIdAsync(id, ct);
         if (memberResult.IsFailure)
@@ -400,7 +393,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -416,7 +408,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
     /// </summary>
     public async Task<Result<int>> DeleteByApplicationIdAsync(long applicationId, CancellationToken ct = default)
     {
-        LogInfo($"执行操作");
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
@@ -458,14 +449,141 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
     {
         LogInfo($"软删非赡养成员: ApplicationId={applicationId}");
 
+        // 2026-11-19 户主行不参与表单"全删全插"：户主由
+        // UpsertHouseholdHeadFromApplicationAsync 从主表单向维护，删掉会导致户主行丢失/回退旧快照。
         var sql = @"UPDATE nc_biz_family_members SET deleted_at = NOW()
-                    WHERE application_id = $1 AND member_category <> 'Support' AND deleted_at IS NULL";
+                    WHERE application_id = $1 AND deleted_at IS NULL
+                      AND COALESCE(member_category, '') <> 'Support'
+                      AND COALESCE(member_category, '') <> 'HouseholdHead'
+                      AND COALESCE(is_applicant, FALSE) = FALSE";
         var deleteResult = await _db.ExecuteNonQueryAsync(sql, ct, applicationId);
         if (deleteResult.IsFailure)
             return Result.Failure<int>(deleteResult.ErrorCode!, deleteResult.Message!);
 
         LogInfo($"软删非赡养成员完成: 删除行数={deleteResult.Value}");
         return Result.Success(deleteResult.Value);
+    }
+
+    /// <summary>
+    /// 按主表申请人字段同步户主成员行（2026-11-19）。
+    /// 背景：表单建档只保存共同生活成员，户主权威在主表；缺失户主行会让户主死亡/月报/打印定位失败。
+    /// 做法：① 更新身份证与主表申请人一致的户主候选行（唯一户主标记）；
+    ///       ② 无户主候选行时从主表 INSERT；③ 清除非现任户主的 is_applicant 标记。
+    /// 幂等，可在表单保存事务内反复调用；只覆盖主表有权威值的字段，成员表独有字段（户籍省市区镇等）不动。
+    /// </summary>
+    public async Task<Result> UpsertHouseholdHeadFromApplicationAsync(long applicationId, CancellationToken ct = default)
+    {
+        LogInfo($"同步户主成员行: ApplicationId={applicationId}");
+
+        const string updateSql = @"UPDATE nc_biz_family_members m SET
+            name = TRIM(a.applicant_name),
+            id_card = TRIM(a.applicant_id_card),
+            is_applicant = TRUE,
+            relationship_to_head = '本人/户主',
+            member_category = 'HouseholdHead',
+            gender = COALESCE(NULLIF(a.gender, ''), m.gender),
+            birth_date = CASE WHEN a.applicant_id_card ~ '^[0-9]{17}[0-9Xx]$'
+                              THEN to_date(substr(a.applicant_id_card, 7, 8), 'YYYYMMDD') ELSE m.birth_date END,
+            age = CASE WHEN a.applicant_id_card ~ '^[0-9]{17}[0-9Xx]$'
+                       THEN date_part('year', age(to_date(substr(a.applicant_id_card, 7, 8), 'YYYYMMDD')))::int ELSE m.age END,
+            ethnicity = COALESCE(NULLIF(a.ethnicity, ''), m.ethnicity),
+            marital_status = COALESCE(NULLIF(a.marital_status, ''), m.marital_status),
+            phone = COALESCE(NULLIF(a.applicant_phone, ''), m.phone),
+            hukou_type = COALESCE(NULLIF(a.hukou_type, ''), m.hukou_type),
+            hukou_address = COALESCE(NULLIF(a.hukou_address, ''), m.hukou_address),
+            home_province = COALESCE(NULLIF(a.province, ''), m.home_province),
+            home_city = COALESCE(NULLIF(a.city, ''), m.home_city),
+            home_district = COALESCE(NULLIF(a.district, ''), m.home_district),
+            home_town = COALESCE(NULLIF(a.town, ''), m.home_town),
+            home_village = COALESCE(NULLIF(a.community, ''), m.home_village),
+            home_address = COALESCE(NULLIF(a.address, ''), m.home_address),
+            education_level = COALESCE(NULLIF(a.education_level, ''), m.education_level),
+            political_status = COALESCE(NULLIF(a.political_status, ''), m.political_status),
+            health_status = COALESCE(NULLIF(a.health_status, ''), m.health_status),
+            employment_status = COALESCE(NULLIF(a.employment_status, ''), m.employment_status),
+            work_unit = COALESCE(NULLIF(a.work_unit, ''), m.work_unit),
+            main_income_source = COALESCE(NULLIF(a.income_source, ''), m.main_income_source),
+            is_disabled = COALESCE(a.disability_type, '') <> '',
+            disability_certificate_no = COALESCE(NULLIF(a.disability_card_no, ''), m.disability_certificate_no),
+            disability_type = COALESCE(NULLIF(a.disability_type, ''), m.disability_type),
+            disability_level = COALESCE(NULLIF(a.disability_level, ''), m.disability_level),
+            disease_name = COALESCE(NULLIF(a.disease_name, ''), m.disease_name),
+            secondary_disease = COALESCE(NULLIF(a.secondary_disease_name, ''), m.secondary_disease),
+            is_severe_disease = COALESCE(a.is_severe_disease, m.is_severe_disease),
+            family_size = COALESCE(a.family_size, m.family_size),
+            updated_at = NOW()
+        FROM nc_biz_applications a
+        WHERE a.id = $1 AND a.deleted_at IS NULL
+          AND m.application_id = $1 AND m.deleted_at IS NULL
+          AND COALESCE(TRIM(a.applicant_id_card), '') <> ''
+          AND m.id = (
+              SELECT m2.id FROM nc_biz_family_members m2
+              WHERE m2.application_id = $1 AND m2.deleted_at IS NULL
+                AND (COALESCE(m2.is_applicant, FALSE)
+                     OR m2.member_category = 'HouseholdHead'
+                     OR TRIM(COALESCE(m2.id_card, '')) = TRIM(a.applicant_id_card))
+              ORDER BY (TRIM(COALESCE(m2.id_card, '')) = TRIM(a.applicant_id_card)) DESC,
+                       COALESCE(m2.is_applicant, FALSE) DESC,
+                       (m2.member_category = 'HouseholdHead') DESC,
+                       m2.id
+              LIMIT 1)";
+
+        var updateResult = await _db.ExecuteNonQueryAsync(updateSql, ct, applicationId);
+        if (updateResult.IsFailure)
+            return Result.Failure(updateResult.ErrorCode!, updateResult.Message!);
+
+        // 无户主候选行（档案有成员但都不是户主）→ 从主表补一条
+        const string insertSql = @"INSERT INTO nc_biz_family_members (
+            application_id, name, id_card, is_applicant, relationship_to_head, member_category,
+            gender, birth_date, age, ethnicity, marital_status, phone,
+            hukou_type, hukou_address,
+            home_province, home_city, home_district, home_town, home_village, home_address,
+            education_level, political_status, health_status, employment_status, work_unit, main_income_source,
+            is_disabled, disability_certificate_no, disability_type, disability_level,
+            disease_name, secondary_disease, is_severe_disease, family_size,
+            created_at, updated_at)
+        SELECT a.id, TRIM(a.applicant_name), TRIM(a.applicant_id_card), TRUE, '本人/户主', 'HouseholdHead',
+            a.gender,
+            CASE WHEN a.applicant_id_card ~ '^[0-9]{17}[0-9Xx]$'
+                 THEN to_date(substr(a.applicant_id_card, 7, 8), 'YYYYMMDD') END,
+            CASE WHEN a.applicant_id_card ~ '^[0-9]{17}[0-9Xx]$'
+                 THEN date_part('year', age(to_date(substr(a.applicant_id_card, 7, 8), 'YYYYMMDD')))::int END,
+            a.ethnicity, a.marital_status, a.applicant_phone,
+            a.hukou_type, a.hukou_address,
+            a.province, a.city, a.district, a.town, a.community, a.address,
+            a.education_level, a.political_status, a.health_status, a.employment_status, a.work_unit, a.income_source,
+            COALESCE(a.disability_type, '') <> '', a.disability_card_no, a.disability_type, a.disability_level,
+            a.disease_name, a.secondary_disease_name, COALESCE(a.is_severe_disease, FALSE), a.family_size,
+            NOW(), NOW()
+        FROM nc_biz_applications a
+        WHERE a.id = $1 AND a.deleted_at IS NULL
+          AND COALESCE(TRIM(a.applicant_name), '') <> ''
+          AND COALESCE(TRIM(a.applicant_id_card), '') <> ''
+          AND NOT EXISTS (
+              SELECT 1 FROM nc_biz_family_members m
+              WHERE m.application_id = a.id AND m.deleted_at IS NULL
+                AND (COALESCE(m.is_applicant, FALSE)
+                     OR m.member_category = 'HouseholdHead'
+                     OR TRIM(COALESCE(m.id_card, '')) = TRIM(a.applicant_id_card)))";
+
+        var insertResult = await _db.ExecuteNonQueryAsync(insertSql, ct, applicationId);
+        if (insertResult.IsFailure)
+            return Result.Failure(insertResult.ErrorCode!, insertResult.Message!);
+
+        // 清除非现任户主的 is_applicant 标记（历史户主变更未清理会一档多户主）
+        const string clearStaleSql = @"UPDATE nc_biz_family_members m SET is_applicant = FALSE, updated_at = NOW()
+            FROM nc_biz_applications a
+            WHERE a.id = $1 AND a.deleted_at IS NULL
+              AND m.application_id = $1 AND m.deleted_at IS NULL
+              AND COALESCE(TRIM(a.applicant_id_card), '') <> ''
+              AND m.is_applicant
+              AND TRIM(COALESCE(m.id_card, '')) <> TRIM(a.applicant_id_card)";
+        var clearResult = await _db.ExecuteNonQueryAsync(clearStaleSql, ct, applicationId);
+        if (clearResult.IsFailure)
+            return Result.Failure(clearResult.ErrorCode!, clearResult.Message!);
+
+        LogInfo($"户主成员行同步完成: 更新={updateResult.Value} 新增={insertResult.Value} 清旧标记={clearResult.Value}");
+        return Result.Success();
     }
 
     /// <summary>
@@ -507,7 +625,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)
@@ -556,7 +673,6 @@ public class FamilyMemberService : BaseService, IFamilyMemberService
 
             await tx.CommitAsync(ct);
 
-            LogInfo($"执行操作");
             return Result.Success();
         }
         catch (Exception ex)

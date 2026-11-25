@@ -91,9 +91,12 @@ public static class TupleRowMapper
             {
                 item.SetValue(target, ConvertValue(raw, item.FieldType));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // 与实体映射同口径：单字段转换失败跳过（保持 default），不让整行失败
+                // 与实体映射同口径：单字段转换失败跳过（保持 default），不让整行失败；
+                // 但必须留痕，否则关键列（身份证/分类）静默变 null 无从定位。
+                Serilog.Log.Debug(ex, "[TupleRowMapper] 字段转换失败，保持 default: Field={Field}, SourceType={SourceType}",
+                    item.Name, raw?.GetType().Name);
             }
         }
 

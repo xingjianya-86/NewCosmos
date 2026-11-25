@@ -23,8 +23,9 @@ public class StringToColorConverter : IValueConverter
                 {
                     return Microsoft.Maui.Graphics.Color.FromArgb(c);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Serilog.Log.Debug(ex, "[StringToColorConverter] 颜色值解析失败，使用默认色: {Value}", c);
                     return DefaultColor;
                 }
             });

@@ -324,7 +324,7 @@ public partial class MobileMainViewModel : ViewModelBase
         try
         {
             var result = await _statisticsService.GetAssetVerificationStatsAsync();
-            if (result.IsSuccess && result.Value != null)
+            if (result.HasValue)
             {
                 PendingReportCount = result.Value.PendingReportCount.ToString("N0");
                 MonthlyCompletedCount = result.Value.MonthlyCompleted.ToString("N0");

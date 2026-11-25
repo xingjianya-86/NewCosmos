@@ -1196,7 +1196,7 @@ public partial class ElderlyApplicationFormViewModel
                 if (NavigateToStopAfterSave && PendingStopApplicationId > 0)
                 {
                     var loadResult = await _applicationService.GetByIdAsync(PendingStopApplicationId, CancellationToken);
-                    if (loadResult.IsSuccess && loadResult.Value != null)
+                    if (loadResult.HasValue)
                     {
                         await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyStopPage, Models.Entities.ElderlyApplication>(loadResult.Value);
                         return Result.Success();
@@ -1283,7 +1283,7 @@ public partial class ElderlyApplicationFormViewModel
             if (OperationMode != FormOperationMode.Create)
             {
                 var statusResult = await _applicationService.GetByIdAsync(_id, CancellationToken);
-                if (statusResult.IsSuccess && statusResult.Value != null)
+                if (statusResult.HasValue)
                 {
                     statusToConfirm = statusResult.Value.Status ?? string.Empty;
                     _loadedStatus = statusToConfirm;
@@ -1328,7 +1328,7 @@ public partial class ElderlyApplicationFormViewModel
             if (NavigateToStopAfterSave && PendingStopApplicationId > 0)
             {
                 var loadResult = await _applicationService.GetByIdAsync(PendingStopApplicationId, CancellationToken);
-                if (loadResult.IsSuccess && loadResult.Value != null)
+                if (loadResult.HasValue)
                 {
                     await NavigateToPageAsync<Pages.ElderlyBenefits.ElderlyStopPage, Models.Entities.ElderlyApplication>(loadResult.Value);
                     return Result.Success();
@@ -1344,7 +1344,7 @@ public partial class ElderlyApplicationFormViewModel
 
             // 正常流程：跳转档案输出页
             var savedResult = await _applicationService.GetByIdAsync(_id, CancellationToken);
-            if (savedResult.IsSuccess && savedResult.Value != null)
+            if (savedResult.HasValue)
             {
                 var fields = ElderlyPrintDataBuilder.BuildSingleFields(savedResult.Value);
                 // 整档入口：先清文书模式上下文，防上一次「仅出文书」的静态残留被继承

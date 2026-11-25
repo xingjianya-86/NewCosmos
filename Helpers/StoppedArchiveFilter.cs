@@ -81,6 +81,34 @@ public static class StoppedArchiveFilter
                              WHERE up.id = {alias}.original_application_id AND up.deleted_at IS NULL))";
     }
 
+    /// <summary>
+    /// "真·首拒（首次申请即被拒）"排除子句（追加到 WHERE 条件中）。
+    /// 归档终结判不合格会把从未享受过的首拒档直接置 Stopped 并写 stop_reason；它没有审批享受事实
+    /// （first_approved_at 为空），链上也取不到在保前分类，属《档案_变更告知书》"不予认定"方向，
+    /// 不是"退出/停保"对象（权威口径见 docs\20261119_告知书停止与不予认定方向判定.md，app110 实测错例）。
+    /// 判定（三条同时成立才排除）：自身为停保码 + first_approved_at 为空 +
+    /// 链上（application_id/new_application_id）无非停保码的 old_classification。
+    /// 停旧建新档案会复制 first_approved_at（ChangeService.RebuildAndReview），该判据同时覆盖接续档。
+    /// 分类码为编译期常量，以 SQL 字面量拼接，无注入风险。
+    /// </summary>
+    public static string NotFirstRefusalSql(string alias)
+    {
+        var stops = Literals(ClassificationConstants.StopCategoryCodes);
+
+        return $@"
+        AND NOT (
+            {alias}.classification_result IN ({stops})
+            AND {alias}.first_approved_at IS NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM nc_biz_change_records c
+                WHERE (c.application_id = {alias}.id OR c.new_application_id = {alias}.id)
+                  AND c.deleted_at IS NULL
+                  AND c.old_classification IS NOT NULL AND c.old_classification <> ''
+                  AND c.old_classification NOT IN ({stops})
+            )
+        )";
+    }
+
     private static string Literals(IEnumerable<string> codes) =>
         string.Join(",", codes.Select(c => $"'{c.Replace("'", "''")}'"));
 }

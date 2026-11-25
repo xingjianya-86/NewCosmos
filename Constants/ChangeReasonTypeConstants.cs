@@ -46,4 +46,13 @@ public static class ChangeReasonTypeConstants
     /// GetLatestGraceExitChangeAsync 按 reason_type 取"最近一条"，复用会被定期复核/渐退文书误读。
     /// </summary>
     public const string VerifyStop = "核验停止";
+
+    /// <summary>
+    /// 归档终结拒保（CompleteArchiveAsync 判不合格置 Stopped 时，链上有在保前分类才补写的 CategoryStop，
+    /// 2026-11-19 丁玉花 app113）：原分类=链上前分类、新分类=档案自身停保码，告知书方向据此判"停止"
+    /// （而非"不予认定"）。清单门 hasEconomicReview 按本类型**排除**——该档从未经过复核行为，
+    /// 计入会让《档案_定期复核审批表》/「经济复核」叶子对拒保档误开放。
+    /// 故意不复用 EconomicReview/MemberChange/HeadDeceased——同 VerifyStop 先例，防"最近一条"取数误读。
+    /// </summary>
+    public const string ArchiveRefusalStop = "归档终结拒保";
 }
