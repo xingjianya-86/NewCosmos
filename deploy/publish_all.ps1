@@ -8,6 +8,8 @@
 #   .\deploy\publish_all.ps1 -Version 1.1.20261010 -WithPatch      # 生成上一版→本版增量补丁
 #   .\deploy\publish_all.ps1 -Version 1.1.20261010 -SoftUpdate     # 非强制升级（minSupported=上一版）
 #   .\deploy\publish_all.ps1 -MinSupported 1.1.20261004            # 显式指定最低支持版本
+#   .\deploy\publish_all.ps1 -ServerHost 192.168.0.2 -ServerRoot /www/... -SkipGit
+#   .\deploy\publish_all.ps1 -SkipGit -SkipPush                    # 只提交不推送
 #
 # 开关：
 #   -WithPatch          生成增量补丁（Windows exe + Android apk，需能取到上一版包），清单 schema=2
@@ -15,7 +17,8 @@
 #   -MinSupported <ver> 显式最低支持版本（优先级高于 -SoftUpdate）
 #   -PrevVersion <ver>  指定上一版（补丁基线/SoftUpdate 用；缺省从 DB 或本机 release 目录推断）
 #   -Force              清单 force=true（无论版本都强制更新）
-#   -SkipWindows / -SkipAndroid / -SkipGit / -SkipDownloadVerify
+#   -ServerHost/-ServerRoot/-ServerUser  显式指定服务器（不再依赖 deploy.local.ps1）
+#   -SkipWindows / -SkipAndroid / -SkipGit / -SkipPush / -SkipDownloadVerify
 #   -SkipTemplateCheck   跳过模板字段体检
 #   -SkipTests           跳过发布前 dotnet test 门槛（默认执行，~1-2 分钟）
 #   -SkipStandardsCheck  跳过 check_standards 规范检查（默认执行，红线类命中即中断）
@@ -39,6 +42,7 @@ param(
     [switch]$SkipWindows,
     [switch]$SkipAndroid,
     [switch]$SkipGit,
+    [switch]$SkipPush,
     [switch]$SkipDownloadVerify,
     [switch]$SkipTemplateCheck,
     [switch]$SkipTests,
@@ -49,7 +53,10 @@ param(
     [string]$AndroidSdkDirectory = "$env:LOCALAPPDATA\Android\Sdk",
     [string]$AsciiTempDir = "C:\bt",
     [string]$SigningKey = "$env:USERPROFILE\.newcosmos\update_signing_key.pem",
-    [string]$SshKey = "$env:USERPROFILE\.ssh\id_ed25519_newcosmos"
+    [string]$SshKey = "$env:USERPROFILE\.ssh\id_ed25519_newcosmos",
+    [string]$ServerHost = "",
+    [string]$ServerRoot = "",
+    [string]$ServerUser = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -106,7 +113,9 @@ function Test-PublishEnvironment {
         _chk "SSH 私钥 ($SshKey)" (Test-Path -LiteralPath $SshKey) "配置 git 推送密钥或改用 -SkipGit"
     }
     _chk "更新签名私钥 ($SigningKey)" (Test-Path -LiteralPath $SigningKey) "UpdateSigningTool 生成或改用 -SkipDownloadVerify"
-    _chk "deploy\deploy.local.ps1（服务器参数）" (Test-Path -LiteralPath $deployLocal) "复制 deploy.sample.ps1 填内网参数"
+    if (-not $ServerHost -or -not $ServerRoot) {
+        _chk "deploy\deploy.local.ps1（服务器参数）" (Test-Path -LiteralPath $deployLocal) "复制 deploy.sample.ps1 填内网参数，或显式传 -ServerHost/-ServerRoot"
+    }
     if ([string]::IsNullOrEmpty($env:NEWCOSMOS_DB_PASSWORD)) {
         Write-Host "  [提示] NEWCOSMOS_DB_PASSWORD 未设置：补丁基线/上一版查询走本地目录回退，发布历史不入库" -ForegroundColor DarkGray
     }
@@ -119,6 +128,7 @@ if (Test-Path -LiteralPath $deployLocal) { . $deployLocal }
 if (-not $ServerHost)      { $ServerHost = $LocalServerHost }
 if (-not $ServerRoot)      { $ServerRoot = $LocalServerRoot }
 if (-not $VerifyUrlStable) { $VerifyUrlStable = $LocalVerifyUrl }
+if (-not $ServerUser)      { $ServerUser = $LocalServerUser }
 if (-not $ServerUser)      { $ServerUser = "root" }
 $dbHost = if ($LocalDbHost) { $LocalDbHost } else { $ServerHost }
 $dbName = if ($LocalDbName) { $LocalDbName } else { "new_cosmos" }
@@ -549,8 +559,13 @@ if (-not $SkipGit) {
     else {
         & git commit -m "发布 $Version"
         if ($LASTEXITCODE -ne 0) { throw "git commit 失败" }
-        & git push origin main
-        if ($LASTEXITCODE -ne 0) { throw "git push 失败" }
+        if ($SkipPush) {
+            Write-Host "已提交，跳过推送（-SkipPush）" -ForegroundColor Yellow
+        }
+        else {
+            & git push origin main
+            if ($LASTEXITCODE -ne 0) { throw "git push 失败" }
+        }
     }
 }
 

@@ -8,6 +8,28 @@
 
 ---
 
+## 〇、统一发布入口（2026-11-27 起）
+
+NewCosmosCode 与 NewCosmosWeb 的发布统一走仓库外的单文件：
+
+```powershell
+C:\Projects\publish-all.ps1
+```
+
+```powershell
+# 完整发布 Code
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Projects\publish-all.ps1 -Project Code -All
+
+# 只跑本仓库的 publish_all（旧入口仍可用）
+C:\Projects\publish-all.ps1 -Project Code -Only Windows,Android
+```
+
+- 单文件负责版本、构建、上传、校验、可选清理与 Git；本目录的 `publish_all.ps1` 仍作为 Code 的底层执行器；
+- `publish_all.ps1` 新增 `-ServerHost` / `-ServerRoot` / `-ServerUser` / `-SkipPush`，供统一入口显式传参；
+- 清理默认不执行，只有传 `-Cleanup` 才会动本地/服务器文件。
+
+---
+
 ## 一、脚本一览
 
 | 脚本 | 作用 | 入口 |
