@@ -13,6 +13,7 @@
 ## [未发布]
 
 ### 新增
+- 页头右上角新增「北斗终端」入口：点击用系统浏览器打开随包内嵌的终端序列页（`Resources/Terminal/index.html`），Windows/Android 两端一致（安卓主界面顶栏另有「北斗」按钮）。
 - 档案照片查询页支持**插入照片**：页内多选图片、图片文件**拖拽进窗口**即入库；插入前强制校验归属人（18 位身份证 + 低收入/高龄/临时救助档案中确实存在），并提供「打开采集页」「照片补传」入口
 - 手机端档案照片列表新增**缩略图**与**点击全屏预览**（大图可关闭，WebP 自动转 JPEG 展示）
 - 档案照片查询页**手机自适配**：单列布局、右侧预览改为点行弹全屏层、次要按钮收进「更多 ▾」菜单
@@ -30,6 +31,9 @@
 - **OCR 识别期间屏幕常亮**：新增 `IScreenAwakeService`（引用计数租约；Android 窗口 `KeepScreenOn`、Windows `SetThreadExecutionState`，两端 DI 注册）；证件扫描页取景+识别全程、档案照片「批量扫描识别」执行期间申请常亮，离页/识别结束自动释放——模型冷启动数十秒不再被系统熄屏打断
 
 ### 变更
+- 依赖升级：EPPlus 8.7.3、NPOI 2.8.1、Npgsql 10.0.4、PDFsharp 6.5.0；PDFsharp 6.5.0 起改为 AGPL/商业双许可，已按 AGPL 显式加载（`PdfSharpLicenseBootstrap`，本项目 GPL-3.0 与 AGPLv3 兼容）。
+- 统一发布入口新增**预设菜单**（无参数运行或双击 `publish-all.bat` 进入）与「本次涉及的服务器路径」摘要；修复版本号提示被跳过、stdin 无输入时 `Read-Host` 返回 null 导致报错两个问题。
+- 安全包对齐最新：`System.Security.Cryptography.Pkcs` / `System.Security.Cryptography.Xml` 10.0.15、`Microsoft.Build.Tasks.Git` 10.0.404、`System.Management` / `ProtectedData` 10.0.15、SkiaSharp 3.119.4。
 - **启动动画与序列登录去重**：冷启动片头（黑幕品牌→洗白→底板）播完后按会话恢复结果分流——会话有效接着自动演完全片直接进主页；需要登录/断网则片头收尾交接序列登录，在「授予访问权限 / 账号密码」步骤停下等待输入，认证后演完剩余步骤进主页；五步验证序列 + 终幕任何路径**只演一遍**，不再"启动动画 + 序列登录"连播两次（新增 `splash-intent` 桥消息与 `ISplashGate` 启动去向状态）
 - **启动动画拆分为「core 引擎 + 五幕场景」**（`Resources\Splash\core\`、`scenes\`）：启动动画与序列登录共用同一套运行时，对外协议、播放时序、`SplashGate` 行为全部不变；宿主平台逻辑收敛到共用控件 `Components\AnimationWebViewView`（SplashPage / LoginPage 同用），Windows 资产戳记改为全目录聚合（子目录脚本改动会自动重新同步）
 - **启动/登录音频改为嵌入式**：新增 `Scripts\prepare_splash_audio.ps1` 把台词/音效 mp3 生成 base64 资产包（`core\anim-audio-assets.js`），启动动画与序列登录对 mp3 **零请求**（虚拟主机 / APK / 本地测试均无流量，本地测试可直接 `file://` 打开，无需起 HTTP 服务）；`audio\*.mp3` 保留为生成来源与降级回退

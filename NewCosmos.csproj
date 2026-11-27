@@ -36,8 +36,8 @@
 		<ApplicationId>com.newcosmos.app</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.2.20261124</ApplicationDisplayVersion>
-		<ApplicationVersion>20261124</ApplicationVersion>
+		<ApplicationDisplayVersion>2.0.20261128</ApplicationDisplayVersion>
+		<ApplicationVersion>20261128</ApplicationVersion>
 
 		<!-- MSIX Packaging -->
 		<WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
@@ -143,6 +143,8 @@
 		<!-- 升级日志素材单一来源随包内置：本地安装包离线也能看全量更新日志
 		     （Services\Core\UpdateHistoryService 读取、Helpers\ChangelogMarkdownParser 解析） -->
 		<EmbeddedResource Include="CHANGELOG.md" LogicalName="NewCosmos.CHANGELOG.md" />
+		<!-- 北斗终端序列页：随包内嵌，页头右上角按钮用系统浏览器打开（T1/T3 离线可用） -->
+		<EmbeddedResource Include="Resources\Terminal\index.html" LogicalName="NewCosmos.Terminal.index.html" />
 	</ItemGroup>
 
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
@@ -157,28 +159,28 @@
 		<PackageReference Include="Serilog" Version="4.4.0" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
-		<PackageReference Include="Npgsql" Version="10.0.3" />
+		<PackageReference Include="Npgsql" Version="10.0.4" />
 		<PackageReference Include="BCrypt.Net-Next" Version="4.2.1" />
 		<PackageReference Include="YamlDotNet" Version="18.1.0" />
-		<PackageReference Include="EPPlus" Version="8.6.3" />
+		<PackageReference Include="EPPlus" Version="8.7.3" />
 		<PackageReference Include="ExcelDataReader" Version="3.9.0" />
 		<PackageReference Include="ExcelDataReader.DataSet" Version="3.9.0" />
 		<PackageReference Include="TinyPinyin" Version="1.1.0" />
-		<PackageReference Include="NPOI" Version="2.8.0" />
-		<!-- NPOI 2.8.0 传递引入 SourceLink 链（Microsoft.Build.Tasks.Git 8.0.0），
+		<PackageReference Include="NPOI" Version="2.8.1" />
+		<!-- NPOI 2.8.1 传递引入 SourceLink 链（Microsoft.Build.Tasks.Git 8.0.0），
 		     其 CVE-2026-62900（GHSA-23fw-v26w-5fgq）无 8.0.0 修补版，
-		     此处显式引用已修补的 10.0.303（NuGet 最高版本获胜规则压过传递依赖）消除 NU1902。
+		     此处显式引用已修补的 10.0.404（NuGet 最高版本获胜规则压过传递依赖）消除 NU1902。
 		     该包为纯构建期工具、不进发布产物；本项目无 git 仓库，任务实际 no-op -->
-		<PackageReference Include="Microsoft.Build.Tasks.Git" Version="10.0.303" />
-		<PackageReference Include="PDFsharp" Version="6.1.1" />
-		<PackageReference Include="System.Management" Version="10.0.10"
+		<PackageReference Include="Microsoft.Build.Tasks.Git" Version="10.0.404" />
+		<PackageReference Include="PDFsharp" Version="6.5.0" />
+		<PackageReference Include="System.Management" Version="10.0.15"
 		                  Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
-		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10"
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.15"
 		                  Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
 		<!-- Pkcs/Xml 10.0.10 系传递引入，5 个 GHSA（High×4 + Moderate×1，windows/android 双 TFM 均命中）；
-		     显式引用 10.0.x 最新 10.0.14 压过传递依赖（同上方 Build.Tasks.Git 的最高版本获胜规则），消除 NU1902/NU1903 -->
-		<PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
-		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
+		     显式引用 10.0.x 最新 10.0.15 压过传递依赖（同上方 Build.Tasks.Git 的最高版本获胜规则），消除 NU1902/NU1903 -->
+		<PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.15" />
 		<PackageReference Include="BsDiff" Version="1.1.0" />
 	</ItemGroup>
 
@@ -212,14 +214,14 @@
 	     发布输入集，AOT 编译 NPOI.OOXML 时报 "Could not load ... 'SkiaSharp'"。
 	     显式引用 SkiaSharp，确保其 Android 资产被纳入发布与 AOT 输入。仅 Android。 -->
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-		<PackageReference Include="SkiaSharp" Version="3.119.2" />
+		<PackageReference Include="SkiaSharp" Version="3.119.4" />
 	</ItemGroup>
 
 	<!-- 档案照片 WebP 编解码（Helpers/ImageCompressor、ImageTranscoder）。
 	     Windows 输出本来已带 libSkiaSharp 原生资产（NPOI/SkiaSharp 传递依赖），
 	     这里补托管 SkiaSharp.dll；Android 已在上一组引用，避免重复。 -->
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-		<PackageReference Include="SkiaSharp" Version="3.119.2" />
+		<PackageReference Include="SkiaSharp" Version="3.119.4" />
 	</ItemGroup>
 
 	<ItemGroup>
