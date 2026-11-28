@@ -7,12 +7,17 @@ namespace NewCosmos.Models.NavigationData;
 /// 由死亡情况说明「联动卡片」携带死亡日期/时刻/原因预填停发表单，
 /// 目标页仍走自身校验与确认（只读视图 + 预填跳转，不跨域写）。
 /// 与既有 <see cref="ElderlyApplication"/> 直传参数并存（页面同时实现两个 IParameterizedPage 契约）。
+/// 年度认证停发预览跳转时追加：认证任务ID、建议停发原因、建议应停日期、预填备注（可选，既有 4 参数调用不受影响）。
 /// </summary>
 public sealed record ElderlyStopPrefill(
     ElderlyApplication Application,
     DateTime? DeathDate,
     string? DeathTime,
-    string? DeathReason);
+    string? DeathReason,
+    long? CertificationTaskId = null,
+    string? PresetStopReason = null,
+    DateTime? PresetDueStopDate = null,
+    string? PresetNote = null);
 
 /// <summary>
 /// 跨流程联动预填参数：户主死亡变更（停旧建新）。

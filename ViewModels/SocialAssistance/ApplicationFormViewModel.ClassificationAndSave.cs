@@ -866,6 +866,18 @@ public partial class ApplicationFormViewModel
             return;
         }
 
+        // 异地协助：跳过特困校验（不适用），保存状态用 RemoteAssistanceDraft
+        if (IsRemoteAssistance)
+        {
+            await ExecuteAsync(async ct =>
+            {
+                _logger.LogBusiness("异地协助保存");
+                await SaveApplicationInternalAsync(ApplicationStatusCodes.REMOTE_ASSISTANCE_DRAFT, ct);
+                await ShowSnackBarAsync("异地协助已保存");
+            }, "保存中...");
+            return;
+        }
+
         await ExecuteAsync(async ct =>
         {
             _logger.LogBusiness("保存草稿");
@@ -966,18 +978,22 @@ public partial class ApplicationFormViewModel
         else
         {
             // 新建模式：删除同身份证旧草稿 + 创建新记录
-            var existsResult = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
-            if (existsResult.IsSuccess && existsResult.Value?.Count > 0)
+            // 异地协助跳过旧草稿删除（允许同一人多条协助记录）
+            if (!IsRemoteAssistance)
             {
-                foreach (var existing in existsResult.Value)
+                var existsResult = await _applicationService.GetByIdCardAsync(ApplicantIdCard, ct);
+                if (existsResult.IsSuccess && existsResult.Value?.Count > 0)
                 {
-                    if (existing.Status == ApplicationStatusCodes.DRAFT)
+                    foreach (var existing in existsResult.Value)
                     {
-                        var deleteResult = await _applicationService.DeleteAsync(existing.Id, ct);
-                        if (!deleteResult.IsSuccess)
-                            _logger.Error($"删除旧草稿失败: {deleteResult.Message}");
-                        deleteResult.ThrowIfFailure("删除旧草稿");
-                        _logger.LogBusiness("已删除旧草稿", ("OldApplicationId", existing.Id));
+                        if (existing.Status == ApplicationStatusCodes.DRAFT)
+                        {
+                            var deleteResult = await _applicationService.DeleteAsync(existing.Id, ct);
+                            if (!deleteResult.IsSuccess)
+                                _logger.Error($"删除旧草稿失败: {deleteResult.Message}");
+                            deleteResult.ThrowIfFailure("删除旧草稿");
+                            _logger.LogBusiness("已删除旧草稿", ("OldApplicationId", existing.Id));
+                        }
                     }
                 }
             }

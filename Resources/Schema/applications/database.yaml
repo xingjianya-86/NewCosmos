@@ -387,6 +387,11 @@ tables:
         type: BIGINT
         nullable: true
         comment: 关联 nc_biz_special_approvals.id
+      - name: application_type
+        type: VARCHAR(30)
+        nullable: true
+        defaultValue: 'LowIncome'
+        comment: 业务类型（LowIncome 低收入认定 / RemoteAssistance 异地协助；存量 NULL 按 LowIncome）
       - name: source_type
         type: VARCHAR(50)
         nullable: true
@@ -464,3 +469,6 @@ tables:
       - name: idx_applications_archived_step_updated
         columns: [updated_at DESC]
         where: "current_step = 6 AND deleted_at IS NULL"
+      - name: idx_applications_remote_assistance
+        columns: [updated_at DESC]
+        where: "application_type = 'RemoteAssistance' AND deleted_at IS NULL"

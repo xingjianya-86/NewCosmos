@@ -62,6 +62,11 @@ public static class PrintNavigationData
     public static string[]? PrefilterDocTypes { get; set; }
 
     /// <summary>
+    /// 是否异地协助模式（true 时输出页隐藏"完成归档"按钮）。
+    /// </summary>
+    public static bool IsRemoteAssistance { get; set; }
+
+    /// <summary>
     /// 仅清「文书模式」四字段，保留记录型上下文（BusinessType/Classification/FieldData…）。
     /// 由整档型入口（高龄停发/复核、临救、追缴、资产核查、月报等）在写入记录上下文时调用，
     /// 防止上一次「仅出文书」会话的 OutputCategories/OperationOverride/Prefilter/TemplateDocTypeFilter
@@ -73,6 +78,7 @@ public static class PrintNavigationData
         OperationOverride = null;
         TemplateDocTypeFilter = null;
         PrefilterDocTypes = null;
+        IsRemoteAssistance = false;
     }
 
     public static void Clear()
@@ -90,5 +96,6 @@ public static class PrintNavigationData
         OutputCategories = null;
         OperationOverride = null;
         PrefilterDocTypes = null;
+        IsRemoteAssistance = false;
     }
 }

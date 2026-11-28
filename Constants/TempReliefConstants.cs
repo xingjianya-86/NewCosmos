@@ -47,13 +47,66 @@ public static class TempReliefConstants
         => !string.IsNullOrEmpty(sourceTable) && Array.IndexOf(InsuredSourceTables, sourceTable) >= 0;
 
     /// <summary>
-    /// 人群状态判定：手工登记一律非在册；其余按来源表是否四类在册。
+    /// 人群状态判定（兜底口径）：手工登记一律非在册；其余按来源表是否四类在册。
+    /// 正式流程已改为按身份证反查四类在册台账（<c>ITempReliefService.ResolveInsuredIdentityAsync</c>），
+    /// 本方法仅用于存量/异常路径兜底，不再作为落库唯一依据。
     /// </summary>
     public static string ResolvePopulationStatus(string? sourceType, string? sourceTable)
         => string.Equals(sourceType, SourceManual, StringComparison.Ordinal)
            || !IsInsuredSourceTable(sourceTable)
             ? PopulationUninsured
             : PopulationInsured;
+
+    /// <summary>四类在册台账展示名（自动判定依据展示用）。</summary>
+    public static string GetInsuredLedgerDisplayName(string? table) => table switch
+    {
+        "nc_biz_rural_subsistence_families" => "农村低保台账",
+        "nc_biz_urban_subsistence_families" => "城市低保台账",
+        "nc_biz_destitute_families" => "特困人员台账",
+        "nc_biz_low_income_edge_families" => "最低生活保障边缘台账",
+        "nc_biz_rigid_expenditure_families" => "刚性支出困难家庭台账",
+        _ => table ?? string.Empty
+    };
+
+    /// <summary>
+    /// 四类在册台账主口径优先级（同一人命中多张台账时取首个展示）：
+    /// 特困 &gt; 低保（农村/城市）&gt; 边缘 &gt; 刚性支出。
+    /// </summary>
+    public static readonly string[] InsuredLedgerPriority =
+    {
+        "nc_biz_destitute_families",
+        "nc_biz_rural_subsistence_families",
+        "nc_biz_urban_subsistence_families",
+        "nc_biz_low_income_edge_families",
+        "nc_biz_rigid_expenditure_families"
+    };
+
+    /// <summary>
+    /// 将命中台账按优先级转展示名（纯逻辑，单测覆盖）：优先输出 <see cref="InsuredLedgerPriority"/>，
+    /// 未知表名按原样追加在末尾。
+    /// </summary>
+    public static List<string> ResolveInsuredLedgerNames(IEnumerable<string?> matchedTables)
+    {
+        var remaining = new HashSet<string>(
+            (matchedTables ?? Enumerable.Empty<string?>())
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t!),
+            StringComparer.Ordinal);
+
+        var names = new List<string>();
+        foreach (var table in InsuredLedgerPriority)
+        {
+            if (remaining.Remove(table)) names.Add(GetInsuredLedgerDisplayName(table));
+        }
+
+        foreach (var table in remaining)
+        {
+            var name = GetInsuredLedgerDisplayName(table);
+            if (!string.IsNullOrEmpty(name) && !names.Contains(name)) names.Add(name);
+        }
+
+        return names;
+    }
 
     /// <summary>
     /// 发放渠道归一：小额固定备用金；常规默认上级部门；非法值回退默认。
@@ -151,6 +204,27 @@ public static class TempReliefConstants
 
     /// <summary>申请编号前缀</summary>
     public const string ApplicationNoPrefix = "LZ";
+
+    /// <summary>
+    /// 申请日期最多可提前的月数（未来日期上限，2026-11-25 口径）：
+    /// 新建/改期均以「今天 + 本值」为上限，超过即校验失败。
+    /// </summary>
+    public const int ApplyDateFutureMonths = 1;
+
+    /// <summary>申请日期未来上限 = 今天 + <see cref="ApplyDateFutureMonths"/>（含当日）。</summary>
+    public static DateTime GetApplyDateUpperBound(DateTime today) => today.Date.AddMonths(ApplyDateFutureMonths);
+
+    /// <summary>
+    /// 申请日期是否在允许范围内：只校验未来上限（过去日期不设下限，保持历史行为）。
+    /// </summary>
+    public static bool IsApplyDateWithinRange(DateTime date, DateTime today)
+        => date.Date <= GetApplyDateUpperBound(today);
+
+    /// <summary>
+    /// 拼申请编号：LZ + yyyyMMdd + 4 位序号（取号与改期重号共用，禁止调用点各自拼字符串）。
+    /// </summary>
+    public static string BuildApplicationNo(DateTime date, long sequence)
+        => $"{ApplicationNoPrefix}{date:yyyyMMdd}{sequence:D4}";
 
     /// <summary>困难类型：疾病</summary>
     public const string DifficultyTypeDisease = "疾病";

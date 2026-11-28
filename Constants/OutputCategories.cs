@@ -34,4 +34,7 @@ public static class OutputCategories
 
     /// <summary>彩票预测结果导出（平铺）</summary>
     public const string LotteryPrediction = "彩票预测";
+
+    /// <summary>高龄年度认证报表（期间 = 认证年度，如 2026）</summary>
+    public const string ElderlyCertification = "高龄认证";
 }

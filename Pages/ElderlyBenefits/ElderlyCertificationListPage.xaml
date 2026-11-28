@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             xmlns:results="clr-namespace:NewCosmos.Models.Results"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyCertificationListPage"
+             x:DataType="ElderlyCertificationListViewModel"
+             Title="高龄年度认证"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="CertTaskRow" x:DataType="ent:ElderlyCertTask">
+            <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                    <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="8">
+                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                            <Label Text="{Binding CertStatusName}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                        <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                            <Label Text="{Binding VerifyMethodName}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </HorizontalStackLayout>
+
+                    <HorizontalStackLayout Grid.Row="0" Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                        <Button Text="信息变更" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationListViewModel}}, Path=OpenInfoChangeCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="凭证" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationListViewModel}}, Path=ViewEvidenceCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="改结果" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationListViewModel}}, Path=ChangeResultCommand}"
+                                CommandParameter="{Binding .}"/>
+                    </HorizontalStackLayout>
+
+                    <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                           Text="{Binding IdCard}" FontSize="14"
+                           TextColor="{StaticResource TextSecondary}"/>
+
+                    <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="14">
+                        <Label Text="{Binding VillageDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding EvidenceDisplay, StringFormat='凭证 {0}'}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding EvidenceStatusName}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding StopDecisionName, StringFormat='停发: {0}'}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PreviewIssueRow" x:DataType="results:ElderlyCertImportRowPreview">
+            <Border Style="{StaticResource CardBorder}" Padding="10" Margin="0,0,0,6">
+                <VerticalStackLayout Spacing="2">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="{Binding RowNo, StringFormat='第{0}行'}" FontSize="14" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding Name}" FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding MatchStatusName}" FontSize="13" TextColor="{StaticResource WarningDark}"/>
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding IdCard}" FontSize="13" TextColor="{StaticResource TextSecondary}"/>
+                    <Label Text="{Binding EvidenceStatusName, StringFormat='凭证: {0}'}" FontSize="13"
+                           TextColor="{StaticResource TextSecondary}"/>
+                    <Label Text="{Binding ErrorMessage}" FontSize="13" TextColor="{StaticResource Error}"
+                           LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8D4;', Android='&#x1F510;'}"
+                                   Title="高龄年度认证"
+                                   Subtitle="批次名单快照 · Excel + 图片 ZIP 批量导入 · 认证结果与凭证"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.Stats>
+                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                    <components:StatCapsule IsLight="True" Value="{Binding TotalText}" Caption="应认证（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="1" Value="{Binding VerifiedText}" Caption="已通过（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="2" Value="{Binding PendingText}" Caption="待核查（人）"/>
+                    <components:StatCapsule IsLight="True" Grid.Column="3" Value="{Binding EvidenceIssueText}" Caption="凭证异常（人）"/>
+                </Grid>
+            </components:PageHeaderView.Stats>
+        </components:PageHeaderView>
+
+        <ScrollView Grid.Row="1" MaximumHeightRequest="430">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="认证批次" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <Picker ItemsSource="{Binding Campaigns}"
+                                    ItemDisplayBinding="{Binding DisplayName, x:DataType=ent:ElderlyCertCampaign}"
+                                    SelectedItem="{Binding SelectedCampaign}"
+                                    HeightRequest="42"/>
+                            <Button Grid.Column="1" Text="新建批次"
+                                    Command="{Binding CreateCampaignCommand}"
+                                    IsEnabled="{Binding CanManage}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="42"/>
+                            <Button Grid.Column="2" Text="生成名单"
+                                    Command="{Binding GenerateRosterCommand}"
+                                    IsEnabled="{Binding CanManage}"
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="42"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                            <Label Text="{Binding CampaignInfo}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                                   VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="报表"
+                                    Command="{Binding OpenReportCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="34"/>
+                            <Button Grid.Column="2" Text="停发预览"
+                                    Command="{Binding OpenStopPreviewCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="34"/>
+                            <Button Grid.Column="3" Text="变更审批"
+                                    Command="{Binding OpenInfoChangeListCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="34"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="批量导入（Excel 名单 + 图片 ZIP）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
+                            <Button Text="选择 Excel" Command="{Binding PickExcelCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <Label Grid.Column="1" Text="{Binding ExcelFileName}" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            <Button Grid.Column="2" Text="选择 ZIP" Command="{Binding PickZipCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <Label Grid.Column="3" Text="{Binding ZipFileName}" FontSize="14"
+                                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                            <Button Text="预览" Command="{Binding PreviewImportCommand}"
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="38"/>
+                            <Button Grid.Column="1" Text="应用导入" Command="{Binding ApplyImportCommand}"
+                                    IsEnabled="{Binding CanManage}" Style="{StaticResource ButtonSuccess}" HeightRequest="38"/>
+                            <Button Grid.Column="2" Text="清除" Command="{Binding ClearPreviewCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="38"/>
+                            <HorizontalStackLayout Grid.Column="3" Spacing="4" VerticalOptions="Center">
+                                <CheckBox IsChecked="{Binding AllowAdverseOverwrite}" Scale="0.9"/>
+                                <Label Text="允许覆盖已通过的不利结果" FontSize="13"
+                                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Label Text="{Binding PreviewSummary}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                               LineBreakMode="WordWrap"/>
+                        <Label Text="{Binding BatchStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                               LineBreakMode="WordWrap"/>
+                        <Button Text="查看未匹配图片" Command="{Binding OpenUnmatchedEvidenceCommand}"
+                                Style="{StaticResource ButtonOutline}" HeightRequest="34"
+                                HorizontalOptions="Start"/>
+
+                        <Label Text="异常/待处理行（最多显示 300 行）" FontSize="14" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <CollectionView ItemsSource="{Binding PreviewIssues}"
+                                        HeightRequest="180"
+                                        ItemTemplate="{StaticResource PreviewIssueRow}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Entry Placeholder="姓名 / 身份证号" Text="{Binding SearchText}"
+                               ReturnCommand="{Binding SearchCommand}" HeightRequest="40"/>
+                        <Picker Grid.Column="1" ItemsSource="{Binding CertStatusOptions}"
+                                SelectedItem="{Binding SelectedCertStatus}" WidthRequest="130" HeightRequest="40"/>
+                        <Picker Grid.Column="2" ItemsSource="{Binding EvidenceStatusOptions}"
+                                SelectedItem="{Binding SelectedEvidenceStatus}" WidthRequest="130" HeightRequest="40"/>
+                        <Button Grid.Column="3" Text="查询" Command="{Binding SearchCommand}"
+                                Style="{StaticResource ButtonPrimary}" HeightRequest="40"/>
+                    </Grid>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto" Padding="16,0,16,16" RowSpacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="认证名单" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}"/>
+                <Label Grid.Column="1" Text="{Binding PageStatusText}" FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+            </Grid>
+
+            <CollectionView Grid.Row="1" ItemsSource="{Binding Tasks}"
+                            ItemTemplate="{StaticResource CertTaskRow}"
+                            SelectionMode="None"
+                            VerticalScrollBarVisibility="Always">
+                <CollectionView.EmptyView>
+                    <Label Text="当前批次暂无名单。先点“生成名单”，再上传 Excel + ZIP。"
+                           Style="{StaticResource EmptyStateLabel}"
+                           Margin="0,24,0,0"/>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <Button Text="上一页" Command="{Binding PreviousPageCommand}"
+                        IsEnabled="{Binding CanGoPrevious}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+                <Label Grid.Column="1" Text="{Binding PageStatusText}" FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+                <Button Grid.Column="2" Text="下一页" Command="{Binding NextPageCommand}"
+                        IsEnabled="{Binding CanGoNext}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+            </Grid>
+        </Grid>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

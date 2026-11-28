@@ -29,6 +29,9 @@ public static class TemplateDocTypes
     /// <summary>入户调查表三版（档案_入户调查表 / 特困版 / 临时救助版；文书模式补挂判定）</summary>
     public const string Survey = "入户调查";
 
+    /// <summary>邻里访问调查表（异地协助专用文书）</summary>
+    public const string NeighborVisit = "邻里访问";
+
     // ── 土地二选一（适用性规则相反，必须分值）──
     /// <summary>无土地证明：有地时不出</summary>
     public const string NoLandProof = "无土地证明";
@@ -92,7 +95,7 @@ public static class TemplateDocTypes
     public static readonly string[] All =
     {
         // 档案骨架
-        Cover, Directory, Survey,
+        Cover, Directory, Survey, NeighborVisit,
         // 土地/一事一议/近亲属
         NoLandProof, VillageLandNote,
         SpecialApprovalDeclaration, SpecialApprovalApplication, SpecialApprovalRecord,

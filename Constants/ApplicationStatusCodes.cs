@@ -14,6 +14,12 @@ public static class ApplicationStatusCodes
     public const string REFUSED = "Refused";
     public const string STOPPED = "Stopped";
 
+    // ── 异地协助专用状态（application_type=RemoteAssistance） ──
+    /// <summary>异地协助办理中（等价草稿语义，但不进普通草稿 Tab，兼容未升级客户端）</summary>
+    public const string REMOTE_ASSISTANCE_DRAFT = "RemoteAssistanceDraft";
+    /// <summary>异地协助已办结（终态，只读，永不进入月报/在保/停保口径）</summary>
+    public const string REMOTE_ASSISTANCE_COMPLETED = "RemoteAssistanceCompleted";
+
     // ── 别名/通用状态（跨表共用） ──
     /// <summary>通用待处理状态（资产核对/流程节点等）</summary>
     public const string PENDING = "Pending";

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             xmlns:vm="clr-namespace:NewCosmos.ViewModels.SocialAssistance"
+             x:Class="NewCosmos.Pages.SocialAssistance.RemoteAssistanceListPage"
+             x:DataType="vm:RemoteAssistanceListViewModel"
+             Title="异地协助"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="0">
+
+        <!-- 统一页头 -->
+        <components:PageHeaderView Grid.Row="0"
+                                   Title="异地协助"
+                                   Kicker="Remote Assistance"
+                                   Subtitle="入户调查与邻里走访，本地留存，不纳入月报统计"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回工作台">
+            <components:PageHeaderView.HeaderActions>
+                <Button Text="＋ 新增协助"
+                        Command="{Binding CreateCommand}"
+                        Style="{StaticResource ButtonOutline}"
+                        FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
+                        Padding="18,8"
+                        VerticalOptions="Center"/>
+            </components:PageHeaderView.HeaderActions>
+        </components:PageHeaderView>
+
+        <!-- 顶部检索工具条 -->
+        <Border Grid.Row="1"
+                BackgroundColor="{StaticResource Paper}"
+                StrokeThickness="0"
+                Padding="24,14">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Border BackgroundColor="Transparent" StrokeThickness="0" Padding="0,4">
+                    <Grid>
+                        <Entry Text="{Binding SearchText}"
+                               Placeholder="搜索姓名、身份证号"
+                               FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
+                               BackgroundColor="Transparent"
+                               Margin="0,-6"
+                               ReturnCommand="{Binding SearchCommand}"/>
+                        <BoxView HeightRequest="1" Color="{StaticResource LineStrong}" VerticalOptions="End" InputTransparent="True"/>
+                    </Grid>
+                </Border>
+                <Picker Grid.Column="1"
+                        ItemsSource="{Binding StatusOptions}"
+                        SelectedItem="{Binding SelectedStatus}"
+                        Title="全部状态"
+                        FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"/>
+                <Button Grid.Column="2"
+                        Text="检 索"
+                        Style="{StaticResource ButtonSmall}"
+                        BackgroundColor="{StaticResource Ink}"
+                        TextColor="{StaticResource Paper}"
+                        BorderColor="{StaticResource Ink}"
+                        BorderWidth="1"
+                        Command="{Binding SearchCommand}"
+                        VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- 错误提示条 -->
+        <Border Grid.Row="2"
+                IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                BackgroundColor="{StaticResource DangerSoft}"
+                StrokeThickness="0"
+                Padding="24,10">
+            <Label Text="{Binding ErrorMessage}"
+                   FontSize="{OnPlatform WinUI=15, Android=14, Default=15}"
+                   TextColor="{StaticResource Error}"/>
+        </Border>
+
+        <!-- 记录列表 -->
+        <Border Grid.Row="3"
+                Style="{StaticResource CardBorder}"
+                Padding="0"
+                Margin="24,16"
+                MinimumWidthRequest="720">
+
+            <Grid RowDefinitions="Auto, Auto, *">
+
+                <!-- 标题行 -->
+                <Grid Grid.Row="0" Padding="16,14,16,10" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                        <Label Text="异地协助记录" FontSize="{OnPlatform WinUI=21, Android=18, Default=21}" FontAttributes="Bold"
+                               FontFamily="{OnPlatform WinUI='Noto Serif SC', Android='notoserifregular', Default='Noto Serif SC'}"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding StatusText}"
+                               FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                               FontSize="14" TextColor="{StaticResource Muted}"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- 加载指示 -->
+                <ActivityIndicator Grid.Row="1"
+                                   IsRunning="{Binding IsBusy}"
+                                   IsVisible="{Binding IsBusy}"
+                                   Color="{StaticResource Ink}"
+                                   HorizontalOptions="Center"/>
+
+                <!-- 列表 -->
+                <CollectionView Grid.Row="2"
+                                ItemsSource="{Binding Items}"
+                                SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout Padding="0,32" Spacing="8" HorizontalOptions="Center">
+                            <Label Text="暂无异地协助记录"
+                                   FontSize="{OnPlatform WinUI=16, Android=15, Default=16}"
+                                   TextColor="{StaticResource Muted}"
+                                   HorizontalOptions="Center"/>
+                            <Label Text="点击右上角「新增协助」创建"
+                                   FontSize="{OnPlatform WinUI=14, Android=13, Default=14}"
+                                   TextColor="{StaticResource Gray500}"
+                                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ent:Application">
+                            <Border Style="{StaticResource CardBorder}"
+                                    Padding="16,12"
+                                    Margin="24,4"
+                                    StrokeThickness="1">
+                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+
+                                    <!-- 姓名 + 状态 -->
+                                    <HorizontalStackLayout Grid.Row="0" Spacing="10" VerticalOptions="Center">
+                                        <Label Text="{Binding ApplicantName}"
+                                               FontSize="{OnPlatform WinUI=18, Android=16, Default=18}"
+                                               FontAttributes="Bold"
+                                               TextColor="{StaticResource TextPrimary}"/>
+                                        <Label Text="{Binding Status, Converter={StaticResource RemoteAssistanceStatusConverter}}"
+                                               FontSize="{OnPlatform WinUI=12, Android=11, Default=12}"
+                                               TextColor="{StaticResource Muted}"
+                                               BackgroundColor="{StaticResource Paper3}"
+                                               Padding="6,2"
+                                               VerticalOptions="Center"/>
+                                    </HorizontalStackLayout>
+
+                                    <!-- 操作按钮 -->
+                                    <HorizontalStackLayout Grid.Row="0" Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                        <Button Text="编辑"
+                                                FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                                Style="{StaticResource ButtonSmall}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RemoteAssistanceListViewModel}}, Path=EditCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                        <Button Text="出文书"
+                                                FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                                Style="{StaticResource ButtonSmall}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RemoteAssistanceListViewModel}}, Path=OutputDocumentsCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                        <Button Text="办结"
+                                                FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                                Style="{StaticResource ButtonSmall}"
+                                                BackgroundColor="{StaticResource Success}"
+                                                TextColor="White"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RemoteAssistanceListViewModel}}, Path=CompleteCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                        <Button Text="删除"
+                                                FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                                Style="{StaticResource ButtonSmall}"
+                                                BackgroundColor="{StaticResource Danger}"
+                                                TextColor="White"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RemoteAssistanceListViewModel}}, Path=DeleteCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                    </HorizontalStackLayout>
+
+                                    <!-- 身份证号 -->
+                                    <Label Grid.Row="1"
+                                           Text="{Binding ApplicantIdCard}"
+                                           FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
+                                           FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                           TextColor="{StaticResource Muted}"/>
+
+                                    <!-- 编号 + 更新时间 -->
+                                    <HorizontalStackLayout Grid.Row="2" Spacing="16">
+                                        <Label FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                               TextColor="{StaticResource Gray500}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="编号："/>
+                                                    <Span Text="{Binding ApplicationNo}" TextColor="{StaticResource TextPrimary}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label FontSize="{OnPlatform WinUI=13, Android=12, Default=13}"
+                                               TextColor="{StaticResource Gray500}">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="更新："/>
+                                                    <Span Text="{Binding UpdatedAt, StringFormat='{0:yyyy-MM-dd HH:mm}'}" TextColor="{StaticResource TextPrimary}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </HorizontalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

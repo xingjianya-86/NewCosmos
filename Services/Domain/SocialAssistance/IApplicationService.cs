@@ -154,6 +154,20 @@ public interface IApplicationService
     Task<Result> CompleteArchiveAsync(long applicationId, string operatorName, CancellationToken ct = default);
 
     /// <summary>
+    /// 异地协助办结：将 status 从 RemoteAssistanceDraft 置为 RemoteAssistanceCompleted。
+    /// 已办结后为终态只读，不进入月报/在保/停保口径。
+    /// </summary>
+    /// <param name="applicationId">档案 ID</param>
+    /// <param name="operatorName">操作人姓名，写入 nc_biz_application_logs.operator_name。</param>
+    Task<Result> CompleteRemoteAssistanceAsync(long applicationId, string operatorName, CancellationToken ct = default);
+
+    /// <summary>
+    /// 异地协助列表分页（只查 application_type=RemoteAssistance）。
+    /// </summary>
+    Task<Result<PagedResult<ApplicationEntity>>> GetRemoteAssistancePagedAsync(
+        string keyword, int pageIndex, int pageSize, string? status = null, CancellationToken ct = default);
+
+    /// <summary>
     /// 为单人保成员创建草稿申请
     /// </summary>
     Task<Result<long>> CreateSingleRescueDraftAsync(long sourceApplicationId, FamilyMember member, CancellationToken ct = default);

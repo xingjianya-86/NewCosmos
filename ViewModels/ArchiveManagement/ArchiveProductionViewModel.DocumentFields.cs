@@ -400,6 +400,14 @@ public partial class ArchiveProductionViewModel
     /// </summary>
     private string BuildSurveyVisitSituation(ApplicationEntity app)
     {
+        // 异地协助：按入户调查结论生成，不按分类
+        if (string.Equals(app.ApplicationType, ApplicationTypeConstants.REMOTE_ASSISTANCE, StringComparison.OrdinalIgnoreCase))
+        {
+            var conclusion = _cachedHouseholdSurvey?.SurveyConclusion?.Trim();
+            if (string.IsNullOrEmpty(conclusion)) conclusion = "属实";
+            return $"经入户调查和邻里走访，该家庭情况{conclusion}。";
+        }
+
         return $"经入户调查，该家庭确属困难家庭，符合{(ClassificationConstants.ConvertFromCode(_docClassification))}条件。";
     }
 

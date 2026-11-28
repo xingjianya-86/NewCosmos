@@ -429,6 +429,34 @@ public class TempReliefCandidate
 }
 
 /// <summary>
+/// 临时救助「保障人群」判定结果（按身份证反查四类在册台账，自动判定；人工不可改）。
+/// </summary>
+public class TempReliefInsuredIdentity
+{
+    /// <summary>是否命中四类在册台账</summary>
+    public bool IsInsured { get; set; }
+
+    /// <summary>命中台账展示名（按政策优先级排序；未命中为空列表）</summary>
+    public List<string> LedgerNames { get; set; } = new();
+
+    /// <summary>主口径台账名（列表首项；未命中为空串）</summary>
+    public string PrimaryLedgerName => LedgerNames.Count > 0 ? LedgerNames[0] : string.Empty;
+
+    /// <summary>人群状态值（Insured/Uninsured）</summary>
+    public string PopulationStatus => IsInsured
+        ? TempReliefConstants.PopulationInsured
+        : TempReliefConstants.PopulationUninsured;
+
+    /// <summary>判定依据文本（界面展示）</summary>
+    public string BasisText => IsInsured
+        ? $"身份证命中{FormatLedgerNames(LedgerNames)}"
+        : "身份证未命中四类在册台账";
+
+    private static string FormatLedgerNames(IReadOnlyList<string> names)
+        => names.Count == 0 ? string.Empty : "《" + string.Join("》《", names) + "》";
+}
+
+/// <summary>
 /// 候选人家庭成员快照（审批表 5 行成员用）
 /// </summary>
 public class TempReliefMemberSnapshot

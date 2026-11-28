@@ -18,7 +18,7 @@ public static class ApplicationColumns
         "rigid_expenditure, alimony_income, total_annual_income, per_capita_annual_income, is_eligible, classification_result, classified_subsidy_type, classified_subsidy_amount, " +
         "household_monthly_guarantee_amount, person_category_protection_total_amount, caregiver_subsidy_amount, total_guarantee_amount, stop_reason, stop_date, stop_remark, is_special_approval, " +
         "special_approval_id, status, current_step, submit_at, submit_by, created_at, updated_at, created_by, " +
-        "updated_by, deleted_at, original_application_id, source_type, chain_type, source_table, data_completed_at, first_approved_at, " +
+        "updated_by, deleted_at, original_application_id, application_type, source_type, chain_type, source_table, data_completed_at, first_approved_at, " +
         "family_land_area, self_farmed_land_area, subleased_land_area, contracted_land_area, land_income_total, subsidy_total, total_confirmed_land_area, confirmed_person_count";
 
     /// <summary>

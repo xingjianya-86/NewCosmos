@@ -53,7 +53,13 @@ public static class ApplicationStateMachine
         [ApplicationStatus.Stopped] = new HashSet<ApplicationStatus>
         {
             ApplicationStatus.Approved
-        }
+        },
+        // 异地协助：办理中 → 已办结（单向，已办结为终态不可回退）
+        [ApplicationStatus.RemoteAssistanceDraft] = new HashSet<ApplicationStatus>
+        {
+            ApplicationStatus.RemoteAssistanceCompleted
+        },
+        [ApplicationStatus.RemoteAssistanceCompleted] = new HashSet<ApplicationStatus>()
     };
 
     /// <summary>
@@ -79,8 +85,8 @@ public static class ApplicationStateMachine
     }
 
     /// <summary>
-    /// 判断是否可编辑（仅草稿可编辑）
+    /// 判断是否可编辑（仅草稿与异地协助办理中可编辑）
     /// </summary>
     public static bool IsEditable(ApplicationStatus status) =>
-        status == ApplicationStatus.Draft;
+        status is ApplicationStatus.Draft or ApplicationStatus.RemoteAssistanceDraft;
 }

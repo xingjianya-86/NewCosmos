@@ -22,6 +22,13 @@ public interface ITempReliefService
     Task<Result<TempReliefCandidate>> GetCandidateDetailAsync(string sourceTable, long sourceFamilyId, string? excludeIdCard = null, CancellationToken ct = default);
 
     /// <summary>
+    /// 「保障人群」自动判定（唯一口径）：按身份证反查四类在册台账（家庭表户主 + 人员表成员），
+    /// 命中即 <c>Insured</c>，未命中即 <c>Uninsured</c>；查询失败如实返回 Failure。
+    /// 表单展示、创建/更新落库均走本方法，人工不可改判。
+    /// </summary>
+    Task<Result<TempReliefInsuredIdentity>> ResolveInsuredIdentityAsync(string? idCard, CancellationToken ct = default);
+
+    /// <summary>
     /// 按身份证跨来源解析户籍分类（当前库低保申请库优先，其次 6 个导入台账库；
     /// 农村/城镇低保台账按表名固定，其余取 hukou_type 列）。
     /// 未找到返回 Success("")，由表单提示手动选择档位（=手选户籍分类）。
@@ -87,6 +94,13 @@ public interface ITempReliefService
     /// 更新申请（草稿可编辑）
     /// </summary>
     Task<Result> UpdateAsync(TempReliefApplication application, List<TempReliefMember> members, CancellationToken ct = default);
+
+    /// <summary>
+    /// 修改申请日期并重编号（仅草稿/退回补正）：
+    /// 按新日期重取 LZ 编号，同步 apply_date/apply_year/accepted_at 与公示起止；
+    /// 年度唯一校验排除自身；单事务 + 并发守卫。返回新申请编号。
+    /// </summary>
+    Task<Result<string>> ChangeApplyDateAsync(long applicationId, DateTime newDate, string operatorName, CancellationToken ct = default);
 
     /// <summary>
     /// 确认生效（草稿→已确认）

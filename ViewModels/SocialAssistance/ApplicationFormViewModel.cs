@@ -1109,6 +1109,17 @@ public partial class ApplicationFormViewModel : FormViewModelBase
     public bool IsMemberChangeMode => OperationMode == FormOperationMode.MemberChange;
 
     /// <summary>
+    /// 是否异地协助模式（仅基本信息+入户调查，不走分类认定/归档）
+    /// </summary>
+    public bool IsRemoteAssistance => OperationMode == FormOperationMode.RemoteAssistance;
+
+    /// <summary>
+    /// 业务类型（LowIncome=低收入认定 / RemoteAssistance=异地协助；存量 NULL 按 LowIncome）
+    /// </summary>
+    [ObservableProperty]
+    private string _applicationType = ApplicationTypeConstants.LOW_INCOME;
+
+    /// <summary>
     /// 是否查看模式（档案只读查看：全部字段不可编辑，仅浏览）
     /// </summary>
     public bool IsViewMode => OperationMode == FormOperationMode.View;

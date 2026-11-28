@@ -305,6 +305,7 @@ public partial class ApplicationFormViewModel
         return new Application
         {
             Id = _applicationId,
+            ApplicationType = ApplicationType,
             ApplicantName = ApplicantName,
             ApplicantIdCard = ApplicantIdCard,
             ApplicantPhone = ApplicantPhone,

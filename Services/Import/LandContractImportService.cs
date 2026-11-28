@@ -98,18 +98,32 @@ public partial class LandContractImportService : BaseImportService
     }
 
     /// <summary>按文件名派生数据年度。</summary>
-    private static int DeriveDataYear(string filePath)
+    /// <remarks>
+    /// 只认「2026年 / 2026年度」这类带年份上下文的 token，并校验合理范围，
+    /// 避免把文件名里的普通编号（如 2010、2030）误当成年度。
+    /// 识别不到时回退当前年度。
+    /// </remarks>
+    private int DeriveDataYear(string filePath)
     {
+        var fileName = Path.GetFileName(filePath);
         var dataYear = DateTime.Now.Year;
-        var yearMatch = YearRegex().Match(Path.GetFileName(filePath));
-        if (yearMatch.Success && int.TryParse(yearMatch.Value, out var year))
+        var yearMatch = YearRegex().Match(fileName);
+        if (yearMatch.Success
+            && int.TryParse(yearMatch.Groups[1].Value, out var year)
+            && year >= DateTime.Now.Year - 5
+            && year <= DateTime.Now.Year + 1)
         {
             dataYear = year;
+            LogInfo($"土地承包数据年度按文件名识别: {dataYear}（{fileName}）");
+        }
+        else
+        {
+            LogWarn($"土地承包文件名未识别到有效年度，回退当前年度 {dataYear}（{fileName}）");
         }
         return dataYear;
     }
 
-    [GeneratedRegex(@"20\d{2}")]
+    [GeneratedRegex(@"(?<!\d)(20\d{2})\s*(?:年|年度)")]
     private static partial Regex YearRegex();
 
     protected override async Task ProcessWorksheetAsync(IExcelSheetReader reader, ImportResult result, IProgress<string>? progress, CancellationToken ct)
@@ -390,6 +404,14 @@ public partial class LandContractImportService : BaseImportService
             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
             RETURNING id";
 
+        // 重新导入同一承包方/村/年度时，先清掉旧地块，避免 DELETE 头表后留下孤儿地块。
+        await DatabaseService.ExecuteNonQueryAsync(
+            @"DELETE FROM nc_biz_land_contract_plot
+              WHERE contractor_id IN (
+                  SELECT id FROM nc_biz_land_contract_contractor
+                  WHERE contractor_name = $1 AND employer_name = $2 AND data_year = $3
+              )",
+            ct, contractor.Name, contractor.Employer, dataYear);
         await DatabaseService.ExecuteNonQueryAsync(
             "DELETE FROM nc_biz_land_contract_contractor WHERE contractor_name = $1 AND employer_name = $2 AND data_year = $3",
             ct, contractor.Name, contractor.Employer, dataYear);

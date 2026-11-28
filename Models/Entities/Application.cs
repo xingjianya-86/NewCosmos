@@ -492,6 +492,11 @@ public class Application
     public long OriginalApplicationId { get; set; }
 
     /// <summary>
+    /// 业务类型（LowIncome 低收入认定 / RemoteAssistance 异地协助；存量 NULL 按 LowIncome 处理）
+    /// </summary>
+    public string? ApplicationType { get; set; } = ApplicationTypeConstants.LOW_INCOME;
+
+    /// <summary>
     /// 数据来源类型（NewApplication 原生 / ImportedArchive 导入库建档等）
     /// </summary>
     public string? SourceType { get; set; }

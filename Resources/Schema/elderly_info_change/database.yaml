@@ -1,0 +1,162 @@
+# 普惠高龄年度认证 - 信息变更单 Schema 定义（2026-11-26 新增）
+# 用途：认证/导入过程中发现电话、地址、银行卡、代办人变化时，不直接覆盖申请主表；
+#       先落变更单，审批通过后再更新 nc_biz_elderly_applications，保留旧值、来源与审批人。
+# 设计要点：
+#   1) records 一次提交一行，details 一字段一行，共用 change_no；
+#   2) 同人同字段已有 Pending 时，旧单置 Cancelled，新单保留完整 old/new；
+#   3) 审批写入申请主表前必须 SELECT ... FOR UPDATE 并校验当前值仍等于 old_value。
+database: 普惠高龄信息变更
+version: 1.0
+description: 普惠高龄年度认证 - 信息变更单、字段明细与审批留痕
+
+tables:
+  # ── 信息变更单 ──
+  - name: nc_biz_elderly_info_change_records
+    comment: "[高龄信息变更] 变更单头 - 一次提交一行，记录来源、状态、审批人与生效月"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: change_no
+        type: VARCHAR(40)
+        nullable: false
+        comment: 变更单号（BG+时间戳，如 BG20261126123045123）
+      - name: campaign_id
+        type: BIGINT
+        nullable: true
+        comment: 认证批次ID（手动变更可空）
+      - name: task_id
+        type: BIGINT
+        nullable: true
+        comment: 认证任务ID（nc_biz_elderly_cert_tasks.id）
+      - name: application_id
+        type: BIGINT
+        nullable: true
+        comment: 关联在享档案ID（nc_biz_elderly_applications.id）
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 身份证号
+      - name: name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 姓名
+      - name: change_type
+        type: VARCHAR(20)
+        nullable: false
+        comment: 风险级别（LOW/HIGH）
+      - name: reason
+        type: VARCHAR(500)
+        nullable: true
+        comment: 变更原因
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Pending'
+        comment: 状态（Pending/Approved/Rejected/Cancelled）
+      - name: source_type
+        type: VARCHAR(30)
+        nullable: true
+        comment: 来源类型（Manual/CertificationImport/Certification）
+      - name: source_file
+        type: VARCHAR(200)
+        nullable: true
+        comment: 来源文件名
+      - name: source_row
+        type: INTEGER
+        nullable: true
+        comment: 来源行号
+      - name: effective_month
+        type: VARCHAR(7)
+        nullable: true
+        comment: 银行卡等生效月（YYYY-MM，可空）
+      - name: applied_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 写入申请主表时间
+      - name: applied_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 写入申请主表操作人
+      - name: reviewed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 审批时间
+      - name: reviewed_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 审批人
+      - name: review_opinion
+        type: VARCHAR(500)
+        nullable: true
+        comment: 审批意见
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: uq_elderly_info_change_no
+        columns: [change_no]
+        unique: true
+      - name: idx_elderly_info_change_idcard
+        columns: [id_card]
+      - name: idx_elderly_info_change_campaign_status
+        columns: [campaign_id, status]
+      - name: idx_elderly_info_change_application
+        columns: [application_id]
+      - name: idx_elderly_info_change_task
+        columns: [task_id]
+
+  # ── 信息变更字段明细 ──
+  - name: nc_biz_elderly_info_change_details
+    comment: "[高龄信息变更] 字段明细 - 一行一字段，保留旧值/新值与中文标签"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: change_id
+        type: BIGINT
+        nullable: false
+        comment: 变更单ID（nc_biz_elderly_info_change_records.id）
+      - name: field_key
+        type: VARCHAR(50)
+        nullable: false
+        comment: 字段 key（phone/family_address/bank_account/agent_* 等）
+      - name: field_label
+        type: VARCHAR(100)
+        nullable: true
+        comment: 字段中文名
+      - name: old_value
+        type: TEXT
+        nullable: true
+        comment: 旧值（提交时的申请主表当前值）
+      - name: new_value
+        type: TEXT
+        nullable: true
+        comment: 新值
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: idx_elderly_info_change_detail_change
+        columns: [change_id]

@@ -120,11 +120,14 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private static bool IsStandaloneOutput => string.Equals(
         PrintNavigationData.BusinessType, NearRelativeConstants.BusinessType, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>异地协助输出域：无归档/工单语义，两个完成按钮均隐藏（办结由表单页处理）</summary>
+    private static bool IsRemoteOutput => PrintNavigationData.IsRemoteAssistance;
+
     /// <summary>「完成归档」按钮可见：既非过滤模式也非文档模式，且非独立输出域</summary>
-    public bool IsCompleteArchiveVisible => !IsTemplateFilterMode && !IsDocumentMode && !IsStandaloneOutput;
+    public bool IsCompleteArchiveVisible => !IsTemplateFilterMode && !IsDocumentMode && !IsStandaloneOutput && !IsRemoteOutput;
 
     /// <summary>「完成工单」按钮可见：与「完成归档」互斥（文档/过滤模式下替代留痕办理完成；独立输出域均隐藏）</summary>
-    public bool IsWorkOrderCompleteVisible => (IsTemplateFilterMode || IsDocumentMode) && !IsStandaloneOutput;
+    public bool IsWorkOrderCompleteVisible => (IsTemplateFilterMode || IsDocumentMode) && !IsStandaloneOutput && !IsRemoteOutput;
 
     partial void OnIsTemplateFilterModeChanged(bool value)
     {

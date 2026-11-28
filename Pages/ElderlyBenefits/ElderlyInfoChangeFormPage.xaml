@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyInfoChangeFormPage"
+             x:DataType="ElderlyInfoChangeFormViewModel"
+             Title="信息变更"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE70F;', Android='&#x1F4DD;'}"
+                                   Title="信息变更"
+                                   Subtitle="填写新值与原因后提交审批 · 审批通过才写入在享档案"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回认证名单"/>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding TaskName}" FontSize="20" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding ApplicationStatusText}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                        <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}"
+                                Stroke="Transparent" Padding="10,6" IsVisible="{Binding HasPendingChanges}">
+                            <Label Text="{Binding PendingHint}" FontSize="13"
+                                   TextColor="{StaticResource WarningDark}" LineBreakMode="WordWrap"/>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 联系方式与现居住地址 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="联系方式与现居住地址（低风险，可直接审批）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="联系电话" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentPhone, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewPhone}" Placeholder="新联系电话"
+                                   Keyboard="Telephone" MaxLength="20" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="家庭住址" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentFamilyAddress, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewFamilyAddress}" Placeholder="新家庭住址"
+                                   MaxLength="200" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="家庭详细地址（门牌号）" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentDetailAddress, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewDetailAddress}" Placeholder="新详细地址（门牌号）"
+                                   MaxLength="200" HeightRequest="40"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 社保卡 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="社保卡" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center">
+                                <Label Text="高风险 · 需复核" Style="{StaticResource ChipWarningText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="社保卡开户行" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentBankName, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewBankName}" Placeholder="新开户行"
+                                   MaxLength="100" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="社保卡账号" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentBankAccount, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewBankAccount}" Placeholder="新社保卡账号"
+                                   Keyboard="Numeric" MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 代办人 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="代办人" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center">
+                                <Label Text="高风险 · 需审批" Style="{StaticResource ChipWarningText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代办人姓名" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentName, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentName}" Placeholder="新代办人姓名"
+                                   MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代办人关系" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentRelation, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentRelation}" Placeholder="新代办人关系"
+                                   MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 代领人 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="代领人" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                            <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center">
+                                <Label Text="高风险 · 需审批" Style="{StaticResource ChipWarningText}"/>
+                            </Border>
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代领人姓名" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentReceiveName, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentReceiveName}" Placeholder="新代领人姓名"
+                                   MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代领人关系" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentReceiveRelation, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentReceiveRelation}" Placeholder="新代领人关系"
+                                   MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代领人开户行" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentReceiveBankName, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentReceiveBankName}" Placeholder="新代领人开户行"
+                                   MaxLength="100" HeightRequest="40"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,280" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="代领人账号" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                                <Label Text="{Binding CurrentAgentReceiveBankAccount, StringFormat='当前：{0}'}" FontSize="14"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                            </VerticalStackLayout>
+                            <Entry Grid.Column="1" Text="{Binding NewAgentReceiveBankAccount}" Placeholder="新代领人账号"
+                                   Keyboard="Numeric" MaxLength="50" HeightRequest="40"/>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 原因与生效月 -->
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="变更原因与生效月" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Editor Text="{Binding Reason}" Placeholder="如：老人更换社保卡（选填，建议填写以便审批追溯）"
+                                HeightRequest="80" MaxLength="500"/>
+                        <Label Text="银行卡生效月（YYYY-MM，选填；不填默认下个月）" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Entry Text="{Binding EffectiveMonth}" Placeholder="2026-12" MaxLength="7"
+                               Keyboard="Text" HeightRequest="40"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="身份信息（姓名/身份证）、户籍、享受类别与身份比对结果不能通过信息变更修改；请走人工核实、迁出/停旧建新或高龄复核流程。"
+                       FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="2" BackgroundColor="White" Padding="16,10" StrokeThickness="0">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Label Text="提交后为待审批状态，不会立即改档案。" FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+                <Button Grid.Column="1" Text="提交变更" Command="{Binding SubmitCommand}"
+                        IsEnabled="{Binding CanSubmit}" Style="{StaticResource ButtonPrimary}"
+                        HeightRequest="42" MinimumWidthRequest="120"/>
+                <Button Grid.Column="2" Text="返回" Command="{Binding GoBackCommand}"
+                        Style="{StaticResource ButtonOutline}" HeightRequest="42" MinimumWidthRequest="100"/>
+            </Grid>
+        </Border>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

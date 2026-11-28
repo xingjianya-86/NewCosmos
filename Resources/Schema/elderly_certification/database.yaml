@@ -1,0 +1,740 @@
+# 普惠高龄年度认证 Schema 定义（2026-11-26 新增）
+# 用途：年度/批次身份认证的名单快照、认证结果、凭证图片、Excel+ZIP 导入留痕。
+# 设计要点：
+#   1) 批次（campaign）与名单快照（task）分离，保证历史报表可复现；
+#   2) 一人一批次一行，唯一键 (campaign_id, id_card)，重复导入幂等；
+#   3) 一人多图，凭证表按 seq 排序；对不上人的图片 task_id 为空，保留待人工挂接；
+#   4) 认证结果不等于停发决定，停发走独立 stop_decision 字段与现有停发流程。
+database: 普惠高龄年度认证
+version: 1.0
+description: 普惠高龄年度身份认证 - 批次、应认证名单快照、认证结果、凭证图片、导入批次与行留痕
+
+tables:
+  # ── 认证批次 ──
+  - name: nc_biz_elderly_cert_campaigns
+    comment: "[年度认证] 认证批次 - 年度/轮次、认证起止、截止后停发口径"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: campaign_no
+        type: VARCHAR(30)
+        nullable: false
+        comment: 批次编号（如 RZ2026 / RZ2026-2）
+      - name: year
+        type: INTEGER
+        nullable: false
+        comment: 认证年度
+      - name: round
+        type: INTEGER
+        nullable: false
+        defaultValue: 1
+        comment: 年度内轮次（1=首轮，2=补认证）
+      - name: name
+        type: VARCHAR(100)
+        nullable: false
+        comment: 批次名称（如 2026年度高龄津贴领取资格认证）
+      - name: period_start
+        type: DATE
+        nullable: false
+        comment: 认证开始日期
+      - name: period_end
+        type: DATE
+        nullable: false
+        comment: 认证截止日期
+      - name: valid_until
+        type: DATE
+        nullable: true
+        comment: 认证有效期止（默认=截止日期）
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Draft'
+        comment: 状态（Draft=草稿，Collecting=收集中，Reviewing=复核中，Closed=已关闭）
+      - name: require_evidence
+        type: BOOLEAN
+        nullable: false
+        defaultValue: true
+        comment: 是否要求认证凭证（照片/截图）
+      - name: deadline_stop_offset
+        type: INTEGER
+        nullable: false
+        defaultValue: 1
+        comment: 截止后停发月偏移（0=截止当月，1=次月）
+      - name: roster_generated_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 名单快照生成时间
+      - name: closed_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 批次关闭时间
+      - name: closed_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 批次关闭人
+      - name: remark
+        type: VARCHAR(500)
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: updated_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 更新人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: uq_elderly_cert_campaign_no
+        columns: [campaign_no]
+        unique: true
+        where: deleted_at IS NULL
+      - name: uq_elderly_cert_campaign_year_round
+        columns: [year, round]
+        unique: true
+        where: deleted_at IS NULL
+      - name: idx_elderly_cert_campaign_status
+        columns: [status]
+      - name: idx_elderly_cert_campaign_period
+        columns: [period_end]
+
+  # ── 应认证名单快照 + 认证结果 ──
+  - name: nc_biz_elderly_cert_tasks
+    comment: "[年度认证] 一人一批次一行 - 应认证名单快照、认证结果、凭证统计、停发决定"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: campaign_id
+        type: BIGINT
+        nullable: false
+        comment: 认证批次ID（nc_biz_elderly_cert_campaigns.id）
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: false
+        comment: 身份证号（批次内唯一）
+      - name: name
+        type: VARCHAR(50)
+        nullable: false
+        comment: 姓名（快照）
+      - name: application_id
+        type: BIGINT
+        nullable: true
+        comment: 关联在享档案ID（nc_biz_elderly_applications.id，名册人员为空）
+      - name: application_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 关联档案编号
+      - name: source_kind
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Application'
+        comment: 名单来源（Application=在享档案，History=名册Active未建档）
+      - name: gender
+        type: VARCHAR(10)
+        nullable: true
+        comment: 性别（快照）
+      - name: birth_date
+        type: DATE
+        nullable: true
+        comment: 出生日期（快照）
+      - name: age_snapshot
+        type: INTEGER
+        nullable: true
+        comment: 名单生成时年龄（周岁）
+      - name: category
+        type: VARCHAR(20)
+        nullable: true
+        comment: 享受类别（CAT1-CAT4，快照）
+      - name: identity_flag
+        type: VARCHAR(20)
+        nullable: true
+        comment: 身份比对结果（快照）
+      - name: issue_amount
+        type: NUMERIC(12,2)
+        nullable: true
+        comment: 月标准（快照，元/月）
+      - name: hukou_city_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍城市ID（快照）
+      - name: hukou_county_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍区县ID（快照）
+      - name: hukou_town_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍乡镇ID（快照）
+      - name: hukou_village_id
+        type: INTEGER
+        nullable: true
+        comment: 户籍村社区ID（快照）
+      - name: hukou_village
+        type: VARCHAR(100)
+        nullable: true
+        comment: 户籍所属村（快照）
+      - name: hukou_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 户籍地址（快照）
+      - name: family_city_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭城市ID（快照）
+      - name: family_county_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭区县ID（快照）
+      - name: family_town_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭乡镇ID（快照）
+      - name: family_village_id
+        type: INTEGER
+        nullable: true
+        comment: 家庭村社区ID（快照）
+      - name: family_address
+        type: VARCHAR(200)
+        nullable: true
+        comment: 家庭住址（快照）
+      - name: phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 联系电话（快照）
+      - name: bank_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 社保卡开户行（快照）
+      - name: bank_account
+        type: VARCHAR(50)
+        nullable: true
+        comment: 社保卡账号（快照）
+      - name: agent_name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代办人姓名（快照）
+      - name: agent_relation
+        type: VARCHAR(50)
+        nullable: true
+        comment: 代办人与申请人关系（快照）
+      - name: snapshot_at
+        type: TIMESTAMP
+        nullable: false
+        defaultValue: NOW()
+        comment: 名单快照时间
+      - name: cert_status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Pending'
+        comment: 认证状态（Pending/Verified/Refused/Failed/Deceased/MovedOut/NotLocated/Exempt/Stopped/Invalid）
+      - name: verify_method
+        type: VARCHAR(20)
+        nullable: true
+        comment: 认证方式（Face/Onsite/Video/Photo/Other）
+      - name: verified_at
+        type: DATE
+        nullable: true
+        comment: 认证日期
+      - name: verified_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 认证人/填报人
+      - name: verifier_org
+        type: VARCHAR(200)
+        nullable: true
+        comment: 认证单位/村社区
+      - name: verifier_phone
+        type: VARCHAR(20)
+        nullable: true
+        comment: 认证人联系电话
+      - name: result_note
+        type: VARCHAR(500)
+        nullable: true
+        comment: 认证结果备注
+      - name: death_date
+        type: DATE
+        nullable: true
+        comment: 死亡日期（认证结果为去世时）
+      - name: expected_evidence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: Excel 名单中声明的凭证数
+      - name: evidence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 已匹配入库的凭证数
+      - name: evidence_status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'None'
+        comment: 凭证状态（None/Complete/Partial/Missing/Ambiguous）
+      - name: stop_decision
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'None'
+        comment: 停发决定（None/Pending/Approved/Deferred/Excluded）
+      - name: stop_reason
+        type: VARCHAR(50)
+        nullable: true
+        comment: 停发原因 key
+      - name: stop_note
+        type: VARCHAR(500)
+        nullable: true
+        comment: 停发决定备注
+      - name: follow_up_date
+        type: DATE
+        nullable: true
+        comment: 暂缓/跟进日期
+      - name: due_stop_date
+        type: DATE
+        nullable: true
+        comment: 应停发日期
+      - name: actual_stop_date
+        type: DATE
+        nullable: true
+        comment: 实际停发日期
+      - name: stop_application_id
+        type: BIGINT
+        nullable: true
+        comment: 停发后的档案ID
+      - name: stopped_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 停发办理时间
+      - name: source_batch_no
+        type: VARCHAR(50)
+        nullable: true
+        comment: 最近一次导入批次号
+      - name: source_file
+        type: VARCHAR(200)
+        nullable: true
+        comment: 最近一次来源文件名
+      - name: source_row
+        type: INTEGER
+        nullable: true
+        comment: 最近一次来源行号
+      - name: source_submitted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 最近一次腾讯表提交时间
+      - name: last_imported_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 最近一次导入时间
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: updated_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 更新时间
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: uq_elderly_cert_task_campaign_idcard
+        columns: [campaign_id, id_card]
+        unique: true
+        where: deleted_at IS NULL
+      - name: idx_elderly_cert_task_campaign_status
+        columns: [campaign_id, cert_status]
+      - name: idx_elderly_cert_task_campaign_region
+        columns: [campaign_id, hukou_town_id, hukou_village_id]
+      - name: idx_elderly_cert_task_idcard
+        columns: [id_card]
+      - name: idx_elderly_cert_task_application
+        columns: [application_id]
+      - name: idx_elderly_cert_task_stop
+        columns: [stop_decision]
+      - name: idx_elderly_cert_task_evidence
+        columns: [evidence_status]
+
+  # ── 认证凭证图片 ──
+  - name: nc_biz_elderly_cert_evidence
+    comment: "[年度认证] 认证凭证 - 一人多图按 seq 排序；对不上人的图片 task_id 为空保留待挂接"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: task_id
+        type: BIGINT
+        nullable: true
+        comment: 认证任务ID（未匹配为空）
+      - name: batch_id
+        type: BIGINT
+        nullable: true
+        comment: 导入批次ID
+      - name: seq
+        type: INTEGER
+        nullable: false
+        defaultValue: 1
+        comment: 同一人凭证序号（1..N）
+      - name: evidence_type
+        type: VARCHAR(30)
+        nullable: true
+        defaultValue: 'OTHER'
+        comment: 凭证类型（FACE/ONSITE/ID_CARD/OTHER）
+      - name: original_name
+        type: VARCHAR(300)
+        nullable: true
+        comment: 原始文件名
+      - name: stored_name
+        type: VARCHAR(300)
+        nullable: true
+        comment: 系统内部文件名（不含PII）
+      - name: display_name
+        type: VARCHAR(500)
+        nullable: true
+        comment: 导出/归档显示名
+      - name: source_zip
+        type: VARCHAR(300)
+        nullable: true
+        comment: 来源ZIP文件名
+      - name: source_entry
+        type: VARCHAR(1000)
+        nullable: true
+        comment: ZIP内条目路径
+      - name: match_status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Unmatched'
+        comment: 匹配状态（Matched/Unmatched/Ambiguous/Manual）
+      - name: match_method
+        type: VARCHAR(20)
+        nullable: true
+        comment: 匹配方式（ExcelName/ExcelUrl/Manual）
+      - name: photo_data
+        type: BYTEA
+        nullable: false
+        comment: 图片二进制
+      - name: image_format
+        type: VARCHAR(16)
+        nullable: false
+        defaultValue: 'jpg'
+        comment: 图片格式（jpg/png/webp）
+      - name: file_size
+        type: BIGINT
+        nullable: false
+        defaultValue: 0
+        comment: 字节数
+      - name: sha256
+        type: VARCHAR(64)
+        nullable: true
+        comment: SHA256（去重）
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+      - name: deleted_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 删除时间（软删除标记）
+    indexes:
+      - name: uq_elderly_cert_evidence_task_seq
+        columns: [task_id, seq]
+        unique: true
+        where: task_id IS NOT NULL AND deleted_at IS NULL
+      - name: uq_elderly_cert_evidence_task_sha
+        columns: [task_id, sha256]
+        unique: true
+        where: task_id IS NOT NULL AND sha256 IS NOT NULL AND deleted_at IS NULL
+      - name: idx_elderly_cert_evidence_batch
+        columns: [batch_id]
+      - name: idx_elderly_cert_evidence_sha
+        columns: [sha256]
+
+  # ── 导入批次 ──
+  - name: nc_biz_elderly_cert_import_batches
+    comment: "[年度认证] 导入批次 - Excel+ZIP 一次导入的统计与审计"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: campaign_id
+        type: BIGINT
+        nullable: false
+        comment: 认证批次ID
+      - name: batch_no
+        type: VARCHAR(40)
+        nullable: false
+        comment: 导入批次号
+      - name: file_name
+        type: VARCHAR(300)
+        nullable: true
+        comment: Excel文件名
+      - name: file_hash
+        type: VARCHAR(64)
+        nullable: true
+        comment: Excel SHA256
+      - name: file_size
+        type: BIGINT
+        nullable: true
+        comment: Excel字节数
+      - name: zip_name
+        type: VARCHAR(300)
+        nullable: true
+        comment: ZIP文件名
+      - name: zip_hash
+        type: VARCHAR(64)
+        nullable: true
+        comment: ZIP SHA256
+      - name: zip_size
+        type: BIGINT
+        nullable: true
+        comment: ZIP字节数
+      - name: total_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: Excel数据行数
+      - name: matched_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 匹配到名单的行数
+      - name: unknown_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 名单外行数
+      - name: duplicate_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 重复提交行数
+      - name: name_mismatch_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 姓名不一致行数
+      - name: invalid_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 无效行数
+      - name: evidence_total
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 声明凭证总数
+      - name: evidence_matched
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 已匹配凭证数
+      - name: evidence_missing
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 缺失凭证数
+      - name: evidence_unmatched
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 多余未匹配图片数
+      - name: applied_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 实际应用行数
+      - name: skipped_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 跳过行数
+      - name: error_rows
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 失败行数
+      - name: status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'Previewed'
+        comment: 状态（Previewed/Applied/PartiallyApplied/Revoked/Failed）
+      - name: applied_at
+        type: TIMESTAMP
+        nullable: true
+        comment: 应用时间
+      - name: applied_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 应用人
+      - name: remark
+        type: VARCHAR(500)
+        nullable: true
+        comment: 备注
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+      - name: created_by
+        type: VARCHAR(50)
+        nullable: true
+        comment: 创建人
+    indexes:
+      - name: uq_elderly_cert_import_batch_no
+        columns: [batch_no]
+        unique: true
+      - name: idx_elderly_cert_import_batch_campaign
+        columns: [campaign_id, status]
+      - name: idx_elderly_cert_import_batch_hash
+        columns: [file_hash]
+
+  # ── 导入行暂存 ──
+  - name: nc_biz_elderly_cert_import_rows
+    comment: "[年度认证] 导入行暂存 - 原始值、解析值、匹配结果，供异常处理和审计"
+    columns:
+      - name: id
+        type: BIGSERIAL
+        nullable: false
+        primaryKey: true
+        comment: 主键ID
+      - name: batch_id
+        type: BIGINT
+        nullable: false
+        comment: 导入批次ID
+      - name: row_no
+        type: INTEGER
+        nullable: false
+        comment: Excel行号
+      - name: raw_name
+        type: VARCHAR(100)
+        nullable: true
+        comment: 原始姓名
+      - name: raw_id_card
+        type: VARCHAR(30)
+        nullable: true
+        comment: 原始身份证号
+      - name: raw_phone
+        type: VARCHAR(30)
+        nullable: true
+        comment: 原始电话
+      - name: raw_village
+        type: VARCHAR(200)
+        nullable: true
+        comment: 原始村社区/乡镇
+      - name: raw_method
+        type: VARCHAR(50)
+        nullable: true
+        comment: 原始认证方式
+      - name: raw_result
+        type: VARCHAR(50)
+        nullable: true
+        comment: 原始认证结果
+      - name: raw_verified_at
+        type: VARCHAR(50)
+        nullable: true
+        comment: 原始认证日期
+      - name: raw_submitted_at
+        type: VARCHAR(50)
+        nullable: true
+        comment: 原始提交时间
+      - name: raw_remark
+        type: VARCHAR(1000)
+        nullable: true
+        comment: 原始备注
+      - name: raw_file_names
+        type: TEXT
+        nullable: true
+        comment: 原始图片文件名（换行分隔）
+      - name: raw_json
+        type: TEXT
+        nullable: true
+        comment: 原始行JSON（追溯用）
+      - name: id_card
+        type: VARCHAR(18)
+        nullable: true
+        comment: 规范化身份证号
+      - name: name
+        type: VARCHAR(50)
+        nullable: true
+        comment: 规范化姓名
+      - name: cert_status
+        type: VARCHAR(20)
+        nullable: true
+        comment: 解析后的认证状态
+      - name: verify_method
+        type: VARCHAR(20)
+        nullable: true
+        comment: 解析后的认证方式
+      - name: verified_at
+        type: DATE
+        nullable: true
+        comment: 解析后的认证日期
+      - name: expected_evidence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 声明凭证数
+      - name: matched_evidence_count
+        type: INTEGER
+        nullable: false
+        defaultValue: 0
+        comment: 匹配凭证数
+      - name: evidence_status
+        type: VARCHAR(20)
+        nullable: false
+        defaultValue: 'None'
+        comment: 凭证状态
+      - name: task_id
+        type: BIGINT
+        nullable: true
+        comment: 匹配到的任务ID
+      - name: match_status
+        type: VARCHAR(30)
+        nullable: false
+        defaultValue: 'Unknown'
+        comment: 行匹配状态（Matched/Unknown/NameMismatch/Invalid/Conflict）
+      - name: error_message
+        type: VARCHAR(500)
+        nullable: true
+        comment: 错误/跳过原因
+      - name: created_at
+        type: TIMESTAMP
+        nullable: true
+        defaultValue: NOW()
+        comment: 创建时间
+    indexes:
+      - name: idx_elderly_cert_import_row_batch
+        columns: [batch_id]
+      - name: idx_elderly_cert_import_row_idcard
+        columns: [id_card]
+      - name: idx_elderly_cert_import_row_status
+        columns: [match_status]

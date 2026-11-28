@@ -769,6 +769,8 @@ public partial class ApplicationFormViewModel
             if (result.HasValue)
             {
                 var app = result.Value;
+                // 异地协助模式加载
+                ApplicationType = app.ApplicationType ?? ApplicationTypeConstants.LOW_INCOME;
                 // 向导入口固化复核前快照：Step5 判定与 SaveEconomicDetailsAsync 随后会覆写本档，
                 // 此后读库不再是复核前状态（真旧值口径与 _loadedClassification 一致）
                 _entryApplicationSnapshot = app;

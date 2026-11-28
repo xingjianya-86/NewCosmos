@@ -1270,5 +1270,8 @@ public enum FormOperationMode
     EditFamilyInfo,
 
     /// <summary>家庭成员变更模式（锁定户主Step1，放开成员Step2增删，经济Step3可调、重新认定，停旧建新）</summary>
-    MemberChange
+    MemberChange,
+
+    /// <summary>异地协助模式（仅基本信息+入户调查，不走分类认定/归档）</summary>
+    RemoteAssistance
 }

@@ -143,6 +143,11 @@ public partial class ElderlyBenefitsHomeViewModel : ModuleHomeViewModelBase
             CanAccessElderlyBenefit, "高龄津贴月报表", "高龄津贴月报表");
 
     [RelayCommand]
+    private Task OpenCertificationAsync() =>
+        NavigateToFeatureAsync<Pages.ElderlyBenefits.ElderlyCertificationListPage>(
+            CanAccessElderlyBenefit, "高龄年度认证", "高龄年度认证");
+
+    [RelayCommand]
     private Task OpenReviewListAsync() =>
         NavigateToFeatureAsync<Pages.ElderlyBenefits.ElderlyReviewListPage>(
             CanAccessElderlyBenefit, "高龄津贴复核", "高龄津贴复核");

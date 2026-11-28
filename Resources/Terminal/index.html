@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>帝皇权杖 δ-me13 · 北斗终端序列 · 设计演示</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   帝皇权杖 δ-me13 · 北斗终端序列
+   沿用 Web 端「纸墨档案风」令牌（web/src/styles/tokens.css），
+   终端只加一枚"印色"，不改底色 / 文字 / 圆角 / 发丝线体系。
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme: light;
+  --paper:#f2ece1; --paper2:#f8f3e9; --paper3:#e9e1d1; --paper4:#dfd5c2;
+  --ink:#171310; --ink2:#4c4237; --muted:#8b7f6c; --muted2:#6d6354;
+  --seal:#ab3227; --seal-dark:#7f231b; --seal-soft:#f2dcd9;
+  --pine:#2e4738; --amber:#96681c; --violet:#5a4a72;
+  --indigo:#2f4a63; --bronze:#8a4b2a; --gold:#c9a24a;
+  --line:rgba(23,19,16,.16); --line-strong:rgba(23,19,16,.32); --line-faint:rgba(23,19,16,.07);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC',STSong,SimSun,Georgia,serif;
+  --sans:'Noto Sans SC','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Segoe UI',Arial,sans-serif;
+  --mono:'DM Mono','JetBrains Mono','Cascadia Mono',Consolas,'Courier New',monospace;
+  --r:2px;
+  --shadow:0 2px 8px rgba(23,19,16,.07);
+  --shadow-lg:0 14px 32px rgba(23,19,16,.14);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:14px; line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;font-family:var(--serif);font-weight:700;letter-spacing:.06em}
+p{margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:inherit}
+
+/* ── 顶栏：朱砂竖条 + 宋体标题 + DM Mono kicker（对齐 AppLayout） ── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:14px;
+  height:60px;padding:0 clamp(16px,3vw,34px);
+  background:rgba(248,243,233,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line-strong);
+}
+.topbar::before{content:'';width:4px;height:26px;background:var(--seal);border-radius:1px}
+.topbar h1{font-size:17px}
+.topbar .kicker{
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.24em;
+  color:var(--muted2);text-transform:uppercase;
+}
+.topbar .spacer{flex:1}
+.topbar .meta{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+
+/* ── Hero：北斗七星 ─────────────────────────────────────────────── */
+.hero{
+  position:relative;overflow:hidden;
+  padding:clamp(30px,5vw,58px) clamp(16px,4vw,54px) clamp(26px,4vw,46px);
+  background:
+    repeating-linear-gradient(0deg,transparent 0 34px,rgba(23,19,16,.04) 34px 35px),
+    var(--paper3);
+  border-bottom:1px solid var(--line-strong);
+}
+.hero-grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1.15fr);gap:clamp(20px,4vw,54px);align-items:center;max-width:1320px;margin:0 auto}
+.hero-kicker{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.24em;color:var(--muted2);text-transform:uppercase}
+.hero-kicker::before{content:'';width:7px;height:7px;background:var(--seal);border-radius:1px}
+.hero h2{margin-top:18px;font-size:clamp(28px,3.6vw,44px);line-height:1.28}
+.hero h2 em{font-style:normal;color:var(--seal)}
+.hero-desc{margin-top:16px;max-width:44ch;color:var(--ink2);font-size:14px;line-height:1.95}
+.hero-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.hero-stat{padding:9px 14px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r)}
+.hero-stat b{display:block;font-family:var(--mono);font-size:19px;color:var(--ink);letter-spacing:.04em}
+.hero-stat span{font-size:11px;color:var(--muted);letter-spacing:.1em}
+
+/* 北斗星图 */
+.dipper{position:relative;background:#0e1116;border:1px solid #262d38;border-radius:var(--r);box-shadow:var(--shadow-lg);overflow:hidden}
+.dipper::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 78% 10%,rgba(201,162,74,.18),transparent 60%);
+}
+.dipper-head{display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid rgba(233,226,214,.12);color:#8b8577;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase}
+.dipper-head::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.dipper svg{display:block;width:100%;height:auto}
+.star{fill:#e9e2d6;filter:drop-shadow(0 0 6px rgba(201,162,74,.85));animation:twinkle 3.4s ease-in-out infinite}
+.star.s7{fill:var(--gold);animation-duration:2.6s}
+.link{stroke:rgba(201,162,74,.55);stroke-width:1.1;fill:none;stroke-dasharray:600;stroke-dashoffset:600;animation:draw 2.4s var(--ease,ease) forwards}
+.slabel{fill:#9a9384;font-family:var(--mono);font-size:11px;letter-spacing:.12em}
+.sname{fill:#e9e2d6;font-family:var(--serif);font-size:13px;letter-spacing:.14em}
+@keyframes twinkle{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* ── 通用区块 ───────────────────────────────────────────────────── */
+.section{max-width:1320px;margin:0 auto;padding:clamp(34px,5vw,64px) clamp(16px,4vw,54px)}
+.section + .section{border-top:1px solid var(--line-faint)}
+.sec-head{margin-bottom:26px}
+.sec-kicker{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.24em;color:var(--muted2);text-transform:uppercase}
+.sec-kicker::before{content:'';display:inline-block;width:18px;height:1px;background:var(--seal);vertical-align:middle;margin-right:9px}
+.sec-head h3{margin-top:10px;font-size:clamp(21px,2.4vw,27px)}
+.sec-head p{margin-top:9px;max-width:78ch;color:var(--ink2);font-size:13.5px}
+
+/* ── 终端卡片 ───────────────────────────────────────────────────── */
+.term-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:16px}
+.term{
+  --acc:var(--seal);
+  position:relative;display:flex;flex-direction:column;gap:12px;
+  padding:18px 18px 16px;background:var(--paper2);
+  border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.term::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.term:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:rgba(23,19,16,.28)}
+.term-top{display:flex;align-items:center;justify-content:space-between}
+.term-code{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.14em;color:var(--acc)}
+.term-tag{font-size:10.5px;letter-spacing:.1em;padding:2px 7px;border:1px solid var(--line);border-radius:var(--r);color:var(--muted2);background:var(--paper)}
+.term-glyph{display:flex;align-items:center;gap:11px}
+.term-glyph svg{width:30px;height:30px;color:var(--acc);flex:none}
+.term-name{font-size:18px;letter-spacing:.1em}
+.term-en{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+.term dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:2px 0 0;font-size:12.5px}
+.term dt{color:var(--muted);white-space:nowrap}
+.term dd{margin:0;color:var(--ink2)}
+.term dd.k{font-family:var(--mono);letter-spacing:.05em}
+.term-foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:11px;border-top:1px solid var(--line-faint);font-size:11.5px;color:var(--muted)}
+.swatch{width:22px;height:10px;border-radius:1px;background:var(--acc);flex:none}
+.term.t1{--acc:#ab3227} .term.t2{--acc:#2f4a63} .term.t3{--acc:#96681c}
+.term.t4{--acc:#2e4738} .term.t5{--acc:#5a4a72} .term.t6{--acc:#8a4b2a}
+.term.t7{--acc:#c9a24a;background:#12161c;border-color:#262d38;color:#e9e2d6;box-shadow:0 8px 22px rgba(14,17,22,.35)}
+.term.t7 .term-name,.term.t7 dd{color:#e9e2d6}
+.term.t7 dt,.term.t7 .term-en,.term.t7 .term-foot{color:#8b8577}
+.term.t7 .term-top .term-tag{color:#8b8577;border-color:rgba(233,226,214,.2);background:rgba(233,226,214,.05)}
+.term.t7 .term-glyph svg{color:var(--gold)}
+.term.t7 .term-foot{border-top-color:rgba(233,226,214,.12)}
+.term.t7::before{background:linear-gradient(180deg,var(--gold),#7a5315)}
+
+/* ── 浏览器/手机外框 ────────────────────────────────────────────── */
+.frame{border:1px solid var(--line-strong);border-radius:var(--r);background:var(--paper2);box-shadow:var(--shadow-lg);overflow:hidden}
+.frame-bar{display:flex;align-items:center;gap:8px;padding:9px 13px;background:var(--paper3);border-bottom:1px solid var(--line)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--paper4)}
+.frame-url{flex:1;margin-left:6px;padding:4px 10px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r);font-family:var(--mono);font-size:11px;color:var(--muted2);letter-spacing:.03em}
+
+/* ── 登录页演示 ─────────────────────────────────────────────────── */
+.login-demo{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:20px;align-items:start}
+.switcher{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chip{
+  cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px;
+  padding:7px 12px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r);
+  font-size:12px;color:var(--ink2);transition:.16s ease;
+}
+.chip:hover{border-color:var(--line-strong);background:var(--paper)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper2)}
+.chip .c{font-family:var(--mono);font-size:11px;letter-spacing:.1em;opacity:.75}
+.chip.on .c{opacity:.6}
+
+.login-page{--acc:var(--seal);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);min-height:430px;background:var(--paper)}
+.login-hero{
+  position:relative;overflow:hidden;padding:38px clamp(24px,4vw,54px);
+  background:repeating-linear-gradient(0deg,transparent 0 34px,rgba(23,19,16,.045) 34px 35px),var(--paper3);
+  border-right:1px solid var(--line-strong);
+}
+.login-hero::before{content:'';position:absolute;top:0;bottom:0;left:22px;width:1px;background:rgba(171,50,39,.3);background:color-mix(in srgb,var(--acc) 30%,transparent)}
+.login-hero::after{content:'档';position:absolute;top:-16px;right:14px;font-family:var(--serif);font-size:150px;font-weight:700;line-height:1;opacity:.035;pointer-events:none}
+.lh-inner{position:relative;z-index:1;max-width:340px;padding-left:16px;border-left:1px solid rgba(171,50,39,.34);border-left:1px solid color-mix(in srgb,var(--acc) 34%,transparent)}
+.lh-kicker{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.22em;color:var(--muted2);text-transform:uppercase}
+.lh-kicker::before{content:'';width:7px;height:7px;background:var(--acc);border-radius:1px}
+.lh-title{margin-top:16px;font-size:clamp(24px,2.6vw,34px);line-height:1.3}
+.lh-desc{margin-top:12px;color:var(--ink2);font-size:12.5px;line-height:1.9}
+.lh-points{display:grid;gap:9px;margin-top:20px;padding:0;list-style:none}
+.lh-points li{display:flex;gap:9px;font-size:12px;color:var(--ink2)}
+.lh-points i{flex:none;width:6px;height:6px;margin-top:7px;background:var(--acc);border-radius:1px;opacity:.85}
+.lh-foot{display:flex;align-items:center;gap:10px;margin-top:26px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.08em}
+.lh-foot::before{content:'';width:24px;height:1px;background:var(--acc);opacity:.6}
+.stamp{
+  position:absolute;right:22px;bottom:26px;z-index:1;display:flex;align-items:center;justify-content:center;
+  width:74px;height:74px;border:2px solid var(--acc);border-radius:var(--r);color:var(--acc);
+  font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:.14em;text-align:center;line-height:1.2;
+  opacity:.8;transform:rotate(-5deg);box-shadow:inset 0 0 0 2px rgba(171,50,39,.14);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--acc) 14%,transparent);
+}
+.login-panel{display:flex;flex-direction:column;justify-content:center;padding:26px 22px;background:var(--paper)}
+.login-card{width:100%;max-width:340px;padding:24px 24px 22px;border:1px solid var(--line);border-top:3px solid var(--acc);border-radius:var(--r);background:var(--paper2);box-shadow:var(--shadow)}
+.lc-kicker{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+.lc-title{margin-top:7px;font-size:20px}
+.lc-sub{margin-top:5px;font-size:12px;color:var(--muted2)}
+.field{margin-top:14px}
+.field label{display:block;font-size:12px;color:var(--ink2);margin-bottom:5px}
+.input{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);color:var(--muted);font-size:13px}
+.input svg{width:14px;height:14px;flex:none}
+.opts{display:flex;align-items:center;justify-content:space-between;margin-top:13px;font-size:12px;color:var(--muted2)}
+.check{display:inline-flex;align-items:center;gap:7px}
+.check i{width:13px;height:13px;border:1px solid var(--line-strong);border-radius:1px;background:var(--acc);position:relative}
+.check i::after{content:'';position:absolute;left:3.5px;top:1px;width:4px;height:7px;border:solid var(--paper2);border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.btn{display:block;width:100%;margin-top:16px;padding:11px 0;background:var(--acc);border:none;border-radius:var(--r);color:#fff;font-family:var(--serif);font-size:15px;letter-spacing:.3em;text-align:center;cursor:pointer;transition:.16s ease}
+.btn:hover{filter:brightness(.93)}
+.lc-tip{margin-top:12px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+.term-badge{
+  position:absolute;top:12px;right:14px;z-index:5;display:inline-flex;align-items:center;gap:7px;
+  padding:5px 11px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ink2);box-shadow:var(--shadow)
+}
+.term-badge b{color:var(--acc);font-weight:700}
+.login-stage{position:relative}
+
+/* ── 在线会话表 ─────────────────────────────────────────────────── */
+.table-wrap{border:1px solid var(--line-strong);border-radius:var(--r);background:var(--paper2);box-shadow:var(--shadow);overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:820px}
+thead th{
+  text-align:left;padding:11px 15px;background:var(--paper3);border-bottom:1px solid var(--line-strong);
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;color:var(--muted2);text-transform:uppercase;white-space:nowrap;
+}
+tbody td{padding:12px 15px;border-bottom:1px solid var(--line-faint);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--paper)}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--paper);font-size:12px;white-space:nowrap}
+.pill .code{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em}
+.pill .dotc{width:8px;height:8px;border-radius:1px}
+.fam{font-size:11px;letter-spacing:.08em;padding:3px 9px;border-radius:var(--r);border:1px solid var(--line);color:var(--muted2);background:var(--paper)}
+.fam.d{border-color:rgba(47,74,99,.4);color:#2f4a63;background:rgba(47,74,99,.06)}
+.fam.m{border-color:rgba(46,71,56,.4);color:#2e4738;background:rgba(46,71,56,.06)}
+.online{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--pine)}
+.online i{width:8px;height:8px;border-radius:50%;background:#3f7d55;box-shadow:0 0 0 0 rgba(63,125,85,.55);animation:pulse 2.2s infinite}
+.offline{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+.offline i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,125,85,.5)}70%{box-shadow:0 0 0 7px rgba(63,125,85,0)}100%{box-shadow:0 0 0 0 rgba(63,125,85,0)}}
+.who{display:flex;flex-direction:column;gap:1px}
+.who b{font-weight:600}
+.who span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ── T7 天鉴 暗色控制台 ─────────────────────────────────────────── */
+.console{
+  --c-bg:#0e1116; --c-panel:#151a22; --c-line:rgba(233,226,214,.12); --c-text:#e9e2d6; --c-muted:#8b8577; --c-gold:#c9a24a;
+  position:relative;overflow:hidden;background:var(--c-bg);color:var(--c-text);
+  border:1px solid #262d38;border-radius:var(--r);box-shadow:0 20px 48px rgba(14,17,22,.45);
+}
+.console-bg{
+  position:absolute;inset:0;background-color:#0e1116;
+  background-image:
+    linear-gradient(180deg,rgba(14,17,22,.35),rgba(14,17,22,.82)),
+    radial-gradient(120% 90% at 80% 0%,rgba(201,162,74,.16),transparent 55%);
+}
+/* 程序化星图：不依赖外部图片，离线可用 */
+.console-bg::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    radial-gradient(1.6px 1.6px at 10% 22%, rgba(233,226,214,.9), transparent 65%),
+    radial-gradient(1.4px 1.4px at 24% 62%, rgba(233,226,214,.7), transparent 65%),
+    radial-gradient(1.9px 1.9px at 38% 14%, rgba(201,162,74,.85), transparent 65%),
+    radial-gradient(1.3px 1.3px at 52% 44%, rgba(233,226,214,.65), transparent 65%),
+    radial-gradient(1.5px 1.5px at 66% 74%, rgba(233,226,214,.75), transparent 65%),
+    radial-gradient(2.1px 2.1px at 80% 18%, rgba(201,162,74,.9), transparent 65%),
+    radial-gradient(1.4px 1.4px at 88% 56%, rgba(233,226,214,.7), transparent 65%),
+    radial-gradient(1.3px 1.3px at 16% 84%, rgba(233,226,214,.6), transparent 65%),
+    radial-gradient(1.5px 1.5px at 46% 88%, rgba(233,226,214,.55), transparent 65%),
+    radial-gradient(70% 60% at 82% 6%, rgba(201,162,74,.2), transparent 70%);
+}
+/* 可选：把 assets/starfield.png 放进来会自动叠加；未提供时仅用上面的程序化星图 */
+.console-inner{position:relative;z-index:1;padding:clamp(18px,3vw,32px)}
+.console-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--c-line)}
+.console-head .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--c-gold);text-transform:uppercase}
+.console-head h3{margin-top:8px;font-size:clamp(20px,2.4vw,27px);color:var(--c-text)}
+.console-head p{margin-top:6px;font-size:12.5px;color:var(--c-muted);max-width:60ch}
+.clock{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--c-muted);text-align:right}
+.clock b{display:block;font-size:22px;color:var(--c-gold);letter-spacing:.08em;font-weight:600}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-top:18px}
+.stat{padding:14px 15px;background:rgba(21,26,34,.72);border:1px solid var(--c-line);border-radius:var(--r);backdrop-filter:blur(3px)}
+.stat .lab{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--c-muted);text-transform:uppercase}
+.stat .val{margin-top:7px;font-family:var(--mono);font-size:27px;letter-spacing:.02em;color:var(--c-text);line-height:1.15}
+.stat .val small{font-size:13px;color:var(--c-muted);margin-left:4px}
+.stat .sub{margin-top:5px;font-size:11.5px;color:var(--c-muted)}
+.stat.g .val{color:var(--c-gold)}
+.console-cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;margin-top:16px}
+.panel{background:rgba(21,26,34,.72);border:1px solid var(--c-line);border-radius:var(--r);padding:15px 16px}
+.panel h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--c-muted);text-transform:uppercase;font-weight:600}
+.map{margin-top:12px}
+.map svg{display:block;width:100%;height:auto}
+.map .mline{stroke:rgba(201,162,74,.45);stroke-width:1;fill:none}
+.map .mnode{fill:#e9e2d6}
+.map .mnode.g{fill:var(--c-gold);filter:drop-shadow(0 0 7px rgba(201,162,74,.9))}
+.map .mtext{fill:#a7a091;font-family:var(--mono);font-size:11px;letter-spacing:.1em}
+.map .mname{fill:#e9e2d6;font-family:var(--serif);font-size:12.5px;letter-spacing:.12em}
+.ctable{width:100%;min-width:0;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+.ctable th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--c-line);font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--c-muted);text-transform:uppercase}
+.ctable td{padding:9px 8px;border-bottom:1px solid rgba(233,226,214,.06);color:#d6d0c4}
+.ctable tr:last-child td{border-bottom:none}
+.cdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px}
+.cdot.on{background:#4f9d6b;box-shadow:0 0 7px rgba(79,157,107,.9)}
+.cdot.off{background:#6a6459}
+.console-foot{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;padding-top:14px;border-top:1px solid var(--c-line);font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--c-muted)}
+.console-foot span::before{content:'';display:inline-block;width:6px;height:6px;border-radius:1px;background:var(--c-gold);margin-right:7px;vertical-align:middle}
+
+/* ── 移动端形态 ─────────────────────────────────────────────────── */
+.phones{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;align-items:start}
+.phone{width:100%;max-width:300px;margin:0 auto;border:1px solid var(--line-strong);border-radius:22px;background:var(--paper2);box-shadow:var(--shadow-lg);overflow:hidden;padding:9px}
+.phone-screen{border-radius:15px;overflow:hidden;background:var(--paper);border:1px solid var(--line)}
+.phone-status{display:flex;justify-content:space-between;padding:6px 13px;font-family:var(--mono);font-size:10px;color:var(--muted2);background:var(--paper3)}
+.phone-nav{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);background:var(--paper2)}
+.phone-nav::before{content:'';width:3px;height:17px;background:var(--acc);border-radius:1px}
+.phone-nav b{font-family:var(--serif);font-size:13.5px;letter-spacing:.08em}
+.phone-nav .tag{margin-left:auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;padding:2px 7px;border:1px solid var(--line);border-radius:var(--r);color:var(--muted2)}
+.phone-body{padding:13px}
+.m-hero{padding:15px 14px;background:var(--paper3);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:var(--r)}
+.m-hero .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--muted2);text-transform:uppercase}
+.m-hero b{display:block;margin-top:6px;font-family:var(--serif);font-size:17px;letter-spacing:.08em}
+.m-hero span{display:block;margin-top:5px;font-size:11.5px;color:var(--ink2)}
+.m-list{display:grid;gap:9px;margin-top:12px}
+.m-item{display:flex;align-items:center;gap:10px;padding:10px 11px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r)}
+.m-item .ic{width:26px;height:26px;display:grid;place-items:center;border-radius:var(--r);background:rgba(171,50,39,.12);background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--acc);flex:none}
+.m-item .ic svg{width:14px;height:14px}
+.m-item .tx{min-width:0}
+.m-item .tx b{display:block;font-size:12.5px;font-weight:600}
+.m-item .tx span{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em}
+.m-item .st{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--pine)}
+.m-tab{display:flex;justify-content:space-between;padding:9px 14px 11px;border-top:1px solid var(--line);background:var(--paper2)}
+.m-tab i{width:22px;height:3px;border-radius:2px;background:var(--paper4)}
+.m-tab i.on{background:var(--acc)}
+.phone.p1{--acc:#2e4738} .phone.p2{--acc:#8a4b2a}
+.phone-cap{margin-top:12px;text-align:center;font-size:12px;color:var(--muted2)}
+.phone-cap b{color:var(--ink2);font-weight:600}
+
+/* ── 落地清单 ───────────────────────────────────────────────────── */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.note{padding:16px 18px;background:var(--paper2);border:1px solid var(--line);border-radius:var(--r)}
+.note h4{font-size:15px;margin-bottom:8px}
+.note ul{margin:0;padding-left:17px;color:var(--ink2);font-size:12.5px;line-height:1.95}
+.note code{font-family:var(--mono);font-size:11.5px;background:var(--paper3);padding:1px 5px;border-radius:1px}
+.foot{padding:26px clamp(16px,4vw,54px) 40px;border-top:1px solid var(--line-strong);color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-align:center}
+@media (max-width:960px){
+  .hero-grid,.login-demo,.console-cols{grid-template-columns:1fr}
+  .login-page{grid-template-columns:1fr;min-height:0}
+  .login-hero{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>帝皇权杖 δ-me13</h1>
+  <span class="kicker">Terminal Sequence</span>
+  <span class="spacer"></span>
+  <span class="meta">北斗终端序列 · 设计演示 · v0.1</span>
+</header>
+
+<!-- ═══════════ Hero ═══════════ -->
+<section class="hero">
+  <div class="hero-grid">
+    <div>
+      <span class="hero-kicker">NewCosmos · Client Identity</span>
+      <h2>七枚终端，<em>一个身份</em><br/>一套会话，两条端族</h2>
+      <p class="hero-desc">
+        用北斗七星给每一个登录终端编号：T1 御座到 T6 星使是六个真实客户端，
+        T7 天鉴是管理 / 审计 / 大屏控制台。名字只进 UI 与文档，工程名、安装包名、更新清单一律不动。
+      </p>
+      <div class="hero-stats">
+        <div class="hero-stat"><b>7</b><span>终端编号</span></div>
+        <div class="hero-stat"><b>6</b><span>真实客户端</span></div>
+        <div class="hero-stat"><b>2</b><span>端族配额</span></div>
+        <div class="hero-stat"><b>0</b><span>DDL 迁移</span></div>
+      </div>
+    </div>
+
+    <div class="dipper">
+      <div class="dipper-head">Beidou · Terminal Map</div>
+      <svg viewBox="0 0 360 178" role="img" aria-label="北斗七星终端星图">
+        <path class="link" d="M56,124 L112,140 L172,132 L214,100 L258,68 L296,38 L330,14" />
+        <g class="star"><circle cx="56" cy="124" r="4.4"/></g>
+        <g class="star"><circle cx="112" cy="140" r="4.4"/></g>
+        <g class="star"><circle cx="172" cy="132" r="4.4"/></g>
+        <g class="star"><circle cx="214" cy="100" r="4.4"/></g>
+        <g class="star"><circle cx="258" cy="68" r="4.4"/></g>
+        <g class="star"><circle cx="296" cy="38" r="4.4"/></g>
+        <g class="star s7"><circle cx="330" cy="14" r="5.4"/></g>
+        <text class="slabel" x="44" y="146">T1</text><text class="sname" x="34" y="164">御座</text>
+        <text class="slabel" x="100" y="162">T2</text><text class="sname" x="90" y="176">云阙</text>
+        <text class="slabel" x="160" y="154">T3</text><text class="sname" x="150" y="170">行杖</text>
+        <text class="slabel" x="202" y="86">T4</text><text class="sname" x="192" y="74">轻舟</text>
+        <text class="slabel" x="246" y="56">T5</text><text class="sname" x="236" y="44">星阁</text>
+        <text class="slabel" x="284" y="28">T6</text><text class="sname" x="274" y="16">星使</text>
+        <text class="slabel" x="322" y="40" style="fill:#c9a24a">T7</text><text class="sname" x="312" y="56" style="fill:#c9a24a">天鉴</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 终端序列 ═══════════ -->
+<section class="section" id="sequence">
+  <div class="sec-head">
+    <span class="sec-kicker">01 · Terminal Sequence</span>
+    <h3>北斗终端序列</h3>
+    <p>显示名只用于 UI / 日志 / 文档；工程名与发布物保持不变，自动更新、免登录恢复、安装路径都不受影响。</p>
+  </div>
+
+  <div class="term-grid">
+    <!-- T1 -->
+    <article class="term t1">
+      <div class="term-top"><span class="term-code">T1</span><span class="term-tag">桌面族 · max_desktop</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 20V9l7-5 7 5v11"/><path d="M9 20v-6h6v6"/><path d="M3 20h18"/></svg>
+        <div><div class="term-name">天枢 · 御座</div><div class="term-en">Throne</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>Windows 桌面主端</dd>
+        <dt>device_kind</dt><dd class="k">desktop</dd>
+        <dt>工程</dt><dd class="k">NewCosmosCode</dd>
+        <dt>产物</dt><dd class="k">NewCosmosSetup_*.exe</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>全功能办理 · 打印 · Office · 直连数据库</div>
+    </article>
+
+    <!-- T2 -->
+    <article class="term t2">
+      <div class="term-top"><span class="term-code">T2</span><span class="term-tag">桌面族 · max_desktop</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20V7l8-4 8 4v13"/><path d="M4 11h16"/><path d="M9 20v-5h6v5"/></svg>
+        <div><div class="term-name">天璇 · 云阙</div><div class="term-en">Skyhold</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>浏览器桌面端</dd>
+        <dt>device_kind</dt><dd class="k">web</dd>
+        <dt>工程</dt><dd class="k">NewCosmosWeb / web</dd>
+        <dt>产物</dt><dd class="k">web/dist → .1</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>日常业务 · 审批 · 查询 · 报表</div>
+    </article>
+
+    <!-- T3 -->
+    <article class="term t3">
+      <div class="term-top"><span class="term-code">T3</span><span class="term-tag">移动族 · max_mobile</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18"/><circle cx="12" cy="7" r="3"/><path d="M8 21h8"/></svg>
+        <div><div class="term-name">天玑 · 行杖</div><div class="term-en">Wayfarer</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>Android 主端</dd>
+        <dt>device_kind</dt><dd class="k">android</dd>
+        <dt>工程</dt><dd class="k">NewCosmosCode</dd>
+        <dt>产物</dt><dd class="k">NewCosmosSetup_*.apk</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>入户采集 · 现场录入 · 移动办理</div>
+    </article>
+
+    <!-- T4 -->
+    <article class="term t4">
+      <div class="term-top"><span class="term-code">T4</span><span class="term-tag">移动族 · max_mobile</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16l8-10 8 10"/><path d="M3 19c2 0 2 1.5 4.5 1.5S10 19 12 19s2 1.5 4.5 1.5S19 19 21 19"/></svg>
+        <div><div class="term-name">天权 · 轻舟</div><div class="term-en">Drift</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>浏览器移动端</dd>
+        <dt>device_kind</dt><dd class="k">mobile-web</dd>
+        <dt>工程</dt><dd class="k">NewCosmosWeb / web</dd>
+        <dt>产物</dt><dd class="k">同一份 web/dist</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>免安装 · 临时查看 · 轻量办理</div>
+    </article>
+
+    <!-- T5 -->
+    <article class="term t5">
+      <div class="term-top"><span class="term-code">T5</span><span class="term-tag">桌面族 · 新增 kind</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18"/><path d="M5 21V11l7-6 7 6v10"/><path d="M9 21v-6h6v6"/><path d="M12 5V2"/></svg>
+        <div><div class="term-name">玉衡 · 星阁</div><div class="term-en">Pavilion</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>Windows WebView2 壳端</dd>
+        <dt>device_kind</dt><dd class="k">shell</dd>
+        <dt>工程</dt><dd class="k">NewCosmos.Shell</dd>
+        <dt>产物</dt><dd class="k">NewCosmosShellSetup_*.exe</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>托盘常驻 · 快速入口 · 打印代理</div>
+    </article>
+
+    <!-- T6 -->
+    <article class="term t6">
+      <div class="term-top"><span class="term-code">T6</span><span class="term-tag">移动族 · 新增 kind</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l2.4 5.2 5.6.6-4.2 3.8 1.2 5.6L12 15.6 6.99 18.2 8.2 12.6 4 8.8l5.6-.6z"/></svg>
+        <div><div class="term-name">开阳 · 星使</div><div class="term-en">Envoy</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>Android Capacitor 壳端</dd>
+        <dt>device_kind</dt><dd class="k">capacitor</dd>
+        <dt>工程</dt><dd class="k">NewCosmosWeb / mobile</dd>
+        <dt>产物</dt><dd class="k">newcosmos-*.apk</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>安装包入口 · 移动端统一壳</div>
+    </article>
+
+    <!-- T7 -->
+    <article class="term t7">
+      <div class="term-top"><span class="term-code">T7</span><span class="term-tag">不参与登录</span></div>
+      <div class="term-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8"/><path d="M12 6.5l1.6 3.4 3.6.4-2.7 2.4.8 3.6L12 14.4 8.7 16.3l.8-3.6-2.7-2.4 3.6-.4z"/></svg>
+        <div><div class="term-name">摇光 · 天鉴</div><div class="term-en">Mirror</div></div>
+      </div>
+      <dl>
+        <dt>形态</dt><dd>管理 / 审计 / 大屏控制台</dd>
+        <dt>device_kind</dt><dd class="k">mirror（预留）</dd>
+        <dt>工程</dt><dd class="k">Web 内页面（非独立客户端）</dd>
+        <dt>产物</dt><dd class="k">随 web 构建，无独立安装包</dd>
+      </dl>
+      <div class="term-foot"><span class="swatch"></span>全局在线态势 · 审计 · 指挥大屏</div>
+    </article>
+  </div>
+</section>
+
+<!-- ═══════════ 登录页演示 ═══════════ -->
+<section class="section" id="login">
+  <div class="sec-head">
+    <span class="sec-kicker">02 · Login Surface</span>
+    <h3>登录页 · 终端徽标与换肤</h3>
+    <p>登录页只多一枚「终端徽标」和一个印色；点下面的终端可实时切换徽标、印章、按钮与主色。</p>
+  </div>
+
+  <div class="switcher" id="switcher">
+    <button class="chip on" data-t="t1"><span class="c">T1</span>天枢·御座</button>
+    <button class="chip" data-t="t2"><span class="c">T2</span>天璇·云阙</button>
+    <button class="chip" data-t="t3"><span class="c">T3</span>天玑·行杖</button>
+    <button class="chip" data-t="t4"><span class="c">T4</span>天权·轻舟</button>
+    <button class="chip" data-t="t5"><span class="c">T5</span>玉衡·星阁</button>
+    <button class="chip" data-t="t6"><span class="c">T6</span>开阳·星使</button>
+    <button class="chip" data-t="t7"><span class="c">T7</span>摇光·天鉴 →</button>
+  </div>
+
+  <div class="login-demo">
+    <div class="login-stage frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="frame-url" id="frameUrl">https://cosmos.sua17.cn/login</span>
+      </div>
+      <div class="login-page" id="loginPage" style="--acc:#ab3227">
+        <div class="term-badge" id="termBadge"><b>T1</b> 天枢 · 御座</div>
+        <div class="login-hero">
+          <div class="lh-inner">
+            <span class="lh-kicker">NewCosmos · Archive</span>
+            <div class="lh-title">帝皇权杖<br/>δ-me13</div>
+            <p class="lh-desc">社会救助业务一体化协同，数据在政务网络内安全流转。</p>
+            <ul class="lh-points">
+              <li><i></i>统一身份认证，会话按端族严格管控</li>
+              <li><i></i>打印机按账户绑定，手机入队、电脑执行</li>
+              <li><i></i>桌面与手机自适应，无需安装客户端</li>
+            </ul>
+            <div class="lh-foot">v2.0.20261127 · 政务内网专用</div>
+          </div>
+          <div class="stamp" id="stamp">档案<br/>专用</div>
+        </div>
+        <div class="login-panel">
+          <div class="login-card">
+            <div class="lc-kicker">Account · Sign in</div>
+            <div class="lc-title">账号登录</div>
+            <div class="lc-sub">请使用政务账号登录系统</div>
+            <div class="field"><label>用户名</label><div class="input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>请输入用户名</div></div>
+            <div class="field"><label>密码</label><div class="input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="1"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>••••••••</div></div>
+            <div class="opts"><span class="check"><i></i>记住账号</span><span>忘记密码请联系管理员</span></div>
+            <button class="btn">登 录</button>
+            <p class="lc-tip">登录即表示同意按政务数据安全要求使用本系统。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <h4>这一枚徽标解决什么</h4>
+      <ul>
+        <li>用户一眼知道自己在哪一端登录，避免「网页还是应用」混淆。</li>
+        <li>管理员在「在线会话」里按 <code>T1–T7</code> 一眼定位是哪台客户端。</li>
+        <li>徽标由 <code>device_kind</code> 决定，不信任客户端自报名称。</li>
+        <li>印色只作强调，底色、文字、发丝线、圆角仍走原纸墨令牌。</li>
+      </ul>
+      <h4 style="margin-top:16px">身份识别（新增）</h4>
+      <ul>
+        <li>T5 注入 UA 标记 <code>NewCosmosShell/版本</code> → <code>shell</code>。</li>
+        <li>T6 已有 <code>NewCosmosAndroid/版本</code> → <code>capacitor</code>。</li>
+        <li>两端 <code>SessionConstants</code> 增加 6 个 kind 与端族映射。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 在线会话 ═══════════ -->
+<section class="section" id="sessions">
+  <div class="sec-head">
+    <span class="sec-kicker">03 · Online Sessions</span>
+    <h3>在线会话 · 终端列</h3>
+    <p>把「设备名」升级为「终端徽标 + 设备名」，并标注端族；互踢仍按端族配额执行。</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>账号</th><th>终端</th><th>设备</th><th>端族</th><th>版本</th><th>最后心跳</th><th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="who"><b>李文秀</b><span>liwx</span></div></td>
+          <td><span class="pill" style="--acc:#ab3227"><span class="dotc" style="background:#ab3227"></span><span class="code" style="color:#ab3227">T1</span> 天枢·御座</span></td>
+          <td>MZ-01</td><td><span class="fam d">桌面族</span></td>
+          <td class="mono">1.2.20261124</td><td class="mono">14:22:07</td>
+          <td><span class="online"><i></i>在线</span></td>
+        </tr>
+        <tr>
+          <td><div class="who"><b>李文秀</b><span>liwx</span></div></td>
+          <td><span class="pill" style="--acc:#2f4a63"><span class="dotc" style="background:#2f4a63"></span><span class="code" style="color:#2f4a63">T2</span> 天璇·云阙</span></td>
+          <td>Chrome / Windows</td><td><span class="fam d">桌面族</span></td>
+          <td class="mono">2.0.20261127</td><td class="mono">14:21:58</td>
+          <td><span class="online"><i></i>在线</span></td>
+        </tr>
+        <tr>
+          <td><div class="who"><b>王建国</b><span>wangjg</span></div></td>
+          <td><span class="pill" style="--acc:#96681c"><span class="dotc" style="background:#96681c"></span><span class="code" style="color:#96681c">T3</span> 天玑·行杖</span></td>
+          <td>Redmi K70</td><td><span class="fam m">移动族</span></td>
+          <td class="mono">1.2.20261124</td><td class="mono">14:19:41</td>
+          <td><span class="online"><i></i>在线</span></td>
+        </tr>
+        <tr>
+          <td><div class="who"><b>王建国</b><span>wangjg</span></div></td>
+          <td><span class="pill" style="--acc:#2e4738"><span class="dotc" style="background:#2e4738"></span><span class="code" style="color:#2e4738">T4</span> 天权·轻舟</span></td>
+          <td>Safari / iOS</td><td><span class="fam m">移动族</span></td>
+          <td class="mono">2.0.20261127</td><td class="mono">13:58:12</td>
+          <td><span class="offline"><i></i>离线</span></td>
+        </tr>
+        <tr>
+          <td><div class="who"><b>陈慧敏</b><span>chenhm</span></div></td>
+          <td><span class="pill" style="--acc:#5a4a72"><span class="dotc" style="background:#5a4a72"></span><span class="code" style="color:#5a4a72">T5</span> 玉衡·星阁</span></td>
+          <td>MZ-03</td><td><span class="fam d">桌面族</span></td>
+          <td class="mono">2.0.20261127</td><td class="mono">14:22:03</td>
+          <td><span class="online"><i></i>在线</span></td>
+        </tr>
+        <tr>
+          <td><div class="who"><b>陈慧敏</b><span>chenhm</span></div></td>
+          <td><span class="pill" style="--acc:#8a4b2a"><span class="dotc" style="background:#8a4b2a"></span><span class="code" style="color:#8a4b2a">T6</span> 开阳·星使</span></td>
+          <td>HUAWEI Mate 60</td><td><span class="fam m">移动族</span></td>
+          <td class="mono">2.0.20261127</td><td class="mono">14:12:36</td>
+          <td><span class="online"><i></i>在线</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2" style="margin-top:16px">
+    <div class="note">
+      <h4>互踢规则（不变）</h4>
+      <ul>
+        <li>桌面族 <code>desktop / web / shell</code> 共用 <code>max_desktop=1</code>。</li>
+        <li>移动族 <code>android / mobile-web / capacitor</code> 共用 <code>max_mobile=1</code>。</li>
+        <li>新登录顶掉旧端；桌面 + 移动仍可并存。</li>
+        <li>同 <code>device_id</code> 重复登录一律顶号，不留垃圾行。</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h4>被顶号提示（统一）</h4>
+      <ul>
+        <li>桌面端：SnackBar「账号已在其他设备登录」+ 30 秒保存宽限。</li>
+        <li>网页端：把服务端 <code>SESSION_REPLACED</code> 消息透传到 Toast，不再泛化成「登录状态已失效」。</li>
+        <li>两端文案同源 <code>SessionConstants.GetEndedMessage</code>。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ T7 天鉴 ═══════════ -->
+<section class="section" id="console">
+  <div class="sec-head">
+    <span class="sec-kicker">04 · T7 Mirror Console</span>
+    <h3>摇光 · 天鉴 控制台</h3>
+    <p>管理 / 审计 / 大屏专用暗色主题：深墨底 + 鎏金 + 星图，独立于纸墨体系；登录复用 T2 云阙，仅界面与权限独立。</p>
+  </div>
+
+  <div class="console">
+    <div class="console-bg"></div>
+    <div class="console-inner">
+      <div class="console-head">
+        <div>
+          <div class="k">T7 · Mirror · 天鉴控制台</div>
+          <h3>在线态势 · 终端与会话</h3>
+          <p>全系统登录终端的实时分布、端族配额占用与异常顶号事件。</p>
+        </div>
+        <div class="clock"><b id="clock">14:22:08</b>2026-11-27 · 星期五</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat g"><div class="lab">在线终端</div><div class="val">12<small>/ 48</small></div><div class="sub">桌面族 7 · 移动族 5</div></div>
+        <div class="stat"><div class="lab">桌面族占用</div><div class="val">7<small>/ 12</small></div><div class="sub">max_desktop = 1 / 账号</div></div>
+        <div class="stat"><div class="lab">移动族占用</div><div class="val">5<small>/ 12</small></div><div class="sub">max_mobile = 1 / 账号</div></div>
+        <div class="stat"><div class="lab">今日顶号</div><div class="val">23<small>次</small></div><div class="sub">other_device_login</div></div>
+        <div class="stat"><div class="lab">异常会话</div><div class="val">0</div><div class="sub">device_mismatch / expired</div></div>
+      </div>
+
+      <div class="console-cols">
+        <div class="panel">
+          <h4>终端星图 · 端族分布</h4>
+          <div class="map">
+            <svg viewBox="0 0 560 200" role="img" aria-label="终端分布星图">
+              <path class="mline" d="M60,150 L130,168 L205,158 L255,124 L305,88 L350,54 L392,26" />
+              <g class="mnode"><circle cx="60" cy="150" r="5"/></g>
+              <g class="mnode"><circle cx="130" cy="168" r="5"/></g>
+              <g class="mnode"><circle cx="205" cy="158" r="5"/></g>
+              <g class="mnode"><circle cx="255" cy="124" r="5"/></g>
+              <g class="mnode"><circle cx="305" cy="88" r="5"/></g>
+              <g class="mnode"><circle cx="350" cy="54" r="5"/></g>
+              <g class="mnode g"><circle cx="392" cy="26" r="6"/></g>
+              <text class="mtext" x="46" y="172">T1 · 3 在线</text><text class="mname" x="46" y="188">御座</text>
+              <text class="mtext" x="116" y="190">T2 · 2 在线</text><text class="mname" x="116" y="206" style="display:none">云阙</text>
+              <text class="mtext" x="191" y="180">T3 · 3 在线</text>
+              <text class="mtext" x="241" y="112">T4 · 1 在线</text>
+              <text class="mtext" x="291" y="76">T5 · 2 在线</text>
+              <text class="mtext" x="336" y="42">T6 · 1 在线</text>
+              <text class="mtext" x="378" y="18" style="fill:#c9a24a">T7 · 天鉴</text>
+              <line class="mline" x1="430" y1="40" x2="530" y2="40" stroke-dasharray="3 4"/>
+              <text class="mtext" x="430" y="34">端族配额</text>
+              <text class="mtext" x="430" y="64" style="fill:#e9e2d6">桌面族 7 / 12</text>
+              <text class="mtext" x="430" y="86" style="fill:#e9e2d6">移动族 5 / 12</text>
+              <text class="mtext" x="430" y="120">今日顶号 23</text>
+              <text class="mtext" x="430" y="142">宽限写入 4</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>最近会话事件</h4>
+          <table class="ctable">
+            <thead><tr><th>时间</th><th>账号</th><th>终端</th><th>事件</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">14:22:03</td><td>chenhm</td><td style="color:#c9a24a">T5 星阁</td><td><span class="cdot on"></span>心跳续期</td></tr>
+              <tr><td class="mono">14:21:58</td><td>liwx</td><td style="color:#e9e2d6">T2 云阙</td><td><span class="cdot on"></span>顶掉 T1 御座</td></tr>
+              <tr><td class="mono">14:19:41</td><td>wangjg</td><td style="color:#e9e2d6">T3 行杖</td><td><span class="cdot on"></span>登录建立</td></tr>
+              <tr><td class="mono">14:12:36</td><td>chenhm</td><td style="color:#e9e2d6">T6 星使</td><td><span class="cdot on"></span>登录建立</td></tr>
+              <tr><td class="mono">13:58:12</td><td>wangjg</td><td style="color:#e9e2d6">T4 轻舟</td><td><span class="cdot off"></span>离线超窗</td></tr>
+              <tr><td class="mono">13:41:05</td><td>zhangyl</td><td style="color:#e9e2d6">T1 御座</td><td><span class="cdot off"></span>管理员下线</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="console-foot">
+        <span>数据源 nc_sys_user_sessions</span>
+        <span>策略 category='session'</span>
+        <span>审计 LogSecurity</span>
+        <span>T7 不作为独立客户端登录</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 移动端 ═══════════ -->
+<section class="section" id="mobile">
+  <div class="sec-head">
+    <span class="sec-kicker">05 · Mobile Forms</span>
+    <h3>移动端形态</h3>
+    <p>T4 轻舟（手机浏览器）与 T6 星使（安卓壳）共用 Vue 页面，只靠 UA 与徽标区分；端族同属移动族。</p>
+  </div>
+
+  <div class="phones">
+    <div>
+      <div class="phone p1">
+        <div class="phone-screen">
+          <div class="phone-status"><span>14:22</span><span>5G ▮▮▮</span></div>
+          <div class="phone-nav"><b>天权 · 轻舟</b><span class="tag">T4 · mobile-web</span></div>
+          <div class="phone-body">
+            <div class="m-hero">
+              <div class="k">Mobile Web</div>
+              <b>帝皇权杖 δ-me13</b>
+              <span>免安装 · 浏览器直接办理</span>
+            </div>
+            <div class="m-list">
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><span class="tx"><b>待办事项</b><span>3 项待复核</span></span><span class="st">在线</span></div>
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span><span class="tx"><b>档案查询</b><span>按姓名 / 身份证</span></span><span class="st">在线</span></div>
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></span><span class="tx"><b>临时救助</b><span>快速录入</span></span><span class="st">在线</span></div>
+            </div>
+          </div>
+          <div class="m-tab"><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+      <p class="phone-cap"><b>T4 天权 · 轻舟</b> — 浏览器移动端（mobile-web）</p>
+    </div>
+
+    <div>
+      <div class="phone p2">
+        <div class="phone-screen">
+          <div class="phone-status"><span>14:22</span><span>5G ▮▮▮</span></div>
+          <div class="phone-nav"><b>开阳 · 星使</b><span class="tag">T6 · capacitor</span></div>
+          <div class="phone-body">
+            <div class="m-hero">
+              <div class="k">Android Shell</div>
+              <b>帝皇权杖 δ-me13</b>
+              <span>安装包 · 移动端统一入口</span>
+            </div>
+            <div class="m-list">
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v18"/><circle cx="12" cy="7" r="3"/><path d="M8 21h8"/></svg></span><span class="tx"><b>入户采集</b><span>现场拍照 · 签名</span></span><span class="st">在线</span></div>
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12l4 4L19 6"/></svg></span><span class="tx"><b>快速核验</b><span>身份 / 收入比对</span></span><span class="st">在线</span></div>
+              <div class="m-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16l8-10 8 10"/><path d="M3 19c2 0 2 1.5 4.5 1.5S10 19 12 19s2 1.5 4.5 1.5S19 19 21 19"/></svg></span><span class="tx"><b>动态管理</b><span>变更登记</span></span><span class="st">在线</span></div>
+            </div>
+          </div>
+          <div class="m-tab"><i></i><i class="on"></i><i></i><i></i></div>
+        </div>
+      </div>
+      <p class="phone-cap"><b>T6 开阳 · 星使</b> — Android Capacitor 壳端（capacitor）</p>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  帝皇权杖 δ-me13 · 北斗终端序列 · 设计演示　|　T1 御座 · T2 云阙 · T3 行杖 · T4 轻舟 · T5 星阁 · T6 星使 · T7 天鉴
+</footer>
+
+<script>
+(function(){
+  var meta = {
+    t1:{code:'T1',name:'天枢 · 御座',acc:'#ab3227',url:'NewCosmos.exe · Windows 桌面主端'},
+    t2:{code:'T2',name:'天璇 · 云阙',acc:'#2f4a63',url:'https://cosmos.sua17.cn/login'},
+    t3:{code:'T3',name:'天玑 · 行杖',acc:'#96681c',url:'NewCosmos.apk · Android 主端'},
+    t4:{code:'T4',name:'天权 · 轻舟',acc:'#2e4738',url:'https://cosmos.sua17.cn/login'},
+    t5:{code:'T5',name:'玉衡 · 星阁',acc:'#5a4a72',url:'NewCosmos.Shell.exe · WebView2 壳端'},
+    t6:{code:'T6',name:'开阳 · 星使',acc:'#8a4b2a',url:'newcosmos.apk · Capacitor 壳端'},
+    t7:{code:'T7',name:'摇光 · 天鉴',acc:'#c9a24a',url:'https://cosmos.sua17.cn/console · 管理控制台'}
+  };
+  var page = document.getElementById('loginPage');
+  var badge = document.getElementById('termBadge');
+  var frameUrl = document.getElementById('frameUrl');
+  var chips = document.querySelectorAll('#switcher .chip');
+
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      var key = chip.getAttribute('data-t');
+      var m = meta[key];
+      if(!m) return;
+      if(key === 't7'){
+        document.getElementById('console').scrollIntoView({behavior:'smooth', block:'start'});
+        return;
+      }
+      chips.forEach(function(c){ c.classList.remove('on'); });
+      chip.classList.add('on');
+      page.style.setProperty('--acc', m.acc);
+      badge.innerHTML = '<b>' + m.code + '</b> ' + m.name;
+      frameUrl.textContent = m.url;
+    });
+  });
+
+  function tick(){
+    var d = new Date();
+    var p = function(n){ return n < 10 ? '0' + n : '' + n; };
+    var el = document.getElementById('clock');
+    if(el) el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+  tick(); setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using NewCosmos.Services.Platform;
 
 namespace NewCosmos.Components;
 
@@ -299,5 +300,22 @@ public partial class PageHeaderView : ContentView
         BackBtn.Command = BackCommand;
         BackBtn.Text = BackText;
         BackBtn.IsVisible = BackCommand != null;
+    }
+
+    /// <summary>右上角「北斗终端」：打开随包内嵌的终端序列页（系统浏览器）。</summary>
+    private async void OnTerminalButtonClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button button)
+            button.IsEnabled = false;
+
+        try
+        {
+            await TerminalPageLauncher.OpenAsync();
+        }
+        finally
+        {
+            if (sender is Button target)
+                target.IsEnabled = true;
+        }
     }
 }

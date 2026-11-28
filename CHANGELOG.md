@@ -45,6 +45,7 @@
 - 照片三处重复实现收敛为共用单点：推送打印（权限门控/组任务/入队 → `PhotoPrintPushHelper`）、缩略图与 WebP 预览转码（→ `PhotoDisplayHelper`）、导出文件名（→ `PhotoNameBuilder.BuildExportFileName`）、版式选项与「按默认」解析（→ `PhotoLayoutConstants`），行为与文案保持一致
 
 ### 修复
+- 消除编译警告 CS8601（临时救助表单户籍快照赋值补空值兜底）；Code 构建现为 **0 警告 0 错误**。
 - **户主死亡/变更新建新档的"本人字段/豁免标记"残留修复（张桂秋 app115 实测）**：停旧建新主表从旧户主整行复制（仅换姓名/证件/性别等），换户主后新户主的健康/疾病/残疾/就业/收入来源等本人字段会带上**死者/旧户主**的数据（并出现"健康=重病、重病勾选=否"的自相矛盾）；死亡原户主被剔除后，原照顾者的"因照顾重病重残亲属免于劳动力判定"在户内已无照顾目标却保留，新档表单保存被联动校验拦截、业务卡死。修复：①停旧建新成员复制后统一清理"无照顾目标"的豁免残留（死亡新建/户主变更/成员变更共用，幂等，`ChangeService.MemberIntegrity.ClearInvalidLaborExemptAsync`）；②换户主（户主死亡/户主变更）后主表本人字段从**新户主成员行**镜像、无成员来源的身体状况与残疾证号清空（`SyncHeadPersonFieldsAsync`）；③保存校验文案补齐"含户主本人"口径。存量数据：档案115（张桂秋）已修复（豁免清除、主表病情清空，快照见 backup），全库同型扫描 0 例
 - 手机采集页「已回填 N 条识别结果」与 OCR 分配页「已全部标记为不使用」两条轻提示此前**不显示**（页面无页内 SnackBar 宿主）——改走全局 SnackBar 宿主恢复显示
 - **修复既有 Bug：DB 行 → 元组映射恒返回默认值**——ValueTuple 只有公共字段、无可写公共属性，行映射走 `GetProperties()` 恒取空数组（运行实证 props=0），致 3 处元组查询全部取不到数：`GetClassificationsByIdCardsAsync`（批量分类带出）、`CompleteArchiveAsync`（归档联动资产核查标记）、批量添加家庭成员（回传 id 映射）。新增 `TupleRowMapper` 按 **SELECT 列序位置映射**（3 个调用点列序已逐一核对一致；DateOnly→DateTime、DBNull 保持 default、Rest 递归展开），`PostgreSqlDatabaseService` 元组分支先行判定；纯逻辑单测含假读取器全路径

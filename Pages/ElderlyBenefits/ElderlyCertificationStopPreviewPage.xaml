@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:results="clr-namespace:NewCosmos.Models.Results"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyCertificationStopPreviewPage"
+             x:DataType="ElderlyCertificationStopPreviewViewModel"
+             Title="认证停发预览"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="BoolToInverseConverter"/>
+
+        <DataTemplate x:Key="StopPreviewRow" x:DataType="results:ElderlyCertificationStopPreviewItem">
+            <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5">
+
+                    <!-- 第1行：姓名 / 认证状态 / 停发决定 / 截止提示 -->
+                    <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="8">
+                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                            <Label Text="{Binding CertStatusName}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                        <Border Style="{StaticResource ChipInfo}" VerticalOptions="Center">
+                            <Label Text="{Binding DecisionDisplay}" Style="{StaticResource ChipInfoText}"/>
+                        </Border>
+                        <Label Text="{Binding PendingHint}" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource WarningDark}"
+                               IsVisible="{Binding HasPendingHint}"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+
+                    <Label Grid.Row="0" Grid.Column="1"
+                           Text="{Binding EventDateDisplay}" FontSize="13"
+                           TextColor="{StaticResource TextSecondary}" VerticalOptions="Center"/>
+
+                    <!-- 第2行：身份证 / 村 / 凭证 -->
+                    <HorizontalStackLayout Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="14">
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding VillageDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding EvidenceDisplay, StringFormat='凭证 {0}'}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding EvidenceStatusName}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 第3行：建议停发原因 / 建议应停日期 -->
+                    <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="14">
+                        <Label Text="{Binding SuggestedStopReasonName, StringFormat='建议停发原因：{0}'}"
+                               FontSize="14" TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding SuggestedDueStopDate, StringFormat='建议应停：{0:yyyy-MM-dd}'}"
+                               FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                    </HorizontalStackLayout>
+
+                    <!-- 第4行：逐人操作（无批量停发入口） -->
+                    <HorizontalStackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="8">
+                        <Button Text="办理停发" Style="{StaticResource ButtonSmall}"
+                                BackgroundColor="{StaticResource Primary}"
+                                IsEnabled="{Binding CanStop}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationStopPreviewViewModel}}, Path=StopCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="暂缓" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationStopPreviewViewModel}}, Path=DeferCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="排除" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationStopPreviewViewModel}}, Path=ExcludeCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="恢复待停发" Style="{StaticResource ButtonSmall}"
+                                IsVisible="{Binding CanResetDecision}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationStopPreviewViewModel}}, Path=ResetDecisionCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Button Text="凭证" Style="{StaticResource ButtonSmall}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyCertificationStopPreviewViewModel}}, Path=ViewEvidenceCommand}"
+                                CommandParameter="{Binding .}"/>
+                        <Label Text="{Binding StopDisabledHint}" FontSize="13" FontAttributes="Bold"
+                               TextColor="{StaticResource WarningDark}"
+                               IsVisible="{Binding CanStop, Converter={StaticResource BoolToInverseConverter}}"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE7BA;', Android='&#x26A0;&#xFE0F;'}"
+                                   Title="认证停发预览"
+                                   Subtitle="异常认证结果逐人核对 · 办理停发/暂缓/排除 · 仅逐人办理，不提供批量停发"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回认证名单"/>
+
+        <VerticalStackLayout Grid.Row="1" Padding="16,12,16,0" Spacing="8">
+            <Border Style="{StaticResource CardBorder}" Padding="12">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Entry Placeholder="姓名 / 身份证号" Text="{Binding SearchText}"
+                           ReturnCommand="{Binding SearchCommand}" HeightRequest="40"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding StatusOptions}"
+                            SelectedItem="{Binding SelectedStatus}" WidthRequest="140" HeightRequest="40"/>
+                    <Button Grid.Column="2" Text="查询" Command="{Binding SearchCommand}"
+                            Style="{StaticResource ButtonPrimary}" HeightRequest="40"/>
+                </Grid>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="{Binding CampaignInfo}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                       VerticalOptions="Center"/>
+                <Label Grid.Column="1" Text="{Binding SummaryText}" FontSize="14" FontAttributes="Bold"
+                       TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+            </Grid>
+
+            <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource InfoSoft}" Stroke="Transparent"
+                    Padding="12,8">
+                <Label FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"
+                       Text="待核查人员在批次已关闭或截止后才视为「逾期未核查」；标注「待截止」的可继续等待补认证。名册 Active 未建档人员需先补建档，本页仅禁止直接停发历史名册行。"/>
+            </Border>
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Items}"
+                        ItemTemplate="{StaticResource StopPreviewRow}"
+                        SelectionMode="None"
+                        Margin="16,10,16,0"
+                        VerticalScrollBarVisibility="Always">
+            <CollectionView.EmptyView>
+                <Label Text="当前批次没有需要停发的认证异常人员。"
+                       Style="{StaticResource EmptyStateLabel}"
+                       Margin="0,24,0,0"/>
+            </CollectionView.EmptyView>
+        </CollectionView>
+
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="16,8,16,16">
+            <Button Text="上一页" Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding CanGoPrevious}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+            <Label Grid.Column="1" Text="{Binding PageStatusText}" FontSize="14"
+                   TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Button Grid.Column="2" Text="下一页" Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding CanGoNext}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+        </Grid>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

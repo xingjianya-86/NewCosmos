@@ -59,6 +59,8 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        PdfSharpLicenseBootstrap.EnsureLoaded();
+
         var builder = MauiApp.CreateBuilder();
 
         builder
@@ -227,6 +229,10 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ElderlyCategoryService>();
         builder.Services.AddSingleton<IElderlyApplicationService, ElderlyApplicationService>();
+        builder.Services.AddSingleton<IElderlyCertificationService, ElderlyCertificationService>();
+        builder.Services.AddSingleton<IElderlyCertificationImportService, ElderlyCertificationImportService>();
+        builder.Services.AddSingleton<ElderlyCertificationReportService>();
+        builder.Services.AddSingleton<IElderlyInfoChangeService, ElderlyInfoChangeService>();
 
         #endregion
 
@@ -463,6 +469,11 @@ builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoPen
         builder.Services.AddTransient<GracePeriodExpiringListViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.BankFlow.BankFlowViewViewModel>();
         builder.Services.AddTransient<ElderlyReportViewModel>();
+        builder.Services.AddTransient<ElderlyCertificationListViewModel>();
+        builder.Services.AddTransient<ElderlyCertificationStopPreviewViewModel>();
+        builder.Services.AddTransient<ElderlyCertificationReportViewModel>();
+        builder.Services.AddTransient<ElderlyInfoChangeListViewModel>();
+        builder.Services.AddTransient<ElderlyInfoChangeFormViewModel>();
         builder.Services.AddTransient<ElderlyPendingListViewModel>();
         builder.Services.AddTransient<ElderlyReviewListViewModel>();
         builder.Services.AddTransient<ElderlyReviewViewModel>();
@@ -471,6 +482,7 @@ builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoPen
         builder.Services.AddTransient<TempReliefFormViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.NearRelativeEntryViewModel>();
         builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.NearRelativeListViewModel>();
+        builder.Services.AddTransient<NewCosmos.ViewModels.SocialAssistance.RemoteAssistanceListViewModel>();
 
         // ── 统一补打中心（五域 Provider + 三栏按人补打/跨户批量） ──
         // 注意：必须注册接口 IReprintDomainProvider——UnifiedReprintViewModel 注入的是 IEnumerable<IReprintDomainProvider>，
@@ -622,6 +634,11 @@ builder.Services.AddTransient<Pages.ArchiveManagement.PendingPhotosPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyStopPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.GracePeriodExpiringListPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyReportPage>();
+        builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyCertificationListPage>();
+        builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyCertificationStopPreviewPage>();
+        builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyCertificationReportPage>();
+        builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyInfoChangeListPage>();
+        builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyInfoChangeFormPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyPendingListPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyReviewListPage>();
         builder.Services.AddTransient<Pages.ElderlyBenefits.ElderlyReviewPage>();
@@ -630,6 +647,7 @@ builder.Services.AddTransient<Pages.ArchiveManagement.PendingPhotosPage>();
         builder.Services.AddTransient<TempReliefFormPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.NearRelativeEntryPage>();
         builder.Services.AddTransient<Pages.SocialAssistance.NearRelativeListPage>();
+        builder.Services.AddTransient<Pages.SocialAssistance.RemoteAssistanceListPage>();
 
         builder.Services.AddTransient<RecoverySearchPage>();
         builder.Services.AddTransient<RecoveryFormPage>();

@@ -36,11 +36,29 @@ public partial class ElderlyStopPage : ContentPage, IParameterizedPage<ElderlyAp
         return Task.CompletedTask;
     }
 
-    /// <summary>联动预填入口（死亡情况说明跳转）：先加载档案再回填死亡日期/原因</summary>
+    /// <summary>
+    /// 联动预填入口：先加载档案。
+    /// 认证停发预览携带认证任务ID时，额外预填建议停发原因/应停日期/死亡日期/备注；
+    /// 其余入口沿用死亡联动预填（死亡日期/原因）。
+    /// </summary>
     async Task IParameterizedPage<ElderlyStopPrefill>.SetParameterAsync(ElderlyStopPrefill prefill)
     {
         _viewModel.LoadApplication(prefill.Application);
-        _viewModel.ApplyDeathPrefill(prefill.DeathDate, prefill.DeathReason);
+
+        if (prefill.CertificationTaskId is { } certificationTaskId)
+        {
+            _viewModel.ApplyCertificationPrefill(
+                certificationTaskId,
+                prefill.PresetStopReason,
+                prefill.PresetDueStopDate,
+                prefill.DeathDate,
+                prefill.PresetNote);
+        }
+        else
+        {
+            _viewModel.ApplyDeathPrefill(prefill.DeathDate, prefill.DeathReason);
+        }
+
         await Task.CompletedTask;
     }
 }

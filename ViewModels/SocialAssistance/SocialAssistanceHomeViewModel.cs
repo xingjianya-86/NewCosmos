@@ -200,6 +200,12 @@ public partial class SocialAssistanceHomeViewModel : ModuleHomeViewModelBase
         NavigateToFeatureAsync<Pages.SocialAssistance.QuickVerifyPage>(
             CanAccessSocialAssistance, "快速核验·模拟测算", "快速核验·模拟测算");
 
+    // 异地协助：入户调查与邻里走访，本地留存不纳入月报（入口门控沿用查看低收入认定权限）
+    [RelayCommand]
+    private Task OpenRemoteAssistanceAsync() =>
+        NavigateToFeatureAsync<Pages.SocialAssistance.RemoteAssistanceListPage>(
+            CanAccessSocialAssistance, "异地协助", "异地协助");
+
     // 返回上一页：使用基类 GoBackCommand（含栈守卫与窗口标题恢复）
 
     #endregion

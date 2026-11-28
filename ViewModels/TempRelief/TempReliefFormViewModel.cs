@@ -130,52 +130,100 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     #endregion
 
-    #region 两大类（人群状态）
+    #region 两大类（人群状态，自动判定）
 
-    /// <summary>人群状态：Insured 在保障人群内 / Uninsured 不在保障人群内</summary>
+    /// <summary>人群状态：Insured 在保障人群内 / Uninsured 不在保障人群内（按身份证反查四类在册台账自动判定）</summary>
     [ObservableProperty]
     private string _populationStatus = TempReliefConstants.PopulationInsured;
 
-    public bool IsInsured => PopulationStatus == TempReliefConstants.PopulationInsured;
-    public bool IsUninsured => !IsInsured;
+    /// <summary>判定结果是否已产生（未检索/未选人前 false，界面显示"待判定"）</summary>
+    [ObservableProperty]
+    private bool _isPopulationStatusResolved;
 
-    /// <summary>非在册手工登记：未选中任何台账候选时，申请人字段可编辑</summary>
-    public bool IsManualEntry => IsUninsured && string.IsNullOrEmpty(_sourceTable);
+    /// <summary>判定依据（界面展示：命中哪张台账 / 未命中）。</summary>
+    [ObservableProperty]
+    private string _populationStatusBasis = string.Empty;
+
+    /// <summary>显式非在册手工登记模式（不再由人群状态推导）。</summary>
+    private bool _manualEntry;
+
+    /// <summary>手工登记时身份证命中四类在册台账：提示改用检索并阻断保存。</summary>
+    [ObservableProperty]
+    private bool _manualEntryMatchesLedger;
+
+    /// <summary>最近一次已核查的手工登记身份证（避免同一身份证重复查询）。</summary>
+    private string _lastInsuredCheckedIdCard = string.Empty;
+
+    /// <summary>手工身份证核查代际：连续输入时仅最新一次结果生效。</summary>
+    private int _insuredCheckGeneration;
+
+    public bool IsInsured => IsPopulationStatusResolved
+        && PopulationStatus == TempReliefConstants.PopulationInsured;
+
+    public bool IsUninsured => IsPopulationStatusResolved
+        && PopulationStatus == TempReliefConstants.PopulationUninsured;
+
+    /// <summary>尚未判定（界面显示"检索并选择申请人后自动判定"）。</summary>
+    public bool IsPopulationStatusPending => !IsPopulationStatusResolved;
+
+    /// <summary>非在册手工登记：申请人字段可编辑</summary>
+    public bool IsManualEntry => _manualEntry;
 
     /// <summary>在册必须走台账选择（只读）；非在册手工登记可编辑；已选候选时只读</summary>
     public bool IsApplicantReadOnly => !IsManualEntry;
 
+    /// <summary>可进入非在册手工登记（未手工、未选人、可编辑时）</summary>
+    public bool CanEnterManualEntry => !IsManualEntry && !IsCandidateSelected && IsEditable;
+
     partial void OnIsCandidateSelectedChanged(bool value)
     {
-        OnPropertyChanged(nameof(IsManualEntry));
-        OnPropertyChanged(nameof(IsApplicantReadOnly));
+        OnPropertyChanged(nameof(CanEnterManualEntry));
     }
 
+    partial void OnIsPopulationStatusResolvedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsInsured));
+        OnPropertyChanged(nameof(IsUninsured));
+        OnPropertyChanged(nameof(IsPopulationStatusPending));
+    }
 
     partial void OnPopulationStatusChanged(string value)
     {
         OnPropertyChanged(nameof(IsInsured));
         OnPropertyChanged(nameof(IsUninsured));
+    }
+
+    /// <summary>切换手工登记模式并刷新只读/按钮可见性（不在此清空来源，由调用方决定）。</summary>
+    private void SetManualEntry(bool manual)
+    {
+        if (_manualEntry == manual) return;
+        _manualEntry = manual;
         OnPropertyChanged(nameof(IsManualEntry));
         OnPropertyChanged(nameof(IsApplicantReadOnly));
-        if (_suppressReload) return;
+        OnPropertyChanged(nameof(CanEnterManualEntry));
+    }
 
-        // 切换大类必须重选来源：在册走四类台账，非在册可手工登记或从其他困难/申请库选
+    /// <summary>
+    /// 检索不到时进入非在册手工登记：清空已选来源/候选，申请人字段改为可编辑。
+    /// 身份证填写完整后自动核查四类在册台账（命中则阻断保存、导流检索）。
+    /// </summary>
+    [RelayCommand]
+    private void EnterManualEntry()
+    {
+        SetManualEntry(true);
         _sourceTable = string.Empty;
         _sourceFamilyId = 0;
         Candidates.Clear();
         SelectedCandidate = null;
         IsCandidateSelected = false;
         CandidateSummary = string.Empty;
-        OnPropertyChanged(nameof(IsManualEntry));
-        OnPropertyChanged(nameof(IsApplicantReadOnly));
+        ManualEntryMatchesLedger = false;
+        PopulationStatus = TempReliefConstants.PopulationUninsured;
+        IsPopulationStatusResolved = true;
+        PopulationStatusBasis = "非在册登记：填写身份证后自动核查四类在册台账";
+        _lastInsuredCheckedIdCard = string.Empty;
+        _insuredCheckGeneration++;
     }
-
-    [RelayCommand]
-    private void SelectInsured() => PopulationStatus = TempReliefConstants.PopulationInsured;
-
-    [RelayCommand]
-    private void SelectUninsured() => PopulationStatus = TempReliefConstants.PopulationUninsured;
 
     #endregion
 
@@ -709,6 +757,24 @@ public partial class TempReliefFormViewModel : ViewModelBase
     [ObservableProperty]
     private DateTime _applyDate = DateTime.Today;
 
+    /// <summary>申请日期未来上限（今天 + 1 个月，含当日；与常量/服务端同一口径）。</summary>
+    public DateTime ApplyDateMaximum => TempReliefConstants.GetApplyDateUpperBound(DateTime.Today);
+
+    /// <summary>当前档案状态（Draft/Returned/...）；新建为空，用于控制改期按钮可见性。</summary>
+    [ObservableProperty]
+    private string _currentStatus = string.Empty;
+
+    partial void OnCurrentStatusChanged(string value)
+        => OnPropertyChanged(nameof(CanChangeApplyDate));
+
+    /// <summary>是否已入库档案（新建未保存为 false）。</summary>
+    public bool IsExistingRecord => _id > 0;
+
+    /// <summary>可改期重号：编辑态 + 已入库 + 草稿/退回补正。</summary>
+    public bool CanChangeApplyDate => IsEditable && IsExistingRecord
+        && (string.Equals(CurrentStatus, TempReliefConstants.StatusDraft, StringComparison.Ordinal)
+            || string.Equals(CurrentStatus, TempReliefConstants.StatusReturned, StringComparison.Ordinal));
+
     /// <summary>
     /// 归属批次提示（只读）：新建/草稿时显示本次申请落在哪个 C 线批次与逐笔时间曲线，
     /// 例："本次归属：2026年11月批次（公示 11-11~11-13，验收 11-14）"。
@@ -1191,6 +1257,8 @@ public partial class TempReliefFormViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSavable));
         OnPropertyChanged(nameof(IsNewMode));
         OnPropertyChanged(nameof(IsSaveAndConfirmVisible));
+        OnPropertyChanged(nameof(CanEnterManualEntry));
+        OnPropertyChanged(nameof(CanChangeApplyDate));
     }
 
     public async Task InitializeAsync()
@@ -1198,6 +1266,16 @@ public partial class TempReliefFormViewModel : ViewModelBase
         if (OperationMode == FormOperationMode.Create)
         {
             _id = 0;
+            CurrentStatus = string.Empty;
+            OnPropertyChanged(nameof(IsExistingRecord));
+            OnPropertyChanged(nameof(CanChangeApplyDate));
+            SetManualEntry(false);
+            ManualEntryMatchesLedger = false;
+            PopulationStatus = TempReliefConstants.PopulationInsured;
+            IsPopulationStatusResolved = false;
+            PopulationStatusBasis = string.Empty;
+            _lastInsuredCheckedIdCard = string.Empty;
+            _insuredCheckGeneration++;
             _suppressReload = true;
             ReliefType = TempReliefConstants.ReliefTypeLarge;
             ApplyDate = DateTime.Today;
@@ -1362,7 +1440,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
 
     /// <summary>
     /// C 线逐笔 5 天曲线与批次标签（新建/草稿场景，2026-11-13 起）：
-    /// ① 申请日期先修正为「不晚于今日」（仅未来日期被拉回今天，不做回填钳制）；
+    /// ① 申请日期只做空值兜底与去时间部分；允许未来日期（上限 = 今天 + 1 个月，由表单/服务端统一校验）；
     /// ② 曲线：公示起 = 申请日+1、公示止 = 申请日+3（恒 3 天）、验收日 = 申请日+4（自动推导，不手填）；
     /// ③ 批次仅作标签：申请日 ≤ 当月验收日(13号) 归本月，否则顺延下月（跨年接续），与公示/验收脱钩。
     /// 申请日期本身不改写。公示日期仅用于新建/草稿场景；编辑或查看已保存档案时保留库中原值、不重算。
@@ -1389,8 +1467,8 @@ public partial class TempReliefFormViewModel : ViewModelBase
             var generation = Interlocked.Increment(ref _publicizeCalcGeneration);
             var timelineService = _serviceProvider.GetRequiredService<IBusinessTimelineService>();
 
-            // 申请日期自动修正：不晚于今日
-            var corrected = ApplyDate == default || ApplyDate.Date > DateTime.Today ? DateTime.Today : ApplyDate.Date;
+            // 申请日期只做空值兜底与去时间部分；未来日期上限由表单/服务端统一校验，不在此回拉
+            var corrected = ApplyDate == default ? DateTime.Today : ApplyDate.Date;
             // 批次标签（申请日 ≤ A 归本月）与逐笔曲线分开取：曲线才是公示/验收的唯一口径
             var batch = await timelineService.CalculateTempReliefForApplyDateAsync(corrected);
             var curve = timelineService.BuildTempReliefCurve(corrected);
@@ -1402,7 +1480,7 @@ public partial class TempReliefFormViewModel : ViewModelBase
             _suppressReload = true;
             try
             {
-                // 只回拉未来日期到今天；过去日期原样保留
+                // 只做日期归一（去时间）；未来日期上限由表单/服务端校验，不再回拉
                 if (ApplyDate.Date != corrected)
                     ApplyDate = corrected;
 

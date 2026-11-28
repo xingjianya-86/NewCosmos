@@ -14,6 +14,7 @@ namespace NewCosmos.ViewModels.ElderlyBenefits;
 public partial class ElderlyStopViewModel : ViewModelBase
 {
     private readonly IElderlyApplicationService _applicationService = null!;
+    private readonly IElderlyCertificationService _certificationService = null!;
     private readonly ILoggerService _logger = null!;
     private readonly IServiceProvider _serviceProvider = null!;
     private readonly IDialogService _dialogService = null!;
@@ -25,6 +26,12 @@ public partial class ElderlyStopViewModel : ViewModelBase
     #endregion
 
     private long _applicationId;
+
+    /// <summary>年度认证任务ID（仅认证停发预览跳转时非空，用于停发成功后回写认证任务）。</summary>
+    private long? _certificationTaskId;
+
+    /// <summary>当前办理关联的认证任务ID；普通停发为 null。</summary>
+    public long? CertificationTaskId => _certificationTaskId;
 
     [ObservableProperty]
     private string _applicantName = string.Empty;
@@ -121,12 +128,14 @@ public partial class ElderlyStopViewModel : ViewModelBase
 
     public ElderlyStopViewModel(
         IElderlyApplicationService applicationService,
+        IElderlyCertificationService certificationService,
         ILoggerService logger,
         IServiceProvider serviceProvider,
         IDialogService dialogService,
         INewPermissionService permissionService)
     {
         _applicationService = applicationService;
+        _certificationService = certificationService;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
@@ -146,7 +155,9 @@ public partial class ElderlyStopViewModel : ViewModelBase
     }
 
     public void LoadApplication(ElderlyApplication app)
-    {        _applicationId = app.Id;
+    {
+        _applicationId = app.Id;
+        _certificationTaskId = null;
         ApplicantName = app.Name;
         ApplicantIdCard = app.IdCard;
         ApplicationNo = app.ApplicationNo;
@@ -177,6 +188,9 @@ public partial class ElderlyStopViewModel : ViewModelBase
     /// </summary>
     public void ApplyDeathPrefill(DateTime? deathDate, string? deathReason)
     {
+        // 普通死亡联动不是认证停发来源，清掉可能残留的认证任务ID，避免误回写。
+        _certificationTaskId = null;
+
         var deceased = StopReasonOptions.FirstOrDefault(o => o.Key == ElderlyBenefitConstants.StopReasonDeceased);
         if (!string.IsNullOrEmpty(deceased.Key))
             SelectedStopReason = deceased;
@@ -186,6 +200,42 @@ public partial class ElderlyStopViewModel : ViewModelBase
             DeathDate = date;
             DueStopDate = date;
         }
+    }
+
+    /// <summary>
+    /// 年度认证停发预览预填（逐人办理）：
+    /// 记录认证任务ID、预选建议停发原因、回填应停日期/死亡日期与备注。
+    /// 仍走本页自身校验、确认与权限门控，停发成功后再回写认证任务。
+    /// </summary>
+    public void ApplyCertificationPrefill(
+        long certificationTaskId,
+        string? stopReason,
+        DateTime? dueStopDate,
+        DateTime? deathDate,
+        string? note = null)
+    {
+        _certificationTaskId = certificationTaskId;
+
+        if (!string.IsNullOrWhiteSpace(stopReason))
+        {
+            var option = StopReasonOptions.FirstOrDefault(o =>
+                string.Equals(o.Key, stopReason, StringComparison.Ordinal));
+            if (!string.IsNullOrEmpty(option.Key))
+                SelectedStopReason = option;
+        }
+
+        if (dueStopDate is { } due && due != default)
+            DueStopDate = due.Date;
+
+        if (deathDate is { } death && death != default)
+        {
+            DeathDate = death.Date;
+            if (dueStopDate is null)
+                DueStopDate = death.Date;
+        }
+
+        if (!string.IsNullOrWhiteSpace(note))
+            Remark = note.Trim();
     }
 
     /// <summary>办理权限校验（异常按无权限处理，保守拒绝）</summary>
@@ -290,6 +340,31 @@ public partial class ElderlyStopViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _logger.LogBusiness("普惠高龄登记停发成功", ("ApplicationId", _applicationId));
+
+                // 认证停发预览来源：停发成功后回写认证任务；回写失败只记 Warn，不阻断停发主流程。
+                if (_certificationTaskId is { } certTaskId)
+                {
+                    try
+                    {
+                        var markResult = await _certificationService.MarkStoppedAsync(
+                            certTaskId,
+                            _applicationId,
+                            stopReasonValue,
+                            DueStopDate,
+                            DateTime.Today,
+                            App.CurrentUserName,
+                            CancellationToken);
+
+                        if (markResult.IsFailure)
+                            _logger.Warn(
+                                $"高龄认证停发回写失败（TaskId={certTaskId}）：{markResult.ErrorCode} {markResult.Message}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warn($"高龄认证停发回写异常（TaskId={certTaskId}）：{ex.Message}");
+                    }
+                }
+
                 // 联动失败时主操作成功但带警告（SuccessWithWarning），需让用户看到可重试提示
                 await _dialogService.ShowSnackBarAsync(
                     string.IsNullOrEmpty(result.Message) ? "停发成功" : result.Message);

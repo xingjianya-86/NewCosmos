@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyInfoChangeListPage"
+             x:DataType="ElderlyInfoChangeListViewModel"
+             Title="信息变更审批"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:BoolToInverseConverter x:Key="InverseBool"/>
+
+        <DataTemplate x:Key="ChangeRow" x:DataType="ent:ElderlyInfoChangeRecord">
+            <Border Style="{StaticResource CardBorder}" Padding="12" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5">
+
+                    <HorizontalStackLayout Grid.Row="0" Grid.Column="0" Spacing="8">
+                        <Label Text="{Binding Name}" FontSize="17" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                        <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center">
+                            <Label Text="{Binding StatusName}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                        <Border Style="{StaticResource ChipWarning}" VerticalOptions="Center"
+                                IsVisible="{Binding IsHighRisk}">
+                            <Label Text="{Binding RiskName}" Style="{StaticResource ChipWarningText}"/>
+                        </Border>
+                        <Border Style="{StaticResource ChipNeutral}" VerticalOptions="Center"
+                                IsVisible="{Binding IsHighRisk, Converter={StaticResource InverseBool}}">
+                            <Label Text="{Binding RiskName}" Style="{StaticResource ChipNeutralText}"/>
+                        </Border>
+                    </HorizontalStackLayout>
+
+                    <Button Grid.Row="0" Grid.Column="1" Text="查看/审批" Style="{StaticResource ButtonSmall}"
+                            BackgroundColor="{StaticResource Primary}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ElderlyInfoChangeListViewModel}}, Path=OpenReviewCommand}"
+                            CommandParameter="{Binding .}"/>
+
+                    <HorizontalStackLayout Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="14">
+                        <Label Text="{Binding ChangeNo}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding IdCard}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding CreatedAtDisplay}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+                    </HorizontalStackLayout>
+
+                    <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                           Text="{Binding DetailsSummary}" FontSize="14"
+                           TextColor="{StaticResource TextPrimary}"/>
+
+                    <HorizontalStackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="14">
+                        <Label Text="{Binding SourceDisplay, StringFormat='来源：{0}'}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding Reason}" FontSize="14" TextColor="{StaticResource TextSecondary}"
+                               LineBreakMode="TailTruncation" MaximumWidthRequest="620"/>
+                        <Label Text="{Binding EffectiveMonthDisplay, StringFormat='生效月：{0}'}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8D4;', Android='&#x1F4DD;'}"
+                                   Title="信息变更审批"
+                                   Subtitle="电话/地址/银行卡/代办人变更 · 审批通过后才写入在享档案"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回认证名单"/>
+
+        <VerticalStackLayout Grid.Row="1" Padding="16,12,16,0" Spacing="8">
+            <Border Style="{StaticResource CardBorder}" Padding="12">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Entry Placeholder="姓名 / 身份证号 / 变更单号" Text="{Binding SearchText}"
+                           ReturnCommand="{Binding SearchCommand}" HeightRequest="40"/>
+                    <Picker Grid.Column="1" ItemsSource="{Binding StatusOptions}"
+                            SelectedItem="{Binding SelectedStatus}" WidthRequest="140" HeightRequest="40"/>
+                    <Button Grid.Column="2" Text="查询" Command="{Binding SearchCommand}"
+                            Style="{StaticResource ButtonPrimary}" HeightRequest="40"/>
+                </Grid>
+            </Border>
+
+            <Label Text="{Binding PageStatusText}" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Items}"
+                        ItemTemplate="{StaticResource ChangeRow}"
+                        SelectionMode="None"
+                        Margin="16,10,16,0"
+                        VerticalScrollBarVisibility="Always">
+            <CollectionView.EmptyView>
+                <Label Text="当前没有待审批的信息变更单。"
+                       Style="{StaticResource EmptyStateLabel}"
+                       Margin="0,24,0,0"/>
+            </CollectionView.EmptyView>
+        </CollectionView>
+
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Padding="16,8,16,16">
+            <Button Text="上一页" Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding CanGoPrevious}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+            <Label Grid.Column="1" Text="{Binding PageStatusText}" FontSize="14"
+                   TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Button Grid.Column="2" Text="下一页" Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding CanGoNext}" Style="{StaticResource ButtonOutline}" HeightRequest="36"/>
+        </Grid>
+
+        <!-- 明细 / 审批弹窗 -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" IsVisible="{Binding IsReviewPanelVisible}"
+              BackgroundColor="#99000000" Padding="24">
+            <Border Style="{StaticResource CardBorder}" Padding="20"
+                    HorizontalOptions="Center" VerticalOptions="Center"
+                    MaximumWidthRequest="760" MaximumHeightRequest="700">
+                <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+
+                    <VerticalStackLayout Grid.Row="0" Spacing="4">
+                        <Label Text="{Binding ReviewHeader}" FontSize="20" FontAttributes="Bold"
+                               TextColor="{StaticResource TextPrimary}"/>
+                        <Label Text="{Binding ReviewSubHeader}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                        <Label Text="{Binding ReviewReason, StringFormat='变更原因：{0}'}" FontSize="14"
+                               TextColor="{StaticResource TextPrimary}" LineBreakMode="WordWrap"/>
+                        <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource WarningSoft}"
+                                Stroke="Transparent" Padding="10,6" IsVisible="{Binding RequiresEffectiveMonth}">
+                            <Label Text="本次包含银行卡/代领卡变更：请核对新卡凭证，并确认生效月后再通过。"
+                                   FontSize="13" TextColor="{StaticResource WarningDark}" LineBreakMode="WordWrap"/>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <ScrollView Grid.Row="1">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="字段明细（旧值 → 新值）" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding SelectedRecord.Details}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="ent:ElderlyInfoChangeDetail">
+                                        <Border Style="{StaticResource CardBorder}" Padding="10">
+                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="3">
+                                                <Label Text="{Binding Label}" FontSize="15" FontAttributes="Bold"
+                                                       TextColor="{StaticResource TextPrimary}"/>
+                                                <Label Grid.Column="1" Text="{Binding RiskName}" FontSize="13"
+                                                       TextColor="{StaticResource WarningDark}"/>
+                                                <Label Grid.Row="1" Grid.ColumnSpan="2"
+                                                       Text="{Binding OldValueDisplay, StringFormat='旧值：{0}'}"
+                                                       FontSize="13" TextColor="{StaticResource TextSecondary}"
+                                                       LineBreakMode="WordWrap"/>
+                                                <Label Grid.Row="2" Grid.ColumnSpan="2"
+                                                       Text="{Binding NewValueDisplay, StringFormat='新值：{0}'}"
+                                                       FontSize="14" TextColor="{StaticResource TextPrimary}"
+                                                       LineBreakMode="WordWrap"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <Label Text="审批意见（驳回必填）" FontSize="14" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}"/>
+                            <Editor Text="{Binding ReviewOpinion}" Placeholder="如：已核对新卡照片；新卡号与照片不一致"
+                                    HeightRequest="80" MaxLength="500"/>
+
+                            <Label Text="银行卡生效月（YYYY-MM）" FontSize="14" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}"
+                                   IsVisible="{Binding RequiresEffectiveMonth}"/>
+                            <Entry Text="{Binding EffectiveMonth}" Placeholder="2026-12" MaxLength="7"
+                                   Keyboard="Text" HeightRequest="40"
+                                   IsVisible="{Binding RequiresEffectiveMonth}"/>
+                        </VerticalStackLayout>
+                    </ScrollView>
+
+                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Button Text="关闭" Command="{Binding CloseReviewCommand}"
+                                Style="{StaticResource ButtonOutline}" HeightRequest="40"
+                                HorizontalOptions="Start"/>
+                        <Button Grid.Column="1" Text="驳回" Command="{Binding RejectCommand}"
+                                IsEnabled="{Binding CanReview}" Style="{StaticResource ButtonDanger}"
+                                HeightRequest="40"/>
+                        <Button Grid.Column="2" Text="通过并写回" Command="{Binding ApproveCommand}"
+                                IsEnabled="{Binding CanReview}" Style="{StaticResource ButtonSuccess}"
+                                HeightRequest="40"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="4"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

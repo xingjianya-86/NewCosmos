@@ -16,6 +16,17 @@ NewCosmosCode 与 NewCosmosWeb 的发布统一走仓库外的单文件：
 C:\Projects\publish-all.ps1
 ```
 
+双击 `C:\Projects\publish-all.bat`（或不带参数运行 `.ps1`）进入**预设菜单**：
+
+```text
+1) Web 全量发布   2) Code 全量发布   3) All 全量发布
+4) Web 仅构建     5) Code 仅构建      6) 自定义步骤
+7) 清理           8) DryRun 体检      9) 查看版本与产物   0) 退出
+```
+
+选完再问版本号与更新说明；预检含 **NuGet 漏洞阻断**（有已知漏洞即中止，`-SkipVulnerabilityCheck` 可跳过）。
+CI 用 `-NonInteractive` 关闭菜单，`-Menu` 可强制进入。
+
 ```powershell
 # 完整发布 Code
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\Projects\publish-all.ps1 -Project Code -All

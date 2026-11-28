@@ -71,6 +71,13 @@
                                                 Command="{Binding OpenMonthlyReportCommand}"
                                                 Opacity="{Binding ElderlyOpacity}"/>
 
+                        <!-- 年度身份认证 -->
+                        <components:FeatureCard Grid.Row="1" Grid.Column="1" Glyph="{OnPlatform WinUI='&#xE8D4;', Android='&#x1F510;'}"
+                                                IconBackgroundColor="#F5F3FF" IconColor="{StaticResource ModuleElderly}"
+                                                Title="年度身份认证" Description="批次名单、Excel+图片导入、认证结果"
+                                                Command="{Binding OpenCertificationCommand}"
+                                                Opacity="{Binding ElderlyOpacity}"/>
+
                         <!-- 后补追缴入口已收敛到主界面侧栏（CanAccessRecovery 权限门控），本页不再重复 -->
 
                         <!-- 高龄津贴复核 -->

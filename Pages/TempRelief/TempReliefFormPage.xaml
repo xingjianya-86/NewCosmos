@@ -156,13 +156,13 @@
                 <!-- ════════════ Tab 0：类型与申请人 ════════════ -->
                 <VerticalStackLayout Spacing="12" IsVisible="{Binding IsSection0Selected}">
 
-                    <!-- 卡片0：两大类（人群状态） -->
+                    <!-- 卡片0：两大类（人群状态，按身份证自动判定，人工不可改） -->
                     <Border Style="{StaticResource CardBorder}">
                         <Border.Shadow>
                             <Shadow Brush="{StaticResource Black}" Offset="0,1" Radius="4" Opacity="0.06"/>
                         </Border.Shadow>
                         <VerticalStackLayout Spacing="12">
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                 <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 20"
                                         BackgroundColor="{StaticResource PrimarySoft}" StrokeThickness="0" Padding="0">
                                     <Label Text="{OnPlatform WinUI='&#xE716;', Android='&#x1F465;'}" FontFamily="{OnPlatform WinUI='Segoe Fluent Icons', Android=''}" FontSize="20"
@@ -170,34 +170,34 @@
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <Label Grid.Column="1" Text="保障人群 *" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="系统自动判定" FontSize="13" TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                             </Grid>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                                 <Border Grid.Column="0" StrokeShape="RoundRectangle 8" Padding="16,14"
                                         BackgroundColor="{Binding IsInsured, Converter={StaticResource BoolToColorConverter}}"
                                         StrokeThickness="0">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding SelectInsuredCommand}"/>
-                                    </Border.GestureRecognizers>
                                     <VerticalStackLayout Spacing="4">
                                         <Label Text="在保障人群内" FontSize="18" FontAttributes="Bold"
-                                               TextColor="{Binding IsInsured, Converter={StaticResource BoolToColorConverter}}"/>
+                                               TextColor="{StaticResource TextPrimary}"/>
                                         <Label Text="四类在册：低保/特困/边缘/刚性支出；5 日办结" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                     </VerticalStackLayout>
                                 </Border>
                                 <Border Grid.Column="1" StrokeShape="RoundRectangle 8" Padding="16,14"
                                         BackgroundColor="{Binding IsUninsured, Converter={StaticResource BoolToColorConverter}}"
                                         StrokeThickness="0">
-                                    <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding SelectUninsuredCommand}"/>
-                                    </Border.GestureRecognizers>
                                     <VerticalStackLayout Spacing="4">
                                         <Label Text="不在保障人群内" FontSize="18" FontAttributes="Bold"
-                                               TextColor="{Binding IsUninsured, Converter={StaticResource BoolToColorConverter}}"/>
+                                               TextColor="{StaticResource TextPrimary}"/>
                                         <Label Text="手工登记；需核对/公示，15 日办结" FontSize="14" TextColor="{StaticResource TextSecondary}"/>
                                     </VerticalStackLayout>
                                 </Border>
                             </Grid>
+                            <Label Text="检索并选择申请人后，系统按身份证自动判定（人工不可改）"
+                                   FontSize="13" TextColor="{StaticResource TextTertiary}"
+                                   IsVisible="{Binding IsPopulationStatusPending}"/>
+                            <Label Text="{Binding PopulationStatusBasis}" FontSize="13" TextColor="{StaticResource TextSecondary}"
+                                   IsVisible="{Binding IsPopulationStatusResolved}"/>
                         </VerticalStackLayout>
                     </Border>
 
@@ -262,7 +262,7 @@
                                            HorizontalOptions="Center" VerticalOptions="Center"/>
                                 </Border>
                                 <Label Grid.Column="1" Text="选择申请人" Style="{StaticResource SectionTitleLabel}" Margin="0" VerticalOptions="Center"/>
-                                <Label Grid.Column="2" Text="在册：四类台账 / 非在册：手工或其他困难" FontSize="13"
+                                <Label Grid.Column="2" Text="统一检索台账与申请库，系统自动判定大类" FontSize="13"
                                        TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
                             </Grid>
                             <BoxView Style="{StaticResource Divider}" Margin="0"/>
@@ -315,12 +315,26 @@
                                     IsEnabled="{Binding SelectedCandidate, Converter={StaticResource NullToBoolConverter}}"
                                     HeightRequest="44"/>
 
+                            <!-- 检索不到 → 非在册手工登记 -->
+                            <Button Text="未检索到？转非在册登记" Style="{StaticResource ButtonOutline}"
+                                    Command="{Binding EnterManualEntryCommand}"
+                                    IsVisible="{Binding CanEnterManualEntry}"
+                                    HeightRequest="44"/>
+
                             <!-- 非在册登记提示 -->
-                            <Border IsVisible="{Binding IsUninsured}"
+                            <Border IsVisible="{Binding IsManualEntry}"
                                     BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0"
                                     StrokeShape="RoundRectangle 8" Padding="12,8">
-                                <Label Text="非在册登记：请直接填写申请人信息，无需检索；需入户/经济核对与 3 日公示，15 日办结。"
+                                <Label Text="非在册登记：请直接填写申请人信息；需入户/经济核对与 3 日公示，15 日办结。填写身份证后系统自动核查四类在册台账。"
                                        FontSize="14" TextColor="{StaticResource WarningDark}"/>
+                            </Border>
+
+                            <!-- 手工登记命中四类台账：阻止保存并导流检索 -->
+                            <Border IsVisible="{Binding ManualEntryMatchesLedger}"
+                                    BackgroundColor="{StaticResource WarningSoft}" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="12,8">
+                                <Label Text="该身份证命中四类在册台账，请改用上方检索选择该申请人（不可手工登记）。"
+                                       FontSize="14" TextColor="{StaticResource Error}"/>
                             </Border>
 
                             <!-- 已选申请人摘要 -->
@@ -535,7 +549,24 @@
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                                 <VerticalStackLayout Grid.Column="0" Spacing="6">
                                     <Label Text="申请日期 *" Style="{StaticResource FormFieldLabelStyle}"/>
-                                    <DatePicker Date="{Binding ApplyDate}" Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <!-- 新建：可选未来日期（最晚今天 + 1 个月） -->
+                                    <DatePicker Date="{Binding ApplyDate}" MaximumDate="{Binding ApplyDateMaximum}"
+                                                Format="yyyy/MM/dd" IsVisible="{Binding IsCreateMode}"
+                                                Style="{StaticResource FormFieldPickerStyle}"/>
+                                    <!-- 已入库：只读；草稿/退回补正可点「修改」走改期重号流程 -->
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"
+                                          IsVisible="{Binding IsExistingRecord}">
+                                        <Border BackgroundColor="{StaticResource Gray100}" StrokeThickness="0"
+                                                StrokeShape="RoundRectangle 8" Padding="12,0" HeightRequest="48">
+                                            <Label Text="{Binding ApplyDate, StringFormat='{0:yyyy/MM/dd}'}"
+                                                   FontSize="18" FontAttributes="Bold"
+                                                   TextColor="{StaticResource TextPrimary}" VerticalOptions="Center"/>
+                                        </Border>
+                                        <Button Grid.Column="1" Text="修改" Style="{StaticResource ButtonSmall}"
+                                                Command="{Binding ChangeApplyDateCommand}"
+                                                IsVisible="{Binding CanChangeApplyDate}"
+                                                VerticalOptions="Center"/>
+                                    </Grid>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="6">
                                     <Label Text="填报单位" Style="{StaticResource FormFieldLabelStyle}"/>

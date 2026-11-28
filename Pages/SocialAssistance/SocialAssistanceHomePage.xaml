@@ -34,7 +34,7 @@
                 <VerticalStackLayout Margin="20,20,20,0" Spacing="14">
                     <Label Text="业务办理" Style="{StaticResource SectionTitleLabel}" Margin="4,4,0,0"/>
 
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="14">
 
                         <!-- 业务申请 -->
                         <components:FeatureCard Grid.Row="0" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE7C1;', Android='&#x1F4C3;'}"
@@ -91,6 +91,13 @@
                                                 IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
                                                 Title="快速核验·模拟测算" Description="身份证一键核验土地/补贴/保障身份，收入与标准试算"
                                                 Command="{Binding OpenQuickVerifyCommand}"
+                                                Opacity="{Binding SocialAssistanceOpacity}"/>
+
+                        <!-- 异地协助（入户调查与邻里走访，本地留存不纳入月报） -->
+                        <components:FeatureCard Grid.Row="4" Grid.Column="0" Glyph="{OnPlatform WinUI='&#xE716;', Android='&#x1F91D;'}"
+                                                IconBackgroundColor="#EBF5FF" IconColor="{StaticResource ModuleSocialAssistance}"
+                                                Title="异地协助" Description="入户调查与邻里走访，本地留存不纳入月报"
+                                                Command="{Binding OpenRemoteAssistanceCommand}"
                                                 Opacity="{Binding SocialAssistanceOpacity}"/>
 
                     </Grid>

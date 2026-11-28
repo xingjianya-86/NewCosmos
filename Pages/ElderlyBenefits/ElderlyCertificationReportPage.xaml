@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/maui/global"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ent="clr-namespace:NewCosmos.Models.Entities"
+             x:Class="NewCosmos.Pages.ElderlyBenefits.ElderlyCertificationReportPage"
+             x:DataType="ElderlyCertificationReportViewModel"
+             Title="认证报表"
+             NavigationPage.HasNavigationBar="False"
+             BackgroundColor="{StaticResource Background}">
+
+    <ContentPage.Resources>
+        <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <components:PageHeaderView Grid.Row="0"
+                                   Glyph="{OnPlatform WinUI='&#xE8A5;', Android='&#x1F4C4;'}"
+                                   Title="认证报表"
+                                   Subtitle="年度认证花名册 · 情况汇总表 · 未认证人员名单（Excel / PDF 导出与打印）"
+                                   BackCommand="{Binding GoBackCommand}"
+                                   BackText="返回认证名单"/>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="16" Spacing="12">
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="认证批次" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Picker ItemsSource="{Binding Campaigns}"
+                                ItemDisplayBinding="{Binding DisplayName, x:DataType=ent:ElderlyCertCampaign}"
+                                SelectedItem="{Binding SelectedCampaign}"
+                                HeightRequest="42"/>
+                        <Label Text="{Binding CampaignInfo}" FontSize="14"
+                               TextColor="{StaticResource TextSecondary}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="报表类型" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <CheckBox IsChecked="{Binding ExportRoster}" VerticalOptions="Start"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="年度认证花名册（ROSTER）" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="批次全部任务；按乡镇/村、姓名、身份证排序，含认证结果与停发决定。"
+                                       FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <CheckBox IsChecked="{Binding ExportSummary}" VerticalOptions="Start"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="年度认证情况汇总表（SUMMARY）" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="按乡镇/村社区聚合；末行合计，认证率保留 1 位小数。"
+                                       FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                            <CheckBox IsChecked="{Binding ExportUnverified}" VerticalOptions="Start"/>
+                            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                <Label Text="未认证人员名单（UNVERIFIED）" FontSize="15" FontAttributes="Bold"
+                                       TextColor="{StaticResource TextPrimary}"/>
+                                <Label Text="待核查/拒绝核查/核查不通过/无法联系，且未停发、未标记已停发。"
+                                       FontSize="13" TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="输出位置" Style="{StaticResource SectionTitleLabel}" Margin="0"/>
+                        <Label Text="{Binding OutputFolder}" FontSize="13"
+                               TextColor="{StaticResource TextSecondary}" LineBreakMode="CharacterWrap"/>
+                        <FlexLayout Direction="Row" Wrap="Wrap" AlignItems="Center">
+                            <Button Text="导出 Excel"
+                                    Command="{Binding ExportCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                                    Margin="0,0,8,8"/>
+                            <Button Text="导出 PDF"
+                                    Command="{Binding ExportPdfCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonPrimary}" HeightRequest="40"
+                                    Margin="0,0,8,8"/>
+                            <Button Text="打印 PDF"
+                                    Command="{Binding PrintPdfCommand}"
+                                    IsEnabled="{Binding CanView}"
+                                    Style="{StaticResource ButtonSecondary}" HeightRequest="40"
+                                    Margin="0,0,8,8"/>
+                            <Button Text="打开输出目录"
+                                    Command="{Binding OpenOutputFolderCommand}"
+                                    Style="{StaticResource ButtonOutline}" HeightRequest="40"
+                                    Margin="0,0,8,8"/>
+                        </FlexLayout>
+                        <Label Text="{Binding LastExportText}" FontSize="13"
+                               TextColor="{StaticResource TextSecondary}" LineBreakMode="WordWrap"
+                               IsVisible="{Binding LastExportText, Converter={StaticResource StringNotEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}" BackgroundColor="{StaticResource InfoSoft}"
+                        Stroke="Transparent" Padding="12,8">
+                    <Label FontSize="13" TextColor="{StaticResource PrimaryDark}" LineBreakMode="WordWrap"
+                           Text="Excel/PDF 文件名格式：批次编号_报表KEY_时间戳.xlsx|pdf。打印会把勾选的报表合并成一份 PDF，再交给系统默认 PDF 应用；未关联打印程序时会打开阅读器由人工打印。"/>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <components:LoadingOverlay Grid.Row="0" Grid.RowSpan="3"
+                                   IsLoading="{Binding IsBusy}"
+                                   LoadingText="{Binding LoadingMessage}"/>
+    </Grid>
+</ContentPage>

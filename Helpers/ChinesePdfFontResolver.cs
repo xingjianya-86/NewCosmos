@@ -3,7 +3,8 @@ using PdfSharp.Fonts;
 namespace NewCosmos.Helpers;
 
 /// <summary>
-/// PDFsharp 中文字体解析（Windows 系统字体）：用于直接生成告知书 PDF。
+/// PDFsharp 中文字体解析：用于直接生成告知书/认证报表 PDF。
+/// 查找顺序：环境变量 NC_PDF_FONT_PATH → Windows 系统字体 → 应用目录 Resources/Fonts → Linux 常见字体。
 /// 仅在首次调用时注册；找不到字体时显式失败，禁止静默输出乱码。
 /// </summary>
 public sealed class ChinesePdfFontResolver : IFontResolver
@@ -38,10 +39,10 @@ public sealed class ChinesePdfFontResolver : IFontResolver
                 return _initError == null;
             }
 
-            var fontPath = FindSystemChineseFont();
+            var fontPath = FindChineseFont();
             if (fontPath == null)
             {
-                _initError = "未找到中文字体（simhei.ttf/simfang.ttf/simkai.ttf），无法生成告知书 PDF";
+                _initError = "未找到中文字体（可设置 NC_PDF_FONT_PATH，或安装 simhei/Noto Sans CJK），无法生成 PDF";
                 error = _initError;
                 return false;
             }
@@ -55,15 +56,47 @@ public sealed class ChinesePdfFontResolver : IFontResolver
         }
     }
 
-    private static string? FindSystemChineseFont()
+    private static string? FindChineseFont()
     {
-        var dir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-        if (string.IsNullOrWhiteSpace(dir)) return null;
-        foreach (var name in new[] { "simhei.ttf", "simfang.ttf", "simkai.ttf", "simsunb.ttf" })
+        foreach (var path in EnumerateCandidates())
         {
-            var path = Path.Combine(dir, name);
             if (File.Exists(path)) return path;
         }
         return null;
+    }
+
+    private static IEnumerable<string> EnumerateCandidates()
+    {
+        // 1) 部署环境显式指定（Linux 容器最稳）。
+        var configured = Environment.GetEnvironmentVariable("NC_PDF_FONT_PATH");
+        if (!string.IsNullOrWhiteSpace(configured))
+            yield return configured;
+
+        // 2) Windows 系统黑体/仿宋/楷体。
+        var fontsDir = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+        if (!string.IsNullOrWhiteSpace(fontsDir))
+        {
+            foreach (var name in new[] { "simhei.ttf", "simfang.ttf", "simkai.ttf", "simsunb.ttf" })
+                yield return Path.Combine(fontsDir, name);
+        }
+
+        // 3) 随应用发布的字体（Web 服务端内置，避免依赖系统字体包）。
+        var baseDir = AppContext.BaseDirectory;
+        yield return Path.Combine(baseDir, "Resources", "Fonts", "notosansregular.ttf");
+        yield return Path.Combine(baseDir, "Fonts", "notosansregular.ttf");
+        yield return Path.Combine(baseDir, "Resources", "Fonts", "NotoSansSC-Regular.otf");
+
+        // 4) Linux 常见单文件字体（.ttc 集合 PDFsharp 不支持，跳过）。
+        foreach (var path in new[]
+                 {
+                     "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
+                     "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf",
+                     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttf",
+                     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttf",
+                     "/usr/share/fonts/truetype/arphic/uming.ttf"
+                 })
+        {
+            yield return path;
+        }
     }
 }

@@ -20,8 +20,16 @@
                         <Label Grid.Column="1" Text="NEWCOSMOS" FontFamily="{OnPlatform WinUI='DM Mono', Android='dmmono', Default='DM Mono'}"
                                FontSize="12" CharacterSpacing="3" TextColor="{StaticResource Muted}"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
-                        <Label Grid.Column="2" Text="{Binding AppVersion}" FontSize="14"
-                               TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                        <HorizontalStackLayout Grid.Column="2" Spacing="8" VerticalOptions="Center">
+                            <Label Text="{Binding AppVersion}" FontSize="14"
+                                   TextColor="{StaticResource TextTertiary}" VerticalOptions="Center"/>
+                            <!-- 右上角「北斗终端」入口：内嵌终端序列页，系统浏览器打开 -->
+                            <Button Text="北斗" FontSize="11" HeightRequest="28" Padding="8,0"
+                                    Style="{StaticResource ButtonOutline}"
+                                    TextColor="{StaticResource Muted}" BorderColor="{StaticResource Line}"
+                                    VerticalOptions="Center"
+                                    Clicked="OnTerminalButtonClicked"/>
+                        </HorizontalStackLayout>
                     </Grid>
                 </Border>
                 <!-- 报头底部双线（墨线 + 细线，与桌面报头同构） -->

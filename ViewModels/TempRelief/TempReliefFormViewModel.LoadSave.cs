@@ -25,6 +25,8 @@ public partial class TempReliefFormViewModel
     public async Task LoadAsync(long id)
     {
         _id = id;
+        OnPropertyChanged(nameof(IsExistingRecord));
+        OnPropertyChanged(nameof(CanChangeApplyDate));
         _suppressReload = true;
         var isDraft = false;
         await ExecuteAsync(async () =>
@@ -34,11 +36,21 @@ public partial class TempReliefFormViewModel
                 return Result.Failure(ErrorCodes.RECORD_NOT_FOUND, "申请记录不存在");
 
             var app = result.Value;
+            CurrentStatus = app.Status ?? string.Empty;
             isDraft = string.Equals(app.Status, TempReliefConstants.StatusDraft, StringComparison.Ordinal);
             ReliefType = app.ReliefType;
-            PopulationStatus = string.IsNullOrEmpty(app.PopulationStatus)
-                ? TempReliefConstants.PopulationInsured
-                : app.PopulationStatus;
+            SetManualEntry(string.Equals(app.SourceType, TempReliefConstants.SourceManual, StringComparison.Ordinal));
+            var hasStoredPopulation = !string.IsNullOrEmpty(app.PopulationStatus);
+            PopulationStatus = hasStoredPopulation
+                ? app.PopulationStatus
+                : TempReliefConstants.PopulationInsured;
+            IsPopulationStatusResolved = hasStoredPopulation;
+            PopulationStatusBasis = hasStoredPopulation
+                ? "按保存时判定结果（身份证反查四类在册台账）"
+                : "存量记录未保存判定结果，保存时将按身份证重新判定";
+            ManualEntryMatchesLedger = false;
+            _lastInsuredCheckedIdCard = (app.ApplicantIdCard ?? string.Empty).Trim();
+            _insuredCheckGeneration++;
             PaymentChannel = TempReliefConstants.ResolvePaymentChannel(app.ReliefType, app.PaymentChannel);
             _lastLargePaymentChannel = app.ReliefType == TempReliefConstants.ReliefTypeLarge
                 ? PaymentChannel
@@ -66,7 +78,7 @@ public partial class TempReliefFormViewModel
             _hukouType = app.HukouType;
 
             ApplicantName = app.ApplicantName;
-            ApplicantIdCard = app.ApplicantIdCard;
+            ApplicantIdCard = app.ApplicantIdCard ?? string.Empty;
 
             // 户籍快照缺失（存量记录）时按身份证跨来源补判：当前库申请库 + 导入台账
             if (string.IsNullOrWhiteSpace(_hukouType) && !string.IsNullOrWhiteSpace(app.ApplicantIdCard))
@@ -104,8 +116,9 @@ public partial class TempReliefFormViewModel
             BankName = app.BankName;
             BankAccount = app.BankAccount;
 
-            // 草稿读入：申请日期自动重置为当前日期（与新建一致）
-            ApplyDate = isDraft ? DateTime.Today : (app.ApplyDate ?? DateTime.Today);
+            // 保留已存申请日期（含未来日期）；仅空值兜底今天。草稿不再强制重置为今天，
+            // 否则用户选的未来/历史日期存草稿后重开会丢失。
+            ApplyDate = app.ApplyDate ?? DateTime.Today;
             DifficultyReason = app.DifficultyReason;
             DifficultyType = string.IsNullOrWhiteSpace(app.DifficultyType)
                 ? TempReliefConstants.DifficultyTypeOther
@@ -409,10 +422,8 @@ public partial class TempReliefFormViewModel
             }
 
             var list = result.Value;
-            // 在册只认四类在册台账；非在册保留其他困难台账 + 低保申请库候选（手工登记仍可用）
-            list = IsInsured
-                ? list.Where(c => TempReliefConstants.IsInsuredSourceTable(c.SourceTable)).ToList()
-                : list.Where(c => !TempReliefConstants.IsInsuredSourceTable(c.SourceTable)).ToList();
+            // 统一检索全部来源（四类在册台账 + 其他困难台账 + 低保申请库），
+            // 保障人群在选中申请人后按身份证自动判定，不再先选大类再过滤。
             MainThread.BeginInvokeOnMainThread(() =>
             {
                 Candidates.Clear();
@@ -459,6 +470,18 @@ public partial class TempReliefFormViewModel
                 return Result.Failure(ErrorCodes.ANNUAL_LIMIT_EXCEEDED, $"该申请人本年度已申请过临时救助，每年仅限一次");
             }
 
+            // 保障人群自动判定（唯一口径）：按身份证反查四类在册台账；查询失败如实失败，不静默降级。
+            var insuredResult = await _applicationService.ResolveInsuredIdentityAsync(c.IdCard, CancellationToken);
+            if (insuredResult.IsFailure)
+                return Result.Failure(insuredResult.ErrorCode!, insuredResult.Message!);
+            var insuredIdentity = insuredResult.Value;
+
+            // 已从台账/申请库选中：退出手工登记模式，避免身份证回填触发重复核查。
+            SetManualEntry(false);
+            ManualEntryMatchesLedger = false;
+            _lastInsuredCheckedIdCard = (c.IdCard ?? string.Empty).Trim();
+            _insuredCheckGeneration++;
+
             _sourceTable = c.SourceTable;
             _sourceFamilyId = c.SourceFamilyId;
             _hukouType = c.HukouType;
@@ -467,7 +490,7 @@ public partial class TempReliefFormViewModel
                 await LoadSmallAmountLevelsAsync();
 
             ApplicantName = c.Name;
-            ApplicantIdCard = c.IdCard;
+            ApplicantIdCard = c.IdCard ?? string.Empty;
             ApplicantGender = c.Gender;
             ApplicantPhone = c.Phone;
             ApplicantProvince = c.Province;
@@ -492,7 +515,7 @@ public partial class TempReliefFormViewModel
             BankName = c.BankName;
             BankAccount = string.IsNullOrWhiteSpace(c.OneCardAccount) ? c.BankAccount : c.OneCardAccount;
 
-            var age = Helpers.IdCardValidator.ExtractAge(c.IdCard);
+            var age = Helpers.IdCardValidator.ExtractAge(c.IdCard ?? string.Empty);
             if (age.HasValue)
                 ApplicantAge = age.Value;
 
@@ -508,14 +531,14 @@ public partial class TempReliefFormViewModel
 
             if (string.IsNullOrWhiteSpace(PolicyEnjoyed))
             {
-                var policyResult = await _applicationService.GetPolicySnapshotAsync(c.IdCard, CancellationToken);
+                var policyResult = await _applicationService.GetPolicySnapshotAsync(c.IdCard ?? string.Empty, CancellationToken);
                 if (policyResult.IsSuccess && policyResult.Value is { Count: > 0 })
                     PolicyEnjoyed = string.Join("；", policyResult.Value) + "。";
             }
 
             if (string.IsNullOrWhiteSpace(FamilyMemberStatus))
             {
-                var statusResult = await _applicationService.GetFamilyMemberStatusAsync(c.IdCard, CancellationToken);
+                var statusResult = await _applicationService.GetFamilyMemberStatusAsync(c.IdCard ?? string.Empty, CancellationToken);
                 if (statusResult.IsSuccess && !string.IsNullOrWhiteSpace(statusResult.Value))
                     FamilyMemberStatus = statusResult.Value;
             }
@@ -549,6 +572,13 @@ public partial class TempReliefFormViewModel
                 RebuildBeneficiaryOptions(string.IsNullOrWhiteSpace(matchedMemberIdCard) ? null : matchedMemberIdCard);
                 RebuildMemberNameOptions();
 
+                // 判定结果与摘要（判定查询已在选中前完成）
+                PopulationStatus = insuredIdentity.PopulationStatus;
+                IsPopulationStatusResolved = true;
+                PopulationStatusBasis = insuredIdentity.IsInsured
+                    ? insuredIdentity.BasisText
+                    : $"{insuredIdentity.BasisText}（来源：{c.SourceName}）";
+
                 IsCandidateSelected = true;
                 CandidateSummary = string.IsNullOrEmpty(matchedPersonInfo)
                     ? $"已选择：{c.Name}（{c.SourceName}）"
@@ -561,6 +591,129 @@ public partial class TempReliefFormViewModel
                 ("Name", Services.Core.DataMasker.MaskName(c.Name)));
             return Result.Success();
         }, "选择申请人...");
+    }
+
+    /// <summary>
+    /// 手工登记：身份证填满 18 位且校验通过时自动核查四类在册台账（同一身份证只查一次）。
+    /// 命中则提示改用检索并阻断保存；查询失败不打断录入（保存时服务端同口径再判并阻断）。
+    /// </summary>
+    partial void OnApplicantIdCardChanged(string value)
+    {
+        if (_suppressReload || !IsManualEntry || IsViewMode) return;
+
+        var id = (value ?? string.Empty).Trim();
+
+        // 身份证已改动：先撤销上一次核查结论，避免旧命中提示/阻断残留。
+        if (!string.Equals(id, _lastInsuredCheckedIdCard, StringComparison.OrdinalIgnoreCase))
+        {
+            ManualEntryMatchesLedger = false;
+            PopulationStatus = TempReliefConstants.PopulationUninsured;
+            IsPopulationStatusResolved = true;
+            PopulationStatusBasis = "非在册登记：填写身份证后自动核查四类在册台账";
+        }
+
+        if (id.Length != 18 || !IdCardValidator.IsValid(id)) return;
+        if (string.Equals(id, _lastInsuredCheckedIdCard, StringComparison.OrdinalIgnoreCase)) return;
+
+        var generation = ++_insuredCheckGeneration;
+        SafeFireAndForget(() => CheckManualIdCardAsync(id, generation));
+    }
+
+    private async Task CheckManualIdCardAsync(string idCard, int generation)
+    {
+        var result = await _applicationService.ResolveInsuredIdentityAsync(idCard, CancellationToken);
+        if (generation != _insuredCheckGeneration || !IsManualEntry) return;
+        if (result.IsFailure)
+        {
+            _logger.Warn($"临时救助手工登记身份证核查失败: {result.ErrorCode} {result.Message}");
+            return;
+        }
+
+        if (!string.Equals((ApplicantIdCard ?? string.Empty).Trim(), idCard, StringComparison.OrdinalIgnoreCase)) return;
+
+        _lastInsuredCheckedIdCard = idCard;
+        var identity = result.Value;
+        PopulationStatus = identity.PopulationStatus;
+        IsPopulationStatusResolved = true;
+        ManualEntryMatchesLedger = identity.IsInsured;
+        PopulationStatusBasis = identity.IsInsured
+            ? $"{identity.BasisText}，请改用检索选择该申请人"
+            : $"{identity.BasisText}（非在册登记）";
+    }
+
+    /// <summary>手工登记保存前兜底核查（同一身份证已核查过则跳过）。</summary>
+    private async Task EnsureManualIdCardCheckedAsync()
+    {
+        var id = (ApplicantIdCard ?? string.Empty).Trim();
+        if (id.Length != 18 || !IdCardValidator.IsValid(id)) return;
+        if (string.Equals(id, _lastInsuredCheckedIdCard, StringComparison.OrdinalIgnoreCase)) return;
+
+        await CheckManualIdCardAsync(id, ++_insuredCheckGeneration);
+    }
+
+    /// <summary>
+    /// 修改申请日期（仅草稿/退回补正）：日期选择上限 = 今天 + 1 个月；
+    /// 服务端按新日期重编号并同步 apply_date/accepted_at/公示起止；成功后本地重算曲线与批次提示。
+    /// </summary>
+    [RelayCommand]
+    private async Task ChangeApplyDateAsync()
+    {
+        if (!CanChangeApplyDate) return;
+
+        var userId = App.CurrentUserId;
+        if (!userId.HasValue)
+        {
+            await _dialogService.DisplayAlertAsync("提示", "登录状态已失效，请重新登录", "确定");
+            return;
+        }
+
+        var permissionService = _serviceProvider.GetRequiredService<NewCosmos.Services.UserManagement.INewPermissionService>();
+        if (!await permissionService.HasPermissionAsync(userId.Value, PermissionCodes.TEMP_EDIT, CancellationToken))
+        {
+            await _dialogService.DisplayAlertAsync("提示", "您没有修改申请日期的操作权限", "确定");
+            return;
+        }
+
+        var current = ApplyDate.Date;
+        var upper = TempReliefConstants.GetApplyDateUpperBound(DateTime.Today);
+        var picked = await NewCosmos.Components.DateTimePickerPopupView.ShowAsync(
+            current, upper, showTime: false, title: "修改申请日期");
+        if (!picked.HasValue) return;
+
+        var newDay = picked.Value.Date;
+        if (newDay == current) return;
+
+        var confirm = await _dialogService.DisplayAlertAsync("确认修改申请日期",
+            $"申请日期：{current:yyyy/MM/dd} → {newDay:yyyy/MM/dd}\n\n" +
+            "修改后将重新生成申请编号（LZ…），并重算公示、验收与办理时限；已打印的文书需重新出文书才会更新。\n\n是否继续？",
+            "确认修改", "取消");
+        if (!confirm) return;
+
+        await ExecuteAsync(async () =>
+        {
+            var operatorName = string.IsNullOrWhiteSpace(App.CurrentUserName) ? "System" : App.CurrentUserName;
+            var result = await _applicationService.ChangeApplyDateAsync(_id, newDay, operatorName, CancellationToken);
+            if (result.IsFailure)
+            {
+                await _dialogService.DisplayAlertAsync("修改失败", result.Message ?? "修改申请日期失败", "确定");
+                return Result.Success();
+            }
+
+            // 本地同步：日期 → 公示/验收/批次提示（服务端已按同一曲线持久化）
+            _suppressReload = true;
+            try
+            {
+                ApplyDate = newDay;
+            }
+            finally
+            {
+                _suppressReload = false;
+            }
+            await ApplyPublicizeDefaultsAsync();
+
+            await _dialogService.ShowSnackBarAsync($"申请日期已改为 {newDay:yyyy/MM/dd}，新编号：{result.Value}");
+            return Result.Success();
+        }, "修改申请日期...");
     }
 
     [RelayCommand]
@@ -675,6 +828,10 @@ public partial class TempReliefFormViewModel
     /// </summary>
     private async Task<Result?> SaveCoreAsync()
     {
+        // 手工登记保存前先确保身份证核查完成（输入后立刻点保存时，异步核查可能还没回来）。
+        if (IsManualEntry)
+            await EnsureManualIdCardCheckedAsync();
+
         var validation = Validate();
         if (validation != null)
         {
@@ -684,6 +841,11 @@ public partial class TempReliefFormViewModel
 
         // 保存兜底：未手动编辑过救助原因时按当前困难类型与明细重新生成
         if (!_reasonDirty) RegenerateDifficultyReason();
+
+        // 新建：保存前确保公示/验收曲线与当前申请日期同源（日期改动后立刻保存时，异步重算可能尚未回写）
+        if (IsCreateMode)
+            await ApplyPublicizeDefaultsAsync();
+
         var app = BuildApplication();
 
         if (OperationMode == FormOperationMode.Create)
@@ -973,8 +1135,19 @@ public partial class TempReliefFormViewModel
 
     private string? Validate()
     {
+        var applyDateUpper = TempReliefConstants.GetApplyDateUpperBound(DateTime.Today);
+        if (ApplyDate.Date > applyDateUpper)
+            return $"申请日期最多只能提前 {TempReliefConstants.ApplyDateFutureMonths} 个月（最晚 {applyDateUpper:yyyy-MM-dd}）";
+
+        if (!IsPopulationStatusResolved)
+            return "请先检索并选择申请人（或转非在册登记），系统将自动判定保障人群";
+
         if (IsManualEntry)
         {
+            if (ManualEntryMatchesLedger)
+                return string.IsNullOrWhiteSpace(PopulationStatusBasis)
+                    ? "该身份证命中四类在册台账，请改用检索选择该申请人"
+                    : PopulationStatusBasis;
             if (string.IsNullOrWhiteSpace(ApplicantName))
                 return "请填写申请人姓名";
             if (string.IsNullOrWhiteSpace(ApplicantIdCard))
@@ -984,7 +1157,7 @@ public partial class TempReliefFormViewModel
         }
         else if (!IsCandidateSelected && string.IsNullOrEmpty(ApplicantName))
         {
-            return "请先从四类在册台账中选择申请人；不在保障人群内请切换为「非在册登记」";
+            return "请先检索并选择申请人；检索不到可点「转非在册登记」";
         }
 
         if (string.IsNullOrEmpty(ApplicantIdCard))
@@ -1093,8 +1266,8 @@ public partial class TempReliefFormViewModel
         {
             Id = _id,
             ReliefType = ReliefType,
-            PopulationStatus = IsManualEntry
-                ? TempReliefConstants.PopulationUninsured
+            PopulationStatus = IsPopulationStatusResolved
+                ? PopulationStatus
                 : TempReliefConstants.ResolvePopulationStatus(sourceType, sourceTable),
             PaymentChannel = TempReliefConstants.ResolvePaymentChannel(ReliefType, PaymentChannel),
             SourceType = sourceType,

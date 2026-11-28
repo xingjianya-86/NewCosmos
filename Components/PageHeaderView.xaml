@@ -46,7 +46,7 @@
 
             <!-- 内容区（标题行） -->
             <Grid x:Name="ContentGrid" Grid.Row="0" Grid.Column="1" Padding="20,16,16,14"
-                  ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                  ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="12">
 
                 <!-- 返回按钮（统一内置） -->
                 <components:BackButton x:Name="BackBtn" Grid.Column="0" VerticalOptions="Center"/>
@@ -69,6 +69,17 @@
                      不用 XAML Binding——SourceGen 下 {x:Reference Root} 绑定到 ContentPresenter 会失效 → Content 恒 null） -->
                 <ContentPresenter x:Name="ActionsPresenter" Grid.Column="3"
                                   VerticalOptions="Center"/>
+
+                <!-- 右上角「北斗终端」入口：内嵌终端序列页，点按后用系统浏览器打开。
+                     置于动作槽之后，始终位于最右侧；Android 收成两字，避免挤占标题。 -->
+                <Button x:Name="TerminalButton" Grid.Column="4"
+                        Style="{StaticResource ButtonOutline}"
+                        Text="{OnPlatform WinUI='北斗终端', Android='北斗', Default='北斗终端'}"
+                        FontSize="{OnPlatform WinUI=12, Android=11, Default=12}"
+                        HeightRequest="30" Padding="10,0" Margin="8,0,0,0"
+                        TextColor="{StaticResource Muted}" BorderColor="{StaticResource Line}"
+                        VerticalOptions="Center"
+                        Clicked="OnTerminalButtonClicked"/>
             </Grid>
 
             <!-- 统计插槽（模块主页的统计胶囊行；Content 由 Stats 属性变化时代码后置赋值）。
