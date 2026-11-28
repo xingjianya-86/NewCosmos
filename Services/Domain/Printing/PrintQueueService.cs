@@ -31,7 +31,6 @@ public class PrintQueueService : BaseService, IPrintQueueService
 
         var jobNo = $"PJ{DateTime.Now:yyyyMMddHHmmssfff}";
         var fieldsJson = JsonSerializer.Serialize(request.Fields ?? new(), JsonOptions);
-        var tableRowsJson = JsonSerializer.Serialize(request.TableRows ?? new(), JsonOptions);
         var supporterJson = request.SupporterTableData == null
             ? null
             : JsonSerializer.Serialize(request.SupporterTableData, JsonOptions);
@@ -44,16 +43,24 @@ public class PrintQueueService : BaseService, IPrintQueueService
             && (request.PhotoData == null || request.PhotoData.Length == 0))
             return Result.Failure<PrintJob>(ErrorCodes.VALIDATION_FAILED, "照片打印任务缺少照片数据");
 
+        // 赡养人行展平（口径同 PrintAgentService 的 effectiveRows：supporter 行非空则以其为准）：
+        // Windows Agent 的 payload 不带 supporter_table_data_json，只读 table_rows_json，
+        // 不展平会让 CopiesBySupporter 模板在 Web 侧丢掉逐人行。
+        var supporterRows = request.SupporterTableData;
+        var effectiveTableRows = supporterRows is { Count: > 0 } ? supporterRows : request.TableRows;
+
         const string sql = @"INSERT INTO nc_biz_print_jobs
                 (job_no, business_type, business_id, classification, template_id, template_name,
                  applicant_name, applicant_id_card, printer_name, copies, is_duplex,
                  fields_json, table_rows_json, supporter_table_data_json,
                  job_kind, photo_data, photo_layout, photo_category,
-                 status, requested_by, requested_by_name, created_at)
+                 status, requested_by, requested_by_name, created_at,
+                 target_user_id, target_device_id, target_printer)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
                         $12::jsonb, $13::jsonb, $14::jsonb,
                         $15, $16, $17, $18,
-                        $21, $19, $20, NOW())
+                        $21, $19, $20, NOW(),
+                        $22, $23, $24)
                 RETURNING id, job_no, status, created_at";
 
         var result = await _db.QuerySingleAsync<PrintJob>(sql, ct,
@@ -61,10 +68,11 @@ public class PrintQueueService : BaseService, IPrintQueueService
             request.TemplateId, request.TemplateName,
             request.ApplicantName, request.ApplicantIdCard, request.PrinterName,
             request.Copies, request.IsDuplex,
-            fieldsJson, tableRowsJson, supporterJson,
+            fieldsJson, JsonSerializer.Serialize(effectiveTableRows ?? new(), JsonOptions), supporterJson,
             jobKind, request.PhotoData, request.PhotoLayout, request.PhotoCategory,
             request.RequestedBy, request.RequestedByName,
-            PrintJobConstants.StatusPending);
+            PrintJobConstants.StatusPending,
+            request.TargetUserId, request.TargetDeviceId, request.TargetPrinter);
 
         if (result.IsFailure)
         {
@@ -93,11 +101,15 @@ public class PrintQueueService : BaseService, IPrintQueueService
 
         await using var tx = await _db.BeginTransactionScopeAsync(ct);
 
+        // target_device_id IS NULL：本机代理只消费「无定向」任务（手机推送链路 target 恒为 NULL 不受影响）。
+        // 定向任务（target_device_id 非空，含 Web LocalOp 与本机 Queue 模式推送）由对应 Windows Agent 按
+        // target_device_id 认领——此前无此过滤会偷走 Web 定向给其他设备的任务并误判失败。
         const string sql = @"UPDATE nc_biz_print_jobs
                 SET status = $4, agent_machine = $1, claimed_at = NOW()
                 WHERE id IN (
                     SELECT id FROM nc_biz_print_jobs
                     WHERE status = $3 AND deleted_at IS NULL
+                      AND target_device_id IS NULL
                     ORDER BY created_at
                     LIMIT $2
                     FOR UPDATE SKIP LOCKED
@@ -212,6 +224,7 @@ public class PrintQueueService : BaseService, IPrintQueueService
         const string sql = @"SELECT id, job_no, business_type, business_id, classification, template_id, template_name,
                                     applicant_name, applicant_id_card, printer_name, copies, is_duplex,
                                     job_kind, photo_data, photo_layout, photo_category,
+                                    target_user_id, target_device_id, target_printer,
                                     fields_json::text AS FieldsJson,
                                     table_rows_json::text AS TableRowsJson,
                                     supporter_table_data_json::text AS SupporterTableDataJson,

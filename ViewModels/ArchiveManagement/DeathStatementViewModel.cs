@@ -42,6 +42,7 @@ public partial class DeathStatementViewModel : ViewModelBase
     private readonly IServiceProvider _serviceProvider;
     private readonly INewPermissionService _permissionService;
     private readonly IPrintJobFactory _printJobFactory;
+    private readonly IQueuePrintRunner _queuePrintRunner;
     private readonly IElderlyApplicationService _elderlyApplicationService;
     private readonly IRegionService _regionService;
     private readonly IDictionaryService _dictionaryService;
@@ -71,6 +72,7 @@ public partial class DeathStatementViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         INewPermissionService permissionService,
         IPrintJobFactory printJobFactory,
+        IQueuePrintRunner queuePrintRunner,
         IElderlyApplicationService elderlyApplicationService,
         IRegionService regionService,
         IDictionaryService dictionaryService)
@@ -84,6 +86,7 @@ public partial class DeathStatementViewModel : ViewModelBase
         _serviceProvider = serviceProvider;
         _permissionService = permissionService;
         _printJobFactory = printJobFactory;
+        _queuePrintRunner = queuePrintRunner;
         _elderlyApplicationService = elderlyApplicationService;
         _regionService = regionService;
         _dictionaryService = dictionaryService;

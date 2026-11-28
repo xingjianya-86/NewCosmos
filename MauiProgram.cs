@@ -387,6 +387,8 @@ builder.Services.AddSingleton<Services.Domain.ArchiveManagement.IArchivePhotoPen
         // 推送打印队列（手机端入队，PC 端打印代理执行）
         builder.Services.AddSingleton<IPrintQueueService, PrintQueueService>();
         builder.Services.AddSingleton<IPrintJobFactory, PrintJobFactory>();
+        // 打印动作统一路由（app.ini [Print] OutputMode 开关：Local=现状本地 / Queue=推送 Windows Agent）
+        builder.Services.AddSingleton<IQueuePrintRunner, QueuePrintRunner>();
         builder.Services.AddSingleton<IPrintAgentService, PrintAgentService>();
         // 照片打印（手机采集照片 → PC 端 Word COM 排版直接打印，无模板）
         // 纯 Office COM 实现（PhotoPrintService 全文件 #if WINDOWS）；Android 端仅入队，由 PC 打印代理执行

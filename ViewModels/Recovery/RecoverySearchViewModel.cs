@@ -104,16 +104,16 @@ public partial class RecoverySearchViewModel : ViewModelBase
         ILoggerService logger,
         IRecoveryService recoveryService,
         IDialogService dialogService,
-        Services.Domain.Printing.IPrintJobFactory printJobFactory)
+        Services.Domain.Printing.IQueuePrintRunner queuePrintRunner)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
         _dialogService = dialogService;
-        _printJobFactory = printJobFactory;
+        _queuePrintRunner = queuePrintRunner;
     }
 
-    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
+    private readonly Services.Domain.Printing.IQueuePrintRunner _queuePrintRunner = null!;
 
     /// <summary>
     /// 加载统计数据
@@ -576,15 +576,19 @@ public partial class RecoverySearchViewModel : ViewModelBase
                 TableRows = new()
             };
 
-            var push = await _printJobFactory.EnqueueAsync(request);
+            // 方案A：推送按 app.ini [Print] OutputMode 路由（Local=现状入队 / Queue=定向推送并轮询回报）
+            var push = await _queuePrintRunner.RunPushAsync(request, CancellationToken);
             if (push.IsFailure)
             {
                 await _dialogService.DisplayAlertAsync("推送失败", push.Message ?? "推送打印失败", "确定");
                 return;
             }
 
+            var outcome = push.Value!;
             await _dialogService.DisplayAlertAsync("已推送打印",
-                $"打印任务 {push.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+                outcome.UsedQueue
+                    ? $"打印任务 {outcome.JobNo} 已推送，电脑端打印完成。"
+                    : $"打印任务 {outcome.JobNo} 已推送，将在电脑端自动打印。", "确定");
         }
         catch (Exception ex)
         {

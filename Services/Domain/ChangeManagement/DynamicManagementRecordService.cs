@@ -112,6 +112,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
     private readonly Services.Domain.Printing.IPrintExecuteService _printExecuteService;
     private readonly IDictCacheService _dictCacheService;
     private readonly Services.Domain.Printing.IPrintRecordService _printRecordService;
+    private readonly Services.Domain.Printing.IQueuePrintRunner _queuePrintRunner;
 
     public DynamicManagementRecordService(
         IDatabaseService db,
@@ -125,6 +126,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
         Services.Domain.Printing.IPrintExecuteService printExecuteService,
         IDictCacheService dictCacheService,
         Services.Domain.Printing.IPrintRecordService printRecordService,
+        Services.Domain.Printing.IQueuePrintRunner queuePrintRunner,
         ILoggerService logger) : base(logger)
     {
         _db = db;
@@ -138,6 +140,7 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
         _printExecuteService = printExecuteService;
         _dictCacheService = dictCacheService;
         _printRecordService = printRecordService;
+        _queuePrintRunner = queuePrintRunner;
     }
 
     public async Task<Result<Dictionary<string, string>>> BuildFieldsAsync(long applicationId, CancellationToken ct = default)
@@ -526,10 +529,31 @@ public class DynamicManagementRecordService : BaseService, IDynamicManagementRec
 
                 progress?.Invoke(i + 1, applicationIds.Count, name);
 
-                var printResult = await _printExecuteService.ExecutePrintAsync(
-                    templateIdResult.Value, TemplateName, BusinessTypeKey, latestId, batchNo,
-                    fieldsResult.Value, new List<Dictionary<string, string>>(),
-                    name, idCard, printerName, Math.Max(1, copies), false, printToPrinter: true, includePhotos: false, ct);
+                var request = new PrintJobRequest
+                {
+                    BusinessType = BusinessTypeKey,
+                    BusinessId = latestId,
+                    TemplateId = templateIdResult.Value,
+                    TemplateName = TemplateName,
+                    ApplicantName = name,
+                    ApplicantIdCard = idCard,
+                    PrinterName = printerName,
+                    Copies = Math.Max(1, copies),
+                    IsDuplex = false,
+                    Fields = fieldsResult.Value,
+                    TableRows = new()
+                };
+
+                // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+                var printResult = await _queuePrintRunner.RunPrintAsync(
+                    request,
+                    printToPrinter: true,
+                    includePhotos: false,
+                    ct2 => _printExecuteService.ExecutePrintAsync(
+                        templateIdResult.Value, TemplateName, BusinessTypeKey, latestId, batchNo,
+                        fieldsResult.Value, new List<Dictionary<string, string>>(),
+                        name, idCard, printerName, Math.Max(1, copies), false, printToPrinter: true, includePhotos: false, ct2),
+                    ct);
 
                 if (printResult.IsSuccess) successCount++;
                 else failed.Add((string.IsNullOrEmpty(name) ? latestId.ToString(CultureInfo.InvariantCulture) : name,

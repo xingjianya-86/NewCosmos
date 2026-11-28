@@ -86,6 +86,19 @@ public class AppOptions
     public bool AndroidImmersiveFullscreen { get; set; } = true;
 
     /// <summary>
+    /// 打印输出通道（app.ini [Print] OutputMode，默认 Local=零回归本地打印）：
+    /// Queue = 打印动作入队并固化 target_device_id，由 Windows Agent 认领打印。
+    /// 取值见 <see cref="PrintQueueConstants.OutputModeLocal"/> / <see cref="PrintQueueConstants.OutputModeQueue"/>。
+    /// </summary>
+    public string PrintOutputMode { get; set; } = PrintQueueConstants.OutputModeLocal;
+
+    /// <summary>Queue 模式等待远端回报上限（秒，app.ini [Print] QueueWaitSeconds，默认 60）</summary>
+    public int PrintQueueWaitSeconds { get; set; } = PrintQueueConstants.DefaultWaitSeconds;
+
+    /// <summary>Queue 模式任务失败/超时是否回退本地打印（app.ini [Print] QueueFallbackToLocal，默认回退）</summary>
+    public bool PrintQueueFallbackToLocal { get; set; } = PrintQueueConstants.DefaultFallbackToLocal;
+
+    /// <summary>
     /// 验证配置是否完整
     /// </summary>
     public void Validate()

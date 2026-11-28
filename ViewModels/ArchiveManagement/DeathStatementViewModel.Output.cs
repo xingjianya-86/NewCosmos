@@ -386,22 +386,45 @@ public partial class DeathStatementViewModel
     private async Task<Result> PrintOneAsync(string batchNo, string? pushUnit, bool printToPrinter, CancellationToken ct)
     {
         var fields = BuildStatementFields(pushUnit);
-        return await _printExecuteService.ExecutePrintAsync(
-            _statementTemplate!.Id,
-            _statementTemplate.Name,
-            StatementBusinessType,
-            _context?.DeclarationId ?? _context?.DeathRecordId,
-            batchNo,
-            fields,
-            null,
-            Name ?? string.Empty,
-            IdCard ?? string.Empty,
-            printToPrinter ? SelectedPrinter ?? string.Empty : null!,
-            Math.Max(1, Copies),
-            IsDuplex,
-            printToPrinter: printToPrinter,
+        var request = new PrintJobRequest
+        {
+            BusinessType = StatementBusinessType,
+            BusinessId = _context?.DeclarationId ?? _context?.DeathRecordId,
+            Classification = StatementBusinessType,
+            TemplateId = _statementTemplate!.Id,
+            TemplateName = _statementTemplate.Name,
+            ApplicantName = Name ?? string.Empty,
+            ApplicantIdCard = IdCard ?? string.Empty,
+            PrinterName = printToPrinter ? SelectedPrinter ?? string.Empty : null,
+            Copies = Math.Max(1, Copies),
+            IsDuplex = IsDuplex,
+            Fields = fields,
+            TableRows = new()
+        };
+
+        // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+        var run = await _queuePrintRunner.RunPrintAsync(
+            request,
+            printToPrinter,
             includePhotos: false,
+            ct2 => _printExecuteService.ExecutePrintAsync(
+                _statementTemplate.Id,
+                _statementTemplate.Name,
+                StatementBusinessType,
+                _context?.DeclarationId ?? _context?.DeathRecordId,
+                batchNo,
+                fields,
+                null,
+                Name ?? string.Empty,
+                IdCard ?? string.Empty,
+                printToPrinter ? SelectedPrinter ?? string.Empty : null!,
+                Math.Max(1, Copies),
+                IsDuplex,
+                printToPrinter: printToPrinter,
+                includePhotos: false,
+                ct2),
             ct);
+        return run;
     }
 
     /// <summary>手机端推送打印（由 PC 打印代理执行）</summary>

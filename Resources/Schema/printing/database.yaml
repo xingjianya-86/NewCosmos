@@ -88,6 +88,35 @@ tables:
         type: character varying(30)
         nullable: true
         comment: 照片类别（ID_CARD身份证/HOUSEHOLD_REGISTER户口本/PUBLICITY_CHECK公示核查/HOUSEHOLD_INSPECTION入户排查/OTHER_CERT其他证件，展示/留痕用）
+      - name: target_user_id
+        type: integer
+        nullable: true
+        comment: 定向目标用户（发起账户；NULL=无定向，由本机打印代理消费）
+      - name: target_device_id
+        type: bigint
+        nullable: true
+        comment: 定向目标 Agent 设备（nc_sys_print_devices.id；NULL=无定向。入队时固化，只有该设备能认领）
+      - name: target_printer
+        type: text
+        nullable: true
+        comment: 定向目标打印机名（NULL=目标设备默认打印机）
+      - name: retry_count
+        type: integer
+        nullable: false
+        default: 0
+        comment: 超时回收重试次数（Web Agent 认领侧维护，Processing 超时后 +1 重新排队）
+      - name: images_json
+        type: jsonb
+        nullable: true
+        comment: 图片下发列表 JSON（Web Agent 签名/照片占位符图，List<PrintImagePayload>）
+      - name: batch_json
+        type: jsonb
+        nullable: true
+        comment: 批量打印任务定义 JSON（PrintBatchDefinition 快照，Agent 按 part 字段渲染）
+      - name: batch_no
+        type: character varying(64)
+        nullable: true
+        comment: 批次号（批量任务同号，Agent 回执按此归档到 nc_biz_print_records）
       - name: status
         type: character varying(20)
         nullable: false
@@ -130,5 +159,8 @@ tables:
         unique: true
       - name: idx_print_jobs_status_created
         columns: [status, created_at]
+      - name: idx_print_jobs_target_pending
+        columns: [target_device_id, created_at]
+        where: status = 'Pending' AND deleted_at IS NULL
       - name: idx_print_jobs_business
         columns: [business_type, business_id]

@@ -12,6 +12,13 @@ public interface IPrintJobFactory
     /// <summary>按请求入队（若未提供 TemplateId 则按业务类型+分类解析模板）。</summary>
     Task<Result<PrintJob>> EnqueueAsync(PrintJobRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// 解析并固化定向推送目标（方案A）：OutputMode=Queue 且模板/字段不含 SIGNATURE_* 占位时，
+    /// 按本机 machine_name 查 nc_sys_print_devices 并写入 target_*；否则返回 false、target 留 NULL。
+    /// 已解析或已置 SkipTargetResolution 时不重复查询。
+    /// </summary>
+    Task<bool> TryResolveTargetAsync(PrintJobRequest request, CancellationToken ct = default);
+
     /// <summary>临时救助推送打印（构建单据字段后入队；copies 缺省时取模板配置的默认份数）。</summary>
     Task<Result<PrintJob>> EnqueueTempReliefAsync(
         long applicationId,

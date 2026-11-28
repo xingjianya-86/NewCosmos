@@ -3,9 +3,11 @@ using NewCosmos.Helpers;
 using NewCosmos.Models.Entities;
 using NewCosmos.Models.Results;
 using NewCosmos.Services.Core;
+using NewCosmos.Services.Database;
 using NewCosmos.Services.Domain.ArchiveManagement;
 using NewCosmos.Services.Domain.ElderlyBenefits;
 using NewCosmos.Services.Domain.TempRelief;
+using NewCosmos.Services.UserManagement;
 using NewCosmos.Services.Utilities;
 
 namespace NewCosmos.Services.Domain.Printing;
@@ -14,6 +16,8 @@ namespace NewCosmos.Services.Domain.Printing;
 /// 推送打印任务构建服务实现。
 /// 模板选择复用 <see cref="ArchiveCategoryResolver"/>（与档案输出/补打中心同源分类），
 /// 字段构建复用各域 <c>*PrintDataBuilder</c>，保证推送打印与手动打印口径一致。
+/// 方案A（2026-11-28）：Queue 模式下入队前固化 target_device_id，交由对应 Windows Agent 认领；
+/// 入队前补打印权限校验，与 <see cref="PrintExecuteService.ExecutePrintAsync"/> 同口径。
 /// </summary>
 public class PrintJobFactory : BaseService, IPrintJobFactory
 {
@@ -24,6 +28,9 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
     private readonly ITempReliefService _tempReliefService;
     private readonly IElderlyApplicationService _elderlyService;
     private readonly IBusinessTimelineService _timelineService;
+    private readonly IDatabaseService _db;
+    private readonly IConfigService _configService;
+    private readonly INewPermissionService _permissionService;
 
     public PrintJobFactory(
         IPrintQueueService queueService,
@@ -31,6 +38,9 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         ITempReliefService tempReliefService,
         IElderlyApplicationService elderlyService,
         IBusinessTimelineService timelineService,
+        IDatabaseService db,
+        IConfigService configService,
+        INewPermissionService permissionService,
         ILoggerService logger) : base(logger)
     {
         _queueService = queueService;
@@ -38,12 +48,33 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         _tempReliefService = tempReliefService;
         _elderlyService = elderlyService;
         _timelineService = timelineService;
+        _db = db;
+        _configService = configService;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<PrintJob>> EnqueueAsync(PrintJobRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.BusinessType))
             return Result.Failure<PrintJob>(ErrorCodes.VALIDATION_FAILED, "业务类型不能为空");
+
+        // 权限校验：与 PrintExecuteService.ExecutePrintAsync 同口径（登录 → 业务类型登记 → 权限码），
+        // 此前入队无校验，无打印权限的用户能推成任务、到打印时才失败。
+        var currentUserId = App.CurrentUserId;
+        if (!currentUserId.HasValue)
+            return Result.Failure<PrintJob>(ErrorCodes.AUTHENTICATION_FAILED, "用户未登录");
+
+        if (!PrintExecuteService.TryGetPrintPermissionCode(request.BusinessType, out var permissionCode))
+        {
+            LogError($"未登记的打印业务类型: {request.BusinessType}");
+            return Result.Failure<PrintJob>(ErrorCodes.PERMISSION_DENIED, $"未登记的打印业务类型: {request.BusinessType}");
+        }
+
+        if (!await _permissionService.HasPermissionAsync(currentUserId.Value, permissionCode, ct))
+        {
+            LogError($"用户无打印权限, UserId={currentUserId}, Permission={permissionCode}");
+            return Result.Failure<PrintJob>(ErrorCodes.PERMISSION_DENIED, $"无权打印该文档（缺少权限: {permissionCode}）");
+        }
 
         // 未显式指定模板时，按业务类型 + 分类解析
         if (request.TemplateId is null or <= 0)
@@ -59,15 +90,118 @@ public class PrintJobFactory : BaseService, IPrintJobFactory
         request.RequestedBy ??= App.CurrentUserId;
         request.RequestedByName ??= App.CurrentUserName;
 
+        // 方案A：Queue 模式固化定向目标；Local 模式 / 含签名占位 / 本机未注册 Agent → target 留 NULL，
+        // 由本机打印代理消费（回退本地代理/本地打印，Local 模式零回归）。
+        if (!request.SkipTargetResolution && request.TargetDeviceId is null)
+            await TryResolveTargetAsync(request, ct);
+
         var result = await _queueService.EnqueueAsync(request, ct);
         if (result.IsSuccess)
         {
+            // JobNo 以队列服务生成/回读的为准（工厂侧不再另造号码，避免两处时间戳不一致）
             Logger.LogBusiness("打印任务已推送",
                 ("BusinessType", request.BusinessType),
                 ("BusinessId", request.BusinessId?.ToString() ?? string.Empty),
-                ("Template", request.TemplateName ?? string.Empty));
+                ("Template", request.TemplateName ?? string.Empty),
+                ("JobNo", result.Value?.JobNo ?? string.Empty),
+                ("TargetDeviceId", request.TargetDeviceId?.ToString() ?? "NULL"));
         }
         return result;
+    }
+
+    /// <summary>
+    /// 解析并固化定向推送目标（方案A）。
+    /// 仅 OutputMode=Queue 时查 nc_sys_print_devices；Local 模式 / 模板或字段含 SIGNATURE_* 占位 /
+    /// 本机未注册打印代理 → 返回 false，target_* 保持 NULL 交由本机打印代理消费。
+    /// </summary>
+    public async Task<bool> TryResolveTargetAsync(PrintJobRequest request, CancellationToken ct = default)
+    {
+        if (request.SkipTargetResolution || request.TargetDeviceId is not null)
+            return request.TargetDeviceId is not null;
+
+        var options = _configService.GetAppOptions();
+        if (!string.Equals(options.PrintOutputMode, PrintQueueConstants.OutputModeQueue, StringComparison.OrdinalIgnoreCase))
+            return false; // Local 模式：不解析，保持现状（target 留 NULL，本机代理消费）
+
+        if (PrintPushGuard.HasSignatureField(request))
+        {
+            LogInfo($"字段含 SIGNATURE_* 占位，拒绝定向推送，回退本地打印: {request.BusinessType}");
+            return false;
+        }
+
+        // 模板 config 的签名占位：Windows Agent 跳过 SIGNATURE_* 不内嵌，推过去会丢签名
+        var template = await LoadTemplateForSignatureCheckAsync(request, ct);
+        if (template == null)
+            return false; // 模板缺失：留痕由后续 EnqueueAsync / 本地打印统一报错
+
+        if (PrintPushGuard.HasSignaturePlaceholder(template))
+        {
+            LogInfo($"模板含 SIGNATURE_* 占位，拒绝定向推送，回退本地打印: {template.Name}");
+            return false;
+        }
+
+        var deviceId = await ResolveAgentDeviceIdAsync(ct);
+        if (deviceId is null)
+            return false;
+
+        request.TargetDeviceId = deviceId;
+        request.TargetUserId ??= App.CurrentUserId;
+        request.TargetPrinter = string.IsNullOrWhiteSpace(request.PrinterName) ? null : request.PrinterName;
+        return true;
+    }
+
+    /// <summary>
+    /// 查本机注册的打印代理设备（machine_name = 本机名，取最近心跳的一台）。
+    /// 查不到 / 查询失败 → null（调用方回退本地代理/本地打印，只告警不阻断入队）。
+    /// </summary>
+    private async Task<long?> ResolveAgentDeviceIdAsync(CancellationToken ct)
+    {
+        const string sql = @"SELECT id FROM nc_sys_print_devices
+                             WHERE machine_name = $1 AND is_active IS NOT FALSE
+                             ORDER BY last_seen_at DESC
+                             LIMIT 1";
+
+        var result = await _db.ExecuteScalarAsync<long>(sql, ct, Environment.MachineName);
+        if (result.IsFailure)
+        {
+            LogWarn($"查询本机打印代理设备失败，target 留 NULL 回退本地代理/本地打印: {result.ErrorCode} {result.Message}");
+            return null;
+        }
+
+        // 无行时泛型 ExecuteScalarAsync<T> 返回 Success(default)=0；设备 id 为 BIGSERIAL 恒 > 0
+        if (result.Value <= 0)
+        {
+            LogWarn($"本机未注册打印代理设备（nc_sys_print_devices），target 留 NULL 回退本地代理/本地打印: {Environment.MachineName}");
+            return null;
+        }
+
+        return result.Value;
+    }
+
+    /// <summary>取模板做签名占位判定；TemplateId 已定时直接读，否则按业务类型+分类解析并写回 request（避免 EnqueueAsync 重复解析）。</summary>
+    private async Task<Template?> LoadTemplateForSignatureCheckAsync(PrintJobRequest request, CancellationToken ct)
+    {
+        if (request.TemplateId is > 0)
+        {
+            var byId = await _templateService.GetByIdAsync(request.TemplateId.Value, ct);
+            if (byId.IsFailure)
+            {
+                LogWarn($"读取模板失败，无法判定签名占位: {request.TemplateId}, {byId.ErrorCode} {byId.Message}");
+                return null;
+            }
+            return byId.Value;
+        }
+
+        var resolved = await ResolveTemplateAsync(request.BusinessType, request.Classification, ct);
+        if (resolved == null)
+        {
+            LogWarn($"未找到匹配模板，无法判定签名占位: {request.BusinessType} / {request.Classification}");
+            return null;
+        }
+
+        request.TemplateId = resolved.Id;
+        request.TemplateName ??= resolved.Name;
+        return resolved;
     }
 
     public async Task<Result<PrintJob>> EnqueueTempReliefAsync(

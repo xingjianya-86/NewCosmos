@@ -503,6 +503,35 @@ public class ConfigService : IConfigService
                     _appOptions.AndroidImmersiveFullscreen =
                         !string.Equals(value, "EdgeToEdge", StringComparison.OrdinalIgnoreCase);
                     break;
+                case "OutputMode":
+                    // [Print] 打印输出通道：Local（默认，零回归本地打印）/ Queue（入队推送 Windows Agent）。
+                    if (string.Equals(value, PrintQueueConstants.OutputModeQueue, StringComparison.OrdinalIgnoreCase))
+                        _appOptions.PrintOutputMode = PrintQueueConstants.OutputModeQueue;
+                    else if (string.Equals(value, PrintQueueConstants.OutputModeLocal, StringComparison.OrdinalIgnoreCase))
+                        _appOptions.PrintOutputMode = PrintQueueConstants.OutputModeLocal;
+                    else
+                        Serilog.Log.Warning("[ConfigService] app.ini OutputMode 配置无效: {Value}，使用默认 {Default}",
+                            value, PrintQueueConstants.OutputModeLocal);
+                    break;
+                case "QueueWaitSeconds":
+                    // Queue 模式回报等待上限（5–600 秒）。非法值回退默认并告警，不阻断启动。
+                    if (int.TryParse(value, out var queueWait)
+                        && queueWait >= PrintQueueConstants.MinWaitSeconds
+                        && queueWait <= PrintQueueConstants.MaxWaitSeconds)
+                    {
+                        _appOptions.PrintQueueWaitSeconds = queueWait;
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("[ConfigService] app.ini QueueWaitSeconds 配置无效: {Value}，使用默认 {Default}",
+                            value, PrintQueueConstants.DefaultWaitSeconds);
+                    }
+                    break;
+                case "QueueFallbackToLocal":
+                    // Queue 模式失败/超时是否回退本地打印。
+                    _appOptions.PrintQueueFallbackToLocal =
+                        ParseSwitch(value, PrintQueueConstants.DefaultFallbackToLocal, key);
+                    break;
                 case "LoginStyle":
                     // 登录页形态：sequence（默认，验证序列登录）/ classic（经典原生）。非法值回退默认并告警。
                     if (string.Equals(value, SplashConstants.LoginStyleSequence, StringComparison.OrdinalIgnoreCase)

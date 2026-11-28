@@ -196,13 +196,13 @@ public partial class RecoveryFormViewModel : ViewModelBase
         ILoggerService logger,
         IRecoveryService recoveryService,
         IRecoveryHistoryProvider historyProvider,
-        Services.Domain.Printing.IPrintJobFactory printJobFactory)
+        Services.Domain.Printing.IQueuePrintRunner queuePrintRunner)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _recoveryService = recoveryService;
         _historyProvider = historyProvider;
-        _printJobFactory = printJobFactory;
+        _queuePrintRunner = queuePrintRunner;
 
         // 初始化年份和月份列表
         var now = DateTime.Today;
@@ -216,7 +216,7 @@ public partial class RecoveryFormViewModel : ViewModelBase
         EndMonthValue = now.Month;
     }
 
-    private readonly Services.Domain.Printing.IPrintJobFactory _printJobFactory = null!;
+    private readonly Services.Domain.Printing.IQueuePrintRunner _queuePrintRunner = null!;
 
     /// <summary>
     /// 加载人员信息（页面参数注入；历史取数在 OnAppearingAsync 统一执行，属性 setter 里不打 IO）
@@ -617,16 +617,20 @@ public partial class RecoveryFormViewModel : ViewModelBase
             TableRows = new()
         };
 
-        var push = await _printJobFactory.EnqueueAsync(request);
+        // 方案A：推送按 app.ini [Print] OutputMode 路由（Local=现状入队 / Queue=定向推送并轮询回报）
+        var push = await _queuePrintRunner.RunPushAsync(request, CancellationToken);
         if (push.IsFailure)
         {
             ErrorMessage = push.Message ?? "推送打印失败";
             return;
         }
 
+        var outcome = push.Value!;
         var dialog = ServiceProvider.GetRequiredService<IDialogService>();
         await dialog.DisplayAlertAsync("已推送打印",
-            $"打印任务 {push.Value?.JobNo} 已推送，将在电脑端自动打印。", "确定");
+            outcome.UsedQueue
+                ? $"打印任务 {outcome.JobNo} 已推送，电脑端打印完成。"
+                : $"打印任务 {outcome.JobNo} 已推送，将在电脑端自动打印。", "确定");
         await GoBackAsync();
     }
 

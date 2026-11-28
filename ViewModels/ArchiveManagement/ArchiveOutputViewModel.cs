@@ -36,6 +36,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
     private readonly IBusinessTimelineService _timelineService = null!;
     private readonly IAssetVerificationService _assetVerificationService = null!;
     private readonly IChangeDocumentApplicabilityService _changeDocApplicability = null!;
+    private readonly IQueuePrintRunner _queuePrintRunner = null!;
 
     /// <summary>
     /// 由 Page 注入：WebView2 打印 PDF 的回调（pdfPath → Result）。用于核查报告等非 Office/WPS 格式打印。
@@ -74,7 +75,8 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         IPdfVerificationService pdfVerificationService,
         IBusinessTimelineService timelineService,
         IAssetVerificationService assetVerificationService,
-        IChangeDocumentApplicabilityService changeDocApplicability)
+        IChangeDocumentApplicabilityService changeDocApplicability,
+        IQueuePrintRunner queuePrintRunner)
     {
         _serviceProvider = serviceProvider;
         _templateService = templateService;
@@ -88,6 +90,7 @@ public partial class ArchiveOutputViewModel : ViewModelBase
         _timelineService = timelineService;
         _assetVerificationService = assetVerificationService;
         _changeDocApplicability = changeDocApplicability;
+        _queuePrintRunner = queuePrintRunner;
     }
 
     #region 基础实现
@@ -905,38 +908,73 @@ public partial class ArchiveOutputViewModel : ViewModelBase
             var actualCopies = template.BaseCopies * Copies;
             _logger.Info($"{action}: 模板={template.Name}");
 
-            var result = await _printExecuteService.ExecutePrintAsync(
-                template.TemplateId,
-                template.Name,
-                PrintNavigationData.BusinessType,
-                PrintNavigationData.BusinessId,
-                _batchNo,
-                fields,
-                tableRows,
-                applicantName,
-                applicantIdCard,
-                printToPrinter ? SelectedPrinter : null!,
-                actualCopies,
-                IsDuplex,
-                printToPrinter: printToPrinter,
-                includePhotos: IncludePhotos,
+            var request = new PrintJobRequest
+            {
+                BusinessType = PrintNavigationData.BusinessType,
+                BusinessId = PrintNavigationData.BusinessId,
+                Classification = PrintNavigationData.Classification,
+                TemplateId = template.TemplateId,
+                TemplateName = template.Name,
+                ApplicantName = applicantName,
+                ApplicantIdCard = applicantIdCard,
+                PrinterName = printToPrinter ? SelectedPrinter : null,
+                Copies = actualCopies,
+                IsDuplex = IsDuplex,
+                Fields = fields,
+                TableRows = tableRows
+            };
+
+            // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+            var run = await _queuePrintRunner.RunPrintAsync(
+                request,
+                printToPrinter,
+                IncludePhotos,
+                ct2 => _printExecuteService.ExecutePrintAsync(
+                    template.TemplateId,
+                    template.Name,
+                    PrintNavigationData.BusinessType,
+                    PrintNavigationData.BusinessId,
+                    _batchNo,
+                    fields,
+                    tableRows,
+                    applicantName,
+                    applicantIdCard,
+                    printToPrinter ? SelectedPrinter : null!,
+                    actualCopies,
+                    IsDuplex,
+                    printToPrinter: printToPrinter,
+                    includePhotos: IncludePhotos,
+                    ct2),
                 CancellationToken);
 
-            if (result.IsSuccess)
+            if (run.IsFailure)
             {
-                _logger.LogBusiness($"{action}完成",
+                StatusText = $"{action}失败: {run.Message}";
+                if (interactive)
+                    await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {run.Message}", "确定");
+                return false;
+            }
+
+            var outcome = run.Value!;
+            if (outcome.UsedQueue)
+            {
+                // 队列路径无本地产物：源文件/PDF 由 Windows Agent 生成，不进本机输出列表
+                _logger.LogBusiness($"{action}完成（推送）",
                     ("Template", template.Name),
                     ("BatchNo", _batchNo),
-                    ("RecordId", result.Value.Id));
-                StatusText = $"{action}完成";
-                AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
+                    ("JobNo", outcome.JobNo));
+                StatusText = $"{action}完成（任务号 {outcome.JobNo}）";
                 return true;
             }
 
-            StatusText = $"{action}失败: {result.Message}";
-            if (interactive)
-                await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {result.Message}", "确定");
-            return false;
+            var result = outcome.LocalRecord!;
+            _logger.LogBusiness($"{action}完成",
+                ("Template", template.Name),
+                ("BatchNo", _batchNo),
+                ("RecordId", result.Id));
+            StatusText = $"{action}完成";
+            AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.FilePath, result.PdfPath);
+            return true;
         }
         catch (Exception ex)
         {

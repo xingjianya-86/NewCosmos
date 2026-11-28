@@ -31,4 +31,7 @@ public interface IPrintQueueService
 
     /// <summary>按状态统计数量。</summary>
     Task<Result<int>> CountByStatusAsync(string status, CancellationToken ct = default);
+
+    /// <summary>按 ID 读取单个任务（QueuePrintRunner 轮询回报用）；不存在时返回 Success(null)。</summary>
+    Task<Result<PrintJob>> GetByIdAsync(long id, CancellationToken ct = default);
 }

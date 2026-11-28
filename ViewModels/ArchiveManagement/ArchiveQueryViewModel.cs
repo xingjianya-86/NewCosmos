@@ -228,7 +228,8 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         IServiceProvider serviceProvider,
         Services.Domain.Reporting.IStatisticsService statisticsService,
         INewPermissionService permissionService,
-        IPrintJobFactory printJobFactory)
+        IPrintJobFactory printJobFactory,
+        IQueuePrintRunner queuePrintRunner)
     {
         _applicationService = applicationService;
         _importedArchiveService = importedArchiveService;
@@ -244,10 +245,12 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         _statisticsService = statisticsService;
         _permissionService = permissionService;
         _printJobFactory = printJobFactory;
+        _queuePrintRunner = queuePrintRunner;
         Title = "救助档案管理";
     }
 
     private readonly Services.Domain.Reporting.IStatisticsService _statisticsService = null!;
+    private readonly IQueuePrintRunner _queuePrintRunner = null!;
 
     #region 页头统计栏
 
@@ -983,30 +986,54 @@ public partial class ArchiveQueryViewModel : ViewModelBase
         try
         {
             var batchNo = Guid.NewGuid().ToString("N").ToUpper();
-            var result = await _printExecuteService.ExecutePrintAsync(
-                option.TemplateId,
-                option.TemplateName,
-                ProofBusinessType,
-                _proofBusinessId,
-                batchNo,
-                fields,
-                null,
-                ApplicantName,
-                ApplicantIdCard,
-                printToPrinter ? SelectedPrinter ?? string.Empty : null!,
-                Math.Max(1, Copies),
-                IsDuplex,
-                printToPrinter: printToPrinter,
+            var request = new PrintJobRequest
+            {
+                BusinessType = ProofBusinessType,
+                BusinessId = _proofBusinessId,
+                Classification = "Proof",
+                TemplateId = option.TemplateId,
+                TemplateName = option.TemplateName,
+                ApplicantName = ApplicantName,
+                ApplicantIdCard = ApplicantIdCard,
+                PrinterName = printToPrinter ? SelectedPrinter ?? string.Empty : null,
+                Copies = Math.Max(1, Copies),
+                IsDuplex = IsDuplex,
+                Fields = fields,
+                TableRows = new()
+            };
+
+            // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+            var run = await _queuePrintRunner.RunPrintAsync(
+                request,
+                printToPrinter,
                 includePhotos: false,
+                ct2 => _printExecuteService.ExecutePrintAsync(
+                    option.TemplateId,
+                    option.TemplateName,
+                    ProofBusinessType,
+                    _proofBusinessId,
+                    batchNo,
+                    fields,
+                    null,
+                    ApplicantName,
+                    ApplicantIdCard,
+                    printToPrinter ? SelectedPrinter ?? string.Empty : null!,
+                    Math.Max(1, Copies),
+                    IsDuplex,
+                    printToPrinter: printToPrinter,
+                    includePhotos: false,
+                    ct2),
                 CancellationToken);
 
-            if (result.IsFailure)
+            if (run.IsFailure)
             {
-                await ShowTipAsync($"{action}失败: {result.Message}");
+                await ShowTipAsync($"{action}失败: {run.Message}");
                 return;
             }
 
-            await ShowTipAsync($"证明文件{action}完成（单位：{unitName}）");
+            await ShowTipAsync(run.Value!.UsedQueue
+                ? $"证明文件{action}完成（任务号 {run.Value.JobNo}）"
+                : $"证明文件{action}完成（单位：{unitName}）");
             await LoadPrintHistoryAsync();
         }
         catch (Exception ex)

@@ -72,6 +72,15 @@ public class PrintJob
     /// <summary>照片类别（PhotoCategoryConstants，展示/留痕用）</summary>
     public string? PhotoCategory { get; set; }
 
+    /// <summary>定向目标用户（发起账户；NULL=无定向）</summary>
+    public int? TargetUserId { get; set; }
+
+    /// <summary>定向目标 Agent 设备（nc_sys_print_devices.id；NULL=无定向，由本机打印代理消费）</summary>
+    public long? TargetDeviceId { get; set; }
+
+    /// <summary>定向目标打印机名（NULL=目标设备默认打印机）</summary>
+    public string? TargetPrinter { get; set; }
+
     /// <summary>业务类型 + 分类展示（供界面绑定）</summary>
     public string BusinessDisplay =>
         string.IsNullOrEmpty(Classification) ? BusinessType : $"{BusinessType} / {Classification}";
@@ -170,4 +179,20 @@ public class PrintJobRequest
 
     /// <summary>照片类别（PhotoCategoryConstants，展示/留痕用）</summary>
     public string? PhotoCategory { get; set; }
+
+    /// <summary>定向目标用户（发起账户；NULL=无定向）</summary>
+    public int? TargetUserId { get; set; }
+
+    /// <summary>定向目标 Agent 设备（nc_sys_print_devices.id；NULL=无定向，由本机打印代理消费）</summary>
+    public long? TargetDeviceId { get; set; }
+
+    /// <summary>定向目标打印机名（NULL=目标设备默认打印机）</summary>
+    public string? TargetPrinter { get; set; }
+
+    /// <summary>
+    /// 跳过 target 解析（仅 QueuePrintRunner 降级回退时置位）：
+    /// 置位后 PrintJobFactory 不再查 nc_sys_print_devices，target_* 保持 NULL 交由本机打印代理消费。
+    /// 非持久化字段，不参与 INSERT。
+    /// </summary>
+    public bool SkipTargetResolution { get; set; }
 }

@@ -265,34 +265,63 @@ public partial class ArchiveOutputViewModel
         var actualCopies = template.BaseCopies * Copies;
         _logger.Info($"批量{action}: 模板={template.Name}");
 
-        var result = await _printExecuteService.ExecutePrintAsync(
-            template.TemplateId,
-            template.Name,
-            PrintNavigationData.BusinessType,
-            PrintNavigationData.BusinessId,
-            _batchNo,
-            fields,
-            tableRows,
-            applicantName,
-            applicantIdCard,
-            printToPrinter ? SelectedPrinter : null!,
-            actualCopies,
-            IsDuplex,
-            printToPrinter: printToPrinter,
-            includePhotos: IncludePhotos,
+        var request = new PrintJobRequest
+        {
+            BusinessType = PrintNavigationData.BusinessType,
+            BusinessId = PrintNavigationData.BusinessId,
+            Classification = PrintNavigationData.Classification,
+            TemplateId = template.TemplateId,
+            TemplateName = template.Name,
+            ApplicantName = applicantName,
+            ApplicantIdCard = applicantIdCard,
+            PrinterName = printToPrinter ? SelectedPrinter : null,
+            Copies = actualCopies,
+            IsDuplex = IsDuplex,
+            Fields = fields,
+            TableRows = tableRows
+        };
+
+        // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+        var run = await _queuePrintRunner.RunPrintAsync(
+            request,
+            printToPrinter,
+            IncludePhotos,
+            ct2 => _printExecuteService.ExecutePrintAsync(
+                template.TemplateId,
+                template.Name,
+                PrintNavigationData.BusinessType,
+                PrintNavigationData.BusinessId,
+                _batchNo,
+                fields,
+                tableRows,
+                applicantName,
+                applicantIdCard,
+                printToPrinter ? SelectedPrinter : null!,
+                actualCopies,
+                IsDuplex,
+                printToPrinter: printToPrinter,
+                includePhotos: IncludePhotos,
+                ct2),
             CancellationToken);
 
-        if (result.IsSuccess)
+        if (run.IsFailure)
         {
-            AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
-            return true;
-        }
-        else
-        {
-            failedItems.Add((template.Name, result.Message ?? "未知错误"));
+            failedItems.Add((template.Name, run.Message ?? "未知错误"));
             _logger.Warn($"批量{action}失败");
             return false;
         }
+
+        var outcome = run.Value!;
+        if (outcome.UsedQueue)
+        {
+            // 队列路径无本地产物：源文件/PDF 由 Windows Agent 生成，不进本机输出列表
+            _logger.Info($"批量{action}完成（推送）: 模板={template.Name}, JobNo={outcome.JobNo}");
+            return true;
+        }
+
+        var result = outcome.LocalRecord!;
+        AddOutputFiles(template.TemplateId, template.Name, template.DocType ?? string.Empty, result.FilePath, result.PdfPath);
+        return true;
     }
 
     // ========================
@@ -421,36 +450,67 @@ public partial class ArchiveOutputViewModel
 
             var actualCopies = file.BaseCopies * Copies;
 
-            var result = await _printExecuteService.ExecutePrintAsync(
-                file.TemplateId,
-                file.TemplateName,
-                PrintNavigationData.BusinessType,
-                PrintNavigationData.BusinessId,
-                _batchNo,
-                fields,
-                tableRows,
-                applicantName,
-                applicantIdCard,
-                printToPrinter ? SelectedPrinter : null!,
-                actualCopies,
-                IsDuplex,
-                printToPrinter: printToPrinter,
-                includePhotos: IncludePhotos,
+            var request = new PrintJobRequest
+            {
+                BusinessType = PrintNavigationData.BusinessType,
+                BusinessId = PrintNavigationData.BusinessId,
+                Classification = PrintNavigationData.Classification,
+                TemplateId = file.TemplateId,
+                TemplateName = file.TemplateName,
+                ApplicantName = applicantName,
+                ApplicantIdCard = applicantIdCard,
+                PrinterName = printToPrinter ? SelectedPrinter : null,
+                Copies = actualCopies,
+                IsDuplex = IsDuplex,
+                Fields = fields,
+                TableRows = tableRows
+            };
+
+            // 方案A：打印动作按 app.ini [Print] OutputMode 路由（Local=现状本地 / Queue=推送 Windows Agent 并轮询）
+            var run = await _queuePrintRunner.RunPrintAsync(
+                request,
+                printToPrinter,
+                IncludePhotos,
+                ct2 => _printExecuteService.ExecutePrintAsync(
+                    file.TemplateId,
+                    file.TemplateName,
+                    PrintNavigationData.BusinessType,
+                    PrintNavigationData.BusinessId,
+                    _batchNo,
+                    fields,
+                    tableRows,
+                    applicantName,
+                    applicantIdCard,
+                    printToPrinter ? SelectedPrinter : null!,
+                    actualCopies,
+                    IsDuplex,
+                    printToPrinter: printToPrinter,
+                    includePhotos: IncludePhotos,
+                    ct2),
                 CancellationToken);
 
-            if (result.IsSuccess)
+            if (run.IsFailure)
             {
+                StatusText = $"{action}失败: {run.Message}";
+                await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {run.Message}", "确定");
+            }
+            else if (run.Value!.UsedQueue)
+            {
+                _logger.LogBusiness($"单文件{action}完成（推送）",
+                    ("Template", file.TemplateName),
+                    ("BatchNo", _batchNo),
+                    ("JobNo", run.Value.JobNo));
+                StatusText = $"{action}完成（任务号 {run.Value.JobNo}）";
+            }
+            else
+            {
+                var result = run.Value.LocalRecord!;
                 _logger.LogBusiness($"单文件{action}完成",
                     ("Template", file.TemplateName),
                     ("BatchNo", _batchNo),
                     ("Copies", actualCopies));
                 StatusText = $"{action}完成";
-                AddOutputFiles(file.TemplateId, file.TemplateName, file.DocType ?? string.Empty, result.Value.FilePath, result.Value.PdfPath);
-            }
-            else
-            {
-                StatusText = $"{action}失败: {result.Message}";
-                await _dialogService.DisplayAlertAsync("错误", $"{action}失败: {result.Message}", "确定");
+                AddOutputFiles(file.TemplateId, file.TemplateName, file.DocType ?? string.Empty, result.FilePath, result.PdfPath);
             }
         }
         catch (Exception ex)

@@ -38,6 +38,21 @@ public class PrintExecuteService : BaseService, IPrintExecuteService
         ["DeathStatement"] = PermissionCodes.PRINT_LOWINCOMEPROOF,
     };
 
+    /// <summary>
+    /// 按业务类型取打印权限码（入队前校验与本地打印共用同一张中心映射，禁止另抄一份）。
+    /// 未登记返回 null——调用方按 <see cref="PrintExecuteService.ExecutePrintAsync"/> 同口径拒绝。
+    /// </summary>
+    public static bool TryGetPrintPermissionCode(string? businessType, out string permissionCode)
+    {
+        if (!string.IsNullOrEmpty(businessType) && PrintPermissionMap.TryGetValue(businessType, out var code))
+        {
+            permissionCode = code;
+            return true;
+        }
+        permissionCode = string.Empty;
+        return false;
+    }
+
     private readonly IPrintService _printService;
     private readonly ITemplateService _templateService;
     private readonly ITemplateEngineFactory _engineFactory;
